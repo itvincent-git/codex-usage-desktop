@@ -1,4 +1,4 @@
-export type RangeKey = "1d" | "7d";
+export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d";
 
 export type OverviewResponse = {
   range: RangeKey;
@@ -61,4 +61,3 @@ export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> 
   const response = await fetch(`${API_BASE_URL}/api/overview?range=${range}`);
   return readJson<OverviewResponse>(response);
 }
-

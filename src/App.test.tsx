@@ -14,7 +14,7 @@ describe("App", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
-  it("loads the recent 7 day overview and switches to recent 1 day", async () => {
+  it("loads the last 7 day overview and switches to last 1 day", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
@@ -101,7 +101,8 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole("button", { name: "Recent 1 Day" }));
+    await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenLastCalledWith("http://127.0.0.1:43110/api/overview?range=1d");

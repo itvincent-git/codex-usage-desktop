@@ -59,4 +59,38 @@ describe("getOverview", () => {
     expect(overview.totals.totalTokens).toBe(2600);
     expect(overview.totals.avgTokensPerDay).toBeCloseTo(371.428571, 6);
   });
+
+  it("supports the 30 day overview range", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "codex-usage-overview-"));
+    cleanups.push(() => rm(tempDir, { recursive: true, force: true }));
+
+    const db = openDatabase(path.join(tempDir, "overview.db"));
+    cleanups.push(async () => closeDatabase(db));
+
+    upsertDailyRows(db, [
+      {
+        date: "2026-04-26",
+        inputTokens: 1200,
+        cachedInputTokens: 200,
+        outputTokens: 400,
+        reasoningOutputTokens: 0,
+        totalTokens: 1600,
+        costUSD: 0.005275,
+        models: {},
+        updatedAt: "2026-04-26T00:00:00.000Z",
+      },
+    ]);
+
+    const overview = getOverview({
+      db,
+      range: "30d",
+      timezone: "UTC",
+      now: new Date("2026-04-26T10:00:00.000Z"),
+    });
+
+    expect(overview.startDate).toBe("2026-03-28");
+    expect(overview.endDate).toBe("2026-04-26");
+    expect(overview.daily).toHaveLength(30);
+    expect(overview.totals.avgTokensPerDay).toBeCloseTo(53.333333, 6);
+  });
 });

@@ -71,8 +71,8 @@ export function createSidecarServer(options: {
       if (request.method === "GET" && url.pathname === "/api/overview") {
         const range = url.searchParams.get("range");
 
-        if (range !== "1d" && range !== "7d") {
-          sendJson(response, 400, { error: "Range must be 1d or 7d." });
+        if (range !== "1d" && range !== "2d" && range !== "7d" && range !== "14d" && range !== "30d") {
+          sendJson(response, 400, { error: "Range must be one of 1d, 2d, 7d, 14d, or 30d." });
           return;
         }
 

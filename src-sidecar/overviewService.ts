@@ -5,7 +5,10 @@ import type { OverviewResponse, RangeKey } from "./types";
 
 const rangeDaysMap: Record<RangeKey, number> = {
   "1d": 1,
+  "2d": 2,
   "7d": 7,
+  "14d": 14,
+  "30d": 30,
 };
 
 export function getOverview(options: {
@@ -67,4 +70,3 @@ export function getOverview(options: {
     },
   };
 }
-

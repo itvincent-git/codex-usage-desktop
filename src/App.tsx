@@ -8,8 +8,11 @@ import { fetchOverview, scanUsage, type OverviewResponse, type RangeKey } from "
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 
 const rangeLabels: Record<RangeKey, string> = {
-  "1d": "Recent 1 Day",
-  "7d": "Recent 7 Days",
+  "1d": "Last 1 Day",
+  "2d": "Last 2 Days",
+  "7d": "Last 7 Days",
+  "14d": "Last 14 Days",
+  "30d": "Last 30 Days",
 };
 
 export default function App() {
@@ -215,7 +218,7 @@ export default function App() {
                   <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
                     <p>Source of truth: local Codex logs analyzed through the ccusage Codex companion CLI.</p>
                     <p>Storage: SQLite cache in the sidecar so the UI reads a normalized local snapshot.</p>
-                    <p>UI scope: recent 1-day and 7-day overview only. Session, project, export, and alerts come later.</p>
+                    <p>UI scope: 1-day, 2-day, 7-day, 14-day, and 30-day overview only. Session, project, export, and alerts come later.</p>
                   </CardContent>
                 </Card>
               </div>
