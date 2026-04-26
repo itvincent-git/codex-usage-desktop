@@ -1,5 +1,6 @@
 import { RefreshCcw } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { MetricCard } from "@/components/metric-card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,10 @@ const rangeLabels: Record<RangeKey, string> = {
   "14d": "Last 14 Days",
   "30d": "Last 30 Days",
 };
+
+function formatTrendDateLabel(date: string) {
+  return date.slice(5);
+}
 
 export default function App() {
   const [range, setRange] = useState<RangeKey>("7d");
@@ -117,6 +122,14 @@ export default function App() {
       ]
     : [];
 
+  const trendData =
+    overview?.daily.map((day) => ({
+      date: day.date,
+      shortDate: formatTrendDateLabel(day.date),
+      totalTokens: day.totalTokens,
+      costUSD: day.costUSD,
+    })) ?? [];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 py-8 sm:px-8 lg:px-10">
@@ -180,6 +193,92 @@ export default function App() {
                   <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
                 ))}
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Usage Trends</CardTitle>
+                  <CardDescription>Total token and cost movement across the selected natural-day window.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-5 xl:grid-cols-2">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Total Token Trend</p>
+                      <p className="text-sm text-muted-foreground">Daily total tokens from the local sidecar cache.</p>
+                    </div>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                          <CartesianGrid stroke="rgb(var(--border))" strokeDasharray="3 3" vertical={false} />
+                          <XAxis
+                            dataKey="shortDate"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
+                          />
+                          <YAxis
+                            width={72}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
+                            tickFormatter={(value) => formatNumber(Number(value))}
+                          />
+                          <Tooltip
+                            formatter={(value) => formatNumber(Number(value))}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ""}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="totalTokens"
+                            stroke="rgb(var(--primary))"
+                            strokeWidth={2.5}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Cost Trend</p>
+                      <p className="text-sm text-muted-foreground">Estimated USD spend by day for the same window.</p>
+                    </div>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                          <CartesianGrid stroke="rgb(var(--border))" strokeDasharray="3 3" vertical={false} />
+                          <XAxis
+                            dataKey="shortDate"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
+                          />
+                          <YAxis
+                            width={80}
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
+                            tickFormatter={(value) => formatCurrency(Number(value))}
+                          />
+                          <Tooltip
+                            formatter={(value) => formatCurrency(Number(value))}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ""}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="costUSD"
+                            stroke="rgb(var(--secondary))"
+                            strokeWidth={2.5}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
                 <Card>

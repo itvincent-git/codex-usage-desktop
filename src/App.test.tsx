@@ -12,6 +12,14 @@ describe("App", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal(
+      "ResizeObserver",
+      class ResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   it("loads the last 7 day overview and switches to last 1 day", async () => {
@@ -100,6 +108,8 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
+    expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
+    expect(screen.getByText("Cost Trend")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));
