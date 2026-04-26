@@ -122,17 +122,16 @@ export default function App() {
           className="pointer-events-none absolute right-10 top-8 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
         />
 
-        <header className="flex flex-col gap-8 border-b border-border pb-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-2 border-b border-border pb-2">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-4">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">
                 Codex Usage Desktop
               </p>
               <div className="space-y-3">
-                <h1 className="font-display text-5xl tracking-display sm:text-6xl">Local Codex cost intelligence.</h1>
-                <p className="max-w-2xl text-[15px] leading-7 text-muted-foreground">
-                  A desktop-first scorecard for Codex CLI usage. This foundation build syncs your local Codex logs into
-                  SQLite and surfaces recent one-day and seven-day cost snapshots without leaving the app shell.
+                <h1 className="font-display text-3xl tracking-display sm:text-2xl">Local Codex cost intelligence.</h1>
+                <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                  A compact local dashboard for recent Codex usage and cost.
                 </p>
               </div>
             </div>
@@ -172,14 +171,14 @@ export default function App() {
           ) : null}
 
           {!isLoading && overview ? (
-            <div className="space-y-6">
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {metrics.map((metric) => (
                   <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
                 ))}
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
                 <Card>
                   <CardHeader>
                     <CardTitle>{rangeLabels[range]}</CardTitle>
