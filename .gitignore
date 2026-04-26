@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-sidecar
+.vite
+coverage
+src-tauri/target
+src-tauri/gen
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+.playwright-cli

@@ -1,0 +1,53 @@
+{
+  "name": "codex-usage-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Codex CLI usage analysis desktop app powered by ccusage.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:sidecar": "tsx watch src-sidecar/dev.ts",
+    "dev:tauri": "concurrently -k -n web,sidecar -c auto \"pnpm dev\" \"pnpm dev:sidecar\"",
+    "dev:app": "pnpm tauri dev",
+    "build:web": "vite build",
+    "build:sidecar": "tsup src-sidecar/index.ts --format esm --target node24 --out-dir dist-sidecar --clean",
+    "build": "pnpm build:web && pnpm build:sidecar",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:api": "RUN_REAL_API_TESTS=1 vitest run src-sidecar/__tests__/api.integration.test.ts"
+  },
+  "dependencies": {
+    "@ccusage/codex": "^18.0.11",
+    "@tauri-apps/api": "^2.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.0",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
+    "jsdom": "^27.0.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.1",
+    "vitest": "^4.0.7"
+  }
+}

@@ -1,0 +1,55 @@
+@import url("https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 250 250 250;
+    --foreground: 10 10 10;
+    --surface: 255 255 255;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
+    --secondary: 32 151 11;
+    --secondary-foreground: 255 255 255;
+    --muted: 245 245 247;
+    --muted-foreground: 107 107 107;
+    --border: 232 232 236;
+    --ring: 99 102 241;
+    --success: 16 185 129;
+    --warning: 245 158 11;
+    --error: 239 68 68;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 14 14 17;
+      --foreground: 250 250 250;
+      --surface: 24 24 27;
+      --muted: 30 30 34;
+      --muted-foreground: 161 161 170;
+      --border: 48 48 54;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: "DM Sans", sans-serif;
+    background: rgb(var(--background));
+    color: rgb(var(--foreground));
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+  }
+
+  button {
+    @apply outline-none;
+  }
+}
+
