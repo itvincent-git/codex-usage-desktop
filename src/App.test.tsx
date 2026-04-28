@@ -43,6 +43,14 @@ describe("App", () => {
             updatedAt: "2026-04-26T00:00:00.000Z",
             daily: [
               {
+                date: "2026-04-25",
+                inputTokens: 0,
+                cachedInputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                costUSD: 0,
+              },
+              {
                 date: "2026-04-26",
                 inputTokens: 1200,
                 cachedInputTokens: 200,
@@ -110,6 +118,9 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Total Tokens" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "2026-04-26" })).toBeInTheDocument();
+    expect(screen.getByText("No activity")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));
