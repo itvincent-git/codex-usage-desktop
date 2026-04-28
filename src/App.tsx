@@ -20,6 +20,10 @@ function formatTrendDateLabel(date: string) {
   return date.slice(5);
 }
 
+function getYAxisWidth(maxValue: number, formatter: (value: number) => string, minWidth: number) {
+  return Math.max(minWidth, formatter(maxValue).length * 8 + 12);
+}
+
 export default function App() {
   const [range, setRange] = useState<RangeKey>("7d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -132,6 +136,8 @@ export default function App() {
 
   const maxDailyTokens = Math.max(...(overview?.daily.map((day) => day.totalTokens) ?? [0]), 1);
   const maxDailyCost = Math.max(...(overview?.daily.map((day) => day.costUSD) ?? [0]), 0);
+  const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatNumber, 72);
+  const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrency, 80);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -210,7 +216,7 @@ export default function App() {
                     </div>
                     <div className="h-72">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                           <CartesianGrid stroke="rgb(var(--border))" strokeDasharray="3 3" vertical={false} />
                           <XAxis
                             dataKey="shortDate"
@@ -219,7 +225,7 @@ export default function App() {
                             tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
                           />
                           <YAxis
-                            width={72}
+                            width={tokenAxisWidth}
                             tickLine={false}
                             axisLine={false}
                             tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
@@ -249,7 +255,7 @@ export default function App() {
                     </div>
                     <div className="h-72">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                        <LineChart data={trendData} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                           <CartesianGrid stroke="rgb(var(--border))" strokeDasharray="3 3" vertical={false} />
                           <XAxis
                             dataKey="shortDate"
@@ -258,7 +264,7 @@ export default function App() {
                             tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
                           />
                           <YAxis
-                            width={80}
+                            width={costAxisWidth}
                             tickLine={false}
                             axisLine={false}
                             tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
