@@ -11,3 +11,4 @@ src-tauri/gen
 *.log
 
 .playwright-cli
+.DS_Store
