@@ -13,7 +13,7 @@
     "dev:tauri": "concurrently -k -n web,sidecar -c auto \"pnpm dev\" \"pnpm dev:sidecar\"",
     "dev:app": "pnpm tauri dev",
     "build:web": "vite build",
-    "build:sidecar": "tsup src-sidecar/index.ts --format esm --target node24 --out-dir dist-sidecar --clean",
+    "build:sidecar": "tsup src-sidecar/index.ts --format esm --target node24 --out-dir dist-sidecar --clean && perl -0pi -e 's/from \"sqlite\"/from \"node:sqlite\"/g' dist-sidecar/index.js",
     "build": "pnpm build:web && pnpm build:sidecar",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",

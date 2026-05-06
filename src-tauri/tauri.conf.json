@@ -5,7 +5,7 @@
   "identifier": "com.ccusage.codex.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev:tauri",
-    "beforeBuildCommand": "pnpm build:web",
+    "beforeBuildCommand": "pnpm build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
@@ -26,7 +26,15 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
+    "targets": ["app", "dmg"],
+    "resources": {
+      "../dist-sidecar/index.js": "sidecar/index.js",
+      "../node_modules/@ccusage/codex/dist/": "sidecar/ccusage-codex/dist"
+    },
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "icon": ["icons/icon.icns", "icons/icon.png"]
   }
 }
