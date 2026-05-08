@@ -6,12 +6,15 @@ import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
-const fetchMock = vi.fn<typeof fetch>();
+const invokeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock,
+}));
 
 describe("App", () => {
   beforeEach(() => {
-    fetchMock.mockReset();
-    vi.stubGlobal("fetch", fetchMock);
+    invokeMock.mockReset();
     vi.stubGlobal(
       "ResizeObserver",
       class ResizeObserver {
@@ -23,18 +26,13 @@ describe("App", () => {
   });
 
   it("loads the last 7 day overview and switches to last 1 day", async () => {
-    fetchMock.mockImplementation(async (input) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-
-      if (url.endsWith("/api/scan")) {
-        return new Response(JSON.stringify({ importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" }), {
-          status: 200,
-        });
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
       }
 
-      if (url.endsWith("/api/overview?range=7d")) {
-        return new Response(
-          JSON.stringify({
+      if (command === "fetch_overview" && args?.range === "7d") {
+        return {
             range: "7d",
             days: 7,
             timezone: "UTC",
@@ -70,14 +68,11 @@ describe("App", () => {
               cacheHitRate: 0.1538,
               costPerMillionTokens: 2.6083,
             },
-          }),
-          { status: 200 },
-        );
+          };
       }
 
-      if (url.endsWith("/api/overview?range=1d")) {
-        return new Response(
-          JSON.stringify({
+      if (command === "fetch_overview" && args?.range === "1d") {
+        return {
             range: "1d",
             days: 1,
             timezone: "UTC",
@@ -105,12 +100,10 @@ describe("App", () => {
               cacheHitRate: 0.1666,
               costPerMillionTokens: 3.296875,
             },
-          }),
-          { status: 200 },
-        );
+          };
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected invoke: ${command}`);
     });
 
     render(<App />);
@@ -126,25 +119,20 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenLastCalledWith("http://127.0.0.1:43110/api/overview?range=1d");
+      expect(invokeMock).toHaveBeenLastCalledWith("fetch_overview", { range: "1d" });
     });
   });
 
   it("bootstraps only once in strict mode", async () => {
-    fetchMock.mockImplementation(async (input) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-
-      if (url.endsWith("/api/scan")) {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
         await new Promise((resolve) => setTimeout(resolve, 10));
-        return new Response(JSON.stringify({ importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" }), {
-          status: 200,
-        });
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
       }
 
-      if (url.endsWith("/api/overview?range=7d")) {
+      if (command === "fetch_overview" && args?.range === "7d") {
         await new Promise((resolve) => setTimeout(resolve, 10));
-        return new Response(
-          JSON.stringify({
+        return {
             range: "7d",
             days: 7,
             timezone: "UTC",
@@ -172,12 +160,10 @@ describe("App", () => {
               cacheHitRate: 0.1538,
               costPerMillionTokens: 2.6083,
             },
-          }),
-          { status: 200 },
-        );
+          };
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      throw new Error(`Unexpected invoke: ${command}`);
     });
 
     render(
@@ -188,14 +174,8 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:43110/api/scan", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: "{}",
-    });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://127.0.0.1:43110/api/overview?range=7d");
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "scan_usage");
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "7d" });
   });
 });

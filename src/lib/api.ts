@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d";
 
 export type OverviewResponse = {
@@ -34,30 +36,10 @@ export type ScanResponse = {
   timezone: string;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:43110";
-
-async function readJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || `HTTP ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
 export async function scanUsage(): Promise<ScanResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/scan`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-
-  return readJson<ScanResponse>(response);
+  return invoke<ScanResponse>("scan_usage");
 }
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/overview?range=${range}`);
-  return readJson<OverviewResponse>(response);
+  return invoke<OverviewResponse>("fetch_overview", { range });
 }

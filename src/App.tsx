@@ -212,7 +212,7 @@ export default function App() {
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-foreground">Total Token Trend</p>
-                      <p className="text-sm text-muted-foreground">Daily total tokens from the local sidecar cache.</p>
+                      <p className="text-sm text-muted-foreground">Daily total tokens from the native SQLite cache.</p>
                     </div>
                     <div className="h-72">
                       <ResponsiveContainer width="100%" height="100%">
@@ -294,7 +294,7 @@ export default function App() {
                   <CardHeader>
                     <CardTitle>{rangeLabels[range]}</CardTitle>
                     <CardDescription>
-                      Natural-day buckets written from the sidecar cache after the latest scan.
+                      Natural-day buckets written from the native cache after the latest scan.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -393,8 +393,8 @@ export default function App() {
                     <CardDescription>This first version intentionally stays narrow.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
-                    <p>Source of truth: local Codex logs analyzed through the ccusage Codex companion CLI.</p>
-                    <p>Storage: SQLite cache in the sidecar so the UI reads a normalized local snapshot.</p>
+                    <p>Source of truth: local Codex logs analyzed by the native Rust usage pipeline.</p>
+                    <p>Storage: SQLite cache in the app data directory so the UI reads a normalized local snapshot.</p>
                     <p>UI scope: 1-day, 2-day, 7-day, 14-day, and 30-day overview only. Session, project, export, and alerts come later.</p>
                   </CardContent>
                 </Card>

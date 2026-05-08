@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.ccusage.codex.desktop",
   "build": {
-    "beforeDevCommand": "pnpm dev:tauri",
+    "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
@@ -22,16 +22,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:43110 http://localhost:43110 ws://localhost:5173 http://localhost:5173;"
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost ws://localhost:5173 http://localhost:5173;"
     }
   },
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    "resources": {
-      "../dist-sidecar/index.js": "sidecar/index.js",
-      "../node_modules/@ccusage/codex/dist/": "sidecar/ccusage-codex/dist"
-    },
     "macOS": {
       "signingIdentity": "-"
     },

@@ -3,25 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local-first Codex CLI usage analysis desktop app powered by ccusage.",
+  "description": "Local-first Codex CLI usage analysis desktop app.",
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "vite",
-    "dev:sidecar": "tsx watch src-sidecar/dev.ts",
-    "dev:tauri": "concurrently -k -n web,sidecar -c auto \"pnpm dev\" \"pnpm dev:sidecar\"",
     "dev:app": "pnpm tauri dev",
     "build:web": "vite build",
-    "build:sidecar": "tsup src-sidecar/index.ts --format esm --target node24 --out-dir dist-sidecar --clean && perl -0pi -e 's/from \"sqlite\"/from \"node:sqlite\"/g' dist-sidecar/index.js",
-    "build": "pnpm build:web && pnpm build:sidecar",
+    "build": "pnpm build:web",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:api": "RUN_REAL_API_TESTS=1 vitest run src-sidecar/__tests__/api.integration.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
-    "@ccusage/codex": "^18.0.11",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@tauri-apps/api": "^2.0.0",
     "class-variance-authority": "^0.7.1",
@@ -42,12 +37,9 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
     "jsdom": "^27.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
-    "tsup": "^8.5.0",
-    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^7.2.1",
     "vitest": "^4.0.7"

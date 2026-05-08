@@ -65,11 +65,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 **Use `playwright-cli` for UI inspection, but always start from the real Tauri startup path.**
 
 Recommended workflow in this repo:
-- Start the app with `pnpm tauri dev`, not just `pnpm dev`. The UI depends on the local sidecar API.
-- If the issue looks like loading, sync, or missing data, verify the sidecar before blaming React:
-  - `curl http://127.0.0.1:43110/api/health`
-  - `curl -X POST -H 'content-type: application/json' -d '{}' http://127.0.0.1:43110/api/scan`
-  - `curl 'http://127.0.0.1:43110/api/overview?range=7d'`
+- Start the app with `pnpm tauri dev`, not just `pnpm dev`. The UI depends on Tauri commands backed by the native Rust usage pipeline.
+- If the issue looks like loading, sync, or missing data, inspect the Tauri command path and Rust logs before blaming React.
 - Use `playwright-cli` against `http://localhost:5173` to inspect the rendered UI state:
   - `playwright-cli open http://localhost:5173`
   - `playwright-cli snapshot`
@@ -80,12 +77,12 @@ Recommended workflow in this repo:
 
 Preferred `playwright-cli` usage:
 - Use `snapshot` first to get stable element refs before clicking or reading state.
-- Use `console` and `network` before changing code. Confirm whether the page is failing in UI state, fetch state, or startup state.
+- Use `console` before changing code. Confirm whether the page is failing in UI state, invoke state, or startup state.
 - Use `run-code` when you need exact DOM state after a delay, for example waiting a few seconds and then reading `document.body.innerText`.
 - If a session is unreliable, open a fresh browser and inspect in the same command flow instead of assuming `attach` will work.
 
 Known pitfalls to avoid:
-- Do not assume `Data sync failed` or `Load failed` means the React code is broken. In this app it can simply mean the sidecar was not started.
+- Do not assume `Data sync failed` or `Load failed` means the React code is broken. In this app it can mean a Tauri command, Rust scanner, app data path, or Codex log parsing failure.
 - Do not run `pnpm dev` and `pnpm tauri dev` independently on the same port unless you intend to. Port `5173` conflicts will break Tauri startup and look unrelated.
 - Do not treat a `favicon.ico` 404 as the root cause of a broken app state. It is non-blocking noise unless the user asked about it.
 - Do not rely on `playwright-cli` alone to prove a Tauri-only bug. It is useful for React/UI behavior, but it is still a browser approximation of the WebView path.
