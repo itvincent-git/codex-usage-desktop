@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d" | "60d" | "90d";
+export type ExportFormat = "xlsx" | "markdown";
 
 export type OverviewResponse = {
   range: RangeKey;
@@ -44,10 +45,21 @@ export type ScanResponse = {
   timezone: string;
 };
 
+export type ExportResponse = {
+  path: string;
+  format: ExportFormat;
+  range: RangeKey;
+  exportedAt: string;
+};
+
 export async function scanUsage(): Promise<ScanResponse> {
   return invoke<ScanResponse>("scan_usage");
 }
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
   return invoke<OverviewResponse>("fetch_overview", { range });
+}
+
+export async function exportUsage(range: RangeKey, format: ExportFormat, path: string): Promise<ExportResponse> {
+  return invoke<ExportResponse>("export_usage", { range, format, path });
 }

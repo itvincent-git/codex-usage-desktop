@@ -1,5 +1,6 @@
 mod date;
 mod db;
+mod exporter;
 mod overview;
 mod pricing;
 mod scanner;
@@ -7,7 +8,7 @@ mod types;
 
 use std::path::PathBuf;
 use tauri::Manager;
-use types::{OverviewResponse, ScanResponse};
+use types::{ExportResponse, OverviewResponse, ScanResponse};
 
 struct AppState {
     database_path: PathBuf,
@@ -45,9 +46,30 @@ async fn fetch_overview(
     .map_err(|error| error.to_string())?
 }
 
+#[tauri::command]
+async fn export_usage(
+    state: tauri::State<'_, AppState>,
+    range: String,
+    format: String,
+    path: String,
+) -> Result<ExportResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        let overview = overview::get_overview(&db, &range, None, &pricing_source)?;
+        exporter::export_overview(&overview, &format, PathBuf::from(path).as_path())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -57,7 +79,11 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![scan_usage, fetch_overview])
+        .invoke_handler(tauri::generate_handler![
+            scan_usage,
+            fetch_overview,
+            export_usage
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

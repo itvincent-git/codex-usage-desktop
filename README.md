@@ -11,6 +11,7 @@ It uses Tauri to host a React UI, scans local Codex session logs in Rust, stores
 - Shows total tokens, total cost, daily averages, cache hit rate, and cost per million tokens
 - Supports 1d / 2d / 7d / 14d / 30d time windows
 - Lets you rescan local logs and refresh the dashboard
+- Exports the selected time window to Excel or Markdown
 
 ## Architecture
 
@@ -22,6 +23,7 @@ The frontend calls Tauri commands:
 
 - `scan_usage`
 - `fetch_overview`
+- `export_usage`
 
 ## Requirements
 

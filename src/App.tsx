@@ -1,11 +1,13 @@
-import { RefreshCcw } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { Download, FileSpreadsheet, FileText, RefreshCcw } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { MetricCard } from "@/components/metric-card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchOverview, scanUsage, type OverviewResponse, type RangeKey } from "@/lib/api";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { exportUsage, fetchOverview, scanUsage, type ExportFormat, type OverviewResponse, type RangeKey } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 
 const rangeLabels: Record<RangeKey, string> = {
@@ -34,14 +36,37 @@ function formatDuration(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function getExportFileName(range: RangeKey, overview: OverviewResponse, format: ExportFormat) {
+  const extension = format === "xlsx" ? "xlsx" : "md";
+
+  return `codex-usage-${range}-${overview.startDate}_to_${overview.endDate}.${extension}`;
+}
+
+function getExportDialogOptions(format: ExportFormat, defaultPath: string) {
+  if (format === "xlsx") {
+    return {
+      title: "Export Codex usage to Excel",
+      defaultPath,
+      filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
+    };
+  }
+
+  return {
+    title: "Export Codex usage to Markdown",
+    defaultPath,
+    filters: [{ name: "Markdown", extensions: ["md"] }],
+  };
+}
+
 export default function App() {
-  const [range, setRange] = useState<RangeKey>("7d");
+  const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [scanMessage, setScanMessage] = useState("Sync local Codex usage into the desktop cache.");
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
   const hasBootstrappedRef = useRef(false);
 
@@ -106,6 +131,29 @@ export default function App() {
       setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
     } finally {
       setIsRefreshing(false);
+    }
+  }
+
+  async function handleExport(format: ExportFormat) {
+    if (!overview || isLoading) {
+      return;
+    }
+
+    const selectedPath = await save(getExportDialogOptions(format, getExportFileName(range, overview, format)));
+    if (!selectedPath) {
+      return;
+    }
+
+    setIsExporting(format);
+
+    try {
+      const exported = await exportUsage(range, format, selectedPath);
+      setScanMessage(`Exported ${rangeLabels[range]} to ${exported.path}.`);
+      setError(null);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Export failed.");
+    } finally {
+      setIsExporting(null);
     }
   }
 
@@ -176,6 +224,24 @@ export default function App() {
 
             <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <RangeSwitcher value={range} onChange={handleRangeChange} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="lg" disabled={!overview || isLoading || isExporting !== null}>
+                    <Download className="h-4 w-4" />
+                    {isExporting === null ? "Export" : "Exporting"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => void handleExport("xlsx")}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleExport("markdown")}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Markdown (.md)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="primary" size="lg" onClick={handleRefresh} disabled={isRefreshing}>
                 <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                 Rescan local logs

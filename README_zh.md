@@ -11,6 +11,7 @@
 - 展示总 tokens、总成本、日均、缓存命中率、每百万 token 成本
 - 支持按 1d / 2d / 7d / 14d / 30d 切换窗口
 - 支持重新扫描本地日志并刷新看板
+- 支持将当前时间窗口导出为 Excel 或 Markdown
 
 ## 技术结构
 
@@ -22,6 +23,7 @@
 
 - `scan_usage`
 - `fetch_overview`
+- `export_usage`
 
 ## 环境要求
 

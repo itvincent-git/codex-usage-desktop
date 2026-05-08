@@ -88,3 +88,12 @@ pub struct ScanResponse {
     pub scanned_at: String,
     pub timezone: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportResponse {
+    pub path: String,
+    pub format: String,
+    pub range: String,
+    pub exported_at: String,
+}
