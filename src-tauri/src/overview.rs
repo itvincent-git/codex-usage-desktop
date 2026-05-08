@@ -13,6 +13,8 @@ fn range_days(range: &str) -> Option<i64> {
         "7d" => Some(7),
         "14d" => Some(14),
         "30d" => Some(30),
+        "60d" => Some(60),
+        "90d" => Some(90),
         _ => None,
     }
 }

@@ -14,6 +14,8 @@ const rangeLabels: Record<RangeKey, string> = {
   "7d": "Last 7 Days",
   "14d": "Last 14 Days",
   "30d": "Last 30 Days",
+  "60d": "Last 60 Days",
+  "90d": "Last 90 Days",
 };
 
 function formatTrendDateLabel(date: string) {
