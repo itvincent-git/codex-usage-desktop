@@ -37,6 +37,15 @@ export type OverviewResponse = {
     totalTokens: number;
     costUSD: number;
   }>;
+  projects: Array<{
+    project: string;
+    displayName: string;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUSD: number;
+  }>;
 };
 
 export type ScanResponse = {

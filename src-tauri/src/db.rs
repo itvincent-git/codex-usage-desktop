@@ -1,4 +1,4 @@
-use crate::types::{DailyUsageRow, ModelUsage};
+use crate::types::{DailyUsageRow, ModelUsage, ProjectUsage};
 use rusqlite::{params, Connection};
 use std::{collections::BTreeMap, path::Path};
 
@@ -19,6 +19,7 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           total_tokens INTEGER NOT NULL,
           cost_usd REAL NOT NULL,
           models_json TEXT NOT NULL,
+          projects_json TEXT NOT NULL DEFAULT '{}',
           updated_at TEXT NOT NULL
         );
 
@@ -31,7 +32,36 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "#,
     )
     .map_err(|error| error.to_string())?;
+    ensure_column(
+        &db,
+        "daily_usage_rollups",
+        "projects_json",
+        "ALTER TABLE daily_usage_rollups ADD COLUMN projects_json TEXT NOT NULL DEFAULT '{}'",
+    )?;
     Ok(db)
+}
+
+fn ensure_column(
+    db: &Connection,
+    table: &str,
+    column: &str,
+    alter_statement: &str,
+) -> Result<(), String> {
+    let mut statement = db
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|error| error.to_string())?;
+    let columns = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+
+    if !columns.iter().any(|name| name == column) {
+        db.execute(alter_statement, [])
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
 }
 
 pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<(), String> {
@@ -49,8 +79,9 @@ pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<
                   total_tokens,
                   cost_usd,
                   models_json,
+                  projects_json,
                   updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(date) DO UPDATE SET
                   input_tokens = excluded.input_tokens,
                   cached_input_tokens = excluded.cached_input_tokens,
@@ -59,6 +90,7 @@ pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<
                   total_tokens = excluded.total_tokens,
                   cost_usd = excluded.cost_usd,
                   models_json = excluded.models_json,
+                  projects_json = excluded.projects_json,
                   updated_at = excluded.updated_at
                 "#,
             )
@@ -67,6 +99,8 @@ pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<
         for row in rows {
             let models_json =
                 serde_json::to_string(&row.models).map_err(|error| error.to_string())?;
+            let projects_json =
+                serde_json::to_string(&row.projects).map_err(|error| error.to_string())?;
             statement
                 .execute(params![
                     row.date,
@@ -77,6 +111,7 @@ pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<
                     row.total_tokens,
                     row.cost_usd,
                     models_json,
+                    projects_json,
                     row.updated_at
                 ])
                 .map_err(|error| error.to_string())?;
@@ -116,6 +151,7 @@ pub fn query_daily_rows(
               total_tokens,
               cost_usd,
               models_json,
+              projects_json,
               updated_at
             FROM daily_usage_rollups
             WHERE date BETWEEN ? AND ?
@@ -127,7 +163,10 @@ pub fn query_daily_rows(
     let rows = statement
         .query_map(params![start_date, end_date], |row| {
             let models_json: String = row.get(7)?;
+            let projects_json: String = row.get(8)?;
             let models = serde_json::from_str::<BTreeMap<String, ModelUsage>>(&models_json)
+                .unwrap_or_default();
+            let projects = serde_json::from_str::<BTreeMap<String, ProjectUsage>>(&projects_json)
                 .unwrap_or_default();
 
             Ok(DailyUsageRow {
@@ -139,7 +178,8 @@ pub fn query_daily_rows(
                 total_tokens: row.get(5)?,
                 cost_usd: row.get(6)?,
                 models,
-                updated_at: row.get(8)?,
+                projects,
+                updated_at: row.get(9)?,
             })
         })
         .map_err(|error| error.to_string())?;
@@ -155,4 +195,51 @@ pub fn query_latest_update_at(db: &Connection) -> Result<Option<String>, String>
         |row| row.get(0),
     )
     .map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn open_database_adds_projects_json_to_existing_rollups() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-usage-db-migration-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch(
+                r#"
+                CREATE TABLE daily_usage_rollups (
+                  date TEXT PRIMARY KEY,
+                  input_tokens INTEGER NOT NULL,
+                  cached_input_tokens INTEGER NOT NULL,
+                  output_tokens INTEGER NOT NULL,
+                  reasoning_output_tokens INTEGER NOT NULL,
+                  total_tokens INTEGER NOT NULL,
+                  cost_usd REAL NOT NULL,
+                  models_json TEXT NOT NULL,
+                  updated_at TEXT NOT NULL
+                );
+                "#,
+            )
+            .unwrap();
+        }
+
+        let db = open_database(&path).unwrap();
+        let has_projects_json = db
+            .prepare("PRAGMA table_info(daily_usage_rollups)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .iter()
+            .any(|column| column == "projects_json");
+
+        assert!(has_projects_json);
+        let _ = std::fs::remove_file(path);
+    }
 }

@@ -2,7 +2,7 @@ use crate::{
     date::{date_key_in_timezone, resolve_app_timezone},
     db::{record_scan_run, upsert_daily_rows},
     pricing::{calculate_cost_usd, PricingSource},
-    types::{DailyUsageRow, ModelUsage, ScanResponse},
+    types::{DailyUsageRow, ModelUsage, ProjectUsage, ScanResponse},
 };
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
@@ -29,6 +29,7 @@ struct RawUsage {
 struct UsageEvent {
     timestamp: DateTime<Utc>,
     model: String,
+    project_path: String,
     usage: ModelUsage,
     is_fallback_model: bool,
 }
@@ -97,6 +98,7 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), St
     let mut previous_totals: Option<RawUsage> = None;
     let mut current_model: Option<String> = None;
     let mut current_model_is_fallback = false;
+    let mut current_project_path: Option<String> = None;
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -109,10 +111,20 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), St
         };
 
         let entry_type = entry.get("type").and_then(Value::as_str);
+        if entry_type == Some("session_meta") {
+            current_project_path =
+                extract_project_path(entry.get("payload").unwrap_or(&Value::Null));
+            continue;
+        }
+
         if entry_type == Some("turn_context") {
-            if let Some(model) = extract_model(entry.get("payload").unwrap_or(&Value::Null)) {
+            let payload = entry.get("payload").unwrap_or(&Value::Null);
+            if let Some(model) = extract_model(payload) {
                 current_model = Some(model);
                 current_model_is_fallback = false;
+            }
+            if let Some(project_path) = extract_project_path(payload) {
+                current_project_path = Some(project_path);
             }
             continue;
         }
@@ -184,6 +196,9 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), St
         events.push(UsageEvent {
             timestamp,
             model,
+            project_path: current_project_path
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string()),
             usage,
             is_fallback_model,
         });
@@ -288,6 +303,10 @@ fn extract_model(value: &Value) -> Option<String> {
     })
 }
 
+fn extract_project_path(value: &Value) -> Option<String> {
+    string_field(value, "cwd")
+}
+
 fn string_field(value: &Value, field: &str) -> Option<String> {
     value
         .get(field)
@@ -318,6 +337,7 @@ fn build_daily_rows(
                 total_tokens: 0,
                 cost_usd: 0.0,
                 models: BTreeMap::new(),
+                projects: BTreeMap::new(),
                 updated_at: updated_at.to_string(),
             });
 
@@ -327,6 +347,17 @@ fn build_daily_rows(
         if event.is_fallback_model {
             model_usage.is_fallback = Some(true);
         }
+
+        let project_usage = summary
+            .projects
+            .entry(event.project_path.clone())
+            .or_default();
+        add_usage_to_project(
+            project_usage,
+            &event.model,
+            &event.usage,
+            event.is_fallback_model,
+        );
     }
 
     summaries
@@ -358,6 +389,25 @@ fn add_usage(target: &mut ModelUsage, usage: &ModelUsage) {
     target.output_tokens += usage.output_tokens;
     target.reasoning_output_tokens += usage.reasoning_output_tokens;
     target.total_tokens += usage.total_tokens;
+}
+
+fn add_usage_to_project(
+    target: &mut ProjectUsage,
+    model: &str,
+    usage: &ModelUsage,
+    is_fallback_model: bool,
+) {
+    target.input_tokens += usage.input_tokens;
+    target.cached_input_tokens += usage.cached_input_tokens;
+    target.output_tokens += usage.output_tokens;
+    target.reasoning_output_tokens += usage.reasoning_output_tokens;
+    target.total_tokens += usage.total_tokens;
+
+    let model_usage = target.models.entry(model.to_string()).or_default();
+    add_usage(model_usage, usage);
+    if is_fallback_model {
+        model_usage.is_fallback = Some(true);
+    }
 }
 
 #[cfg(test)]
@@ -411,7 +461,77 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].date, "2026-04-18");
         assert_eq!(rows[1].total_tokens, 1000);
+        assert_eq!(rows[1].projects["Unknown"].total_tokens, 1000);
         assert!((rows[1].cost_usd - 0.0028875).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn groups_usage_by_project_directory() {
+        let temp_dir = tempfile_dir();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home
+            .join("sessions")
+            .join("2026")
+            .join("05")
+            .join("08");
+        fs::create_dir_all(&sessions).unwrap();
+        let mut first_file = fs::File::create(sessions.join("first.jsonl")).unwrap();
+        write!(
+            first_file,
+            "{}\n{}\n{}",
+            session_meta("2026-05-08T08:00:00.000Z", "/repo/alpha"),
+            token_context_with_cwd("2026-05-08T08:00:00.000Z", "gpt-5", "/repo/alpha"),
+            token_event(
+                "2026-05-08T08:00:00.000Z",
+                "gpt-5",
+                1000,
+                200,
+                300,
+                1300,
+                1000,
+                200,
+                300,
+                1300
+            )
+        )
+        .unwrap();
+
+        let mut second_file = fs::File::create(sessions.join("second.jsonl")).unwrap();
+        write!(
+            second_file,
+            "{}\n{}\n{}",
+            session_meta("2026-05-08T09:00:00.000Z", "/repo/beta"),
+            token_context_with_cwd("2026-05-08T09:00:00.000Z", "gpt-5.5", "/repo/beta"),
+            token_event(
+                "2026-05-08T09:00:00.000Z",
+                "gpt-5.5",
+                400,
+                100,
+                200,
+                600,
+                400,
+                100,
+                200,
+                600
+            )
+        )
+        .unwrap();
+
+        let events = load_token_usage_events(Some(codex_home)).unwrap();
+        let pricing_source = PricingSource::embedded();
+        let rows = build_daily_rows(&events, "UTC", "2026-05-08T00:00:00.000Z", &pricing_source);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].projects["/repo/alpha"].total_tokens, 1300);
+        assert_eq!(
+            rows[0].projects["/repo/alpha"].models["gpt-5"].total_tokens,
+            1300
+        );
+        assert_eq!(rows[0].projects["/repo/beta"].total_tokens, 600);
+        assert_eq!(
+            rows[0].projects["/repo/beta"].models["gpt-5.5"].total_tokens,
+            600
+        );
     }
 
     #[test]
@@ -463,6 +583,24 @@ mod tests {
             "timestamp": timestamp,
             "type": "turn_context",
             "payload": { "model": model }
+        })
+        .to_string()
+    }
+
+    fn token_context_with_cwd(timestamp: &str, model: &str, cwd: &str) -> String {
+        serde_json::json!({
+            "timestamp": timestamp,
+            "type": "turn_context",
+            "payload": { "model": model, "cwd": cwd }
+        })
+        .to_string()
+    }
+
+    fn session_meta(timestamp: &str, cwd: &str) -> String {
+        serde_json::json!({
+            "timestamp": timestamp,
+            "type": "session_meta",
+            "payload": { "cwd": cwd }
         })
         .to_string()
     }

@@ -2,7 +2,10 @@ use crate::{
     date::{date_key_in_timezone, list_date_keys, resolve_app_timezone, shift_date_key},
     db::{query_daily_rows, query_latest_update_at},
     pricing::{calculate_cost_usd, PricingSource},
-    types::{ModelUsage, OverviewDailyRow, OverviewModelRow, OverviewResponse, OverviewTotals},
+    types::{
+        ModelUsage, OverviewDailyRow, OverviewModelRow, OverviewProjectRow, OverviewResponse,
+        OverviewTotals, ProjectUsage,
+    },
 };
 use chrono::Utc;
 use rusqlite::Connection;
@@ -58,6 +61,7 @@ pub fn get_overview(
     let total_tokens = daily.iter().map(|day| day.total_tokens).sum::<i64>();
     let cost_usd = daily.iter().map(|day| day.cost_usd).sum::<f64>();
     let mut models_by_name = BTreeMap::<String, ModelUsage>::new();
+    let mut projects_by_path = BTreeMap::<String, ProjectUsage>::new();
     for row in rows_by_date.values() {
         for (model, usage) in &row.models {
             let summary = models_by_name.entry(model.clone()).or_default();
@@ -66,6 +70,23 @@ pub fn get_overview(
             summary.output_tokens += usage.output_tokens;
             summary.reasoning_output_tokens += usage.reasoning_output_tokens;
             summary.total_tokens += usage.total_tokens;
+        }
+        for (project, usage) in &row.projects {
+            let summary = projects_by_path.entry(project.clone()).or_default();
+            summary.input_tokens += usage.input_tokens;
+            summary.cached_input_tokens += usage.cached_input_tokens;
+            summary.output_tokens += usage.output_tokens;
+            summary.reasoning_output_tokens += usage.reasoning_output_tokens;
+            summary.total_tokens += usage.total_tokens;
+
+            for (model, model_usage) in &usage.models {
+                let summary_model = summary.models.entry(model.clone()).or_default();
+                summary_model.input_tokens += model_usage.input_tokens;
+                summary_model.cached_input_tokens += model_usage.cached_input_tokens;
+                summary_model.output_tokens += model_usage.output_tokens;
+                summary_model.reasoning_output_tokens += model_usage.reasoning_output_tokens;
+                summary_model.total_tokens += model_usage.total_tokens;
+            }
         }
     }
     let mut models = models_by_name
@@ -83,6 +104,29 @@ pub fn get_overview(
         b.total_tokens
             .cmp(&a.total_tokens)
             .then_with(|| a.model.cmp(&b.model))
+    });
+    let mut projects = projects_by_path
+        .into_iter()
+        .map(|(project, usage)| OverviewProjectRow {
+            cost_usd: usage
+                .models
+                .iter()
+                .map(|(model, model_usage)| {
+                    calculate_cost_usd(model_usage, pricing_source.pricing_for_model(model))
+                })
+                .sum(),
+            display_name: project_display_name(&project),
+            project,
+            input_tokens: usage.input_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
+        })
+        .collect::<Vec<_>>();
+    projects.sort_by(|a, b| {
+        b.total_tokens
+            .cmp(&a.total_tokens)
+            .then_with(|| a.project.cmp(&b.project))
     });
 
     Ok(OverviewResponse {
@@ -113,5 +157,18 @@ pub fn get_overview(
             },
         },
         models,
+        projects,
     })
+}
+
+fn project_display_name(project: &str) -> String {
+    if project == "Unknown" {
+        return project.to_string();
+    }
+
+    project
+        .rsplit(['/', '\\'])
+        .find(|part| !part.is_empty())
+        .unwrap_or(project)
+        .to_string()
 }

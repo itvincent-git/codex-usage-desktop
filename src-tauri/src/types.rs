@@ -25,7 +25,19 @@ pub struct DailyUsageRow {
     #[serde(rename = "costUSD")]
     pub cost_usd: f64,
     pub models: BTreeMap<String, ModelUsage>,
+    pub projects: BTreeMap<String, ProjectUsage>,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUsage {
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+    pub models: BTreeMap<String, ModelUsage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,6 +81,19 @@ pub struct OverviewModelRow {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct OverviewProjectRow {
+    pub project: String,
+    pub display_name: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverviewResponse {
     pub range: String,
     pub days: i64,
@@ -79,6 +104,7 @@ pub struct OverviewResponse {
     pub daily: Vec<OverviewDailyRow>,
     pub totals: OverviewTotals,
     pub models: Vec<OverviewModelRow>,
+    pub projects: Vec<OverviewProjectRow>,
 }
 
 #[derive(Debug, Clone, Serialize)]

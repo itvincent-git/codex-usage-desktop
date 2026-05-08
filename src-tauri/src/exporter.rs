@@ -306,7 +306,7 @@ fn escape_markdown_cell(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{OverviewDailyRow, OverviewModelRow, OverviewTotals};
+    use crate::types::{OverviewDailyRow, OverviewModelRow, OverviewProjectRow, OverviewTotals};
 
     fn sample_overview() -> OverviewResponse {
         OverviewResponse {
@@ -337,6 +337,15 @@ mod tests {
             },
             models: vec![OverviewModelRow {
                 model: "gpt-5".to_string(),
+                input_tokens: 1200,
+                cached_input_tokens: 200,
+                output_tokens: 400,
+                total_tokens: 1600,
+                cost_usd: 0.005275,
+            }],
+            projects: vec![OverviewProjectRow {
+                project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop".to_string(),
+                display_name: "codex-usage-desktop".to_string(),
                 input_tokens: 1200,
                 cached_input_tokens: 200,
                 output_tokens: 400,

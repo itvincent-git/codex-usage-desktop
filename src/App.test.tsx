@@ -84,6 +84,17 @@ describe("App", () => {
               costUSD: 0.0088685,
             },
           ],
+          projects: [
+            {
+              project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop",
+              displayName: "codex-usage-desktop",
+              inputTokens: 2600,
+              cachedInputTokens: 400,
+              outputTokens: 800,
+              totalTokens: 3400,
+              costUSD: 0.0088685,
+            },
+          ],
         };
       }
 
@@ -126,6 +137,17 @@ describe("App", () => {
                 costUSD: 0.005275,
               },
             ],
+            projects: [
+              {
+                project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop",
+                displayName: "codex-usage-desktop",
+                inputTokens: 1200,
+                cachedInputTokens: 200,
+                outputTokens: 400,
+                totalTokens: 1600,
+                costUSD: 0.005275,
+              },
+            ],
         };
       }
 
@@ -137,10 +159,12 @@ describe("App", () => {
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Total Tokens" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Model Usage")).toBeInTheDocument();
+    expect(screen.getByText("Project Usage")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "2026-04-26" })).toBeInTheDocument();
     expect(screen.getByText("No activity")).toBeInTheDocument();
 

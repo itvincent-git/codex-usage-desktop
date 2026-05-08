@@ -199,6 +199,7 @@ export default function App() {
   const maxDailyCost = Math.max(...(overview?.daily.map((day) => day.costUSD) ?? [0]), 0);
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatNumber, 72);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrency, 80);
+  const projects = overview?.projects ?? [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -472,56 +473,114 @@ export default function App() {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Model Usage</CardTitle>
-                    <CardDescription>Token and cost totals grouped by model for the selected window.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {overview.models.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No model activity in this window.</p>
-                    ) : (
-                      <div className="-mx-2 overflow-x-auto px-2">
-                        <table className="min-w-full border-separate border-spacing-0 text-sm">
-                          <thead>
-                            <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                              <th className="border-b border-border px-0 pb-3 font-medium">Model</th>
-                              <th className="border-b border-border px-3 pb-3 text-right font-medium">Total Token</th>
-                              <th className="border-b border-border px-3 pb-3 text-right font-medium">Input</th>
-                              <th className="border-b border-border px-3 pb-3 text-right font-medium">Output</th>
-                              <th className="border-b border-border px-3 pb-3 text-right font-medium">Cache</th>
-                              <th className="border-b border-border px-0 pb-3 text-right font-medium">Cost</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {overview.models.map((model) => (
-                              <tr key={model.model} className="align-top">
-                                <td className="border-b border-border/70 px-0 py-4 font-medium text-foreground">
-                                  {model.model}
-                                </td>
-                                <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
-                                  {formatNumber(model.totalTokens)}
-                                </td>
-                                <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
-                                  {formatNumber(model.inputTokens)}
-                                </td>
-                                <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
-                                  {formatNumber(model.outputTokens)}
-                                </td>
-                                <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-muted-foreground">
-                                  {formatNumber(model.cachedInputTokens)}
-                                </td>
-                                <td className="border-b border-border/70 px-0 py-4 text-right tabular-nums font-medium text-foreground">
-                                  {formatCurrency(model.costUSD)}
-                                </td>
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Model Usage</CardTitle>
+                      <CardDescription>Token and cost totals grouped by model for the selected window.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {overview.models.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No model activity in this window.</p>
+                      ) : (
+                        <div className="-mx-2 overflow-x-auto px-2">
+                          <table className="min-w-full border-separate border-spacing-0 text-sm">
+                            <thead>
+                              <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                <th className="border-b border-border px-0 pb-3 font-medium">Model</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Total Token</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Input</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Output</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Cache</th>
+                                <th className="border-b border-border px-0 pb-3 text-right font-medium">Cost</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                            </thead>
+                            <tbody>
+                              {overview.models.map((model) => (
+                                <tr key={model.model} className="align-top">
+                                  <td className="border-b border-border/70 px-0 py-4 font-medium text-foreground">
+                                    {model.model}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(model.totalTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(model.inputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(model.outputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-muted-foreground">
+                                    {formatNumber(model.cachedInputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-0 py-4 text-right tabular-nums font-medium text-foreground">
+                                    {formatCurrency(model.costUSD)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Project Usage</CardTitle>
+                      <CardDescription>Token and cost totals grouped by project directory for the selected window.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {projects.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No project activity in this window.</p>
+                      ) : (
+                        <div className="-mx-2 overflow-x-auto px-2">
+                          <table className="min-w-full border-separate border-spacing-0 text-sm">
+                            <thead>
+                              <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                <th className="min-w-52 border-b border-border px-0 pb-3 font-medium">Project</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Total Tokens</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Input</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Cache</th>
+                                <th className="border-b border-border px-3 pb-3 text-right font-medium">Output</th>
+                                <th className="border-b border-border px-0 pb-3 text-right font-medium">Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {projects.map((project) => (
+                                <tr key={project.project} className="align-top">
+                                  <td className="border-b border-border/70 px-0 py-4">
+                                    <div className="max-w-72 space-y-1">
+                                      <div className="truncate font-medium text-foreground">{project.displayName}</div>
+                                      <div className="break-all text-xs leading-5 text-muted-foreground">
+                                        {project.project}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(project.totalTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(project.inputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-muted-foreground">
+                                    {formatNumber(project.cachedInputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-3 py-4 text-right tabular-nums text-foreground">
+                                    {formatNumber(project.outputTokens)}
+                                  </td>
+                                  <td className="border-b border-border/70 px-0 py-4 text-right tabular-nums font-medium text-foreground">
+                                    {formatCurrency(project.costUSD)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </div>
           ) : null}
