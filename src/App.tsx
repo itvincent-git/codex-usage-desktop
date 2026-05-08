@@ -24,6 +24,14 @@ function getYAxisWidth(maxValue: number, formatter: (value: number) => string, m
   return Math.max(minWidth, formatter(maxValue).length * 8 + 12);
 }
 
+function formatDuration(ms: number) {
+  if (ms < 1000) {
+    return `${Math.max(Math.round(ms), 1)}ms`;
+  }
+
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 export default function App() {
   const [range, setRange] = useState<RangeKey>("7d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -32,6 +40,7 @@ export default function App() {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
   const hasBootstrappedRef = useRef(false);
 
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
@@ -84,11 +93,13 @@ export default function App() {
 
   async function handleRefresh() {
     setIsRefreshing(true);
+    const startedAt = performance.now();
 
     try {
       const scan = await scanUsage();
       setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
       await loadOverview(range);
+      setLastRescanDurationMs(performance.now() - startedAt);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
     } finally {
@@ -172,7 +183,13 @@ export default function App() {
 
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>{scanMessage}</span>
-            <span>{overview?.updatedAt ? `Last update ${new Date(overview.updatedAt).toLocaleString()}` : "No cached snapshot yet"}</span>
+            <span>
+              {overview?.updatedAt
+                ? `Last update ${new Date(overview.updatedAt).toLocaleString()}${
+                    lastRescanDurationMs === null ? "" : ` · Rescan ${formatDuration(lastRescanDurationMs)}`
+                  }`
+                : "No cached snapshot yet"}
+            </span>
           </div>
         </header>
 

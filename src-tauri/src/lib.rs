@@ -15,19 +15,32 @@ struct AppState {
 }
 
 #[tauri::command]
-fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, String> {
-    let mut db = db::open_database(&state.database_path)?;
-    let pricing_source = pricing::PricingSource::load(Some(state.pricing_cache_path.clone()));
-    scanner::scan_codex_usage(&mut db, &pricing_source, None, None)
+async fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db = db::open_database(&database_path)?;
+        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        scanner::scan_codex_usage(&mut db, &pricing_source, None, None)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn fetch_overview(
+async fn fetch_overview(
     state: tauri::State<'_, AppState>,
     range: String,
 ) -> Result<OverviewResponse, String> {
-    let db = db::open_database(&state.database_path)?;
-    overview::get_overview(&db, &range, None)
+    let database_path = state.database_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        overview::get_overview(&db, &range, None)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
