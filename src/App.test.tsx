@@ -31,6 +31,25 @@ describe("App", () => {
     );
   });
 
+  it("shows the initial loading state while bootstrapping", () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "scan_usage") {
+        return new Promise(() => {});
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    expect(screen.getByRole("status", { name: "Preparing local cache" })).toBeInTheDocument();
+    expect(screen.getByText("Preparing local cache")).toBeInTheDocument();
+    expect(screen.getByText("Scanning local Codex usage and building the dashboard snapshot.")).toBeInTheDocument();
+    expect(screen.getByText("Reading sessions")).toBeInTheDocument();
+    expect(screen.getByText("Aggregating tokens")).toBeInTheDocument();
+    expect(screen.getByText("Estimating cost")).toBeInTheDocument();
+  });
+
   it("loads the last 30 day overview and switches to last 1 day", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {
