@@ -28,6 +28,14 @@ export type OverviewResponse = {
     cacheHitRate: number;
     costPerMillionTokens: number;
   };
+  models: Array<{
+    model: string;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUSD: number;
+  }>;
 };
 
 export type ScanResponse = {

@@ -57,6 +57,18 @@ pub struct OverviewTotals {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct OverviewModelRow {
+    pub model: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverviewResponse {
     pub range: String,
     pub days: i64,
@@ -66,6 +78,7 @@ pub struct OverviewResponse {
     pub updated_at: Option<String>,
     pub daily: Vec<OverviewDailyRow>,
     pub totals: OverviewTotals,
+    pub models: Vec<OverviewModelRow>,
 }
 
 #[derive(Debug, Clone, Serialize)]

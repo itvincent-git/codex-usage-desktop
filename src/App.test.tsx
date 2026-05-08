@@ -68,6 +68,16 @@ describe("App", () => {
               cacheHitRate: 0.1538,
               costPerMillionTokens: 2.6083,
             },
+            models: [
+              {
+                model: "gpt-5",
+                inputTokens: 2600,
+                cachedInputTokens: 400,
+                outputTokens: 800,
+                totalTokens: 3400,
+                costUSD: 0.0088685,
+              },
+            ],
           };
       }
 
@@ -100,6 +110,16 @@ describe("App", () => {
               cacheHitRate: 0.1666,
               costPerMillionTokens: 3.296875,
             },
+            models: [
+              {
+                model: "gpt-5",
+                inputTokens: 1200,
+                cachedInputTokens: 200,
+                outputTokens: 400,
+                totalTokens: 1600,
+                costUSD: 0.005275,
+              },
+            ],
           };
       }
 
@@ -108,10 +128,13 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Total Tokens" })).toBeInTheDocument();
+    expect(screen.getByText("Model Usage")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "2026-04-26" })).toBeInTheDocument();
     expect(screen.getByText("No activity")).toBeInTheDocument();
 
@@ -160,6 +183,16 @@ describe("App", () => {
               cacheHitRate: 0.1538,
               costPerMillionTokens: 2.6083,
             },
+            models: [
+              {
+                model: "gpt-5",
+                inputTokens: 2600,
+                cachedInputTokens: 400,
+                outputTokens: 800,
+                totalTokens: 3400,
+                costUSD: 0.0088685,
+              },
+            ],
           };
       }
 
@@ -172,7 +205,7 @@ describe("App", () => {
       </StrictMode>,
     );
 
-    await waitFor(() => expect(screen.getByText("3,400")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
     expect(invokeMock).toHaveBeenCalledTimes(2);
     expect(invokeMock).toHaveBeenNthCalledWith(1, "scan_usage");

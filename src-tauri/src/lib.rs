@@ -34,10 +34,12 @@ async fn fetch_overview(
     range: String,
 ) -> Result<OverviewResponse, String> {
     let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
-        overview::get_overview(&db, &range, None)
+        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        overview::get_overview(&db, &range, None, &pricing_source)
     })
     .await
     .map_err(|error| error.to_string())?

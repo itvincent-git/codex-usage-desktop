@@ -1,10 +1,12 @@
 use crate::{
     date::{date_key_in_timezone, list_date_keys, resolve_app_timezone, shift_date_key},
     db::{query_daily_rows, query_latest_update_at},
-    types::{OverviewDailyRow, OverviewResponse, OverviewTotals},
+    pricing::{calculate_cost_usd, PricingSource},
+    types::{ModelUsage, OverviewDailyRow, OverviewModelRow, OverviewResponse, OverviewTotals},
 };
 use chrono::Utc;
 use rusqlite::Connection;
+use std::collections::BTreeMap;
 
 fn range_days(range: &str) -> Option<i64> {
     match range {
@@ -23,6 +25,7 @@ pub fn get_overview(
     db: &Connection,
     range: &str,
     timezone: Option<String>,
+    pricing_source: &PricingSource,
 ) -> Result<OverviewResponse, String> {
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
     let days = range_days(range).ok_or_else(|| format!("Unsupported range: {range}"))?;
@@ -32,7 +35,7 @@ pub fn get_overview(
     let rows_by_date = rows
         .into_iter()
         .map(|row| (row.date.clone(), row))
-        .collect::<std::collections::BTreeMap<_, _>>();
+        .collect::<BTreeMap<_, _>>();
 
     let daily = list_date_keys(&start_date, &end_date)?
         .into_iter()
@@ -54,6 +57,33 @@ pub fn get_overview(
     let output_tokens = daily.iter().map(|day| day.output_tokens).sum::<i64>();
     let total_tokens = daily.iter().map(|day| day.total_tokens).sum::<i64>();
     let cost_usd = daily.iter().map(|day| day.cost_usd).sum::<f64>();
+    let mut models_by_name = BTreeMap::<String, ModelUsage>::new();
+    for row in rows_by_date.values() {
+        for (model, usage) in &row.models {
+            let summary = models_by_name.entry(model.clone()).or_default();
+            summary.input_tokens += usage.input_tokens;
+            summary.cached_input_tokens += usage.cached_input_tokens;
+            summary.output_tokens += usage.output_tokens;
+            summary.reasoning_output_tokens += usage.reasoning_output_tokens;
+            summary.total_tokens += usage.total_tokens;
+        }
+    }
+    let mut models = models_by_name
+        .into_iter()
+        .map(|(model, usage)| OverviewModelRow {
+            cost_usd: calculate_cost_usd(&usage, pricing_source.pricing_for_model(&model)),
+            model,
+            input_tokens: usage.input_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
+        })
+        .collect::<Vec<_>>();
+    models.sort_by(|a, b| {
+        b.total_tokens
+            .cmp(&a.total_tokens)
+            .then_with(|| a.model.cmp(&b.model))
+    });
 
     Ok(OverviewResponse {
         range: range.to_string(),
@@ -82,5 +112,6 @@ pub fn get_overview(
                 cost_usd / total_tokens as f64 * 1_000_000.0
             },
         },
+        models,
     })
 }
