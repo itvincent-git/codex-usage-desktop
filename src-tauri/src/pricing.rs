@@ -57,7 +57,15 @@ impl PricingSource {
         Self { pricing }
     }
 
-    pub fn from_pricing(pricing: BTreeMap<String, LiteLlmModelPricing>) -> Self {
+    #[cfg(test)]
+    pub fn embedded() -> Self {
+        Self {
+            pricing: embedded_pricing(),
+        }
+    }
+
+    #[cfg(test)]
+    fn from_pricing(pricing: BTreeMap<String, LiteLlmModelPricing>) -> Self {
         Self { pricing }
     }
 
@@ -76,7 +84,7 @@ impl PricingSource {
                 let alias_pricing = self.lookup_model_pricing(alias);
                 if alias_pricing
                     .as_ref()
-                    .map(LiteLlmModelPricing::has_non_zero_token_pricing)
+                    .map(|pricing| pricing.has_non_zero_token_pricing())
                     .unwrap_or(false)
                 {
                     pricing = alias_pricing;
@@ -84,7 +92,9 @@ impl PricingSource {
             }
         }
 
-        pricing.map(Pricing::from_litellm).unwrap_or_else(Pricing::free)
+        pricing
+            .map(Pricing::from_litellm)
+            .unwrap_or_else(Pricing::free)
     }
 
     fn lookup_model_pricing(&self, model: &str) -> Option<&LiteLlmModelPricing> {
@@ -161,7 +171,10 @@ fn load_remote_pricing() -> Result<BTreeMap<String, LiteLlmModelPricing>, String
         .send()
         .map_err(|error| error.to_string())?;
     if !response.status().is_success() {
-        return Err(format!("Failed to fetch pricing data: {}", response.status()));
+        return Err(format!(
+            "Failed to fetch pricing data: {}",
+            response.status()
+        ));
     }
 
     let raw = response

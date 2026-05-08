@@ -1,6 +1,7 @@
 use crate::{
     date::{date_key_in_timezone, resolve_app_timezone},
     db::{record_scan_run, upsert_daily_rows},
+    pricing::{calculate_cost_usd, PricingSource},
     types::{DailyUsageRow, ModelUsage, ScanResponse},
 };
 use chrono::{DateTime, Utc};
@@ -14,14 +15,6 @@ use std::{
 use walkdir::WalkDir;
 
 const LEGACY_FALLBACK_MODEL: &str = "gpt-5";
-const MILLION: f64 = 1_000_000.0;
-
-#[derive(Debug, Clone, Copy)]
-struct Pricing {
-    input_cost_per_m_token: f64,
-    cached_input_cost_per_m_token: f64,
-    output_cost_per_m_token: f64,
-}
 
 #[derive(Debug, Clone, Default)]
 struct RawUsage {
@@ -42,13 +35,14 @@ struct UsageEvent {
 
 pub fn scan_codex_usage(
     db: &mut Connection,
+    pricing_source: &PricingSource,
     codex_home: Option<PathBuf>,
     timezone: Option<String>,
 ) -> Result<ScanResponse, String> {
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
     let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
     let events = load_token_usage_events(codex_home)?;
-    let rows = build_daily_rows(&events, &timezone, &scanned_at);
+    let rows = build_daily_rows(&events, &timezone, &scanned_at, pricing_source);
 
     upsert_daily_rows(db, &rows)?;
     record_scan_run(db, &scanned_at, &timezone, rows.len())?;
@@ -303,7 +297,12 @@ fn string_field(value: &Value, field: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
-fn build_daily_rows(events: &[UsageEvent], timezone: &str, updated_at: &str) -> Vec<DailyUsageRow> {
+fn build_daily_rows(
+    events: &[UsageEvent],
+    timezone: &str,
+    updated_at: &str,
+    pricing_source: &PricingSource,
+) -> Vec<DailyUsageRow> {
     let mut summaries = BTreeMap::<String, DailyUsageRow>::new();
 
     for event in events {
@@ -336,7 +335,9 @@ fn build_daily_rows(events: &[UsageEvent], timezone: &str, updated_at: &str) -> 
             row.cost_usd = row
                 .models
                 .iter()
-                .map(|(model, usage)| calculate_cost_usd(usage, pricing_for_model(model)))
+                .map(|(model, usage)| {
+                    calculate_cost_usd(usage, pricing_source.pricing_for_model(model))
+                })
                 .sum();
             row
         })
@@ -357,47 +358,6 @@ fn add_usage(target: &mut ModelUsage, usage: &ModelUsage) {
     target.output_tokens += usage.output_tokens;
     target.reasoning_output_tokens += usage.reasoning_output_tokens;
     target.total_tokens += usage.total_tokens;
-}
-
-fn pricing_for_model(model: &str) -> Pricing {
-    let model = match model {
-        "gpt-5-codex" => "gpt-5",
-        "gpt-5.3-codex" => "gpt-5.2-codex",
-        value => value,
-    };
-
-    match model {
-        "gpt-5" | "gpt-5.1" | "gpt-5.2" | "gpt-5.2-codex" => Pricing {
-            input_cost_per_m_token: 1.25,
-            cached_input_cost_per_m_token: 0.125,
-            output_cost_per_m_token: 10.0,
-        },
-        "gpt-5-mini" => Pricing {
-            input_cost_per_m_token: 0.25,
-            cached_input_cost_per_m_token: 0.025,
-            output_cost_per_m_token: 2.0,
-        },
-        "gpt-5-nano" => Pricing {
-            input_cost_per_m_token: 0.05,
-            cached_input_cost_per_m_token: 0.005,
-            output_cost_per_m_token: 0.4,
-        },
-        _ => Pricing {
-            input_cost_per_m_token: 0.0,
-            cached_input_cost_per_m_token: 0.0,
-            output_cost_per_m_token: 0.0,
-        },
-    }
-}
-
-fn calculate_cost_usd(usage: &ModelUsage, pricing: Pricing) -> f64 {
-    let cached_input = usage.cached_input_tokens.min(usage.input_tokens).max(0) as f64;
-    let non_cached_input = (usage.input_tokens - usage.cached_input_tokens).max(0) as f64;
-    let output = usage.output_tokens.max(0) as f64;
-
-    non_cached_input / MILLION * pricing.input_cost_per_m_token
-        + cached_input / MILLION * pricing.cached_input_cost_per_m_token
-        + output / MILLION * pricing.output_cost_per_m_token
 }
 
 #[cfg(test)]
@@ -445,12 +405,48 @@ mod tests {
         .unwrap();
 
         let events = load_token_usage_events(Some(codex_home)).unwrap();
-        let rows = build_daily_rows(&events, "UTC", "2026-04-26T00:00:00.000Z");
+        let pricing_source = PricingSource::embedded();
+        let rows = build_daily_rows(&events, "UTC", "2026-04-26T00:00:00.000Z", &pricing_source);
 
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].date, "2026-04-18");
         assert_eq!(rows[1].total_tokens, 1000);
         assert!((rows[1].cost_usd - 0.0028875).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn imports_gpt_5_5_with_non_zero_cost() {
+        let temp_dir = tempfile_dir();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions").join("project-alpha");
+        fs::create_dir_all(&sessions).unwrap();
+        let mut file = fs::File::create(sessions.join("session.jsonl")).unwrap();
+        write!(
+            file,
+            "{}\n{}",
+            token_context("2026-05-08T09:00:00.000Z", "gpt-5.5"),
+            token_event(
+                "2026-05-08T09:00:00.000Z",
+                "gpt-5.5",
+                1000,
+                200,
+                300,
+                1300,
+                1000,
+                200,
+                300,
+                1300
+            )
+        )
+        .unwrap();
+
+        let events = load_token_usage_events(Some(codex_home)).unwrap();
+        let pricing_source = PricingSource::embedded();
+        let rows = build_daily_rows(&events, "UTC", "2026-05-08T00:00:00.000Z", &pricing_source);
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].models["gpt-5.5"].total_tokens, 1300);
+        assert!((rows[0].cost_usd - 0.0131).abs() < f64::EPSILON);
     }
 
     fn tempfile_dir() -> PathBuf {

@@ -1,6 +1,7 @@
 mod date;
 mod db;
 mod overview;
+mod pricing;
 mod scanner;
 mod types;
 
@@ -10,12 +11,14 @@ use types::{OverviewResponse, ScanResponse};
 
 struct AppState {
     database_path: PathBuf,
+    pricing_cache_path: PathBuf,
 }
 
 #[tauri::command]
 fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, String> {
     let mut db = db::open_database(&state.database_path)?;
-    scanner::scan_codex_usage(&mut db, None, None)
+    let pricing_source = pricing::PricingSource::load(Some(state.pricing_cache_path.clone()));
+    scanner::scan_codex_usage(&mut db, &pricing_source, None, None)
 }
 
 #[tauri::command]
@@ -35,6 +38,7 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
             app.manage(AppState {
                 database_path: app_data_dir.join("codex-usage-desktop.db"),
+                pricing_cache_path: app_data_dir.join("codex-pricing-cache.json"),
             });
             Ok(())
         })
