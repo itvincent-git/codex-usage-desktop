@@ -166,6 +166,13 @@ export default function App() {
     setError(null);
   });
 
+  const scanAndReloadOverview = useEffectEvent(async (startedAt: number) => {
+    const scan = await scanUsage();
+    setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
+    await loadOverview(range);
+    setLastRescanDurationMs(performance.now() - startedAt);
+  });
+
   const bootstrap = useEffectEvent(async () => {
     if (hasBootstrappedRef.current) {
       return;
@@ -175,15 +182,19 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const scan = await scanUsage();
-      setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
       await loadOverview(range);
       setBootstrapped(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load overview.");
+      return;
     } finally {
       setIsLoading(false);
     }
+
+    const startedAt = performance.now();
+    void scanAndReloadOverview(startedAt).catch((scanError: unknown) => {
+      setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
+    });
   });
 
   useEffect(() => {
@@ -213,10 +224,7 @@ export default function App() {
     const startedAt = performance.now();
 
     try {
-      const scan = await scanUsage();
-      setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
-      await loadOverview(range);
-      setLastRescanDurationMs(performance.now() - startedAt);
+      await scanAndReloadOverview(startedAt);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
     } finally {
@@ -293,7 +301,7 @@ export default function App() {
   const loadingTitle = overview ? `Loading ${rangeLabels[range]}` : "Preparing local cache";
   const loadingDescription = overview
     ? "Loading usage and cost data for the selected window."
-    : "Scanning local Codex usage and building the dashboard snapshot.";
+    : "Loading the cached dashboard snapshot.";
 
   return (
     <div className="min-h-screen bg-background text-foreground">

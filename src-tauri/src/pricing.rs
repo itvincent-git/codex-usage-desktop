@@ -40,17 +40,23 @@ struct LiteLlmModelPricing {
 
 impl PricingSource {
     pub fn load(cache_path: Option<PathBuf>) -> Self {
-        let pricing = load_remote_pricing()
-            .inspect(|pricing| {
-                if let Some(path) = cache_path.as_deref() {
-                    let _ = write_cache(path, pricing);
-                }
-            })
+        Self::load_with(cache_path, load_remote_pricing)
+    }
+
+    fn load_with<F>(cache_path: Option<PathBuf>, load_remote: F) -> Self
+    where
+        F: FnOnce() -> Result<BTreeMap<String, LiteLlmModelPricing>, String>,
+    {
+        let pricing = cache_path
+            .as_deref()
+            .ok_or_else(|| "Pricing cache path missing".to_string())
+            .and_then(read_cache)
             .or_else(|_| {
-                cache_path
-                    .as_deref()
-                    .ok_or_else(|| "Pricing cache path missing".to_string())
-                    .and_then(read_cache)
+                load_remote().inspect(|pricing| {
+                    if let Some(path) = cache_path.as_deref() {
+                        let _ = write_cache(path, pricing);
+                    }
+                })
             })
             .unwrap_or_else(|_| embedded_pricing());
 
@@ -268,6 +274,15 @@ fn to_per_million(value: Option<f64>, fallback: Option<f64>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_pricing_cache_path(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("codex-pricing-{name}-{nanos}.json"))
+    }
 
     #[test]
     fn embedded_pricing_calculates_gpt_5_5_cost() {
@@ -284,6 +299,42 @@ mod tests {
         let cost = calculate_cost_usd(&usage, source.pricing_for_model("gpt-5.5"));
 
         assert!((cost - 0.0131).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn load_reads_local_cache_first() {
+        let path = temp_pricing_cache_path("cache-first");
+        let cached = BTreeMap::from([(
+            "gpt-5.5".to_string(),
+            LiteLlmModelPricing {
+                input_cost_per_token: Some(1.0e-6),
+                cache_read_input_token_cost: Some(2.0e-7),
+                output_cost_per_token: Some(3.0e-6),
+            },
+        )]);
+        write_cache(&path, &cached).unwrap();
+
+        let source = PricingSource::load_with(Some(path.clone()), || {
+            panic!("remote pricing should not load when the cache is valid")
+        });
+
+        let pricing = source.pricing_for_model("gpt-5.5");
+        assert!((pricing.input_cost_per_m_token - 1.0).abs() < f64::EPSILON);
+        assert!((pricing.cached_input_cost_per_m_token - 0.2).abs() < f64::EPSILON);
+        assert!((pricing.output_cost_per_m_token - 3.0).abs() < f64::EPSILON);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_falls_back_when_local_cache_is_invalid() {
+        let path = temp_pricing_cache_path("invalid-cache");
+        std::fs::write(&path, "{not-json").unwrap();
+
+        let source =
+            PricingSource::load_with(Some(path.clone()), || Err("remote unavailable".to_string()));
+
+        assert_ne!(source.pricing_for_model("gpt-5.5"), Pricing::free());
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

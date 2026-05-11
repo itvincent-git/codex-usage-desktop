@@ -31,9 +31,9 @@ describe("App", () => {
     );
   });
 
-  it("shows the initial loading state while bootstrapping", () => {
-    invokeMock.mockImplementation(async (command: string) => {
-      if (command === "scan_usage") {
+  it("shows the initial loading state while loading the cached overview", () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_overview" && args?.range === "30d") {
         return new Promise(() => {});
       }
 
@@ -44,7 +44,7 @@ describe("App", () => {
 
     expect(screen.getByRole("status", { name: "Preparing local cache" })).toBeInTheDocument();
     expect(screen.getByText("Preparing local cache")).toBeInTheDocument();
-    expect(screen.getByText("Scanning local Codex usage and building the dashboard snapshot.")).toBeInTheDocument();
+    expect(screen.getByText("Loading the cached dashboard snapshot.")).toBeInTheDocument();
     expect(screen.getByText("Reading sessions")).toBeInTheDocument();
     expect(screen.getByText("Aggregating tokens")).toBeInTheDocument();
     expect(screen.getByText("Estimating cost")).toBeInTheDocument();
@@ -342,9 +342,51 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
-    expect(invokeMock).toHaveBeenCalledTimes(2);
-    expect(invokeMock).toHaveBeenNthCalledWith(1, "scan_usage");
-    expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(3));
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_overview", { range: "30d" });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "scan_usage");
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "fetch_overview", { range: "30d" });
+  });
+
+  it("keeps the cached overview visible when the background scan fails", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 2600,
+            cachedInputTokens: 400,
+            outputTokens: 800,
+            totalTokens: 3400,
+            costUSD: 0.0088685,
+            avgTokensPerDay: 113.3333333,
+            avgCostPerDay: 0.0002956,
+            cacheHitRate: 0.1538,
+            costPerMillionTokens: 2.6083,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "scan_usage") {
+        throw new Error("scan failed");
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByText("scan failed")).toBeInTheDocument());
+    expect(screen.getAllByText("3,400").length).toBeGreaterThan(0);
   });
 
   it("exports the selected range to Excel", async () => {
