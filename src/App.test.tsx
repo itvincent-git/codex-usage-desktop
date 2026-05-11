@@ -339,6 +339,22 @@ describe("App", () => {
           updatedAt: "2026-05-11T00:00:00.000Z",
           monthly: [
             {
+              month: "2026-02",
+              inputTokens: 0,
+              cachedInputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              costUSD: 0,
+            },
+            {
+              month: "2026-03",
+              inputTokens: 0,
+              cachedInputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              costUSD: 0,
+            },
+            {
               month: "2026-04",
               inputTokens: 0,
               cachedInputTokens: 0,
@@ -372,8 +388,10 @@ describe("App", () => {
     expect(screen.getByText("Monthly Usage")).toBeInTheDocument();
     expect(screen.getByText("Natural-month totals from 2025-06 to 2026-05 in UTC.")).toBeInTheDocument();
     const latestMonthlyCell = screen.getByRole("cell", { name: "2026-05" });
-    const previousMonthlyCell = screen.getByRole("cell", { name: "2026-04" });
-    expect(latestMonthlyCell.compareDocumentPosition(previousMonthlyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const inactiveMonthlyCell = screen.getByRole("cell", { name: "2026-02 to 2026-04" });
+    expect(latestMonthlyCell.compareDocumentPosition(inactiveMonthlyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("No usage (3 months)")).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "2026-04" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
     expect(screen.queryByText("Usage Trends")).not.toBeInTheDocument();
