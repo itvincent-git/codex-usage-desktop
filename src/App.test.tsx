@@ -281,6 +281,93 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByRole("status", { name: "Loading Last 90 Days" })).not.toBeInTheDocument());
   });
 
+  it("loads monthly usage from the Monthly tab", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-05-11T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-04-12",
+          endDate: "2026-05-11",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          daily: [
+            {
+              date: "2026-05-11",
+              inputTokens: 1200,
+              cachedInputTokens: 200,
+              outputTokens: 400,
+              totalTokens: 1600,
+              costUSD: 0.005275,
+            },
+          ],
+          totals: {
+            inputTokens: 1200,
+            cachedInputTokens: 200,
+            outputTokens: 400,
+            totalTokens: 1600,
+            costUSD: 0.005275,
+            avgTokensPerDay: 53.3333333,
+            avgCostPerDay: 0.0001758,
+            cacheHitRate: 0.1666,
+            costPerMillionTokens: 3.296875,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "fetch_monthly_usage") {
+        return {
+          timezone: "UTC",
+          startMonth: "2025-06",
+          endMonth: "2026-05",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          monthly: [
+            {
+              month: "2026-04",
+              inputTokens: 0,
+              cachedInputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              costUSD: 0,
+            },
+            {
+              month: "2026-05",
+              inputTokens: 1200,
+              cachedInputTokens: 200,
+              outputTokens: 400,
+              totalTokens: 1600,
+              costUSD: 0.005275,
+            },
+          ],
+        };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+    expect(screen.queryByText("Monthly Usage")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
+
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_monthly_usage"));
+    expect(screen.getByText("Monthly Usage")).toBeInTheDocument();
+    expect(screen.getByText("Natural-month totals from 2025-06 to 2026-05 in UTC.")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "2026-05" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Usage Trends")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+  });
+
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {

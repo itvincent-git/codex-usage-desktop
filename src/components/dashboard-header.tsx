@@ -5,7 +5,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatDuration } from "@/lib/usage-dashboard";
 
+export type DashboardView = "dashboard" | "monthly";
+
 type DashboardHeaderProps = {
+  view: DashboardView;
   range: RangeKey;
   overview: OverviewResponse | null;
   scanMessage: string;
@@ -13,12 +16,14 @@ type DashboardHeaderProps = {
   isRefreshing: boolean;
   isExporting: ExportFormat | null;
   lastRescanDurationMs: number | null;
+  onViewChange: (view: DashboardView) => void;
   onRangeChange: (range: RangeKey) => void;
   onRefresh: () => void;
   onExport: (format: ExportFormat) => void;
 };
 
 export function DashboardHeader({
+  view,
   range,
   overview,
   scanMessage,
@@ -26,6 +31,7 @@ export function DashboardHeader({
   isRefreshing,
   isExporting,
   lastRescanDurationMs,
+  onViewChange,
   onRangeChange,
   onRefresh,
   onExport,
@@ -46,25 +52,53 @@ export function DashboardHeader({
         </div>
 
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-          <RangeSwitcher value={range} onChange={onRangeChange} />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="lg" disabled={!overview || isLoading || isExporting !== null}>
-                <Download className="h-4 w-4" />
-                {isExporting === null ? "Export" : "Exporting"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => onExport("xlsx")}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Excel (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onExport("markdown")}>
-                <FileText className="mr-2 h-4 w-4" />
-                Markdown (.md)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="inline-flex rounded-sm border border-border bg-surface p-1" role="tablist" aria-label="Usage view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "dashboard"}
+              className={`rounded-sm px-4 py-2 text-sm font-medium transition ${
+                view === "dashboard" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onViewChange("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "monthly"}
+              className={`rounded-sm px-4 py-2 text-sm font-medium transition ${
+                view === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onViewChange("monthly")}
+            >
+              Monthly
+            </button>
+          </div>
+          {view === "dashboard" ? (
+            <>
+              <RangeSwitcher value={range} onChange={onRangeChange} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="lg" disabled={!overview || isLoading || isExporting !== null}>
+                    <Download className="h-4 w-4" />
+                    {isExporting === null ? "Export" : "Exporting"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => onExport("xlsx")}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onExport("markdown")}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Markdown (.md)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null}
           <Button variant="primary" size="lg" onClick={onRefresh} disabled={isRefreshing}>
             <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             Rescan local logs

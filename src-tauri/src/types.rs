@@ -109,6 +109,28 @@ pub struct OverviewResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MonthlyUsageRow {
+    pub month: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthlyUsageResponse {
+    pub timezone: String,
+    pub start_month: String,
+    pub end_month: String,
+    pub updated_at: Option<String>,
+    pub monthly: Vec<MonthlyUsageRow>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanResponse {
     pub imported_days: usize,
     pub scanned_at: String,

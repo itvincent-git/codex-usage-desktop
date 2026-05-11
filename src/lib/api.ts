@@ -48,6 +48,21 @@ export type OverviewResponse = {
   }>;
 };
 
+export type MonthlyUsageResponse = {
+  timezone: string;
+  startMonth: string;
+  endMonth: string;
+  updatedAt: string | null;
+  monthly: Array<{
+    month: string;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUSD: number;
+  }>;
+};
+
 export type ScanResponse = {
   importedDays: number;
   scannedAt: string;
@@ -67,6 +82,10 @@ export async function scanUsage(): Promise<ScanResponse> {
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
   return invoke<OverviewResponse>("fetch_overview", { range });
+}
+
+export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
+  return invoke<MonthlyUsageResponse>("fetch_monthly_usage");
 }
 
 export async function exportUsage(range: RangeKey, format: ExportFormat, path: string): Promise<ExportResponse> {

@@ -3,6 +3,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
 import { MetricCard } from "@/components/metric-card";
 import { ModelUsageCard } from "@/components/model-usage-card";
+import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
@@ -11,14 +12,18 @@ import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
 
 export default function App() {
   const {
+    view,
     range,
     overview,
+    monthlyUsage,
     scanMessage,
     error,
     isLoading,
+    isMonthlyLoading,
     isRefreshing,
     isExporting,
     lastRescanDurationMs,
+    handleViewChange,
     handleRangeChange,
     handleRefresh,
     handleExport,
@@ -40,6 +45,7 @@ export default function App() {
         />
 
         <DashboardHeader
+          view={view}
           range={range}
           overview={overview}
           scanMessage={scanMessage}
@@ -47,6 +53,7 @@ export default function App() {
           isRefreshing={isRefreshing}
           isExporting={isExporting}
           lastRescanDurationMs={lastRescanDurationMs}
+          onViewChange={(nextView) => void handleViewChange(nextView)}
           onRangeChange={handleRangeChange}
           onRefresh={() => void handleRefresh()}
           onExport={(format) => void handleExport(format)}
@@ -64,7 +71,11 @@ export default function App() {
 
           {isLoading ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
 
-          {!isLoading && overview ? (
+          {view === "monthly" && isMonthlyLoading ? (
+            <LoadingState title="Loading Monthly Usage" description="Aggregating natural-month totals." />
+          ) : null}
+
+          {!isLoading && view === "dashboard" && overview ? (
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {metrics.map((metric) => (
@@ -83,6 +94,10 @@ export default function App() {
                 </div>
               </div>
             </div>
+          ) : null}
+
+          {!isLoading && view === "monthly" && !isMonthlyLoading && monthlyUsage ? (
+            <MonthlyUsageTable data={monthlyUsage} />
           ) : null}
         </main>
       </div>

@@ -1,15 +1,28 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { exportUsage, fetchOverview, scanUsage, type ExportFormat, type OverviewResponse, type RangeKey } from "@/lib/api";
+import {
+  exportUsage,
+  fetchMonthlyUsage,
+  fetchOverview,
+  scanUsage,
+  type ExportFormat,
+  type MonthlyUsageResponse,
+  type OverviewResponse,
+  type RangeKey,
+} from "@/lib/api";
+import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, rangeLabels } from "@/lib/usage-dashboard";
 
 export function useUsageDashboard() {
+  const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [scanMessage, setScanMessage] = useState("Sync local Codex usage into the desktop cache.");
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMonthlyLoading, setIsMonthlyLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
@@ -21,10 +34,19 @@ export function useUsageDashboard() {
     setError(null);
   });
 
+  const loadMonthlyUsage = useEffectEvent(async () => {
+    const data = await fetchMonthlyUsage();
+    setMonthlyUsage(data);
+    setError(null);
+  });
+
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number) => {
     const scan = await scanUsage();
     setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
     await loadOverview(range);
+    if (view === "monthly") {
+      await loadMonthlyUsage();
+    }
     setLastRescanDurationMs(performance.now() - startedAt);
   });
 
@@ -55,6 +77,24 @@ export function useUsageDashboard() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  async function handleViewChange(nextView: DashboardView) {
+    setView(nextView);
+
+    if (nextView !== "monthly" || monthlyUsage || !bootstrapped) {
+      return;
+    }
+
+    setIsMonthlyLoading(true);
+
+    try {
+      await loadMonthlyUsage();
+    } catch (monthlyError) {
+      setError(monthlyError instanceof Error ? monthlyError.message : "Failed to load monthly usage.");
+    } finally {
+      setIsMonthlyLoading(false);
+    }
+  }
 
   async function handleRangeChange(nextRange: RangeKey) {
     setRange(nextRange);
@@ -111,14 +151,18 @@ export function useUsageDashboard() {
   }
 
   return {
+    view,
     range,
     overview,
+    monthlyUsage,
     scanMessage,
     error,
     isLoading,
+    isMonthlyLoading,
     isRefreshing,
     isExporting,
     lastRescanDurationMs,
+    handleViewChange,
     handleRangeChange,
     handleRefresh,
     handleExport,

@@ -3,11 +3,11 @@ use crate::{
     db::{query_daily_rows, query_latest_update_at},
     pricing::{calculate_cost_usd, PricingSource},
     types::{
-        ModelUsage, OverviewDailyRow, OverviewModelRow, OverviewProjectRow, OverviewResponse,
-        OverviewTotals, ProjectUsage,
+        ModelUsage, MonthlyUsageResponse, MonthlyUsageRow, OverviewDailyRow, OverviewModelRow,
+        OverviewProjectRow, OverviewResponse, OverviewTotals, ProjectUsage,
     },
 };
-use chrono::Utc;
+use chrono::{Datelike, NaiveDate, Utc};
 use rusqlite::Connection;
 use std::collections::BTreeMap;
 
@@ -161,6 +161,98 @@ pub fn get_overview(
     })
 }
 
+pub fn get_monthly_usage(
+    db: &Connection,
+    timezone: Option<String>,
+) -> Result<MonthlyUsageResponse, String> {
+    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
+    let end_date = date_key_in_timezone(Utc::now(), &timezone);
+    let end_month = month_key_from_date_key(&end_date)?;
+    get_monthly_usage_for_end_month(db, &timezone, &end_month, 12)
+}
+
+fn get_monthly_usage_for_end_month(
+    db: &Connection,
+    timezone: &str,
+    end_month: &str,
+    month_count: usize,
+) -> Result<MonthlyUsageResponse, String> {
+    let start_month = shift_month_key(end_month, -((month_count as i32) - 1))?;
+    let start_date = format!("{start_month}-01");
+    let end_date = month_end_date_key(end_month)?;
+    let rows = query_daily_rows(db, &start_date, &end_date)?;
+    let mut monthly_by_key = list_month_keys(&start_month, end_month)?
+        .into_iter()
+        .map(|month| {
+            (
+                month.clone(),
+                MonthlyUsageRow {
+                    month,
+                    input_tokens: 0,
+                    cached_input_tokens: 0,
+                    output_tokens: 0,
+                    total_tokens: 0,
+                    cost_usd: 0.0,
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    for row in rows {
+        let month = month_key_from_date_key(&row.date)?;
+        if let Some(summary) = monthly_by_key.get_mut(&month) {
+            summary.input_tokens += row.input_tokens;
+            summary.cached_input_tokens += row.cached_input_tokens;
+            summary.output_tokens += row.output_tokens;
+            summary.total_tokens += row.total_tokens;
+            summary.cost_usd += row.cost_usd;
+        }
+    }
+
+    Ok(MonthlyUsageResponse {
+        timezone: timezone.to_string(),
+        start_month,
+        end_month: end_month.to_string(),
+        updated_at: query_latest_update_at(db)?,
+        monthly: monthly_by_key.into_values().collect(),
+    })
+}
+
+fn month_key_from_date_key(date_key: &str) -> Result<String, String> {
+    let date =
+        NaiveDate::parse_from_str(date_key, "%Y-%m-%d").map_err(|error| error.to_string())?;
+    Ok(format!("{:04}-{:02}", date.year(), date.month()))
+}
+
+fn shift_month_key(month_key: &str, delta_months: i32) -> Result<String, String> {
+    let date = NaiveDate::parse_from_str(&format!("{month_key}-01"), "%Y-%m-%d")
+        .map_err(|error| error.to_string())?;
+    let total_months = date.year() * 12 + date.month0() as i32 + delta_months;
+    if total_months < 0 {
+        return Err("month shift overflow".to_string());
+    }
+    let year = total_months / 12;
+    let month = total_months % 12 + 1;
+    Ok(format!("{year:04}-{month:02}"))
+}
+
+fn list_month_keys(start_month: &str, end_month: &str) -> Result<Vec<String>, String> {
+    let mut months = Vec::new();
+    let mut current = start_month.to_string();
+
+    while current.as_str() <= end_month {
+        months.push(current.clone());
+        current = shift_month_key(&current, 1)?;
+    }
+
+    Ok(months)
+}
+
+fn month_end_date_key(month_key: &str) -> Result<String, String> {
+    let next_month = shift_month_key(month_key, 1)?;
+    shift_date_key(&format!("{next_month}-01"), -1)
+}
+
 fn project_display_name(project: &str) -> String {
     if project == "Unknown" {
         return project.to_string();
@@ -171,4 +263,86 @@ fn project_display_name(project: &str) -> String {
         .find(|part| !part.is_empty())
         .unwrap_or(project)
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        db::{open_database, upsert_daily_rows},
+        types::DailyUsageRow,
+    };
+
+    #[test]
+    fn aggregates_usage_by_natural_month() {
+        let path = temp_db_path("monthly-aggregation");
+        let mut db = open_database(&path).unwrap();
+        upsert_daily_rows(
+            &mut db,
+            &[
+                daily_row("2025-06-30", 100, 20, 30, 130, 0.11),
+                daily_row("2025-07-01", 200, 50, 40, 240, 0.22),
+                daily_row("2025-07-31", 300, 60, 70, 370, 0.33),
+                daily_row("2026-05-01", 400, 80, 90, 490, 0.44),
+            ],
+        )
+        .unwrap();
+
+        let response = get_monthly_usage_for_end_month(&db, "UTC", "2026-05", 12).unwrap();
+
+        assert_eq!(response.start_month, "2025-06");
+        assert_eq!(response.end_month, "2026-05");
+        assert_eq!(response.monthly.len(), 12);
+        assert_eq!(response.monthly[0].month, "2025-06");
+        assert_eq!(response.monthly[0].total_tokens, 130);
+        assert_eq!(response.monthly[1].month, "2025-07");
+        assert_eq!(response.monthly[1].input_tokens, 500);
+        assert_eq!(response.monthly[1].cached_input_tokens, 110);
+        assert_eq!(response.monthly[1].output_tokens, 110);
+        assert_eq!(response.monthly[1].total_tokens, 610);
+        assert!((response.monthly[1].cost_usd - 0.55).abs() < f64::EPSILON);
+        assert_eq!(response.monthly[10].month, "2026-04");
+        assert_eq!(response.monthly[10].total_tokens, 0);
+        assert_eq!(response.monthly[11].month, "2026-05");
+        assert_eq!(response.monthly[11].total_tokens, 490);
+        assert_eq!(response.updated_at.as_deref(), Some("2026-05-01T00:00:00Z"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn shifts_month_keys_across_years() {
+        assert_eq!(shift_month_key("2026-01", -1).unwrap(), "2025-12");
+        assert_eq!(shift_month_key("2025-12", 1).unwrap(), "2026-01");
+        assert_eq!(shift_month_key("2026-05", -11).unwrap(), "2025-06");
+    }
+
+    fn daily_row(
+        date: &str,
+        input_tokens: i64,
+        cached_input_tokens: i64,
+        output_tokens: i64,
+        total_tokens: i64,
+        cost_usd: f64,
+    ) -> DailyUsageRow {
+        DailyUsageRow {
+            date: date.to_string(),
+            input_tokens,
+            cached_input_tokens,
+            output_tokens,
+            reasoning_output_tokens: 0,
+            total_tokens,
+            cost_usd,
+            models: BTreeMap::new(),
+            projects: BTreeMap::new(),
+            updated_at: format!("{date}T00:00:00Z"),
+        }
+    }
+
+    fn temp_db_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "codex-usage-{name}-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ))
+    }
 }

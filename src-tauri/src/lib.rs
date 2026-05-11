@@ -8,7 +8,7 @@ mod types;
 
 use std::path::PathBuf;
 use tauri::Manager;
-use types::{ExportResponse, OverviewResponse, ScanResponse};
+use types::{ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse};
 
 struct AppState {
     database_path: PathBuf,
@@ -41,6 +41,20 @@ async fn fetch_overview(
         let db = db::open_database(&database_path)?;
         let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
         overview::get_overview(&db, &range, None, &pricing_source)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_monthly_usage(
+    state: tauri::State<'_, AppState>,
+) -> Result<MonthlyUsageResponse, String> {
+    let database_path = state.database_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        overview::get_monthly_usage(&db, None)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -82,6 +96,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_usage,
             fetch_overview,
+            fetch_monthly_usage,
             export_usage
         ])
         .run(tauri::generate_context!())
