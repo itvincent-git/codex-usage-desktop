@@ -74,6 +74,14 @@ describe("App", () => {
               costUSD: 0,
             },
             {
+              date: "2026-04-24",
+              inputTokens: 0,
+              cachedInputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              costUSD: 0,
+            },
+            {
               date: "2026-04-26",
               inputTokens: 1200,
               cachedInputTokens: 200,
@@ -185,9 +193,9 @@ describe("App", () => {
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
     const latestDailyCell = screen.getByRole("cell", { name: "2026-04-26" });
-    const previousDailyCell = screen.getByRole("cell", { name: "2026-04-25" });
-    expect(latestDailyCell.compareDocumentPosition(previousDailyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("No activity")).toBeInTheDocument();
+    const inactiveDailyCell = screen.getByRole("cell", { name: "2026-04-24 to 2026-04-25" });
+    expect(latestDailyCell.compareDocumentPosition(inactiveDailyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("No activity (2 days)")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));
