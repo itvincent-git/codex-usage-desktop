@@ -9,6 +9,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
+import { useMemo } from "react";
 
 export default function App() {
   const {
@@ -31,6 +32,20 @@ export default function App() {
 
   const metrics = overview ? buildMetricCards(overview, range) : [];
   const projects = overview?.projects ?? [];
+  const sortedDailyUsage = useMemo(
+    () => (overview ? [...overview.daily].sort((left, right) => right.date.localeCompare(left.date)) : []),
+    [overview],
+  );
+  const sortedMonthlyUsage = useMemo(
+    () =>
+      monthlyUsage
+        ? {
+            ...monthlyUsage,
+            monthly: [...monthlyUsage.monthly].sort((left, right) => right.month.localeCompare(left.month)),
+          }
+        : null,
+    [monthlyUsage],
+  );
   const loadingTitle = overview ? `Loading ${rangeLabels[range]}` : "Preparing local cache";
   const loadingDescription = overview
     ? "Loading usage and cost data for the selected window."
@@ -86,7 +101,7 @@ export default function App() {
               <UsageTrendsCard daily={overview.daily} />
 
               <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-                <DailyUsageTable range={range} daily={overview.daily} />
+                <DailyUsageTable range={range} daily={sortedDailyUsage} />
 
                 <div className="space-y-4">
                   <ModelUsageCard models={overview.models} />
@@ -96,8 +111,8 @@ export default function App() {
             </div>
           ) : null}
 
-          {!isLoading && view === "monthly" && !isMonthlyLoading && monthlyUsage ? (
-            <MonthlyUsageTable data={monthlyUsage} />
+          {!isLoading && view === "monthly" && !isMonthlyLoading && sortedMonthlyUsage ? (
+            <MonthlyUsageTable data={sortedMonthlyUsage} />
           ) : null}
         </main>
       </div>

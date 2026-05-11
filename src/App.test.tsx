@@ -184,7 +184,9 @@ describe("App", () => {
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "2026-04-26" })).toBeInTheDocument();
+    const latestDailyCell = screen.getByRole("cell", { name: "2026-04-26" });
+    const previousDailyCell = screen.getByRole("cell", { name: "2026-04-25" });
+    expect(latestDailyCell.compareDocumentPosition(previousDailyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("No activity")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
@@ -361,7 +363,9 @@ describe("App", () => {
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_monthly_usage"));
     expect(screen.getByText("Monthly Usage")).toBeInTheDocument();
     expect(screen.getByText("Natural-month totals from 2025-06 to 2026-05 in UTC.")).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "2026-05" })).toBeInTheDocument();
+    const latestMonthlyCell = screen.getByRole("cell", { name: "2026-05" });
+    const previousMonthlyCell = screen.getByRole("cell", { name: "2026-04" });
+    expect(latestMonthlyCell.compareDocumentPosition(previousMonthlyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
     expect(screen.queryByText("Usage Trends")).not.toBeInTheDocument();
