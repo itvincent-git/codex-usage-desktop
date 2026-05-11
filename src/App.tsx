@@ -64,21 +64,24 @@ const loadingRows = [
   { label: "Estimating cost", tokens: "models", cost: "usd" },
 ];
 
-function InitialLoadingState() {
+type LoadingStateProps = {
+  title: string;
+  description: string;
+};
+
+function LoadingState({ title, description }: LoadingStateProps) {
   return (
     <Card
       role="status"
       aria-live="polite"
-      aria-label="Preparing local cache"
+      aria-label={title}
       className="overflow-hidden hover:translate-y-0 hover:shadow-none"
     >
       <CardHeader className="border-b border-border p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-xl space-y-2">
-            <CardTitle className="text-2xl">Preparing local cache</CardTitle>
-            <CardDescription className="leading-6">
-              Scanning local Codex usage and building the dashboard snapshot.
-            </CardDescription>
+            <CardTitle className="text-2xl">{title}</CardTitle>
+            <CardDescription className="leading-6">{description}</CardDescription>
           </div>
 
           <div className="flex w-full items-center justify-between gap-4 rounded-md border border-border bg-muted/30 px-3 py-2 sm:w-auto sm:min-w-44">
@@ -287,6 +290,10 @@ export default function App() {
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatNumber, 72);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrency, 80);
   const projects = overview?.projects ?? [];
+  const loadingTitle = overview ? `Loading ${rangeLabels[range]}` : "Preparing local cache";
+  const loadingDescription = overview
+    ? "Loading usage and cost data for the selected window."
+    : "Scanning local Codex usage and building the dashboard snapshot.";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -359,8 +366,8 @@ export default function App() {
             </Card>
           ) : null}
 
-          {isLoading && !overview ? (
-            <InitialLoadingState />
+          {isLoading ? (
+            <LoadingState title={loadingTitle} description={loadingDescription} />
           ) : null}
 
           {!isLoading && overview ? (

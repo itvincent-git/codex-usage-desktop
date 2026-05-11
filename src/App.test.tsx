@@ -195,6 +195,92 @@ describe("App", () => {
     });
   });
 
+  it("shows a loading state while switching to last 90 days", async () => {
+    let resolve90DayOverview: (value: unknown) => void = () => {};
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [
+            {
+              date: "2026-04-26",
+              inputTokens: 1200,
+              cachedInputTokens: 200,
+              outputTokens: 400,
+              totalTokens: 1600,
+              costUSD: 0.005275,
+            },
+          ],
+          totals: {
+            inputTokens: 2600,
+            cachedInputTokens: 400,
+            outputTokens: 800,
+            totalTokens: 3400,
+            costUSD: 0.0088685,
+            avgTokensPerDay: 113.3333333,
+            avgCostPerDay: 0.0002956,
+            cacheHitRate: 0.1538,
+            costPerMillionTokens: 2.6083,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "fetch_overview" && args?.range === "90d") {
+        return new Promise((resolve) => {
+          resolve90DayOverview = resolve;
+        });
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
+    await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 90 Days" }));
+
+    expect(screen.getByRole("status", { name: "Loading Last 90 Days" })).toBeInTheDocument();
+    expect(screen.getByText("Loading usage and cost data for the selected window.")).toBeInTheDocument();
+
+    resolve90DayOverview({
+      range: "90d",
+      days: 90,
+      timezone: "UTC",
+      startDate: "2026-01-27",
+      endDate: "2026-04-26",
+      updatedAt: "2026-04-26T00:00:00.000Z",
+      daily: [],
+      totals: {
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUSD: 0,
+        avgTokensPerDay: 0,
+        avgCostPerDay: 0,
+        cacheHitRate: 0,
+        costPerMillionTokens: 0,
+      },
+      models: [],
+      projects: [],
+    });
+
+    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading Last 90 Days" })).not.toBeInTheDocument());
+  });
+
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {
