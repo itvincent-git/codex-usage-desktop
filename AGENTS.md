@@ -84,7 +84,6 @@ Preferred `playwright-cli` usage:
 Known pitfalls to avoid:
 - Do not assume `Data sync failed` or `Load failed` means the React code is broken. In this app it can mean a Tauri command, Rust scanner, app data path, or Codex log parsing failure.
 - Do not run `pnpm dev` and `pnpm tauri dev` independently on the same port unless you intend to. Port `5173` conflicts will break Tauri startup and look unrelated.
-- Do not treat a `favicon.ico` 404 as the root cause of a broken app state. It is non-blocking noise unless the user asked about it.
 - Do not rely on `playwright-cli` alone to prove a Tauri-only bug. It is useful for React/UI behavior, but it is still a browser approximation of the WebView path.
 - In React dev mode, `StrictMode` re-runs effects. If startup logic lives in `useEffect`, guard against duplicate bootstrap requests and loading-state flicker.
 - If data is already on screen, avoid replacing the whole view with a full-page loading card for background refreshes unless that behavior is explicitly desired.
