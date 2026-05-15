@@ -67,6 +67,16 @@ export type ScanResponse = {
   importedDays: number;
   scannedAt: string;
   timezone: string;
+  metrics?: {
+    totalMs: number;
+    pricingMs: number;
+    parseMs: number;
+    dbMs: number;
+    filesScanned: number;
+    filesParsed: number;
+    filesReused: number;
+    bytesRead: number;
+  };
 };
 
 export type ExportResponse = {

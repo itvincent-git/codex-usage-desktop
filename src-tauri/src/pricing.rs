@@ -43,6 +43,16 @@ impl PricingSource {
         Self::load_with(cache_path, load_remote_pricing)
     }
 
+    pub fn load_cached_or_embedded(cache_path: Option<PathBuf>) -> Self {
+        let pricing = cache_path
+            .as_deref()
+            .ok_or_else(|| "Pricing cache path missing".to_string())
+            .and_then(read_cache)
+            .unwrap_or_else(|_| embedded_pricing());
+
+        Self { pricing }
+    }
+
     fn load_with<F>(cache_path: Option<PathBuf>, load_remote: F) -> Self
     where
         F: FnOnce() -> Result<BTreeMap<String, LiteLlmModelPricing>, String>,

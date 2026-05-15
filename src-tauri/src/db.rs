@@ -29,6 +29,14 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           timezone TEXT NOT NULL,
           imported_days INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS session_file_rollups (
+          path TEXT PRIMARY KEY,
+          modified_at_ms INTEGER NOT NULL,
+          size_bytes INTEGER NOT NULL,
+          rows_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
         "#,
     )
     .map_err(|error| error.to_string())?;
@@ -39,6 +47,14 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "ALTER TABLE daily_usage_rollups ADD COLUMN projects_json TEXT NOT NULL DEFAULT '{}'",
     )?;
     Ok(db)
+}
+
+#[derive(Debug, Clone)]
+pub struct SessionFileRollup {
+    pub path: String,
+    pub modified_at_ms: i64,
+    pub size_bytes: i64,
+    pub rows: Vec<DailyUsageRow>,
 }
 
 fn ensure_column(
@@ -131,6 +147,135 @@ pub fn record_scan_run(
         params![scanned_at, timezone, imported_days as i64],
     )
     .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+pub fn delete_missing_daily_rows(db: &Connection, active_dates: &[String]) -> Result<(), String> {
+    if active_dates.is_empty() {
+        db.execute("DELETE FROM daily_usage_rollups", [])
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    let mut statement = db
+        .prepare("SELECT date FROM daily_usage_rollups")
+        .map_err(|error| error.to_string())?;
+    let cached_dates = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+
+    for cached_date in cached_dates {
+        if !active_dates.iter().any(|date| date == &cached_date) {
+            db.execute(
+                "DELETE FROM daily_usage_rollups WHERE date = ?",
+                params![cached_date],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn query_session_file_rollup(
+    db: &Connection,
+    path: &str,
+    modified_at_ms: i64,
+    size_bytes: i64,
+) -> Result<Option<Vec<DailyUsageRow>>, String> {
+    let result = db.query_row(
+        r#"
+        SELECT rows_json
+        FROM session_file_rollups
+        WHERE path = ? AND modified_at_ms = ? AND size_bytes = ?
+        "#,
+        params![path, modified_at_ms, size_bytes],
+        |row| row.get::<_, String>(0),
+    );
+
+    match result {
+        Ok(rows_json) => serde_json::from_str(&rows_json)
+            .map(Some)
+            .map_err(|error| error.to_string()),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+pub fn upsert_session_file_rollups(
+    db: &mut Connection,
+    rollups: &[SessionFileRollup],
+    updated_at: &str,
+) -> Result<(), String> {
+    let tx = db.transaction().map_err(|error| error.to_string())?;
+    {
+        let mut statement = tx
+            .prepare(
+                r#"
+                INSERT INTO session_file_rollups (
+                  path,
+                  modified_at_ms,
+                  size_bytes,
+                  rows_json,
+                  updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                  modified_at_ms = excluded.modified_at_ms,
+                  size_bytes = excluded.size_bytes,
+                  rows_json = excluded.rows_json,
+                  updated_at = excluded.updated_at
+                "#,
+            )
+            .map_err(|error| error.to_string())?;
+
+        for rollup in rollups {
+            let rows_json =
+                serde_json::to_string(&rollup.rows).map_err(|error| error.to_string())?;
+            statement
+                .execute(params![
+                    rollup.path,
+                    rollup.modified_at_ms,
+                    rollup.size_bytes,
+                    rows_json,
+                    updated_at
+                ])
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    tx.commit().map_err(|error| error.to_string())
+}
+
+pub fn delete_missing_session_file_rollups(
+    db: &Connection,
+    active_paths: &[String],
+) -> Result<(), String> {
+    if active_paths.is_empty() {
+        db.execute("DELETE FROM session_file_rollups", [])
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    let mut statement = db
+        .prepare("SELECT path FROM session_file_rollups")
+        .map_err(|error| error.to_string())?;
+    let cached_paths = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+
+    for cached_path in cached_paths {
+        if !active_paths.iter().any(|path| path == &cached_path) {
+            db.execute(
+                "DELETE FROM session_file_rollups WHERE path = ?",
+                params![cached_path],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+
     Ok(())
 }
 

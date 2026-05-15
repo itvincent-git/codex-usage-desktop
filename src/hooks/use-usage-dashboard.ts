@@ -42,7 +42,10 @@ export function useUsageDashboard() {
 
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number) => {
     const scan = await scanUsage();
-    setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.`);
+    const cacheMessage = scan.metrics
+      ? ` Parsed ${scan.metrics.filesParsed}, reused ${scan.metrics.filesReused}.`
+      : "";
+    setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
     await loadOverview(range);
     if (view === "monthly") {
       await loadMonthlyUsage();

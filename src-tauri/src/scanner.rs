@@ -1,8 +1,11 @@
 use crate::{
     date::{date_key_in_timezone, resolve_app_timezone},
-    db::{record_scan_run, upsert_daily_rows},
+    db::{
+        delete_missing_daily_rows, delete_missing_session_file_rollups, query_session_file_rollup,
+        record_scan_run, upsert_daily_rows, upsert_session_file_rollups, SessionFileRollup,
+    },
     pricing::{calculate_cost_usd, PricingSource},
-    types::{DailyUsageRow, ModelUsage, ProjectUsage, ScanResponse},
+    types::{DailyUsageRow, ModelUsage, ProjectUsage, ScanMetrics, ScanResponse},
 };
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
@@ -11,6 +14,7 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    time::{Instant, SystemTime},
 };
 use walkdir::WalkDir;
 
@@ -34,24 +38,46 @@ struct UsageEvent {
     is_fallback_model: bool,
 }
 
+#[derive(Debug, Clone)]
+struct SessionFile {
+    path: PathBuf,
+    cache_key: String,
+    modified_at_ms: i64,
+    size_bytes: i64,
+}
+
 pub fn scan_codex_usage(
     db: &mut Connection,
     pricing_source: &PricingSource,
     codex_home: Option<PathBuf>,
     timezone: Option<String>,
 ) -> Result<ScanResponse, String> {
+    let total_started = Instant::now();
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
     let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-    let events = load_token_usage_events(codex_home)?;
-    let rows = build_daily_rows(&events, &timezone, &scanned_at, pricing_source);
+    let scan = load_daily_rows(db, codex_home, &timezone, &scanned_at, pricing_source)?;
+    let db_started = Instant::now();
 
-    upsert_daily_rows(db, &rows)?;
-    record_scan_run(db, &scanned_at, &timezone, rows.len())?;
+    upsert_daily_rows(db, &scan.rows)?;
+    let active_dates = scan
+        .rows
+        .iter()
+        .map(|row| row.date.clone())
+        .collect::<Vec<_>>();
+    delete_missing_daily_rows(db, &active_dates)?;
+    upsert_session_file_rollups(db, &scan.changed_rollups, &scanned_at)?;
+    delete_missing_session_file_rollups(db, &scan.active_paths)?;
+    record_scan_run(db, &scanned_at, &timezone, scan.rows.len())?;
+
+    let mut metrics = scan.metrics;
+    metrics.db_ms = db_started.elapsed().as_millis();
+    metrics.total_ms = total_started.elapsed().as_millis();
 
     Ok(ScanResponse {
-        imported_days: rows.len(),
+        imported_days: scan.rows.len(),
         scanned_at,
         timezone,
+        metrics,
     })
 }
 
@@ -64,6 +90,7 @@ fn default_codex_home() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(".codex"))
 }
 
+#[cfg(test)]
 fn load_token_usage_events(codex_home: Option<PathBuf>) -> Result<Vec<UsageEvent>, String> {
     let sessions_dir = codex_home
         .unwrap_or_else(default_codex_home)
@@ -91,6 +118,109 @@ fn load_token_usage_events(codex_home: Option<PathBuf>) -> Result<Vec<UsageEvent
 
     events.sort_by_key(|event| event.timestamp);
     Ok(events)
+}
+
+struct DailyRowsScan {
+    rows: Vec<DailyUsageRow>,
+    changed_rollups: Vec<SessionFileRollup>,
+    active_paths: Vec<String>,
+    metrics: ScanMetrics,
+}
+
+fn load_daily_rows(
+    db: &Connection,
+    codex_home: Option<PathBuf>,
+    timezone: &str,
+    updated_at: &str,
+    pricing_source: &PricingSource,
+) -> Result<DailyRowsScan, String> {
+    let parse_started = Instant::now();
+    let files = find_session_files(codex_home)?;
+    let mut metrics = ScanMetrics {
+        files_scanned: files.len(),
+        ..ScanMetrics::default()
+    };
+    let mut all_rows = Vec::new();
+    let mut changed_rollups = Vec::new();
+    let mut active_paths = Vec::with_capacity(files.len());
+
+    for file in files {
+        active_paths.push(file.cache_key.clone());
+        if let Some(rows) =
+            query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
+        {
+            metrics.files_reused += 1;
+            all_rows.extend(rows);
+            continue;
+        }
+
+        let mut events = Vec::new();
+        load_session_file(&file.path, &mut events)?;
+        let rows = build_daily_rows(&events, timezone, updated_at, pricing_source);
+        metrics.files_parsed += 1;
+        metrics.bytes_read += file.size_bytes as u64;
+        changed_rollups.push(SessionFileRollup {
+            path: file.cache_key,
+            modified_at_ms: file.modified_at_ms,
+            size_bytes: file.size_bytes,
+            rows: rows.clone(),
+        });
+        all_rows.extend(rows);
+    }
+
+    let mut rows = merge_daily_rows(all_rows, updated_at);
+    apply_daily_costs(&mut rows, pricing_source);
+    metrics.parse_ms = parse_started.elapsed().as_millis();
+
+    Ok(DailyRowsScan {
+        rows,
+        changed_rollups,
+        active_paths,
+        metrics,
+    })
+}
+
+fn find_session_files(codex_home: Option<PathBuf>) -> Result<Vec<SessionFile>, String> {
+    let sessions_dir = codex_home
+        .unwrap_or_else(default_codex_home)
+        .join("sessions");
+    if !sessions_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    for entry in WalkDir::new(sessions_dir)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
+            continue;
+        }
+
+        let metadata = entry.metadata().map_err(|error| error.to_string())?;
+        files.push(SessionFile {
+            path: path.to_path_buf(),
+            cache_key: path.to_string_lossy().to_string(),
+            modified_at_ms: modified_at_ms(&metadata),
+            size_bytes: metadata.len() as i64,
+        });
+    }
+
+    Ok(files)
+}
+
+fn modified_at_ms(metadata: &fs::Metadata) -> i64 {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), String> {
@@ -322,6 +452,16 @@ fn build_daily_rows(
     updated_at: &str,
     pricing_source: &PricingSource,
 ) -> Vec<DailyUsageRow> {
+    let mut rows = build_daily_rows_without_cost(events, timezone, updated_at);
+    apply_daily_costs(&mut rows, pricing_source);
+    rows
+}
+
+fn build_daily_rows_without_cost(
+    events: &[UsageEvent],
+    timezone: &str,
+    updated_at: &str,
+) -> Vec<DailyUsageRow> {
     let mut summaries = BTreeMap::<String, DailyUsageRow>::new();
 
     for event in events {
@@ -360,19 +500,75 @@ fn build_daily_rows(
         );
     }
 
-    summaries
-        .into_values()
-        .map(|mut row| {
-            row.cost_usd = row
-                .models
-                .iter()
-                .map(|(model, usage)| {
-                    calculate_cost_usd(usage, pricing_source.pricing_for_model(model))
-                })
-                .sum();
-            row
-        })
-        .collect()
+    summaries.into_values().collect()
+}
+
+fn merge_daily_rows(rows: Vec<DailyUsageRow>, updated_at: &str) -> Vec<DailyUsageRow> {
+    let mut summaries = BTreeMap::<String, DailyUsageRow>::new();
+
+    for row in rows {
+        let summary = summaries
+            .entry(row.date.clone())
+            .or_insert_with(|| DailyUsageRow {
+                date: row.date,
+                input_tokens: 0,
+                cached_input_tokens: 0,
+                output_tokens: 0,
+                reasoning_output_tokens: 0,
+                total_tokens: 0,
+                cost_usd: 0.0,
+                models: BTreeMap::new(),
+                projects: BTreeMap::new(),
+                updated_at: updated_at.to_string(),
+            });
+
+        summary.input_tokens += row.input_tokens;
+        summary.cached_input_tokens += row.cached_input_tokens;
+        summary.output_tokens += row.output_tokens;
+        summary.reasoning_output_tokens += row.reasoning_output_tokens;
+        summary.total_tokens += row.total_tokens;
+
+        for (model, usage) in row.models {
+            let target = summary.models.entry(model).or_default();
+            let is_fallback = usage.is_fallback == Some(true);
+            add_usage(target, &usage);
+            if is_fallback {
+                target.is_fallback = Some(true);
+            }
+        }
+
+        for (project, usage) in row.projects {
+            let target = summary.projects.entry(project).or_default();
+            target.input_tokens += usage.input_tokens;
+            target.cached_input_tokens += usage.cached_input_tokens;
+            target.output_tokens += usage.output_tokens;
+            target.reasoning_output_tokens += usage.reasoning_output_tokens;
+            target.total_tokens += usage.total_tokens;
+
+            for (model, model_usage) in usage.models {
+                let target_model = target.models.entry(model).or_default();
+                let is_fallback = model_usage.is_fallback == Some(true);
+                add_usage(target_model, &model_usage);
+                if is_fallback {
+                    target_model.is_fallback = Some(true);
+                }
+            }
+        }
+    }
+
+    summaries.into_values().collect()
+}
+
+fn apply_daily_costs(rows: &mut [DailyUsageRow], pricing_source: &PricingSource) {
+    for row in rows {
+        row.cost_usd = row
+            .models
+            .iter()
+            .map(|(model, usage)| {
+                calculate_cost_usd(usage, pricing_source.pricing_for_model(model))
+            })
+            .sum();
+    }
 }
 
 fn add_usage_to_row(row: &mut DailyUsageRow, usage: &ModelUsage) {
@@ -567,6 +763,58 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].models["gpt-5.5"].total_tokens, 1300);
         assert!((rows[0].cost_usd - 0.0131).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn reuses_unchanged_session_file_rollups() {
+        let temp_dir = tempfile_dir();
+        let db_path = temp_dir.join("usage.sqlite");
+        let mut db = crate::db::open_database(&db_path).unwrap();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions").join("project-alpha");
+        fs::create_dir_all(&sessions).unwrap();
+        let mut file = fs::File::create(sessions.join("session.jsonl")).unwrap();
+        write!(
+            file,
+            "{}\n{}",
+            token_context("2026-05-08T09:00:00.000Z", "gpt-5"),
+            token_event(
+                "2026-05-08T09:00:00.000Z",
+                "gpt-5",
+                1000,
+                200,
+                300,
+                1300,
+                1000,
+                200,
+                300,
+                1300
+            )
+        )
+        .unwrap();
+        drop(file);
+
+        let pricing_source = PricingSource::embedded();
+        let first = scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home.clone()),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let second = scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+
+        assert_eq!(first.metrics.files_parsed, 1);
+        assert_eq!(first.metrics.files_reused, 0);
+        assert_eq!(second.metrics.files_parsed, 0);
+        assert_eq!(second.metrics.files_reused, 1);
+        assert_eq!(second.imported_days, 1);
     }
 
     fn tempfile_dir() -> PathBuf {

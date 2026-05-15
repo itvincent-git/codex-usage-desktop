@@ -135,6 +135,20 @@ pub struct ScanResponse {
     pub imported_days: usize,
     pub scanned_at: String,
     pub timezone: String,
+    pub metrics: ScanMetrics,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanMetrics {
+    pub total_ms: u128,
+    pub pricing_ms: u128,
+    pub parse_ms: u128,
+    pub db_ms: u128,
+    pub files_scanned: usize,
+    pub files_parsed: usize,
+    pub files_reused: usize,
+    pub bytes_read: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]

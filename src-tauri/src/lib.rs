@@ -7,6 +7,7 @@ mod scanner;
 mod types;
 
 use std::path::PathBuf;
+use std::time::Instant;
 use tauri::Manager;
 use types::{ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse};
 
@@ -22,8 +23,13 @@ async fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, S
 
     tauri::async_runtime::spawn_blocking(move || {
         let mut db = db::open_database(&database_path)?;
-        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
-        scanner::scan_codex_usage(&mut db, &pricing_source, None, None)
+        let pricing_started = Instant::now();
+        let pricing_source =
+            pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path));
+        let pricing_ms = pricing_started.elapsed().as_millis();
+        let mut response = scanner::scan_codex_usage(&mut db, &pricing_source, None, None)?;
+        response.metrics.pricing_ms = pricing_ms;
+        Ok(response)
     })
     .await
     .map_err(|error| error.to_string())?
