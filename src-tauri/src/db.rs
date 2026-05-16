@@ -150,6 +150,17 @@ pub fn record_scan_run(
     Ok(())
 }
 
+pub fn reset_usage_state(db: &Connection) -> Result<(), String> {
+    db.execute_batch(
+        r#"
+        DELETE FROM daily_usage_rollups;
+        DELETE FROM session_file_rollups;
+        DELETE FROM scan_runs;
+        "#,
+    )
+    .map_err(|error| error.to_string())
+}
+
 pub fn delete_missing_daily_rows(db: &Connection, active_dates: &[String]) -> Result<(), String> {
     if active_dates.is_empty() {
         db.execute("DELETE FROM daily_usage_rollups", [])
@@ -385,6 +396,59 @@ mod tests {
             .any(|column| column == "projects_json");
 
         assert!(has_projects_json);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reset_usage_state_clears_cached_tables() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-usage-db-reset-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let db = open_database(&path).unwrap();
+        db.execute(
+            r#"
+            INSERT INTO daily_usage_rollups (
+              date,
+              input_tokens,
+              cached_input_tokens,
+              output_tokens,
+              reasoning_output_tokens,
+              total_tokens,
+              cost_usd,
+              models_json,
+              projects_json,
+              updated_at
+            ) VALUES ('2026-05-08', 1, 0, 2, 0, 3, 0.01, '{}', '{}', '2026-05-08T00:00:00.000Z')
+            "#,
+            [],
+        )
+        .unwrap();
+        db.execute(
+            r#"
+            INSERT INTO session_file_rollups (
+              path,
+              modified_at_ms,
+              size_bytes,
+              rows_json,
+              updated_at
+            ) VALUES ('/tmp/session.jsonl', 1, 2, '[]', '2026-05-08T00:00:00.000Z')
+            "#,
+            [],
+        )
+        .unwrap();
+        record_scan_run(&db, "2026-05-08T00:00:00.000Z", "UTC", 1).unwrap();
+
+        reset_usage_state(&db).unwrap();
+
+        for table in ["daily_usage_rollups", "session_file_rollups", "scan_runs"] {
+            let count: i64 = db
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(count, 0);
+        }
         let _ = std::fs::remove_file(path);
     }
 }

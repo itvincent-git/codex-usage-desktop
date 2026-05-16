@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/metric-card";
 import { ModelUsageCard } from "@/components/model-usage-card";
 import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
+import { SettingsPage } from "@/components/settings-page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
@@ -22,11 +23,13 @@ export default function App() {
     isLoading,
     isMonthlyLoading,
     isRefreshing,
+    isResetting,
     isExporting,
     lastRescanDurationMs,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
+    handleReset,
     handleExport,
   } = useUsageDashboard();
 
@@ -66,6 +69,7 @@ export default function App() {
           scanMessage={scanMessage}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
+          isResetting={isResetting}
           isExporting={isExporting}
           lastRescanDurationMs={lastRescanDurationMs}
           onViewChange={(nextView) => void handleViewChange(nextView)}
@@ -113,6 +117,14 @@ export default function App() {
 
           {!isLoading && view === "monthly" && !isMonthlyLoading && sortedMonthlyUsage ? (
             <MonthlyUsageTable data={sortedMonthlyUsage} />
+          ) : null}
+
+          {!isLoading && view === "settings" ? (
+            <SettingsPage
+              isResetting={isResetting}
+              isDisabled={isLoading || isMonthlyLoading || isRefreshing || isResetting || isExporting !== null}
+              onReset={() => void handleReset()}
+            />
           ) : null}
         </main>
       </div>

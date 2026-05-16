@@ -21,6 +21,7 @@ describe("App", () => {
   beforeEach(() => {
     invokeMock.mockReset();
     saveMock.mockReset();
+    vi.unstubAllGlobals();
     vi.stubGlobal(
       "ResizeObserver",
       class ResizeObserver {
@@ -48,6 +49,8 @@ describe("App", () => {
     expect(screen.getByText("Reading sessions")).toBeInTheDocument();
     expect(screen.getByText("Aggregating tokens")).toBeInTheDocument();
     expect(screen.getByText("Estimating cost")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset cache" })).not.toBeInTheDocument();
   });
 
   it("loads the last 30 day overview and switches to last 1 day", async () => {
@@ -504,6 +507,137 @@ describe("App", () => {
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.getByText("scan failed")).toBeInTheDocument());
     expect(screen.getAllByText("3,400").length).toBeGreaterThan(0);
+  });
+
+  it("resets the local cache and rebuilds usage data", async () => {
+    const confirmMock = vi.fn(() => true);
+    vi.stubGlobal("confirm", confirmMock);
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "reset_usage_state") {
+        return undefined;
+      }
+
+      if (command === "scan_usage") {
+        return {
+          importedDays: 1,
+          scannedAt: "2026-05-11T00:00:00.000Z",
+          timezone: "UTC",
+          metrics: {
+            totalMs: 20,
+            pricingMs: 1,
+            parseMs: 10,
+            dbMs: 3,
+            filesScanned: 1,
+            filesParsed: 1,
+            filesReused: 0,
+            bytesRead: 1024,
+          },
+        };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-04-12",
+          endDate: "2026-05-11",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          daily: [
+            {
+              date: "2026-05-11",
+              inputTokens: 1200,
+              cachedInputTokens: 200,
+              outputTokens: 400,
+              totalTokens: 1600,
+              costUSD: 0.005275,
+            },
+          ],
+          totals: {
+            inputTokens: 1200,
+            cachedInputTokens: 200,
+            outputTokens: 400,
+            totalTokens: 1600,
+            costUSD: 0.005275,
+            avgTokensPerDay: 53.3333333,
+            avgCostPerDay: 0.0001758,
+            cacheHitRate: 0.1666,
+            costPerMillionTokens: 3.296875,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+
+    expect(screen.getByText("Manage local app state and recovery actions.")).toBeInTheDocument();
+    expect(screen.getByText("Local cache")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
+
+    await waitFor(() => expect(screen.getByText("Reset local cache and rebuilt usage data from local Codex logs.")).toBeInTheDocument());
+    expect(confirmMock).toHaveBeenCalledWith(expect.stringContaining("Source logs will not be deleted"));
+
+    const calls = invokeMock.mock.calls.map(([command, args]) => [command, args]);
+    const resetCallIndex = calls.findIndex(([command]) => command === "reset_usage_state");
+    expect(resetCallIndex).toBeGreaterThan(-1);
+    expect(calls[resetCallIndex + 1]).toEqual(["scan_usage", undefined]);
+    expect(calls[resetCallIndex + 2]).toEqual(["fetch_overview", { range: "30d" }]);
+  });
+
+  it("does not reset when confirmation is canceled", async () => {
+    const confirmMock = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmMock);
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 1, scannedAt: "2026-05-11T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-04-12",
+          endDate: "2026-05-11",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            costUSD: 0,
+            avgTokensPerDay: 0,
+            avgCostPerDay: 0,
+            cacheHitRate: 0,
+            costPerMillionTokens: 0,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
+
+    expect(confirmMock).toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith("reset_usage_state");
   });
 
   it("exports the selected range to Excel", async () => {

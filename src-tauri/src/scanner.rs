@@ -610,6 +610,9 @@ fn add_usage_to_project(
 mod tests {
     use super::*;
     use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn imports_daily_codex_usage() {
@@ -805,7 +808,7 @@ mod tests {
         let second = scan_codex_usage(
             &mut db,
             &pricing_source,
-            Some(codex_home),
+            Some(codex_home.clone()),
             Some("UTC".into()),
         )
         .unwrap();
@@ -815,12 +818,26 @@ mod tests {
         assert_eq!(second.metrics.files_parsed, 0);
         assert_eq!(second.metrics.files_reused, 1);
         assert_eq!(second.imported_days, 1);
+
+        crate::db::reset_usage_state(&db).unwrap();
+        let third = scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+
+        assert_eq!(third.metrics.files_parsed, 1);
+        assert_eq!(third.metrics.files_reused, 0);
     }
 
     fn tempfile_dir() -> PathBuf {
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "codex-usage-desktop-rust-{}",
-            Utc::now().timestamp_nanos_opt().unwrap()
+            "codex-usage-desktop-rust-{}-{}",
+            Utc::now().timestamp_nanos_opt().unwrap(),
+            counter
         ));
         fs::create_dir_all(&path).unwrap();
         path

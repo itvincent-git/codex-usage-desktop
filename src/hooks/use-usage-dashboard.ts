@@ -4,6 +4,7 @@ import {
   exportUsage,
   fetchMonthlyUsage,
   fetchOverview,
+  resetUsageState,
   scanUsage,
   type ExportFormat,
   type MonthlyUsageResponse,
@@ -24,6 +25,7 @@ export function useUsageDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMonthlyLoading, setIsMonthlyLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
   const hasBootstrappedRef = useRef(false);
@@ -130,8 +132,32 @@ export function useUsageDashboard() {
     }
   }
 
+  async function handleReset() {
+    const confirmed = window.confirm(
+      "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsResetting(true);
+    setMonthlyUsage(null);
+    setScanMessage("Resetting local cache and rebuilding usage data.");
+    const startedAt = performance.now();
+
+    try {
+      await resetUsageState();
+      await scanAndReloadOverview(startedAt);
+      setScanMessage("Reset local cache and rebuilt usage data from local Codex logs.");
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : "Reset failed.");
+    } finally {
+      setIsResetting(false);
+    }
+  }
+
   async function handleExport(format: ExportFormat) {
-    if (!overview || isLoading) {
+    if (!overview || isLoading || isResetting) {
       return;
     }
 
@@ -163,11 +189,13 @@ export function useUsageDashboard() {
     isLoading,
     isMonthlyLoading,
     isRefreshing,
+    isResetting,
     isExporting,
     lastRescanDurationMs,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
+    handleReset,
     handleExport,
   };
 }

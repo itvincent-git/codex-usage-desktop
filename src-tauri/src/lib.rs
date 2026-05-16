@@ -6,7 +6,8 @@ mod pricing;
 mod scanner;
 mod types;
 
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::Manager;
 use types::{ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse};
@@ -67,6 +68,20 @@ async fn fetch_monthly_usage(
 }
 
 #[tauri::command]
+async fn reset_usage_state(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        db::reset_usage_state(&db)?;
+        delete_pricing_cache(&pricing_cache_path)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn export_usage(
     state: tauri::State<'_, AppState>,
     range: String,
@@ -86,6 +101,14 @@ async fn export_usage(
     .map_err(|error| error.to_string())?
 }
 
+fn delete_pricing_cache(path: &Path) -> Result<(), String> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -103,8 +126,38 @@ pub fn run() {
             scan_usage,
             fetch_overview,
             fetch_monthly_usage,
+            reset_usage_state,
             export_usage
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn delete_pricing_cache_removes_existing_file() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-pricing-cache-reset-{}.json",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        std::fs::write(&path, "{}").unwrap();
+
+        delete_pricing_cache(&path).unwrap();
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn delete_pricing_cache_allows_missing_file() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-pricing-cache-missing-{}.json",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+
+        delete_pricing_cache(&path).unwrap();
+    }
 }

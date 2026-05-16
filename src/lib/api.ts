@@ -98,6 +98,10 @@ export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
   return invoke<MonthlyUsageResponse>("fetch_monthly_usage");
 }
 
+export async function resetUsageState(): Promise<void> {
+  return invoke<void>("reset_usage_state");
+}
+
 export async function exportUsage(range: RangeKey, format: ExportFormat, path: string): Promise<ExportResponse> {
   return invoke<ExportResponse>("export_usage", { range, format, path });
 }

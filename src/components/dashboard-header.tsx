@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatDuration } from "@/lib/usage-dashboard";
 
-export type DashboardView = "dashboard" | "monthly";
+export type DashboardView = "dashboard" | "monthly" | "settings";
 
 type DashboardHeaderProps = {
   view: DashboardView;
@@ -14,6 +14,7 @@ type DashboardHeaderProps = {
   scanMessage: string;
   isLoading: boolean;
   isRefreshing: boolean;
+  isResetting: boolean;
   isExporting: ExportFormat | null;
   lastRescanDurationMs: number | null;
   onViewChange: (view: DashboardView) => void;
@@ -29,6 +30,7 @@ export function DashboardHeader({
   scanMessage,
   isLoading,
   isRefreshing,
+  isResetting,
   isExporting,
   lastRescanDurationMs,
   onViewChange,
@@ -36,6 +38,8 @@ export function DashboardHeader({
   onRefresh,
   onExport,
 }: DashboardHeaderProps) {
+  const isBusy = isLoading || isRefreshing || isResetting || isExporting !== null;
+
   return (
     <header className="flex flex-col gap-4 border-b border-border pb-2">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -68,6 +72,19 @@ export function DashboardHeader({
           >
             Monthly
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "settings"}
+            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+              view === "settings"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => onViewChange("settings")}
+          >
+            Settings
+          </button>
         </nav>
       </div>
 
@@ -87,7 +104,7 @@ export function DashboardHeader({
               <RangeSwitcher value={range} onChange={onRangeChange} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" size="lg" disabled={!overview || isLoading || isExporting !== null}>
+                  <Button variant="secondary" size="lg" disabled={!overview || isBusy}>
                     <Download className="h-4 w-4" />
                     {isExporting === null ? "Export" : "Exporting"}
                   </Button>
@@ -105,7 +122,7 @@ export function DashboardHeader({
               </DropdownMenu>
             </>
           ) : null}
-          <Button variant="primary" size="lg" onClick={onRefresh} disabled={isRefreshing}>
+          <Button variant="primary" size="lg" onClick={onRefresh} disabled={isBusy}>
             <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             Rescan local logs
           </Button>
