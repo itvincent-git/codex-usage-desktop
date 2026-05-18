@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "app-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build, for example app-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    name: Build ${{ matrix.label }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS Intel
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+          - label: macOS Apple Silicon
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          expected="app-v${version}"
+          if [[ "${RELEASE_TAG}" != "${expected}" ]]; then
+            echo "Release tag ${RELEASE_TAG} does not match src-tauri/tauri.conf.json version ${version}."
+            echo "Expected tag: ${expected}"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test frontend
+        run: pnpm test
+
+      - name: Typecheck frontend
+        run: pnpm typecheck
+
+      - name: Build and publish Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Codex Usage Desktop ${{ env.RELEASE_TAG }}
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
