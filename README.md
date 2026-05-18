@@ -1,78 +1,46 @@
 # Codex Usage Desktop
 
-A local-first desktop dashboard for Codex usage.
+A local-first desktop dashboard for understanding your Codex CLI usage and estimated cost.
 
-It uses Tauri to host a React UI, scans local Codex session logs in Rust, stores daily usage rollups in SQLite, and visualizes token and cost trends across the last 1 / 2 / 7 / 14 / 30 days.
+Use it if you run Codex CLI on your machine and want a simple way to review recent token usage, cost trends, model usage, and project usage without uploading your local logs.
 
 ## Features
 
-- Scans local Codex usage on first launch
-- Caches daily usage rollups in a local SQLite database
-- Shows total tokens, total cost, daily averages, cache hit rate, and cost per million tokens
-- Supports 1d / 2d / 7d / 14d / 30d time windows
-- Lets you rescan local logs and refresh the dashboard
-- Exports the selected time window to Excel or Markdown
+- Local-first scanning of Codex CLI session logs.
+- Daily dashboard windows from 1 day to 90 days.
+- Monthly usage totals for longer-term review.
+- Token, cache, cost, model, and project breakdowns.
+- Excel and Markdown exports for the selected dashboard window.
+- Local cache reset and rebuild when usage data needs to be refreshed from scratch.
 
-## Architecture
+## How To Use
 
-- `src/`: React 19 + Vite frontend
-- `src-tauri/`: Tauri v2 host and native Rust usage pipeline
-- `codex-usage-desktop.db`: runtime-generated local SQLite cache in the app data directory
+1. Open the desktop app.
+2. On first launch, the app reads your local Codex session logs from `~/.codex` and builds a local usage cache.
+3. Use the Dashboard view to see total tokens, estimated cost, daily averages, cache hit rate, cost per million tokens, daily trends, model usage, and project usage.
+4. Switch the dashboard window between 1d / 2d / 7d / 14d / 30d / 60d / 90d.
+5. Open the Monthly view to see natural-month usage totals.
+6. Click `Rescan local logs` after new Codex sessions to refresh the dashboard.
+7. Use `Export` to save the selected dashboard window as Excel (`.xlsx`) or Markdown (`.md`).
+8. Use Settings -> `Reset cache` if the local cache needs to be cleared and rebuilt from your Codex logs.
 
-The frontend calls Tauri commands:
+## Data And Privacy
 
-- `scan_usage`
-- `fetch_overview`
-- `export_usage`
+- Source Codex logs are read locally and are not deleted by scan or reset actions.
+- Usage summaries are stored in a local SQLite cache in the app data directory.
+- Pricing data is cached locally. If the pricing cache is missing, the app tries to fetch Codex model pricing from LiteLLM; if that fails, it uses the bundled pricing table.
+- Cost values are estimates based on the pricing data available to the app.
 
-## Requirements
-
-- Node.js `>= 24`
-- `pnpm`
-- Rust toolchain
-- System dependencies required by Tauri v2
-
-## Install
-
-```bash
-pnpm install
-```
-
-## Development
-
-Use the real app startup path for development:
-
-```bash
-pnpm dev:app
-```
-
-This starts the desktop app through Tauri and launches the Vite frontend at `http://localhost:5173`.
-
-Running `pnpm dev` alone only starts the browser frontend. It is useful for UI-only work, but real scan data is served by Tauri commands.
-
-## Build
-
-```bash
-pnpm build
-pnpm tauri build
-```
-
-The packaged app is self-contained for the usage pipeline and does not spawn a Node.js sidecar.
-
-## Test
-
-```bash
-pnpm test
-pnpm typecheck
-cd src-tauri && cargo test
-```
-
-## Environment Variables
+## Advanced Options
 
 - `CODEX_HOME`: Codex home directory, default `~/.codex`
 - `CODEX_USAGE_TIMEZONE`: timezone for day bucketing, default system timezone with UTC fallback
 
 ## Current Limits
 
-- The current UI shows daily aggregated usage, not session-level detail.
-- Pricing is calculated from the Rust app's bundled model pricing table; unknown models default to zero cost.
+- The app shows daily and monthly aggregate usage, not session-level detail.
+- Unknown models default to zero cost.
+
+## For Developers
+
+The app is built with React 19, Vite, Tauri v2, and a native Rust usage pipeline. To work on it locally, install Node.js `>= 24`, `pnpm`, Rust, and Tauri v2 system dependencies; then run `pnpm install` and `pnpm dev:app`. Useful checks are `pnpm test`, `pnpm typecheck`, and `cd src-tauri && cargo test`; packaged builds use `pnpm build` and `pnpm tauri build`.
