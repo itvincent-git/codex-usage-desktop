@@ -1,19 +1,47 @@
 # Codex Usage Desktop
 
-A local-first desktop dashboard for understanding your Codex CLI usage and estimated cost.
+![ScreenShot](docs/screen_shot.jpg)
+[![Release](https://img.shields.io/github/v/release/itvincent-git/codex-usage-desktop?label=release)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-24c8db.svg)](https://tauri.app/)
+[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#privacy)
 
-Use it if you run Codex CLI on your machine and want a simple way to review recent token usage, cost trends, model usage, and project usage without uploading your local logs.
+A local-first macOS dashboard for Codex CLI token usage, cost estimates, model usage, and project usage from your local `~/.codex` logs.
+
+[Download the latest release](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) · [中文 README](README_zh.md)
+
+Use Codex Usage Desktop if you run Codex CLI on your machine and want an OpenAI Codex usage tracker that helps you review recent token usage, cost trends, cache behavior, model usage, and project usage without uploading local logs.
+
+## Why Use It
+
+- Understand how many Codex tokens you use across recent work.
+- Estimate Codex CLI costs by model, day, and project.
+- See cache hit rate, cost per million tokens, and daily usage trends.
+- Keep usage analysis local by reading `~/.codex` session logs on your machine.
+- Export the selected dashboard window to Excel or Markdown for reporting.
 
 ## Features
 
 - Local-first scanning of Codex CLI session logs.
-- Daily dashboard windows from 1 day to 90 days.
+- Dashboard windows from 1 day to 90 days.
 - Monthly usage totals for longer-term review.
 - Token, cache, cost, model, and project breakdowns.
-- Excel and Markdown exports for the selected dashboard window.
-- Local cache reset and rebuild when usage data needs to be refreshed from scratch.
+- Excel (`.xlsx`) and Markdown (`.md`) exports.
+- Local SQLite cache reset and rebuild when usage data needs to be refreshed from scratch.
 
-## How To Use
+## Download And Install
+
+Download the latest macOS build from [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
+
+Current release builds:
+
+- macOS Apple Silicon
+- macOS Intel
+
+Windows and Linux builds are planned, but the current release workflow only publishes macOS desktop packages.
+
+## How It Works
 
 1. Open the desktop app.
 2. On first launch, the app reads your local Codex session logs from `~/.codex` and builds a local usage cache.
@@ -24,7 +52,7 @@ Use it if you run Codex CLI on your machine and want a simple way to review rece
 7. Use `Export` to save the selected dashboard window as Excel (`.xlsx`) or Markdown (`.md`).
 8. Use Settings -> `Reset cache` if the local cache needs to be cleared and rebuilt from your Codex logs.
 
-## Data And Privacy
+## Privacy
 
 - Source Codex logs are read locally and are not deleted by scan or reset actions.
 - Usage summaries are stored in a local SQLite cache in the app data directory.
@@ -40,7 +68,36 @@ Use it if you run Codex CLI on your machine and want a simple way to review rece
 
 - The app shows daily and monthly aggregate usage, not session-level detail.
 - Unknown models default to zero cost.
+- Release packages are currently macOS-only.
 
-## For Developers
+## Roadmap
 
-The app is built with React 19, Vite, Tauri v2, and a native Rust usage pipeline. To work on it locally, install Node.js `>= 24`, `pnpm`, Rust, and Tauri v2 system dependencies; then run `pnpm install` and `pnpm dev:app`. Useful checks are `pnpm test`, `pnpm typecheck`, and `cd src-tauri && cargo test`; packaged builds use `pnpm build` and `pnpm tauri build`.
+- Windows and Linux release packages.
+- More detailed usage drilldowns.
+- More export and reporting options.
+
+## Development
+
+The app is built with React 19, Vite, Tauri v2, and a native Rust usage pipeline.
+
+Install Node.js `>= 24`, `pnpm`, Rust, and Tauri v2 system dependencies, then run:
+
+```bash
+pnpm install
+pnpm dev:app
+```
+
+Useful checks:
+
+```bash
+pnpm test
+pnpm typecheck
+cd src-tauri && cargo test
+```
+
+Packaged builds use:
+
+```bash
+pnpm build
+pnpm tauri build
+```
