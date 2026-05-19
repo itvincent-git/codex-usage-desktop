@@ -2,9 +2,11 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   exportUsage,
+  fetchCodexLimits,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
+  type CodexLimitsResponse,
   scanUsage,
   type ExportFormat,
   type MonthlyUsageResponse,
@@ -19,6 +21,8 @@ export function useUsageDashboard() {
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
+  const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
+  const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
   const [scanMessage, setScanMessage] = useState("Sync local Codex usage into the desktop cache.");
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -42,13 +46,23 @@ export function useUsageDashboard() {
     setError(null);
   });
 
+  const loadCodexLimits = useEffectEvent(async () => {
+    try {
+      const data = await fetchCodexLimits();
+      setCodexLimits(data);
+      setCodexLimitsError(null);
+    } catch (limitsError) {
+      setCodexLimitsError(limitsError instanceof Error ? limitsError.message : "Failed to load Codex limits.");
+    }
+  });
+
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number) => {
     const scan = await scanUsage();
     const cacheMessage = scan.metrics
       ? ` Parsed ${scan.metrics.filesParsed}, reused ${scan.metrics.filesReused}.`
       : "";
     setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
-    await loadOverview(range);
+    await Promise.all([loadOverview(range), loadCodexLimits()]);
     if (view === "monthly") {
       await loadMonthlyUsage();
     }
@@ -64,7 +78,7 @@ export function useUsageDashboard() {
     setIsLoading(true);
 
     try {
-      await loadOverview(range);
+      await Promise.all([loadOverview(range), loadCodexLimits()]);
       setBootstrapped(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load overview.");
@@ -184,6 +198,8 @@ export function useUsageDashboard() {
     range,
     overview,
     monthlyUsage,
+    codexLimits,
+    codexLimitsError,
     scanMessage,
     error,
     isLoading,

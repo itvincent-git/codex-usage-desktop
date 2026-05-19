@@ -1,3 +1,4 @@
+import { CodexLimitsCard } from "@/components/codex-limits-card";
 import { DailyUsageTable } from "@/components/daily-usage-table";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
@@ -18,6 +19,8 @@ export default function App() {
     range,
     overview,
     monthlyUsage,
+    codexLimits,
+    codexLimitsError,
     scanMessage,
     error,
     isLoading,
@@ -101,6 +104,8 @@ export default function App() {
                   <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
                 ))}
               </div>
+
+              <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
 
               <UsageTrendsCard daily={overview.daily} />
 

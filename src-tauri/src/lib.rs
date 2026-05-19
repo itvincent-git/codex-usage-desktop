@@ -1,3 +1,4 @@
+mod codex_limits;
 mod date;
 mod db;
 mod exporter;
@@ -10,7 +11,9 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::Manager;
-use types::{ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse};
+use types::{
+    CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
+};
 
 struct AppState {
     database_path: PathBuf,
@@ -65,6 +68,13 @@ async fn fetch_monthly_usage(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
+    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -126,6 +136,7 @@ pub fn run() {
             scan_usage,
             fetch_overview,
             fetch_monthly_usage,
+            fetch_codex_limits,
             reset_usage_state,
             export_usage
         ])

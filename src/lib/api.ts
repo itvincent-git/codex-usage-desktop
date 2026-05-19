@@ -86,6 +86,20 @@ export type ExportResponse = {
   exportedAt: string;
 };
 
+export type CodexLimitWindow = {
+  usedPercent: number;
+  remainingPercent: number;
+  windowMinutes: number | null;
+  resetsAt: string | null;
+};
+
+export type CodexLimitsResponse = {
+  session: CodexLimitWindow | null;
+  weekly: CodexLimitWindow | null;
+  updatedAt: string;
+  source: string;
+};
+
 export async function scanUsage(): Promise<ScanResponse> {
   return invoke<ScanResponse>("scan_usage");
 }
@@ -96,6 +110,10 @@ export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> 
 
 export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
   return invoke<MonthlyUsageResponse>("fetch_monthly_usage");
+}
+
+export async function fetchCodexLimits(): Promise<CodexLimitsResponse> {
+  return invoke<CodexLimitsResponse>("fetch_codex_limits");
 }
 
 export async function resetUsageState(): Promise<void> {

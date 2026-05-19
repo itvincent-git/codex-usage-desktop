@@ -159,3 +159,21 @@ pub struct ExportResponse {
     pub range: String,
     pub exported_at: String,
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexLimitWindow {
+    pub used_percent: f64,
+    pub remaining_percent: f64,
+    pub window_minutes: Option<i64>,
+    pub resets_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexLimitsResponse {
+    pub session: Option<CodexLimitWindow>,
+    pub weekly: Option<CodexLimitWindow>,
+    pub updated_at: String,
+    pub source: String,
+}

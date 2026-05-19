@@ -59,6 +59,25 @@ describe("App", () => {
         return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
       }
 
+      if (command === "fetch_codex_limits") {
+        return {
+          session: {
+            usedPercent: 20,
+            remainingPercent: 80,
+            windowMinutes: 300,
+            resetsAt: "2026-04-26T05:00:00.000Z",
+          },
+          weekly: {
+            usedPercent: 45,
+            remainingPercent: 55,
+            windowMinutes: 10080,
+            resetsAt: "2026-04-30T00:00:00.000Z",
+          },
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          source: "cli-rpc",
+        };
+      }
+
       if (command === "fetch_overview" && args?.range === "30d") {
         return {
           range: "30d",
@@ -187,6 +206,11 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
+    expect(screen.getByText("Codex Limits")).toBeInTheDocument();
+    expect(screen.getByText("5 hour")).toBeInTheDocument();
+    expect(screen.getByText("Weekly")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("55%")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
@@ -206,6 +230,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(invokeMock).toHaveBeenLastCalledWith("fetch_overview", { range: "1d" });
     });
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
   });
 
   it("shows a loading state while switching to last 90 days", async () => {
@@ -462,10 +487,12 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_overview", { range: "30d" });
-    expect(invokeMock).toHaveBeenNthCalledWith(2, "scan_usage");
-    expect(invokeMock).toHaveBeenNthCalledWith(3, "fetch_overview", { range: "30d" });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_codex_limits");
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "fetch_overview", { range: "30d" });
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_codex_limits");
   });
 
   it("keeps the cached overview visible when the background scan fails", async () => {
@@ -507,6 +534,51 @@ describe("App", () => {
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.getByText("scan failed")).toBeInTheDocument());
     expect(screen.getAllByText("3,400").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the dashboard visible when Codex limits are unavailable", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        throw new Error("limits failed");
+      }
+
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 2600,
+            cachedInputTokens: 400,
+            outputTokens: 800,
+            totalTokens: 3400,
+            costUSD: 0.0088685,
+            avgTokensPerDay: 113.3333333,
+            avgCostPerDay: 0.0002956,
+            cacheHitRate: 0.1538,
+            costPerMillionTokens: 2.6083,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
+    expect(screen.getByText("Codex limits unavailable: limits failed")).toBeInTheDocument();
+    expect(screen.queryByText("Data sync failed")).not.toBeInTheDocument();
   });
 
   it("resets the local cache and rebuilds usage data", async () => {
