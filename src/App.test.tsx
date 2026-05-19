@@ -539,7 +539,7 @@ describe("App", () => {
   it("keeps the dashboard visible when Codex limits are unavailable", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "fetch_codex_limits") {
-        throw new Error("limits failed");
+        throw "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.";
       }
 
       if (command === "scan_usage") {
@@ -577,7 +577,9 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
-    expect(screen.getByText("Codex limits unavailable: limits failed")).toBeInTheDocument();
+    expect(
+      screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Data sync failed")).not.toBeInTheDocument();
   });
 

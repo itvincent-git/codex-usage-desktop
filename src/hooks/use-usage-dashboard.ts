@@ -52,7 +52,7 @@ export function useUsageDashboard() {
       setCodexLimits(data);
       setCodexLimitsError(null);
     } catch (limitsError) {
-      setCodexLimitsError(limitsError instanceof Error ? limitsError.message : "Failed to load Codex limits.");
+      setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
     }
   });
 
@@ -214,4 +214,15 @@ export function useUsageDashboard() {
     handleReset,
     handleExport,
   };
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
 }
