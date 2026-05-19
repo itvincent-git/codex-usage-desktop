@@ -80,13 +80,17 @@ function LimitRow({ label, window }: LimitRowProps) {
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-border">
         <div
-          className={cn("h-full rounded-full", usedPercent >= 90 ? "bg-error" : usedPercent >= 70 ? "bg-warning" : "bg-primary")}
-          style={{ width: `${usedPercent}%` }}
+          className={cn(
+            "h-full rounded-full",
+            remainingPercent <= 10 ? "bg-error" : remainingPercent <= 30 ? "bg-warning" : "bg-primary",
+          )}
+          style={{ width: `${remainingPercent}%` }}
         />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{formatLimitPercent(usedPercent)} used</span>
+        <span>{formatLimitPercent(remainingPercent)} remaining</span>
+        <span>{formatLimitPercent(usedPercent)} consumed</span>
         <span>{formatWindowMinutes(window.windowMinutes)}</span>
       </div>
     </div>
