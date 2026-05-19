@@ -507,8 +507,10 @@ fn resolve_codex_binary() -> Option<PathBuf> {
         }
     }
 
-    if let Some(path) = find_in_path("codex", &effective_path()) {
-        return Some(path);
+    if let Ok(path) = env::var("PATH") {
+        if let Some(bin) = find_in_path("codex", &path) {
+            return Some(bin);
+        }
     }
 
     if let Some(path) = command_v_codex() {
@@ -525,7 +527,7 @@ fn resolve_codex_binary() -> Option<PathBuf> {
     candidates.push(PathBuf::from("/opt/homebrew/bin/codex"));
     candidates.push(PathBuf::from("/usr/local/bin/codex"));
 
-    candidates.into_iter().find(|path| is_executable(path))
+    candidates.into_iter().find(|path| is_executable(&path))
 }
 
 fn command_v_codex() -> Option<PathBuf> {
