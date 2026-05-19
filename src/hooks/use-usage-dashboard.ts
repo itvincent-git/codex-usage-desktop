@@ -63,9 +63,7 @@ export function useUsageDashboard() {
       : "";
     setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
     
-    // Do not block overview refresh on limits fetch
-    void loadCodexLimits();
-    await loadOverview(range);
+    await Promise.all([loadOverview(range), loadCodexLimits()]);
     
     if (view === "monthly") {
       await loadMonthlyUsage();
