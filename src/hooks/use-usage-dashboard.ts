@@ -62,7 +62,11 @@ export function useUsageDashboard() {
       ? ` Parsed ${scan.metrics.filesParsed}, reused ${scan.metrics.filesReused}.`
       : "";
     setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
-    await Promise.all([loadOverview(range), loadCodexLimits()]);
+    
+    // Do not block overview refresh on limits fetch
+    void loadCodexLimits();
+    await loadOverview(range);
+    
     if (view === "monthly") {
       await loadMonthlyUsage();
     }
@@ -78,7 +82,9 @@ export function useUsageDashboard() {
     setIsLoading(true);
 
     try {
-      await Promise.all([loadOverview(range), loadCodexLimits()]);
+      // Do not block initial render on limits fetch
+      void loadCodexLimits();
+      await loadOverview(range);
       setBootstrapped(true);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load overview.");

@@ -488,11 +488,11 @@ describe("App", () => {
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
-    expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_overview", { range: "30d" });
-    expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_codex_limits");
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
     expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");
-    expect(invokeMock).toHaveBeenNthCalledWith(4, "fetch_overview", { range: "30d" });
-    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_codex_limits");
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "fetch_codex_limits");
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_overview", { range: "30d" });
   });
 
   it("keeps the cached overview visible when the background scan fails", async () => {
@@ -664,7 +664,8 @@ describe("App", () => {
     const resetCallIndex = calls.findIndex(([command]) => command === "reset_usage_state");
     expect(resetCallIndex).toBeGreaterThan(-1);
     expect(calls[resetCallIndex + 1]).toEqual(["scan_usage", undefined]);
-    expect(calls[resetCallIndex + 2]).toEqual(["fetch_overview", { range: "30d" }]);
+    expect(calls[resetCallIndex + 2]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 3]).toEqual(["fetch_overview", { range: "30d" }]);
   });
 
   it("does not reset when confirmation is canceled", async () => {
