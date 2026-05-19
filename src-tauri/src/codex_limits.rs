@@ -85,12 +85,15 @@ fn fetch_codex_limits_with(
 ) -> Result<CodexLimitsResponse, String> {
     match fetch_oauth() {
         Ok(limits) => Ok(make_response(limits)),
-        Err(oauth_error) => match fetch_cli() {
-            Ok(limits) => Ok(make_response(limits)),
-            Err(cli_error) => Err(format!(
-                "OAuth unavailable: {oauth_error}; CLI RPC unavailable: {cli_error}"
-            )),
-        },
+        Err(oauth_error) => {
+            eprintln!("Warning: OAuth limits fetch failed, falling back to CLI. Error: {oauth_error}");
+            match fetch_cli() {
+                Ok(limits) => Ok(make_response(limits)),
+                Err(cli_error) => Err(format!(
+                    "OAuth unavailable: {oauth_error}; CLI RPC unavailable: {cli_error}"
+                )),
+            }
+        }
     }
 }
 

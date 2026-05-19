@@ -21,7 +21,7 @@ chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 dirs = "6"
 iana-time-zone = "0.1"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls-native-roots"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 rust_xlsxwriter = "0.94.1"
 serde = { version = "1", features = ["derive"] }
