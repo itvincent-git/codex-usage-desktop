@@ -76,6 +76,7 @@ struct LimitsSnapshot {
 }
 
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
+    log::info!("Starting fetch_codex_limits...");
     fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits)
 }
 
@@ -84,21 +85,32 @@ fn fetch_codex_limits_with(
     fetch_cli: impl FnOnce() -> Result<LimitsSnapshot, String>,
 ) -> Result<CodexLimitsResponse, String> {
     match fetch_oauth() {
-        Ok(limits) => Ok(make_response(limits)),
+        Ok(limits) => {
+            log::info!("Successfully fetched limits via OAuth.");
+            Ok(make_response(limits))
+        }
         Err(oauth_error) => {
-            eprintln!("Warning: OAuth limits fetch failed, falling back to CLI. Error: {oauth_error}");
+            log::warn!("OAuth limits fetch failed: {oauth_error}. Falling back to CLI...");
             match fetch_cli() {
-                Ok(limits) => Ok(make_response(limits)),
-                Err(cli_error) => Err(format!(
-                    "OAuth unavailable: {oauth_error}; CLI RPC unavailable: {cli_error}"
-                )),
+                Ok(limits) => {
+                    log::info!("Successfully fetched limits via CLI fallback.");
+                    Ok(make_response(limits))
+                }
+                Err(cli_error) => {
+                    log::error!("Both OAuth and CLI failed. CLI error: {cli_error}");
+                    Err(format!(
+                        "OAuth unavailable: {oauth_error}; CLI RPC unavailable: {cli_error}"
+                    ))
+                }
             }
         }
     }
 }
 
 fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
+    log::info!("Attempting to load codex auth...");
     let auth = load_codex_auth()?;
+    log::info!("Building reqwest client for OAuth...");
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()

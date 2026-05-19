@@ -2,6 +2,7 @@ import { CodexLimitsCard } from "@/components/codex-limits-card";
 import { DailyUsageTable } from "@/components/daily-usage-table";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
+import { LogPanel } from "@/components/log-panel";
 import { MetricCard } from "@/components/metric-card";
 import { ModelUsageCard } from "@/components/model-usage-card";
 import { MonthlyUsageTable } from "@/components/monthly-usage-table";
@@ -131,6 +132,8 @@ export default function App() {
               onReset={() => void handleReset()}
             />
           ) : null}
+
+          {!isLoading && view === "logs" ? <LogPanel /> : null}
         </main>
       </div>
     </div>

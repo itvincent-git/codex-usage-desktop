@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatDuration } from "@/lib/usage-dashboard";
 
-export type DashboardView = "dashboard" | "monthly" | "settings";
+export type DashboardView = "dashboard" | "monthly" | "settings" | "logs";
 
 type DashboardHeaderProps = {
   view: DashboardView;
@@ -85,9 +85,21 @@ export function DashboardHeader({
           >
             Settings
           </button>
-        </nav>
-      </div>
-
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "logs"}
+            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+              view === "logs"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => onViewChange("logs")}
+          >
+            Logs
+          </button>
+          </nav>
+          </div>
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-4">
           <div className="space-y-3">
