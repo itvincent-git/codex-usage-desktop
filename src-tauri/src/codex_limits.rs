@@ -120,7 +120,9 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
         .get(CODEX_USAGE_URL)
         .bearer_auth(auth.access_token)
         .header("Accept", "application/json")
-        .header("User-Agent", "codex-usage-desktop");
+        .header("Origin", "https://chatgpt.com")
+        .header("Referer", "https://chatgpt.com/")
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
     if let Some(account_id) = auth.account_id {
         request = request.header("ChatGPT-Account-Id", account_id);
@@ -128,13 +130,17 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
 
     let response = request
         .send()
-        .map_err(|error| format!("Failed to fetch Codex usage API: {error}"))?;
+        .map_err(|error| {
+            log::error!("Request failed: {error:?}");
+            format!("Failed to fetch Codex usage API: {error}")
+        })?;
     let status = response.status();
     let body = response
         .text()
         .map_err(|error| format!("Failed to read Codex usage API response: {error}"))?;
 
     if !status.is_success() {
+        log::error!("Codex API error status: {status}, body: {body}");
         return Err(format!("Codex usage API returned {status}: {body}"));
     }
 
