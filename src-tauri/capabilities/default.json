@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default desktop capability set",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-save"]
+  "permissions": ["core:default", "dialog:allow-save", "log:default"]
 }

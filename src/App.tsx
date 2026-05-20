@@ -133,7 +133,9 @@ export default function App() {
             />
           ) : null}
 
-          {!isLoading && view === "logs" ? <LogPanel /> : null}
+          <div className={!isLoading && view === "logs" ? "block" : "hidden"}>
+            <LogPanel />
+          </div>
         </main>
       </div>
     </div>

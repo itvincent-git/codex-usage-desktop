@@ -17,6 +17,17 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: saveMock,
 }));
 
+vi.mock("@tauri-apps/plugin-log", () => ({
+  attachLogger: vi.fn(() => Promise.resolve(() => {})),
+  LogLevel: {
+    Trace: 0,
+    Debug: 1,
+    Info: 2,
+    Warn: 3,
+    Error: 4,
+  },
+}));
+
 describe("App", () => {
   beforeEach(() => {
     invokeMock.mockReset();
