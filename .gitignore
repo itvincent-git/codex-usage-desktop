@@ -12,3 +12,4 @@ src-tauri/gen
 
 .playwright-cli
 .DS_Store
+.antigravitycli
