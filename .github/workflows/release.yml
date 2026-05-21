@@ -87,6 +87,7 @@ jobs:
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Codex Usage Desktop ${{ env.RELEASE_TAG }}
+          generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
