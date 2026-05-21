@@ -165,11 +165,11 @@ export function useUsageDashboard() {
     void bootstrap();
   }, [bootstrap]);
 
-  // Re-fetch limits when the page/window regains focus or visibility after being inactive ≥60 s.
+  // Re-fetch limits when the page/window regains focus or visibility after being inactive ≥5 min.
   useEffect(() => {
     if (!bootstrapped) return;
 
-    const STALE_MS = 60_000;
+    const STALE_MS = 5 * 60_000;
 
     function handleInactive() {
       if (hiddenSinceRef.current === null) {
