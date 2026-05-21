@@ -26,18 +26,18 @@ export function MetricCard({ kind, label, value, detail, daily, cacheHitRate }: 
 
   return (
     <Card className="group rounded-lg border-border/80 bg-surface/95">
-      <CardHeader className="space-y-2 p-4 pb-3">
+      <CardHeader className="space-y-1 p-3.5 pb-1">
         <div className="flex items-center justify-between gap-3">
           <CardDescription className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {label}
           </CardDescription>
-          <span className={cn("h-2.5 w-2.5 rounded-full", style.bg)} />
+          <span className={cn("h-2 w-2 rounded-full", style.bg)} />
         </div>
-        <CardTitle className="font-sans text-2xl leading-none tracking-normal sm:text-[1.75rem]">{value}</CardTitle>
+        <CardTitle className="font-sans text-xl font-bold leading-none tracking-tight sm:text-2xl">{value}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 px-4 pb-4">
+      <CardContent className="space-y-2 px-3.5 pb-3">
         <MiniMetricChart kind={kind} daily={daily} cacheHitRate={cacheHitRate} stroke={style.line} />
-        <p className="text-xs leading-5 text-muted-foreground">{detail}</p>
+        <p className="text-xs leading-normal text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
   );
@@ -70,12 +70,12 @@ function MiniMetricChart({
   }));
 
   if (data.length === 0) {
-    return <div className="h-16 rounded-md bg-muted/40" />;
+    return <div className="h-10 rounded-md bg-muted/40" />;
   }
 
   if (kind === "tokens") {
     return (
-      <div className="h-16">
+      <div className="h-10">
         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <BarChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
             <Bar dataKey="billableInputTokens" stackId="tokens" fill="rgb(37 99 235)" radius={[2, 2, 0, 0]} />
@@ -89,7 +89,7 @@ function MiniMetricChart({
 
   if (kind === "cost") {
     return (
-      <div className="h-16">
+      <div className="h-10">
         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
             <defs>
@@ -115,7 +115,7 @@ function MiniMetricChart({
   const dataKey = kind === "costPerMillion" ? "costPerMillion" : "averageCost";
 
   return (
-    <div className="h-16">
+    <div className="h-10">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <LineChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <Line type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2} dot={false} />
@@ -132,8 +132,8 @@ function CacheRing({ value }: { value: number }) {
   const offset = circumference - (percent / 100) * circumference;
 
   return (
-    <div className="flex h-16 items-center justify-center">
-      <svg viewBox="0 0 64 64" className="h-16 w-16" role="img" aria-label={`${Math.round(percent)}% cache hit`}>
+    <div className="flex h-10 items-center justify-center">
+      <svg viewBox="0 0 64 64" className="h-10 w-10" role="img" aria-label={`${Math.round(percent)}% cache hit`}>
         <circle cx="32" cy="32" r={radius} fill="none" stroke="rgb(var(--border))" strokeWidth="8" />
         <circle
           cx="32"
