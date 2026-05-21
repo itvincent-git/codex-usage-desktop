@@ -1,5 +1,6 @@
 import { CodexLimitsCard } from "@/components/codex-limits-card";
 import { DailyUsageTable } from "@/components/daily-usage-table";
+import { DashboardHeroCard } from "@/components/dashboard-hero-card";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
 import { LogPanel } from "@/components/log-panel";
@@ -85,7 +86,6 @@ export default function App() {
           isRefreshing={isRefreshing}
           isResetting={isResetting}
           isExporting={isExporting}
-          lastRescanDurationMs={lastRescanDurationMs}
           onViewChange={(nextView) => void handleViewChange(nextView)}
           onRangeChange={handleRangeChange}
           onRefresh={() => void handleRefresh()}
@@ -182,15 +182,31 @@ export default function App() {
 
           {!isLoading && view === "dashboard" && overview ? (
             <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <DashboardHeroCard
+                overview={overview}
+                range={range}
+                scanMessage={scanMessage}
+                lastRescanDurationMs={lastRescanDurationMs}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 {metrics.map((metric) => (
-                  <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
+                  <MetricCard
+                    key={metric.label}
+                    kind={metric.kind}
+                    label={metric.label}
+                    value={metric.value}
+                    detail={metric.detail}
+                    daily={overview.daily}
+                    cacheHitRate={overview.totals.cacheHitRate}
+                  />
                 ))}
               </div>
 
-              <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
-
-              <UsageTrendsCard daily={overview.daily} />
+              <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr]">
+                <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
+                <UsageTrendsCard daily={overview.daily} />
+              </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
                 <DailyUsageTable range={range} daily={sortedDailyUsage} />

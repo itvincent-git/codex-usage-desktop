@@ -1,5 +1,14 @@
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrencyShort, formatNumber, formatPercent } from "@/lib/formatters";
+
+export type MetricCardKind = "tokens" | "cost" | "average" | "cache" | "costPerMillion";
+
+export type MetricCardData = {
+  kind: MetricCardKind;
+  label: string;
+  value: string;
+  detail: string;
+};
 
 export const rangeLabels: Record<RangeKey, string> = {
   "1d": "Last 1 Day",
@@ -49,31 +58,36 @@ export function getExportDialogOptions(format: ExportFormat, defaultPath: string
   };
 }
 
-export function buildMetricCards(overview: OverviewResponse, range: RangeKey) {
+export function buildMetricCards(overview: OverviewResponse, range: RangeKey): MetricCardData[] {
   return [
     {
+      kind: "tokens",
       label: "Total Tokens",
-      value: formatNumber(overview.totals.totalTokens),
-      detail: `${rangeLabels[range]} across ${overview.startDate} to ${overview.endDate}`,
+      value: formatCompactNumber(overview.totals.totalTokens),
+      detail: `${overview.days} day total`,
     },
     {
+      kind: "cost",
       label: "Total Cost",
-      value: formatCurrency(overview.totals.costUSD),
-      detail: `Estimated local-first spend for ${overview.timezone}`,
+      value: formatCurrencyShort(overview.totals.costUSD),
+      detail: `${rangeLabels[range]} estimate`,
     },
     {
+      kind: "average",
       label: "Avg / Day",
-      value: `${formatNumber(overview.totals.avgTokensPerDay)} / ${formatCurrency(overview.totals.avgCostPerDay)}`,
-      detail: "Normalized by the selected natural-day window.",
+      value: `${formatCompactNumber(overview.totals.avgTokensPerDay)} / ${formatCurrencyShort(overview.totals.avgCostPerDay)}`,
+      detail: "Tokens / Cost (daily avg)",
     },
     {
+      kind: "cache",
       label: "Cache Hit",
       value: formatPercent(overview.totals.cacheHitRate),
-      detail: `${formatNumber(overview.totals.cachedInputTokens)} cached input tokens`,
+      detail: `${formatCompactNumber(overview.totals.cachedInputTokens)} cached input tokens`,
     },
     {
+      kind: "costPerMillion",
       label: "Cost / 1M",
-      value: formatCurrency(overview.totals.costPerMillionTokens),
+      value: `${formatCurrencyShort(overview.totals.costPerMillionTokens)}`,
       detail: "Effective blended cost over all billable tokens.",
     },
   ];

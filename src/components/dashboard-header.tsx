@@ -3,7 +3,6 @@ import { RangeSwitcher } from "@/components/range-switcher";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ExportFormat, OverviewResponse, RangeKey, UpdateCheckResponse } from "@/lib/api";
-import { formatDuration } from "@/lib/usage-dashboard";
 
 export type DashboardView = "dashboard" | "monthly" | "settings" | "logs";
 
@@ -16,7 +15,6 @@ type DashboardHeaderProps = {
   isRefreshing: boolean;
   isResetting: boolean;
   isExporting: ExportFormat | null;
-  lastRescanDurationMs: number | null;
   onViewChange: (view: DashboardView) => void;
   onRangeChange: (range: RangeKey) => void;
   onRefresh: () => void;
@@ -35,7 +33,6 @@ export function DashboardHeader({
   isRefreshing,
   isResetting,
   isExporting,
-  lastRescanDurationMs,
   onViewChange,
   onRangeChange,
   onRefresh,
@@ -119,17 +116,7 @@ export function DashboardHeader({
           </button>
           </nav>
           </div>
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl space-y-4">
-          <div className="space-y-3">
-            <h1 className="font-display text-3xl tracking-display sm:text-2xl">Local Codex cost intelligence.</h1>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-              A compact local dashboard for recent Codex usage and cost.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center lg:justify-end">
           {view === "dashboard" ? (
             <>
               <RangeSwitcher value={range} onChange={onRangeChange} />
@@ -157,19 +144,8 @@ export function DashboardHeader({
             <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             Rescan local logs
           </Button>
-        </div>
       </div>
-
-      <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>{scanMessage}</span>
-        <span>
-          {overview?.updatedAt
-            ? `Last update ${new Date(overview.updatedAt).toLocaleString()}${
-                lastRescanDurationMs === null ? "" : ` · Rescan ${formatDuration(lastRescanDurationMs)}`
-              }`
-            : "No cached snapshot yet"}
-        </span>
-      </div>
+      {view !== "dashboard" ? <p className="text-sm text-muted-foreground">{scanMessage}</p> : null}
     </header>
   );
 }

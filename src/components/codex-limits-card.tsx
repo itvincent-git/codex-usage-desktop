@@ -50,7 +50,7 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
 function LimitRow({ label, window }: LimitRowProps) {
   if (!window) {
     return (
-      <div className="rounded-md border border-border bg-muted/20 p-4">
+      <div className="rounded-lg border border-border bg-muted/20 p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium text-foreground">{label}</p>
           <p className="text-xs text-muted-foreground">Unavailable</p>
@@ -64,34 +64,76 @@ function LimitRow({ label, window }: LimitRowProps) {
   const usedPercent = clampPercent(window.usedPercent);
   const remainingPercent = clampPercent(window.remainingPercent);
   const resetLabel = window.resetsAt ? `Resets ${new Date(window.resetsAt).toLocaleString()}` : "Reset unavailable";
+  const status = getLimitStatus(remainingPercent);
 
   return (
-    <div className="rounded-md border border-border bg-muted/20 p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-foreground">{label}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{resetLabel}</p>
+        <div className="space-y-1">
+          <p className="text-base font-semibold text-foreground">
+            <span>{label}</span>
+            <span> window</span>
+          </p>
+          <p className="text-sm font-medium text-primary">{resetLabel}</p>
         </div>
-        <div className="text-right">
-          <p className="font-mono text-lg leading-none tabular-nums text-foreground">{formatLimitPercent(remainingPercent)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">remaining</p>
+        <span className={cn("rounded-sm px-2.5 py-1 text-xs font-semibold", status.badgeClass)}>{status.label}</span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-[8rem_1fr] items-center gap-4">
+        <LimitGauge remainingPercent={remainingPercent} tone={status.tone} />
+        <div className="space-y-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">Consumed</p>
+            <p className="font-medium text-foreground">
+              {formatLimitPercent(usedPercent)} {formatWindowUsage(window.windowMinutes, usedPercent)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Window</p>
+            <p className="font-medium text-foreground">{formatWindowMinutes(window.windowMinutes)}</p>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-border">
-        <div
-          className={cn(
-            "h-full rounded-full",
-            remainingPercent <= 10 ? "bg-error" : remainingPercent <= 30 ? "bg-warning" : "bg-primary",
-          )}
-          style={{ width: `${remainingPercent}%` }}
-        />
+      <div className="mt-5 h-2 overflow-hidden rounded-full bg-border">
+        <div className={cn("h-full rounded-full", status.barClass)} style={{ width: `${remainingPercent}%` }} />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{formatLimitPercent(remainingPercent)} remaining</span>
         <span>{formatLimitPercent(usedPercent)} consumed</span>
-        <span>{formatWindowMinutes(window.windowMinutes)}</span>
+      </div>
+    </div>
+  );
+}
+
+function LimitGauge({ remainingPercent, tone }: { remainingPercent: number; tone: "success" | "warning" | "error" }) {
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (remainingPercent / 100) * circumference;
+  const color =
+    tone === "success" ? "rgb(var(--primary))" : tone === "warning" ? "rgb(var(--warning))" : "rgb(var(--error))";
+
+  return (
+    <div className="relative h-32 w-32">
+      <svg viewBox="0 0 112 112" className="h-32 w-32" role="img" aria-label={`${Math.round(remainingPercent)}% remaining`}>
+        <circle cx="56" cy="56" r={radius} fill="none" stroke="rgb(var(--border))" strokeWidth="10" />
+        <circle
+          cx="56"
+          cy="56"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          strokeWidth="10"
+          transform="rotate(-90 56 56)"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="font-mono text-2xl font-medium tabular-nums text-foreground">{formatLimitPercent(remainingPercent)}</p>
+        <p className="text-xs text-muted-foreground">remaining</p>
       </div>
     </div>
   );
@@ -121,4 +163,44 @@ function formatWindowMinutes(windowMinutes: number | null) {
   }
 
   return "Window unknown";
+}
+
+function formatWindowUsage(windowMinutes: number | null, usedPercent: number) {
+  if (!windowMinutes) {
+    return "";
+  }
+
+  return `(${Math.round((windowMinutes * usedPercent) / 100).toLocaleString()} min)`;
+}
+
+function getLimitStatus(remainingPercent: number): {
+  label: string;
+  tone: "success" | "warning" | "error";
+  badgeClass: string;
+  barClass: string;
+} {
+  if (remainingPercent < 30) {
+    return {
+      label: "Near limit",
+      tone: "error",
+      badgeClass: "bg-error/10 text-error",
+      barClass: "bg-error",
+    };
+  }
+
+  if (remainingPercent < 70) {
+    return {
+      label: "Moderate",
+      tone: "warning",
+      badgeClass: "bg-warning/10 text-warning",
+      barClass: "bg-warning",
+    };
+  }
+
+  return {
+    label: "Healthy",
+    tone: "success",
+    badgeClass: "bg-success/10 text-success",
+    barClass: "bg-primary",
+  };
 }
