@@ -12,9 +12,12 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Sparkles, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function App() {
+  const [showNotes, setShowNotes] = useState(false);
   const {
     view,
     range,
@@ -30,11 +33,18 @@ export default function App() {
     isResetting,
     isExporting,
     lastRescanDurationMs,
+    updateInfo,
+    isUpdateChecking,
+    updateCheckError,
+    isUpdateDismissed,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
     handleReset,
     handleExport,
+    handleDismissUpdate,
+    handleManualUpdateCheck,
+    handleUpgrade,
   } = useUsageDashboard();
 
   const metrics = overview ? buildMetricCards(overview, range) : [];
@@ -83,6 +93,75 @@ export default function App() {
         />
 
         <main className="flex-1 py-8">
+          {updateInfo?.hasUpdate && !isUpdateDismissed ? (
+            <div className="mb-6 overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/30 via-purple-950/20 to-background p-5 text-card-foreground shadow-lg backdrop-blur-md transition-all duration-300 hover:border-indigo-500/30">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+                    <Sparkles className="h-5 w-5 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      New update available: v{updateInfo.latestVersion}
+                      <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400">
+                        Latest
+                      </span>
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-normal">
+                      A newer version of Codex Usage Desktop is ready. You are currently on v{updateInfo.currentVersion}. 
+                      {updateInfo.releaseName ? ` "${updateInfo.releaseName}"` : ""}
+                    </p>
+                    
+                    {updateInfo.releaseNotes ? (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition"
+                          onClick={() => setShowNotes(!showNotes)}
+                        >
+                          {showNotes ? (
+                            <>
+                              Hide release notes <ChevronUp className="h-3 w-3" />
+                            </>
+                          ) : (
+                            <>
+                              View release notes <ChevronDown className="h-3 w-3" />
+                            </>
+                          )}
+                        </button>
+                        
+                        {showNotes ? (
+                          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-black/20 p-3 text-xs text-muted-foreground border border-white/5 font-mono whitespace-pre-wrap leading-relaxed">
+                            {updateInfo.releaseNotes}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+                    onClick={() => void handleUpgrade()}
+                  >
+                    Upgrade Now
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={handleDismissUpdate}
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition"
+                    aria-label="Dismiss update notification"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {error ? (
             <Card className="border-error/30">
               <CardHeader>
@@ -130,6 +209,11 @@ export default function App() {
               isResetting={isResetting}
               isDisabled={isLoading || isMonthlyLoading || isRefreshing || isResetting || isExporting !== null}
               onReset={() => void handleReset()}
+              updateInfo={updateInfo}
+              isUpdateChecking={isUpdateChecking}
+              updateCheckError={updateCheckError}
+              onCheckUpdates={() => void handleManualUpdateCheck()}
+              onUpgrade={() => void handleUpgrade()}
             />
           ) : null}
 

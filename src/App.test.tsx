@@ -487,6 +487,18 @@ describe("App", () => {
           };
       }
 
+      if (command === "check_for_updates") {
+        return {
+          hasUpdate: false,
+          currentVersion: "0.4.0",
+          latestVersion: "0.4.0",
+          latestTag: "v0.4.0",
+          releaseName: null,
+          releaseNotes: null,
+          releaseUrl: "",
+        };
+      }
+
       throw new Error(`Unexpected invoke: ${command}`);
     });
 
@@ -498,11 +510,12 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
     expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");
-    expect(invokeMock).toHaveBeenNthCalledWith(4, "fetch_overview", { range: "30d" });
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "check_for_updates");
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_overview", { range: "30d" });
   });
 
   it("keeps the cached overview visible when the background scan fails", async () => {

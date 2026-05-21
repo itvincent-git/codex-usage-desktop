@@ -12,6 +12,9 @@ import {
   type MonthlyUsageResponse,
   type OverviewResponse,
   type RangeKey,
+  checkForUpdates,
+  openUrl,
+  type UpdateCheckResponse,
 } from "@/lib/api";
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, rangeLabels } from "@/lib/usage-dashboard";
@@ -32,6 +35,12 @@ export function useUsageDashboard() {
   const [isResetting, setIsResetting] = useState(false);
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
+  
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
+  const [isUpdateChecking, setIsUpdateChecking] = useState(false);
+  const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
+  const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
+
   const hasBootstrappedRef = useRef(false);
   const hiddenSinceRef = useRef<number | null>(null);
   const lastLimitsFetchTimeRef = useRef<number>(0);
@@ -81,6 +90,21 @@ export function useUsageDashboard() {
     setLastRescanDurationMs(performance.now() - startedAt);
   });
 
+  const runBackgroundUpdateCheck = useEffectEvent(async () => {
+    try {
+      const info = await checkForUpdates();
+      setUpdateInfo(info);
+      if (info.hasUpdate) {
+        const dismissedTag = localStorage.getItem("dismissed_update_tag");
+        if (dismissedTag === info.latestTag) {
+          setIsUpdateDismissed(true);
+        }
+      }
+    } catch (e) {
+      console.warn("Background update check failed", e);
+    }
+  });
+
   const bootstrap = useEffectEvent(async () => {
     if (hasBootstrappedRef.current) {
       return;
@@ -105,6 +129,8 @@ export function useUsageDashboard() {
     void scanAndReloadOverview(startedAt).catch((scanError: unknown) => {
       setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
     });
+
+    void runBackgroundUpdateCheck();
   });
 
   useEffect(() => {
@@ -252,6 +278,39 @@ export function useUsageDashboard() {
     }
   }
 
+  const handleDismissUpdate = () => {
+    if (updateInfo) {
+      localStorage.setItem("dismissed_update_tag", updateInfo.latestTag);
+      setIsUpdateDismissed(true);
+    }
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setIsUpdateChecking(true);
+    setUpdateCheckError(null);
+    try {
+      const info = await checkForUpdates();
+      setUpdateInfo(info);
+      if (info.hasUpdate) {
+        setIsUpdateDismissed(false); // Reset dismissal on manual trigger
+      }
+    } catch (e) {
+      setUpdateCheckError(errorMessage(e, "Failed to check for updates."));
+    } finally {
+      setIsUpdateChecking(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (updateInfo?.releaseUrl) {
+      try {
+        await openUrl(updateInfo.releaseUrl);
+      } catch (e) {
+        console.error("Failed to open release URL", e);
+      }
+    }
+  };
+
   return {
     view,
     range,
@@ -267,11 +326,18 @@ export function useUsageDashboard() {
     isResetting,
     isExporting,
     lastRescanDurationMs,
+    updateInfo,
+    isUpdateChecking,
+    updateCheckError,
+    isUpdateDismissed,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
     handleReset,
     handleExport,
+    handleDismissUpdate,
+    handleManualUpdateCheck,
+    handleUpgrade,
   };
 }
 

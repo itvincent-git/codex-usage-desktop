@@ -177,3 +177,16 @@ pub struct CodexLimitsResponse {
     pub updated_at: String,
     pub source: String,
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCheckResponse {
+    pub has_update: bool,
+    pub current_version: String,
+    pub latest_version: String,
+    pub latest_tag: String,
+    pub release_name: Option<String>,
+    pub release_notes: Option<String>,
+    pub release_url: String,
+}
+

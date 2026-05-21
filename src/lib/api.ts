@@ -123,3 +123,22 @@ export async function resetUsageState(): Promise<void> {
 export async function exportUsage(range: RangeKey, format: ExportFormat, path: string): Promise<ExportResponse> {
   return invoke<ExportResponse>("export_usage", { range, format, path });
 }
+
+export type UpdateCheckResponse = {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  latestTag: string;
+  releaseName: string | null;
+  releaseNotes: string | null;
+  releaseUrl: string;
+};
+
+export async function checkForUpdates(): Promise<UpdateCheckResponse> {
+  return invoke<UpdateCheckResponse>("check_for_updates");
+}
+
+export async function openUrl(url: string): Promise<void> {
+  return invoke<void>("open_url", { url });
+}
+
