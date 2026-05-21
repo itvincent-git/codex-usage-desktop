@@ -71,31 +71,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 py-8 sm:px-8 lg:px-10">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 pb-8 pt-3 sm:px-8 lg:px-10">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute right-10 top-8 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
+          className="pointer-events-none absolute right-10 top-3 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
         />
 
         <DashboardHeader
           view={view}
-          range={range}
-          overview={overview}
           scanMessage={scanMessage}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
           isResetting={isResetting}
           isExporting={isExporting}
           onViewChange={(nextView) => void handleViewChange(nextView)}
-          onRangeChange={handleRangeChange}
           onRefresh={() => void handleRefresh()}
-          onExport={(format) => void handleExport(format)}
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           onUpgrade={() => void handleUpgrade()}
         />
 
-        <main className="flex-1 py-8">
+        <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
           {updateInfo?.hasUpdate && !isUpdateDismissed ? (
             <div className="mb-6 overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/30 via-purple-950/20 to-background p-5 text-card-foreground shadow-lg backdrop-blur-md transition-all duration-300 hover:border-indigo-500/30">
               <div className="flex items-start justify-between gap-4">
@@ -186,7 +182,13 @@ export default function App() {
                 overview={overview}
                 range={range}
                 scanMessage={scanMessage}
+                isBusy={isLoading || isRefreshing || isResetting || isExporting !== null}
+                isRefreshing={isRefreshing}
+                isExporting={isExporting}
                 lastRescanDurationMs={lastRescanDurationMs}
+                onRangeChange={handleRangeChange}
+                onRefresh={() => void handleRefresh()}
+                onExport={(format) => void handleExport(format)}
               />
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

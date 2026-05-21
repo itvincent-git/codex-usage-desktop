@@ -1,24 +1,18 @@
-import { Download, FileSpreadsheet, FileText, RefreshCcw, Sparkles } from "lucide-react";
-import { RangeSwitcher } from "@/components/range-switcher";
+import { RefreshCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { ExportFormat, OverviewResponse, RangeKey, UpdateCheckResponse } from "@/lib/api";
+import type { ExportFormat, UpdateCheckResponse } from "@/lib/api";
 
 export type DashboardView = "dashboard" | "monthly" | "settings" | "logs";
 
 type DashboardHeaderProps = {
   view: DashboardView;
-  range: RangeKey;
-  overview: OverviewResponse | null;
   scanMessage: string;
   isLoading: boolean;
   isRefreshing: boolean;
   isResetting: boolean;
   isExporting: ExportFormat | null;
   onViewChange: (view: DashboardView) => void;
-  onRangeChange: (range: RangeKey) => void;
   onRefresh: () => void;
-  onExport: (format: ExportFormat) => void;
   updateInfo: UpdateCheckResponse | null;
   isUpdateDismissed: boolean;
   onUpgrade: () => void;
@@ -26,17 +20,13 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({
   view,
-  range,
-  overview,
   scanMessage,
   isLoading,
   isRefreshing,
   isResetting,
   isExporting,
   onViewChange,
-  onRangeChange,
   onRefresh,
-  onExport,
   updateInfo,
   isUpdateDismissed,
   onUpgrade,
@@ -44,7 +34,7 @@ export function DashboardHeader({
   const isBusy = isLoading || isRefreshing || isResetting || isExporting !== null;
 
   return (
-    <header className="flex flex-col gap-4 border-b border-border pb-2">
+    <header className="flex flex-col gap-3 pb-2">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2.5">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">Codex Usage Desktop</p>
@@ -66,7 +56,7 @@ export function DashboardHeader({
             type="button"
             role="tab"
             aria-selected={view === "dashboard"}
-            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
               view === "dashboard"
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -79,7 +69,7 @@ export function DashboardHeader({
             type="button"
             role="tab"
             aria-selected={view === "monthly"}
-            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
               view === "monthly"
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -92,7 +82,7 @@ export function DashboardHeader({
             type="button"
             role="tab"
             aria-selected={view === "settings"}
-            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
               view === "settings"
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -105,7 +95,7 @@ export function DashboardHeader({
             type="button"
             role="tab"
             aria-selected={view === "logs"}
-            className={`border-b-2 px-0 pb-3 pt-1 text-sm font-medium transition ${
+            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
               view === "logs"
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -114,38 +104,17 @@ export function DashboardHeader({
           >
             Logs
           </button>
-          </nav>
-          </div>
-      <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center lg:justify-end">
-          {view === "dashboard" ? (
-            <>
-              <RangeSwitcher value={range} onChange={onRangeChange} />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" size="lg" disabled={!overview || isBusy}>
-                    <Download className="h-4 w-4" />
-                    {isExporting === null ? "Export" : "Exporting"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => onExport("xlsx")}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => onExport("markdown")}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Markdown (.md)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          ) : null}
+        </nav>
+      </div>
+      {view !== "dashboard" ? (
+        <div className="flex flex-col items-start gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-sm text-muted-foreground">{scanMessage}</p>
           <Button variant="primary" size="lg" onClick={onRefresh} disabled={isBusy}>
             <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             Rescan local logs
           </Button>
-      </div>
-      {view !== "dashboard" ? <p className="text-sm text-muted-foreground">{scanMessage}</p> : null}
+        </div>
+      ) : null}
     </header>
   );
 }
