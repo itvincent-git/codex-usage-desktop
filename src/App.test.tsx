@@ -241,7 +241,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(invokeMock).toHaveBeenLastCalledWith("fetch_overview", { range: "1d" });
     });
-    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(1);
   });
 
   it("shows a loading state while switching to last 90 days", async () => {
@@ -498,12 +498,11 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(4));
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
     expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");
     expect(invokeMock).toHaveBeenNthCalledWith(4, "fetch_overview", { range: "30d" });
-    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_codex_limits");
   });
 
   it("keeps the cached overview visible when the background scan fails", async () => {

@@ -33,6 +33,8 @@ export function useUsageDashboard() {
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
   const hasBootstrappedRef = useRef(false);
+  const hiddenSinceRef = useRef<number | null>(null);
+  const lastLimitsFetchTimeRef = useRef<number>(0);
 
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
     const data = await fetchOverview(nextRange);
@@ -46,7 +48,15 @@ export function useUsageDashboard() {
     setError(null);
   });
 
-  const loadCodexLimits = useEffectEvent(async () => {
+  const loadCodexLimits = useEffectEvent(async (options?: { force?: boolean }) => {
+    const now = Date.now();
+    const isManual = options?.force === true;
+    if (!isManual && now - lastLimitsFetchTimeRef.current < 5000) {
+      return;
+    }
+
+    lastLimitsFetchTimeRef.current = now;
+
     try {
       const data = await fetchCodexLimits();
       setCodexLimits(data);
@@ -56,14 +66,14 @@ export function useUsageDashboard() {
     }
   });
 
-  const scanAndReloadOverview = useEffectEvent(async (startedAt: number) => {
+  const scanAndReloadOverview = useEffectEvent(async (startedAt: number, options?: { force?: boolean }) => {
     const scan = await scanUsage();
     const cacheMessage = scan.metrics
       ? ` Parsed ${scan.metrics.filesParsed}, reused ${scan.metrics.filesReused}.`
       : "";
     setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
     
-    await Promise.all([loadOverview(range), loadCodexLimits()]);
+    await Promise.all([loadOverview(range), loadCodexLimits(options)]);
     
     if (view === "monthly") {
       await loadMonthlyUsage();
@@ -100,6 +110,51 @@ export function useUsageDashboard() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  // Re-fetch limits when the page/window regains focus or visibility after being inactive ≥60 s.
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    const STALE_MS = 60_000;
+
+    function handleInactive() {
+      if (hiddenSinceRef.current === null) {
+        hiddenSinceRef.current = Date.now();
+      }
+    }
+
+    function handleActive() {
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        const inactiveDuration = hiddenSinceRef.current;
+        hiddenSinceRef.current = null;
+        if (inactiveDuration !== null && Date.now() - inactiveDuration >= STALE_MS) {
+          void loadCodexLimits();
+        }
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        handleInactive();
+      } else {
+        handleActive();
+      }
+    }
+
+    window.addEventListener("focus", handleActive);
+    window.addEventListener("blur", handleInactive);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    if (document.visibilityState === "hidden" || !document.hasFocus()) {
+      hiddenSinceRef.current = Date.now();
+    }
+
+    return () => {
+      window.removeEventListener("focus", handleActive);
+      window.removeEventListener("blur", handleInactive);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [bootstrapped, loadCodexLimits]);
 
   async function handleViewChange(nextView: DashboardView) {
     setView(nextView);
@@ -142,7 +197,7 @@ export function useUsageDashboard() {
     const startedAt = performance.now();
 
     try {
-      await scanAndReloadOverview(startedAt);
+      await scanAndReloadOverview(startedAt, { force: true });
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
     } finally {
@@ -165,7 +220,7 @@ export function useUsageDashboard() {
 
     try {
       await resetUsageState();
-      await scanAndReloadOverview(startedAt);
+      await scanAndReloadOverview(startedAt, { force: true });
       setScanMessage("Reset local cache and rebuilt usage data from local Codex logs.");
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : "Reset failed.");
