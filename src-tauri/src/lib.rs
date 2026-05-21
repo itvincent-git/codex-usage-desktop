@@ -145,21 +145,34 @@ fn is_newer(current: &str, latest: &str) -> bool {
 async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let current_version = app.package_info().version.to_string();
+        log::info!("Starting update check. Current version: {}", current_version);
         
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+            .map_err(|e| {
+                let err_msg = format!("Failed to build HTTP client: {e}");
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
             
         let response = client
             .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
             .header("User-Agent", "codex-usage-desktop")
             .header("Accept", "application/json")
             .send()
-            .map_err(|e| format!("Network request failed: {e}"))?;
+            .map_err(|e| {
+                let err_msg = format!("Update check network request failed: {e}");
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
             
         if !response.status().is_success() {
-            return Err(format!("GitHub API returned error status: {}", response.status()));
+            let status = response.status();
+            let body = response.text().unwrap_or_else(|_| "Unavailable".to_string());
+            let err_msg = format!("GitHub API returned error status: {status}. Response: {body}");
+            log::error!("{}", err_msg);
+            return Err(err_msg);
         }
         
         #[derive(serde::Deserialize)]
@@ -172,9 +185,20 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse,
         
         let release: GithubReleaseDto = response
             .json()
-            .map_err(|e| format!("Failed to parse release JSON: {e}"))?;
+            .map_err(|e| {
+                let err_msg = format!("Failed to parse release JSON: {e}");
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
             
         let has_update = is_newer(&current_version, &release.tag_name);
+        
+        log::info!(
+            "Update check completed. Latest version: {} (Tag: {}), has_update: {}",
+            release.tag_name.trim_start_matches("app-v").trim_start_matches('v'),
+            release.tag_name,
+            has_update
+        );
         
         Ok(UpdateCheckResponse {
             has_update,

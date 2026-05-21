@@ -92,8 +92,36 @@ export function useUsageDashboard() {
 
   const runBackgroundUpdateCheck = useEffectEvent(async () => {
     try {
+      const now = Date.now();
+      const lastCheckTimeStr = localStorage.getItem("last_update_check_time");
+      const lastCheckResultStr = localStorage.getItem("last_update_check_result");
+      
+      if (lastCheckTimeStr && lastCheckResultStr) {
+        const lastCheckTime = parseInt(lastCheckTimeStr, 10);
+        // Cache for 1 hour to prevent hitting GitHub API rate limit during hot reloads or frequent restarts
+        if (now - lastCheckTime < 3600000) {
+          try {
+            const cachedInfo = JSON.parse(lastCheckResultStr) as UpdateCheckResponse;
+            setUpdateInfo(cachedInfo);
+            if (cachedInfo.hasUpdate) {
+              const dismissedTag = localStorage.getItem("dismissed_update_tag");
+              if (dismissedTag === cachedInfo.latestTag) {
+                setIsUpdateDismissed(true);
+              }
+            }
+            return;
+          } catch (jsonErr) {
+            console.warn("Failed to parse cached update check result", jsonErr);
+          }
+        }
+      }
+
       const info = await checkForUpdates();
       setUpdateInfo(info);
+      
+      localStorage.setItem("last_update_check_time", now.toString());
+      localStorage.setItem("last_update_check_result", JSON.stringify(info));
+
       if (info.hasUpdate) {
         const dismissedTag = localStorage.getItem("dismissed_update_tag");
         if (dismissedTag === info.latestTag) {
@@ -291,6 +319,10 @@ export function useUsageDashboard() {
     try {
       const info = await checkForUpdates();
       setUpdateInfo(info);
+      
+      localStorage.setItem("last_update_check_time", Date.now().toString());
+      localStorage.setItem("last_update_check_result", JSON.stringify(info));
+
       if (info.hasUpdate) {
         setIsUpdateDismissed(false); // Reset dismissal on manual trigger
       }
