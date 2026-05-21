@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, FileText, RefreshCcw } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
@@ -42,24 +42,44 @@ export function DashboardHeroCard({
     (peak, day) => (!peak || day.costUSD > peak.costUSD ? day : peak),
     null,
   );
+  const formatUpdatedTime = (timestamp: string) => {
+    const d = new Date(timestamp);
+    const today = new Date();
+    const isToday = d.toDateString() === today.toDateString();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    if (isToday) {
+      return `Today at ${timeStr}`;
+    }
+    const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    return `${dateStr} ${timeStr}`;
+  };
+
+  const isSynced = !!overview.updatedAt;
   const updatedLabel = overview.updatedAt
-    ? `Updated ${new Date(overview.updatedAt).toLocaleString()}${
+    ? `Updated ${formatUpdatedTime(overview.updatedAt)}${
         lastRescanDurationMs === null ? "" : ` · Rescan ${formatDuration(lastRescanDurationMs)}`
       }`
     : "No cached snapshot yet";
 
   return (
     <Card className="overflow-hidden rounded-lg border-border/80 bg-gradient-to-br from-surface via-surface to-primary/5">
-      <div className="p-6 lg:p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
+      <div className="p-5 lg:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Overview</p>
-            <h1 className="max-w-xl font-display text-3xl tracking-display text-foreground sm:text-4xl">
-              Local Codex cost intelligence
-            </h1>
-            <p className="max-w-md text-sm leading-6 text-muted-foreground">
-              A compact local dashboard for recent Codex usage and cost.
-            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="font-display text-2xl font-bold tracking-display text-foreground sm:text-3xl">
+                Codex Cost Intelligence
+              </h1>
+              <div className="group relative flex items-center">
+                <Info className="h-4 w-4 text-muted-foreground/50 transition-colors hover:text-muted-foreground cursor-help" />
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 w-64 -translate-x-1/2 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
+                  <p className="font-semibold text-foreground">Codex Cost Intelligence</p>
+                  <p className="mt-1 leading-relaxed text-muted-foreground">A compact local dashboard for recent Codex usage and cost.</p>
+                  <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface" />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 lg:justify-end">
@@ -89,27 +109,37 @@ export function DashboardHeroCard({
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[0.8fr_1.4fr]">
-          <div className="flex flex-col justify-between gap-8">
-            <div className="rounded-md border border-border/80 bg-surface/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
-              <p>{scanMessage}</p>
-              <p>{updatedLabel}</p>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-6">
+          <div className="flex flex-col justify-between gap-4">
+            <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
+                  <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
+                </span>
+                <span>{isSynced ? "Cache Synced" : "Out of Sync"}</span>
+                <span className="text-muted-foreground/30">·</span>
+                <span className="text-muted-foreground font-normal">{scanMessage}</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground/75">
+                {updatedLabel}
+              </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground">Total cost ({rangeLabels[range]})</p>
-              <div className="flex flex-wrap items-end gap-3">
-                <p className="font-display text-5xl tracking-display text-foreground sm:text-6xl">
+              <div className="flex flex-wrap items-end gap-2.5">
+                <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
                   {formatCurrencyShort(overview.totals.costUSD)}
                 </p>
-                <p className="pb-2 text-sm font-medium text-success">
+                <p className="pb-1 text-sm font-medium text-success">
                   {formatCompactNumber(overview.totals.totalTokens)} tokens
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="min-h-[260px]">
+          <div className="h-[180px] min-h-[180px] sm:h-[200px] sm:min-h-[200px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={trendData} margin={{ top: 16, right: 10, left: 0, bottom: 0 }}>
                 <defs>
@@ -146,7 +176,7 @@ export function DashboardHeroCard({
               </AreaChart>
             </ResponsiveContainer>
             {peakCostDay ? (
-              <div className="mt-3 flex justify-end text-xs text-muted-foreground">
+              <div className="mt-2 flex justify-end text-[11px] text-muted-foreground">
                 Peak cost day: {peakCostDay.date} · {formatCurrencyShort(peakCostDay.costUSD)}
               </div>
             ) : null}

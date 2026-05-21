@@ -26,7 +26,7 @@ export function useUsageDashboard() {
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
-  const [scanMessage, setScanMessage] = useState("Sync local Codex usage into the desktop cache.");
+  const [scanMessage, setScanMessage] = useState("Sync local logs to cache");
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,9 +78,9 @@ export function useUsageDashboard() {
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number, options?: { force?: boolean }) => {
     const scan = await scanUsage();
     const cacheMessage = scan.metrics
-      ? ` Parsed ${scan.metrics.filesParsed}, reused ${scan.metrics.filesReused}.`
+      ? ` (${scan.metrics.filesReused} cached, ${scan.metrics.filesParsed} parsed)`
       : "";
-    setScanMessage(`Imported ${scan.importedDays} day buckets into the local cache.${cacheMessage}`);
+    setScanMessage(`Synced ${scan.importedDays} days${cacheMessage}`);
     
     await Promise.all([loadOverview(range), loadCodexLimits(options)]);
     
