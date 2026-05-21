@@ -205,15 +205,21 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr]">
-                <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
-                <UsageTrendsCard daily={overview.daily} />
+              <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr] min-w-0">
+                <div className="min-w-0">
+                  <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
+                </div>
+                <div className="min-w-0">
+                  <UsageTrendsCard daily={overview.daily} />
+                </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-                <DailyUsageTable range={range} daily={sortedDailyUsage} />
+              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr] min-w-0">
+                <div className="min-w-0">
+                  <DailyUsageTable range={range} daily={sortedDailyUsage} />
+                </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 min-w-0">
                   <ModelUsageCard models={overview.models} />
                   <ProjectUsageCard projects={projects} />
                 </div>
