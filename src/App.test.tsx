@@ -862,4 +862,88 @@ describe("App", () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
     expect(invokeMock).not.toHaveBeenCalledWith("export_usage", expect.anything());
   });
+
+  it("dismisses the main update banner and shows the eye-catching upgrade button in the header", async () => {
+    localStorage.clear();
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_codex_limits") {
+        return {
+          session: { usedPercent: 20, remainingPercent: 80, windowMinutes: 300, resetsAt: "2026-04-26T05:00:00.000Z" },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-04-30T00:00:00.000Z" },
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          source: "cli-rpc",
+        };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 2600,
+            cachedInputTokens: 400,
+            outputTokens: 800,
+            totalTokens: 3400,
+            costUSD: 0.0088685,
+            avgTokensPerDay: 113.3333333,
+            avgCostPerDay: 0.0002956,
+            cacheHitRate: 0.1538,
+            costPerMillionTokens: 2.6083,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "check_for_updates") {
+        return {
+          hasUpdate: true,
+          currentVersion: "0.4.0",
+          latestVersion: "0.5.0",
+          latestTag: "v0.5.0",
+          releaseName: "Big Release",
+          releaseNotes: "Feature details",
+          releaseUrl: "https://github.com/test/release",
+        };
+      }
+
+      if (command === "open_url" && args?.url === "https://github.com/test/release") {
+        return null;
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    // Wait for the main update banner to be displayed
+    await waitFor(() => expect(screen.getByText("New update available: v0.5.0")).toBeInTheDocument());
+
+    // Click the X button to dismiss the banner
+    const dismissButton = screen.getByRole("button", { name: "Dismiss update notification" });
+    await userEvent.click(dismissButton);
+
+    // Main update banner should disappear
+    expect(screen.queryByText("New update available: v0.5.0")).not.toBeInTheDocument();
+
+    // Check that the persistent dismiss tag was stored in localStorage
+    expect(localStorage.getItem("dismissed_update_tag")).toBe("v0.5.0");
+
+    // The small upgrade button in the header next to CODEX USAGE DESKTOP should appear
+    const headerUpgradeButton = screen.getByRole("button", { name: "Upgrade v0.5.0" });
+    expect(headerUpgradeButton).toBeInTheDocument();
+
+    // Click the header upgrade button to open the release URL
+    await userEvent.click(headerUpgradeButton);
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://github.com/test/release" });
+  });
 });

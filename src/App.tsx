@@ -90,6 +90,9 @@ export default function App() {
           onRangeChange={handleRangeChange}
           onRefresh={() => void handleRefresh()}
           onExport={(format) => void handleExport(format)}
+          updateInfo={updateInfo}
+          isUpdateDismissed={isUpdateDismissed}
+          onUpgrade={() => void handleUpgrade()}
         />
 
         <main className="flex-1 py-8">

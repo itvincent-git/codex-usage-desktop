@@ -1,8 +1,8 @@
-import { Download, FileSpreadsheet, FileText, RefreshCcw } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, RefreshCcw, Sparkles } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
+import type { ExportFormat, OverviewResponse, RangeKey, UpdateCheckResponse } from "@/lib/api";
 import { formatDuration } from "@/lib/usage-dashboard";
 
 export type DashboardView = "dashboard" | "monthly" | "settings" | "logs";
@@ -21,6 +21,9 @@ type DashboardHeaderProps = {
   onRangeChange: (range: RangeKey) => void;
   onRefresh: () => void;
   onExport: (format: ExportFormat) => void;
+  updateInfo: UpdateCheckResponse | null;
+  isUpdateDismissed: boolean;
+  onUpgrade: () => void;
 };
 
 export function DashboardHeader({
@@ -37,13 +40,29 @@ export function DashboardHeader({
   onRangeChange,
   onRefresh,
   onExport,
+  updateInfo,
+  isUpdateDismissed,
+  onUpgrade,
 }: DashboardHeaderProps) {
   const isBusy = isLoading || isRefreshing || isResetting || isExporting !== null;
 
   return (
     <header className="flex flex-col gap-4 border-b border-border pb-2">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">Codex Usage Desktop</p>
+        <div className="flex items-center gap-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">Codex Usage Desktop</p>
+          {updateInfo?.hasUpdate && isUpdateDismissed && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/30 transition-all duration-200 animate-pulse hover:animate-none active:scale-95 cursor-pointer"
+              title="Click to upgrade your application"
+            >
+              <Sparkles className="h-3 w-3 animate-pulse" />
+              Upgrade v{updateInfo.latestVersion}
+            </button>
+          )}
+        </div>
 
         <nav className="flex items-center gap-8 border-b border-border/80" aria-label="Usage view">
           <button
