@@ -218,10 +218,10 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(screen.getByText("Codex Limits")).toBeInTheDocument();
-    expect(screen.getByText("5 hour")).toBeInTheDocument();
-    expect(screen.getByText("Weekly")).toBeInTheDocument();
-    expect(screen.getByText("80%")).toBeInTheDocument();
-    expect(screen.getByText("55%")).toBeInTheDocument();
+    expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
+    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
+    expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
