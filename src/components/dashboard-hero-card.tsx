@@ -110,7 +110,7 @@ export function DashboardHeroCard({
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-6">
-          <div className="flex flex-col justify-between gap-4">
+          <div className="flex flex-col justify-center gap-3 lg:gap-4">
             <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
               <div className="flex items-center gap-1.5 font-medium text-foreground">
                 <span className="relative flex h-1.5 w-1.5">
@@ -139,7 +139,7 @@ export function DashboardHeroCard({
             </div>
           </div>
 
-          <div className="h-[180px] min-h-[180px] sm:h-[200px] sm:min-h-[200px]">
+          <div className="h-[120px] min-h-[120px] sm:h-[140px] sm:min-h-[140px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={trendData} margin={{ top: 16, right: 10, left: 0, bottom: 0 }}>
                 <defs>
