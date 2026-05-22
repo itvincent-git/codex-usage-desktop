@@ -11,6 +11,7 @@ import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
+import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
 import { useMemo, useState } from "react";
@@ -211,16 +212,25 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr] min-w-0">
-                <div className="min-w-0">
-                  <DailyUsageTable range={range} daily={sortedDailyUsage} />
-                </div>
+              <div className="grid gap-5 lg:grid-cols-2 min-w-0">
+                <ModelUsageCard models={overview.models} />
+                <ProjectUsageCard projects={projects} />
+              </div>
+            </div>
+          ) : null}
 
-                <div className="space-y-4 min-w-0">
-                  <ModelUsageCard models={overview.models} />
-                  <ProjectUsageCard projects={projects} />
+          {!isLoading && view === "daily" && overview ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">Daily Usage Details</h2>
+                  <p className="text-sm text-muted-foreground">Analyze your natural-day token and cost distribution.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <RangeSwitcher value={range} onChange={handleRangeChange} />
                 </div>
               </div>
+              <DailyUsageTable range={range} daily={sortedDailyUsage} />
             </div>
           ) : null}
 
