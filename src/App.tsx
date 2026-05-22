@@ -79,13 +79,7 @@ export default function App() {
 
         <DashboardHeader
           view={view}
-          scanMessage={scanMessage}
-          isLoading={isLoading}
-          isRefreshing={isRefreshing}
-          isResetting={isResetting}
-          isExporting={isExporting}
           onViewChange={(nextView) => void handleViewChange(nextView)}
-          onRefresh={() => void handleRefresh()}
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           onUpgrade={() => void handleUpgrade()}

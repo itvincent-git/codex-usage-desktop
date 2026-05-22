@@ -680,6 +680,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
 
+    await userEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
     await waitFor(() => expect(screen.getByText("Reset local cache and rebuilt usage data from local Codex logs.")).toBeInTheDocument());
     expect(confirmMock).toHaveBeenCalledWith(expect.stringContaining("Source logs will not be deleted"));
 

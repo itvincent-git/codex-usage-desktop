@@ -1,18 +1,11 @@
-import { RefreshCcw, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { ExportFormat, UpdateCheckResponse } from "@/lib/api";
+import { Sparkles } from "lucide-react";
+import type { UpdateCheckResponse } from "@/lib/api";
 
 export type DashboardView = "dashboard" | "monthly" | "settings" | "logs";
 
 type DashboardHeaderProps = {
   view: DashboardView;
-  scanMessage: string;
-  isLoading: boolean;
-  isRefreshing: boolean;
-  isResetting: boolean;
-  isExporting: ExportFormat | null;
   onViewChange: (view: DashboardView) => void;
-  onRefresh: () => void;
   updateInfo: UpdateCheckResponse | null;
   isUpdateDismissed: boolean;
   onUpgrade: () => void;
@@ -20,19 +13,11 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({
   view,
-  scanMessage,
-  isLoading,
-  isRefreshing,
-  isResetting,
-  isExporting,
   onViewChange,
-  onRefresh,
   updateInfo,
   isUpdateDismissed,
   onUpgrade,
 }: DashboardHeaderProps) {
-  const isBusy = isLoading || isRefreshing || isResetting || isExporting !== null;
-
   return (
     <header className="flex flex-col gap-3 pb-2">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -106,15 +91,6 @@ export function DashboardHeader({
           </button>
         </nav>
       </div>
-      {view !== "dashboard" ? (
-        <div className="flex flex-col items-start gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
-          <p className="text-sm text-muted-foreground">{scanMessage}</p>
-          <Button variant="primary" size="lg" onClick={onRefresh} disabled={isBusy}>
-            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            Rescan local logs
-          </Button>
-        </div>
-      ) : null}
     </header>
   );
 }
