@@ -4,7 +4,7 @@ import type { OverviewResponse } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
 import { cn } from "@/lib/utils";
-import { Activity, Coins, TrendingUp, Sparkles } from "lucide-react";
+import { Activity, Coins, TrendingUp, Sparkles, Zap } from "lucide-react";
 
 type UsageTrendsCardProps = {
   daily: OverviewResponse["daily"];
@@ -85,6 +85,8 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
   const totalTokens = daily.reduce((sum, day) => sum + day.totalTokens, 0);
   const totalCost = daily.reduce((sum, day) => sum + day.costUSD, 0);
+  const cachedTokens = daily.reduce((sum, day) => sum + day.cachedInputTokens, 0);
+  const avgDailyCost = daily.length > 0 ? totalCost / daily.length : 0;
 
   const peakTokenDay = daily.reduce<OverviewResponse["daily"][number] | null>(
     (peak, day) => (!peak || day.totalTokens > peak.totalTokens ? day : peak),
@@ -200,16 +202,16 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
 
         <div className="grid overflow-hidden rounded-xl border border-border/80 sm:grid-cols-4 shadow-sm">
           <SummaryCell 
-            label="Total Tokens" 
-            value={formatCompactNumber(totalTokens)} 
-            icon={Activity}
-            iconColor="text-indigo-500 bg-indigo-500/10"
+            label="Cached Tokens" 
+            value={formatCompactNumber(cachedTokens)} 
+            icon={Zap}
+            iconColor="text-emerald-500 bg-emerald-500/10"
           />
           <SummaryCell 
-            label="Total Cost" 
-            value={formatCurrencyShort(totalCost)} 
+            label="Avg Daily Cost" 
+            value={formatCurrencyShort(avgDailyCost)} 
             icon={Coins}
-            iconColor="text-emerald-500 bg-emerald-500/10"
+            iconColor="text-indigo-500 bg-indigo-500/10"
           />
           <SummaryCell
             label="Peak Token"

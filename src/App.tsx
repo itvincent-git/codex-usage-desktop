@@ -189,7 +189,7 @@ export default function App() {
                 onExport={(format) => void handleExport(format)}
               />
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {metrics.map((metric) => (
                   <MetricCard
                     key={metric.label}

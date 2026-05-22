@@ -62,15 +62,9 @@ export function buildMetricCards(overview: OverviewResponse, range: RangeKey): M
   return [
     {
       kind: "tokens",
-      label: "Total Tokens",
+      label: "Token Breakdown",
       value: formatCompactNumber(overview.totals.totalTokens),
       detail: `${overview.days}-day total`,
-    },
-    {
-      kind: "cost",
-      label: "Total Cost",
-      value: formatCurrencyShort(overview.totals.costUSD),
-      detail: `${rangeLabels[range]} estimate`,
     },
     {
       kind: "average",
