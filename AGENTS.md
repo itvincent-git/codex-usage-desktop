@@ -88,6 +88,9 @@ Known pitfalls to avoid:
 - In React dev mode, `StrictMode` re-runs effects. If startup logic lives in `useEffect`, guard against duplicate bootstrap requests and loading-state flicker.
 - If data is already on screen, avoid replacing the whole view with a full-page loading card for background refreshes unless that behavior is explicitly desired.
 
+## Git
+After completing the task, if there are no issues, commit the changes to Git. Write in English.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
