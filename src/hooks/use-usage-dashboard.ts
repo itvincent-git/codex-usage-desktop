@@ -103,17 +103,26 @@ export function useUsageDashboard() {
   });
 
   const runBackgroundUpdateCheck = useEffectEvent(async () => {
+    let cachedInfo: UpdateCheckResponse | null = null;
     try {
       const now = Date.now();
       const lastCheckTimeStr = localStorage.getItem("last_update_check_time");
       const lastCheckResultStr = localStorage.getItem("last_update_check_result");
+      const lastCheckFailedTimeStr = localStorage.getItem("last_update_check_failed_time");
       
-      if (lastCheckTimeStr && lastCheckResultStr) {
-        const lastCheckTime = parseInt(lastCheckTimeStr, 10);
-        // Cache for 1 hour to prevent hitting GitHub API rate limit during hot reloads or frequent restarts
-        if (now - lastCheckTime < 3600000) {
-          try {
-            const cachedInfo = JSON.parse(lastCheckResultStr) as UpdateCheckResponse;
+      if (lastCheckResultStr) {
+        try {
+          cachedInfo = JSON.parse(lastCheckResultStr) as UpdateCheckResponse;
+        } catch (jsonErr) {
+          console.warn("Failed to parse cached update check result", jsonErr);
+        }
+      }
+
+      // 1. If we recently failed, enforce a 1-hour cooldown before trying again
+      if (lastCheckFailedTimeStr) {
+        const lastCheckFailedTime = parseInt(lastCheckFailedTimeStr, 10);
+        if (now - lastCheckFailedTime < 3600000) {
+          if (cachedInfo) {
             setUpdateInfo(cachedInfo);
             if (cachedInfo.hasUpdate) {
               const dismissedTag = localStorage.getItem("dismissed_update_tag");
@@ -121,16 +130,49 @@ export function useUsageDashboard() {
                 setIsUpdateDismissed(true);
               }
             }
-            return;
-          } catch (jsonErr) {
-            console.warn("Failed to parse cached update check result", jsonErr);
           }
+          return;
         }
       }
 
-      const info = await checkForUpdates();
+      // 2. If we had a successful check within the last 24 hours, use it
+      if (lastCheckTimeStr && cachedInfo) {
+        const lastCheckTime = parseInt(lastCheckTimeStr, 10);
+        // Cache for 24 hours to prevent hitting GitHub API rate limit during hot reloads or frequent restarts
+        if (now - lastCheckTime < 86400000) {
+          setUpdateInfo(cachedInfo);
+          if (cachedInfo.hasUpdate) {
+            const dismissedTag = localStorage.getItem("dismissed_update_tag");
+            if (dismissedTag === cachedInfo.latestTag) {
+              setIsUpdateDismissed(true);
+            }
+          }
+          return;
+        }
+      }
+
+      // If we are calling the API, pass the cached ETag (if available) to leverage conditional 304 responses
+      const etag = cachedInfo?.etag || null;
+      const info = await checkForUpdates(etag);
+
+      // Clear any prior failure timestamp on success
+      localStorage.removeItem("last_update_check_failed_time");
+
+      if (info.notModified && cachedInfo) {
+        // GitHub API returned 304 Not Modified. Reuse our cached result but refresh the check timestamp.
+        setUpdateInfo(cachedInfo);
+        localStorage.setItem("last_update_check_time", now.toString());
+        
+        if (cachedInfo.hasUpdate) {
+          const dismissedTag = localStorage.getItem("dismissed_update_tag");
+          if (dismissedTag === cachedInfo.latestTag) {
+            setIsUpdateDismissed(true);
+          }
+        }
+        return;
+      }
+
       setUpdateInfo(info);
-      
       localStorage.setItem("last_update_check_time", now.toString());
       localStorage.setItem("last_update_check_result", JSON.stringify(info));
 
@@ -142,6 +184,18 @@ export function useUsageDashboard() {
       }
     } catch (e) {
       console.warn("Background update check failed", e);
+      localStorage.setItem("last_update_check_failed_time", Date.now().toString());
+      
+      // If we had a previously cached success result, still display it
+      if (cachedInfo) {
+        setUpdateInfo(cachedInfo);
+        if (cachedInfo.hasUpdate) {
+          const dismissedTag = localStorage.getItem("dismissed_update_tag");
+          if (dismissedTag === cachedInfo.latestTag) {
+            setIsUpdateDismissed(true);
+          }
+        }
+      }
     }
   });
 
@@ -334,6 +388,7 @@ export function useUsageDashboard() {
       
       localStorage.setItem("last_update_check_time", Date.now().toString());
       localStorage.setItem("last_update_check_result", JSON.stringify(info));
+      localStorage.removeItem("last_update_check_failed_time");
 
       if (info.hasUpdate) {
         setIsUpdateDismissed(false); // Reset dismissal on manual trigger

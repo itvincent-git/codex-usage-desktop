@@ -132,9 +132,14 @@ export type UpdateCheckResponse = {
   releaseName: string | null;
   releaseNotes: string | null;
   releaseUrl: string;
+  etag?: string | null;
+  notModified?: boolean | null;
 };
 
-export async function checkForUpdates(): Promise<UpdateCheckResponse> {
+export async function checkForUpdates(etag?: string | null): Promise<UpdateCheckResponse> {
+  if (etag) {
+    return invoke<UpdateCheckResponse>("check_for_updates", { etag });
+  }
   return invoke<UpdateCheckResponse>("check_for_updates");
 }
 

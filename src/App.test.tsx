@@ -30,6 +30,7 @@ vi.mock("@tauri-apps/plugin-log", () => ({
 
 describe("App", () => {
   beforeEach(() => {
+    localStorage.clear();
     invokeMock.mockReset();
     saveMock.mockReset();
     vi.unstubAllGlobals();
@@ -230,10 +231,18 @@ describe("App", () => {
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
+    // Click the Daily tab to show the DailyUsageTable
+    const dailyTab = screen.getByRole("tab", { name: "Daily" });
+    await userEvent.click(dailyTab);
+
     const latestDailyCell = screen.getByRole("cell", { name: "2026-04-26" });
     const inactiveDailyCell = screen.getByRole("cell", { name: "2026-04-24 to 2026-04-25" });
     expect(latestDailyCell.compareDocumentPosition(inactiveDailyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("No activity (2 days)")).toBeInTheDocument();
+
+    // Switch back to Dashboard tab to perform range selection
+    const dashboardTab = screen.getByRole("tab", { name: "Dashboard" });
+    await userEvent.click(dashboardTab);
 
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 1 Day" }));

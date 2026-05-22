@@ -188,5 +188,7 @@ pub struct UpdateCheckResponse {
     pub release_name: Option<String>,
     pub release_notes: Option<String>,
     pub release_url: String,
+    pub etag: Option<String>,
+    pub not_modified: Option<bool>,
 }
 

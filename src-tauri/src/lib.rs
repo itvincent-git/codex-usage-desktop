@@ -142,10 +142,17 @@ fn is_newer(current: &str, latest: &str) -> bool {
 }
 
 #[tauri::command]
-async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse, String> {
+async fn check_for_updates(
+    app: tauri::AppHandle,
+    etag: Option<String>,
+) -> Result<UpdateCheckResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let current_version = app.package_info().version.to_string();
-        log::info!("Starting update check. Current version: {}", current_version);
+        log::info!(
+            "Starting update check. Current version: {}. ETag context: {:?}",
+            current_version,
+            etag
+        );
         
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
@@ -156,24 +163,49 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse,
                 err_msg
             })?;
             
-        let response = client
+        let mut request = client
             .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
             .header("User-Agent", "codex-usage-desktop")
-            .header("Accept", "application/json")
-            .send()
+            .header("Accept", "application/json");
+            
+        if let Some(ref e) = etag {
+            request = request.header("If-None-Match", e);
+        }
+        
+        let response = request.send()
             .map_err(|e| {
                 let err_msg = format!("Update check network request failed: {e}");
                 log::error!("{}", err_msg);
                 err_msg
             })?;
             
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        
+        if status == reqwest::StatusCode::NOT_MODIFIED {
+            log::info!("Update check: 304 Not Modified. ETag matched.");
+            return Ok(UpdateCheckResponse {
+                has_update: false,
+                current_version,
+                latest_version: "".to_string(),
+                latest_tag: "".to_string(),
+                release_name: None,
+                release_notes: None,
+                release_url: "".to_string(),
+                etag,
+                not_modified: Some(true),
+            });
+        }
+            
+        if !status.is_success() {
             let body = response.text().unwrap_or_else(|_| "Unavailable".to_string());
             let err_msg = format!("GitHub API returned error status: {status}. Response: {body}");
             log::error!("{}", err_msg);
             return Err(err_msg);
         }
+        
+        let response_etag = response.headers().get("etag")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
         
         #[derive(serde::Deserialize)]
         struct GithubReleaseDto {
@@ -194,10 +226,11 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse,
         let has_update = is_newer(&current_version, &release.tag_name);
         
         log::info!(
-            "Update check completed. Latest version: {} (Tag: {}), has_update: {}",
+            "Update check completed. Latest version: {} (Tag: {}), has_update: {}, ETag: {:?}",
             release.tag_name.trim_start_matches("app-v").trim_start_matches('v'),
             release.tag_name,
-            has_update
+            has_update,
+            response_etag
         );
         
         Ok(UpdateCheckResponse {
@@ -208,6 +241,8 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<UpdateCheckResponse,
             release_name: release.name,
             release_notes: release.body,
             release_url: release.html_url,
+            etag: response_etag,
+            not_modified: Some(false),
         })
     })
     .await
