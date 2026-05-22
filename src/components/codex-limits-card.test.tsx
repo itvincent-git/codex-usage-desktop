@@ -33,13 +33,58 @@ describe("formatResetTime", () => {
   it("returns formatted weekly limit style for windowMinutes > 300", () => {
     vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
     
-    const resetsAtStr = "2026-05-24T05:00:00.000Z"; // a Sunday in UTC
+    const resetsAtStr = "2026-05-24T05:00:00.000Z";
     const resetsAt = new Date(resetsAtStr);
-    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const dayName = weekdays[resetsAt.getDay()];
-    const hoursStr = String(resetsAt.getHours()).padStart(2, "0");
-    const minsStr = String(resetsAt.getMinutes()).padStart(2, "0");
+    const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
+    const day = String(resetsAt.getDate()).padStart(2, "0");
     
-    expect(formatResetTime(resetsAtStr, 10080)).toBe(`Reset ${dayName} ${hoursStr}:${minsStr}`);
+    const diffMs = resetsAt.getTime() - new Date("2026-05-22T12:00:00.000Z").getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    let daysLeftText = "";
+    if (diffHours < 1) {
+      const mins = Math.ceil(diffMs / (1000 * 60));
+      daysLeftText = mins === 1 ? "1 min left" : `${mins} mins left`;
+    } else if (diffHours < 24) {
+      const hours = Math.ceil(diffHours);
+      daysLeftText = hours === 1 ? "1 hour left" : `${hours} hours left`;
+    } else {
+      const days = Math.ceil(diffHours / 24);
+      daysLeftText = days === 1 ? "1 day left" : `${days} days left`;
+    }
+    
+    expect(formatResetTime(resetsAtStr, 10080)).toBe(`Reset ${month}-${day} (${daysLeftText})`);
+  });
+
+  it("returns formatted weekly limit style with 1 day left", () => {
+    vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    const resetsAtStr = "2026-05-23T11:59:00.000Z";
+    const resetsAt = new Date(resetsAtStr);
+    const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
+    const day = String(resetsAt.getDate()).padStart(2, "0");
+    expect(formatResetTime(resetsAtStr, 10080)).toBe(`Reset ${month}-${day} (24 hours left)`);
+
+    const resetsAtStr2 = "2026-05-23T12:01:00.000Z";
+    const resetsAt2 = new Date(resetsAtStr2);
+    const month2 = String(resetsAt2.getMonth() + 1).padStart(2, "0");
+    const day2 = String(resetsAt2.getDate()).padStart(2, "0");
+    expect(formatResetTime(resetsAtStr2, 10080)).toBe(`Reset ${month2}-${day2} (1 day left)`);
+  });
+
+  it("returns formatted weekly limit style with hours left", () => {
+    vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    const resetsAtStr = "2026-05-22T17:00:00.000Z"; // 5 hours in future
+    const resetsAt = new Date(resetsAtStr);
+    const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
+    const day = String(resetsAt.getDate()).padStart(2, "0");
+    expect(formatResetTime(resetsAtStr, 10080)).toBe(`Reset ${month}-${day} (5 hours left)`);
+  });
+
+  it("returns formatted weekly limit style with minutes left", () => {
+    vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    const resetsAtStr = "2026-05-22T12:35:00.000Z"; // 35 minutes in future
+    const resetsAt = new Date(resetsAtStr);
+    const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
+    const day = String(resetsAt.getDate()).padStart(2, "0");
+    expect(formatResetTime(resetsAtStr, 10080)).toBe(`Reset ${month}-${day} (35 mins left)`);
   });
 });

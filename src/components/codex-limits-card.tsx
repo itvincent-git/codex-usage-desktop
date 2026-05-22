@@ -237,11 +237,23 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
   }
   
   // For weekly limit
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const dayName = weekdays[resetsAt.getDay()];
-  const hoursStr = String(resetsAt.getHours()).padStart(2, "0");
-  const minsStr = String(resetsAt.getMinutes()).padStart(2, "0");
-  return `Reset ${dayName} ${hoursStr}:${minsStr}`;
+  const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
+  const day = String(resetsAt.getDate()).padStart(2, "0");
+  
+  const diffHours = diffMs / (1000 * 60 * 60);
+  let daysLeftText = "";
+  if (diffHours < 1) {
+    const mins = Math.ceil(diffMs / (1000 * 60));
+    daysLeftText = mins === 1 ? "1 min left" : `${mins} mins left`;
+  } else if (diffHours < 24) {
+    const hours = Math.ceil(diffHours);
+    daysLeftText = hours === 1 ? "1 hour left" : `${hours} hours left`;
+  } else {
+    const days = Math.round(diffHours / 24);
+    daysLeftText = days === 1 ? "1 day left" : `${days} days left`;
+  }
+  
+  return `Reset ${month}-${day} (${daysLeftText})`;
 }
 
 function getLimitStatus(remainingPercent: number): {
