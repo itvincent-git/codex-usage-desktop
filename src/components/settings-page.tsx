@@ -12,6 +12,8 @@ type SettingsPageProps = {
   updateCheckError: string | null;
   onCheckUpdates: () => void;
   onUpgrade: () => void;
+  showLogsTab: boolean;
+  onShowLogsTabChange: (show: boolean) => void;
 };
 
 export function SettingsPage({
@@ -23,6 +25,8 @@ export function SettingsPage({
   updateCheckError,
   onCheckUpdates,
   onUpgrade,
+  showLogsTab,
+  onShowLogsTabChange,
 }: SettingsPageProps) {
   return (
     <div className="max-w-3xl space-y-4">
@@ -43,6 +47,40 @@ export function SettingsPage({
               <RotateCcw className={`h-4 w-4 ${isResetting ? "animate-spin" : ""}`} />
               {isResetting ? "Resetting" : "Reset cache"}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Display Settings</CardTitle>
+          <CardDescription>Customize the dashboard user interface.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-foreground">Show Logs Tab</h4>
+              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+                Display the 'Logs' tab in the navigation header to view real-time log output.
+              </p>
+            </div>
+            <button
+              type="button"
+              id="toggle-show-logs-tab"
+              aria-label="Toggle Logs Tab"
+              onClick={() => onShowLogsTabChange(!showLogsTab)}
+              disabled={isDisabled}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                showLogsTab ? "bg-indigo-600" : "bg-neutral-700"
+              } ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  showLogsTab ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
           </div>
         </CardContent>
       </Card>

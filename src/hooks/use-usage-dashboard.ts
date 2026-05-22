@@ -41,6 +41,18 @@ export function useUsageDashboard() {
   const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
 
+  const [showLogsTab, setShowLogsTabState] = useState(() => {
+    return localStorage.getItem("show_logs_tab") === "true";
+  });
+
+  const setShowLogsTab = (show: boolean) => {
+    localStorage.setItem("show_logs_tab", show.toString());
+    setShowLogsTabState(show);
+    if (!show && view === "logs") {
+      setView("dashboard");
+    }
+  };
+
   const hasBootstrappedRef = useRef(false);
   const hiddenSinceRef = useRef<number | null>(null);
   const lastLimitsFetchTimeRef = useRef<number>(0);
@@ -362,6 +374,8 @@ export function useUsageDashboard() {
     isUpdateChecking,
     updateCheckError,
     isUpdateDismissed,
+    showLogsTab,
+    setShowLogsTab,
     handleViewChange,
     handleRangeChange,
     handleRefresh,

@@ -947,4 +947,92 @@ describe("App", () => {
     await userEvent.click(headerUpgradeButton);
     expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://github.com/test/release" });
   });
+
+  it("defaults to hiding the Logs tab, and shows it when toggled in Settings", async () => {
+    localStorage.removeItem("show_logs_tab");
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_codex_limits") {
+        return {
+          session: { usedPercent: 20, remainingPercent: 80, windowMinutes: 300, resetsAt: "2026-04-26T05:00:00.000Z" },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-04-30T00:00:00.000Z" },
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          source: "cli-rpc",
+        };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            costUSD: 0,
+            avgTokensPerDay: 0,
+            avgCostPerDay: 0,
+            cacheHitRate: 0,
+            costPerMillionTokens: 0,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "0.4.0", latestVersion: "0.4.0", latestTag: "v0.4.0" };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    // Wait for the overview to render (proves app loaded)
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument());
+
+    // By default, the Logs tab should NOT be visible
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
+
+    // Click Settings
+    const settingsTab = screen.getByRole("tab", { name: "Settings" });
+    await userEvent.click(settingsTab);
+
+    // Verify Display Settings card is rendered with "Show Logs Tab" toggle switch
+    expect(screen.getByText("Display Settings")).toBeInTheDocument();
+    const toggleSwitch = screen.getByRole("button", { name: "Toggle Logs Tab" });
+    expect(toggleSwitch).toBeInTheDocument();
+
+    // Click toggle to enable Logs tab
+    await userEvent.click(toggleSwitch);
+
+    // Logs tab should now be visible in navigation
+    const logsTab = screen.getByRole("tab", { name: "Logs" });
+    expect(logsTab).toBeInTheDocument();
+    expect(localStorage.getItem("show_logs_tab")).toBe("true");
+
+    // Click Logs tab to view it
+    await userEvent.click(logsTab);
+    expect(screen.getByText("Waiting for logs...")).toBeInTheDocument();
+
+    // Go back to Settings and toggle it off
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("button", { name: "Toggle Logs Tab" }));
+
+    // Logs tab should be hidden and settings should remain selected
+    expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("show_logs_tab")).toBe("false");
+    expect(screen.getByRole("tab", { name: "Settings" })).toHaveAttribute("aria-selected", "true");
+  });
 });

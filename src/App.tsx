@@ -38,6 +38,8 @@ export default function App() {
     isUpdateChecking,
     updateCheckError,
     isUpdateDismissed,
+    showLogsTab,
+    setShowLogsTab,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
@@ -83,6 +85,7 @@ export default function App() {
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           onUpgrade={() => void handleUpgrade()}
+          showLogsTab={showLogsTab}
         />
 
         <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
@@ -235,6 +238,8 @@ export default function App() {
               updateCheckError={updateCheckError}
               onCheckUpdates={() => void handleManualUpdateCheck()}
               onUpgrade={() => void handleUpgrade()}
+              showLogsTab={showLogsTab}
+              onShowLogsTabChange={setShowLogsTab}
             />
           ) : null}
 

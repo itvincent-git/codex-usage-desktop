@@ -9,6 +9,7 @@ type DashboardHeaderProps = {
   updateInfo: UpdateCheckResponse | null;
   isUpdateDismissed: boolean;
   onUpgrade: () => void;
+  showLogsTab?: boolean;
 };
 
 export function DashboardHeader({
@@ -17,6 +18,7 @@ export function DashboardHeader({
   updateInfo,
   isUpdateDismissed,
   onUpgrade,
+  showLogsTab = false,
 }: DashboardHeaderProps) {
   return (
     <header className="flex flex-col gap-3 pb-2">
@@ -76,19 +78,21 @@ export function DashboardHeader({
           >
             Settings
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "logs"}
-            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
-              view === "logs"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => onViewChange("logs")}
-          >
-            Logs
-          </button>
+          {showLogsTab && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "logs"}
+              className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
+                view === "logs"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onViewChange("logs")}
+            >
+              Logs
+            </button>
+          )}
         </nav>
       </div>
     </header>
