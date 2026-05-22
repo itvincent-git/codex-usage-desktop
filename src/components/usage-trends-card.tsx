@@ -97,8 +97,8 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
 
   return (
     <Card className="rounded-lg h-full flex flex-col">
-      <CardHeader className="flex flex-col gap-4 border-b border-border/80 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6 shrink-0">
-        <div className="space-y-2">
+      <CardHeader className="flex flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5 shrink-0">
+        <div className="space-y-1">
           <CardTitle>Usage Trends</CardTitle>
           <CardDescription>Total token and cost movement across the selected natural-day window.</CardDescription>
           <span className="sr-only">Total Token Trend</span>
@@ -113,10 +113,10 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5 p-5 sm:p-6 flex-1 flex flex-col justify-between">
-        <div className="h-80 flex-1 min-h-[320px]">
+      <CardContent className="space-y-4 p-4 sm:p-4.5 flex-1 flex flex-col justify-between">
+        <div className="h-64 flex-1 min-h-[256px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <ComposedChart data={trendData} margin={{ top: 20, right: 20, left: 20, bottom: 8 }}>
+            <ComposedChart data={trendData} margin={{ top: 12, right: 12, left: 12, bottom: 4 }}>
               <defs>
                 <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="rgb(var(--primary))" stopOpacity={0.15}/>
@@ -249,17 +249,17 @@ function SummaryCell({
   badgeClass?: string;
 }) {
   return (
-    <div className="group relative border-b last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 border-border/80 p-4 sm:p-5 bg-surface transition-all duration-300 hover:bg-muted/10">
-      <div className="flex items-start justify-between gap-2 sm:gap-3">
-        <div className="space-y-1.5 flex-1 min-w-0">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">{label}</p>
+    <div className="group relative border-b last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 border-border/80 p-3 sm:p-3.5 bg-surface transition-all duration-300 hover:bg-muted/10">
+      <div className="flex items-start justify-between gap-2 sm:gap-2.5">
+        <div className="space-y-1 flex-1 min-w-0">
+          <p className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">{label}</p>
           <div className="pt-0.5">
-            <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={value}>{value}</p>
+            <p className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={value}>{value}</p>
             {detail ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider leading-none whitespace-nowrap">Peak:</span>
+              <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                <span className="text-[8px] sm:text-[9px] font-semibold text-muted-foreground uppercase tracking-wider leading-none whitespace-nowrap">Peak:</span>
                 <span className={cn(
-                  "text-[9px] font-bold px-1.5 py-0.5 rounded leading-none uppercase tracking-wider whitespace-nowrap border border-transparent",
+                  "text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded leading-none uppercase tracking-wider whitespace-nowrap border border-transparent",
                   badgeClass || "text-muted-foreground bg-muted/50 border-border/50"
                 )}>
                   {detail}
@@ -268,8 +268,8 @@ function SummaryCell({
             ) : null}
           </div>
         </div>
-        <div className={cn("p-2 sm:p-2.5 rounded-lg group-hover:scale-110 transition-all duration-300 shrink-0", iconColor)}>
-          <Icon className="h-4 sm:h-4.5 w-4 sm:w-4.5" />
+        <div className={cn("p-1.5 sm:p-2 rounded-lg group-hover:scale-110 transition-all duration-300 shrink-0", iconColor)}>
+          <Icon className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
         </div>
       </div>
     </div>
