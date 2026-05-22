@@ -15,8 +15,8 @@ type LimitRowProps = {
 
 export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
   return (
-    <Card>
-      <CardHeader className="border-b border-border p-5 sm:p-6">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="border-b border-border p-5 sm:p-6 shrink-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <CardTitle className="flex items-center gap-2 text-2xl">
@@ -31,13 +31,13 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="p-5 sm:p-6">
+      <CardContent className="p-5 sm:p-6 flex-1 flex flex-col justify-center">
         {error ? (
           <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
             Codex limits unavailable: {error}
           </div>
         ) : (
-          <div className="grid gap-4 grid-cols-1">
+          <div className="grid gap-4 grid-cols-1 flex-1 justify-center">
             <LimitRow label="5 hour" window={limits?.session ?? null} />
             <LimitRow label="Weekly" window={limits?.weekly ?? null} />
           </div>
