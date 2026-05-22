@@ -64,7 +64,7 @@ export function buildMetricCards(overview: OverviewResponse, range: RangeKey): M
       kind: "tokens",
       label: "Total Tokens",
       value: formatCompactNumber(overview.totals.totalTokens),
-      detail: `${overview.days} day total`,
+      detail: `${overview.days}-day total`,
     },
     {
       kind: "cost",
@@ -76,19 +76,19 @@ export function buildMetricCards(overview: OverviewResponse, range: RangeKey): M
       kind: "average",
       label: "Avg / Day",
       value: `${formatCompactNumber(overview.totals.avgTokensPerDay)} / ${formatCurrencyShort(overview.totals.avgCostPerDay)}`,
-      detail: "Tokens / Cost (daily avg)",
+      detail: "Tokens & cost per day",
     },
     {
       kind: "cache",
       label: "Cache Hit",
       value: formatPercent(overview.totals.cacheHitRate),
-      detail: `${formatCompactNumber(overview.totals.cachedInputTokens)} cached input tokens`,
+      detail: `${formatCompactNumber(overview.totals.cachedInputTokens)} cached tokens`,
     },
     {
       kind: "costPerMillion",
       label: "Cost / 1M",
       value: `${formatCurrencyShort(overview.totals.costPerMillionTokens)}`,
-      detail: "Effective blended cost over all billable tokens.",
+      detail: "Blended cost per million",
     },
   ];
 }
