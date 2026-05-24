@@ -1,12 +1,11 @@
-import { Download, FileSpreadsheet, FileText, Info, RefreshCcw } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Cpu, Download, FileSpreadsheet, FileText, FolderGit2, Gauge, Info, RefreshCcw } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
-import { formatCompactNumber, formatCurrencyShort } from "@/lib/formatters";
-import { formatDuration, formatTrendDateLabel, rangeLabels } from "@/lib/usage-dashboard";
+import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
+import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -33,15 +32,16 @@ export function DashboardHeroCard({
   onRefresh,
   onExport,
 }: DashboardHeroCardProps) {
-  const trendData = overview.daily.map((day) => ({
-    date: day.date,
-    shortDate: formatTrendDateLabel(day.date),
-    costUSD: day.costUSD,
-  }));
-  const peakCostDay = overview.daily.reduce<OverviewResponse["daily"][number] | null>(
-    (peak, day) => (!peak || day.costUSD > peak.costUSD ? day : peak),
-    null,
-  );
+  const totalCost = overview.totals.costUSD;
+  const models = overview.models ?? [];
+  const projects = overview.projects ?? [];
+  const topModel = [...models].sort((left, right) => right.costUSD - left.costUSD)[0] ?? null;
+  const topProject = [...projects].sort((left, right) => right.costUSD - left.costUSD)[0] ?? null;
+  const billableInputTokens = Math.max(overview.totals.inputTokens - overview.totals.cachedInputTokens, 0);
+  const tokenMixTotal = billableInputTokens + overview.totals.cachedInputTokens + overview.totals.outputTokens;
+  const costShare = (costUSD: number) => (totalCost > 0 ? costUSD / totalCost : 0);
+  const tokenShare = (tokens: number) => (tokenMixTotal > 0 ? tokens / tokenMixTotal : 0);
+
   const formatUpdatedTime = (timestamp: string) => {
     const d = new Date(timestamp);
     const today = new Date();
@@ -73,10 +73,10 @@ export function DashboardHeroCard({
               </h1>
               <div className="group relative flex items-center">
                 <Info className="h-4 w-4 text-muted-foreground/50 transition-colors hover:text-muted-foreground cursor-help" />
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2.5 w-64 -translate-x-1/2 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
+                <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-2.5 w-64 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
                   <p className="font-semibold text-foreground">Codex Cost Intelligence</p>
                   <p className="mt-1 leading-relaxed text-muted-foreground">A compact local dashboard for recent Codex usage and cost.</p>
-                  <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface" />
+                  <div className="absolute right-1 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface sm:left-1/2 sm:right-auto" />
                 </div>
               </div>
             </div>
@@ -139,50 +139,142 @@ export function DashboardHeroCard({
             </div>
           </div>
 
-          <div className="h-[120px] min-h-[120px] sm:h-[140px] sm:min-h-[140px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={trendData} margin={{ top: 16, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="heroCostGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity={0.32} />
-                    <stop offset="100%" stopColor="rgb(var(--primary))" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgb(var(--border))" strokeDasharray="4 4" vertical={false} />
-                <XAxis
-                  dataKey="shortDate"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
-                  tickFormatter={(value) => formatCurrencyShort(Number(value))}
-                />
-                <Tooltip
-                  formatter={(value) => formatCurrencyShort(Number(value))}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.date ?? ""}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="costUSD"
-                  stroke="rgb(var(--primary))"
-                  strokeWidth={2.5}
-                  fill="url(#heroCostGradient)"
-                  activeDot={{ r: 6, strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-            {peakCostDay ? (
-              <div className="mt-2 flex justify-end text-[11px] text-muted-foreground">
-                Peak cost day: {peakCostDay.date} · {formatCurrencyShort(peakCostDay.costUSD)}
+          <div className="grid gap-3 rounded-lg border border-border/70 bg-surface/55 p-4 shadow-sm sm:grid-cols-[1fr_0.9fr]">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cost Drivers</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Where the selected-window spend comes from</p>
               </div>
-            ) : null}
+
+              <div className="grid gap-2">
+                <DriverRow
+                  icon={Cpu}
+                  label="Top model"
+                  value={topModel?.model ?? "No model data"}
+                  amount={topModel ? formatCurrencyShort(topModel.costUSD) : "$0.00"}
+                  percent={formatPercent(topModel ? costShare(topModel.costUSD) : 0)}
+                  width={topModel ? costShare(topModel.costUSD) : 0}
+                />
+                <DriverRow
+                  icon={FolderGit2}
+                  label="Top project"
+                  value={topProject?.displayName ?? "No project data"}
+                  amount={topProject ? formatCurrencyShort(topProject.costUSD) : "$0.00"}
+                  percent={formatPercent(topProject ? costShare(topProject.costUSD) : 0)}
+                  width={topProject ? costShare(topProject.costUSD) : 0}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between gap-3 rounded-md border border-border/60 bg-background/45 p-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Token mix</p>
+                  <span className="text-xs font-medium text-foreground">{formatCompactNumber(tokenMixTotal)}</span>
+                </div>
+                <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+                  <span
+                    className="bg-primary"
+                    style={{ width: `${tokenShare(billableInputTokens) * 100}%` }}
+                    aria-label={`Billable input ${formatPercent(tokenShare(billableInputTokens))}`}
+                  />
+                  <span
+                    className="bg-success"
+                    style={{ width: `${tokenShare(overview.totals.cachedInputTokens) * 100}%` }}
+                    aria-label={`Cached input ${formatPercent(tokenShare(overview.totals.cachedInputTokens))}`}
+                  />
+                  <span
+                    className="bg-violet-500"
+                    style={{ width: `${tokenShare(overview.totals.outputTokens) * 100}%` }}
+                    aria-label={`Output ${formatPercent(tokenShare(overview.totals.outputTokens))}`}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                  <TokenMixLegend label="Input" value={formatPercent(tokenShare(billableInputTokens))} className="bg-primary" />
+                  <TokenMixLegend label="Cached" value={formatPercent(tokenShare(overview.totals.cachedInputTokens))} className="bg-success" />
+                  <TokenMixLegend label="Output" value={formatPercent(tokenShare(overview.totals.outputTokens))} className="bg-violet-500" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <DriverStat icon={Gauge} label="Cache hit" value={formatPercent(overview.totals.cacheHitRate)} />
+                <DriverStat icon={Gauge} label="Cost / 1M" value={formatCurrencyShort(overview.totals.costPerMillionTokens)} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+function DriverRow({
+  icon: Icon,
+  label,
+  value,
+  amount,
+  percent,
+  width,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  amount: string;
+  percent: string;
+  width: number;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 bg-background/45 p-3">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 rounded-md bg-primary/10 p-2 text-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+            <p className="font-mono text-xs font-semibold text-foreground">{amount}</p>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <p className="truncate text-sm font-semibold text-foreground" title={value}>{value}</p>
+            <p className="shrink-0 text-xs text-muted-foreground">{percent}</p>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(Math.max(width, 0), 1) * 100}%` }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TokenMixLegend({ label, value, className }: { label: string; value: string; className: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${className}`} />
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="mt-0.5 font-mono text-[11px] font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function DriverStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 bg-surface/70 p-2.5">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{label}</span>
+      </div>
+      <p className="mt-1 font-mono text-sm font-semibold text-foreground">{value}</p>
+    </div>
   );
 }
