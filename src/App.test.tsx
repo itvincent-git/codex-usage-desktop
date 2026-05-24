@@ -225,12 +225,18 @@ describe("App", () => {
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Model Usage")).toBeInTheDocument();
-    expect(screen.getByText("Project Usage")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: /codex-usage-desktop/ })).not.toBeInTheDocument();
+
+    const projectUsageTab = screen.getByRole("tab", { name: "Project Usage" });
+    await userEvent.click(projectUsageTab);
+
+    expect(screen.getByRole("heading", { name: "Project Usage Details" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
+
     // Click the Daily tab to show the DailyUsageTable
     const dailyTab = screen.getByRole("tab", { name: "Daily" });
     await userEvent.click(dailyTab);

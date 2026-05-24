@@ -212,10 +212,24 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-2 min-w-0">
+              <div className="min-w-0">
                 <ModelUsageCard models={overview.models} />
-                <ProjectUsageCard projects={projects} />
               </div>
+            </div>
+          ) : null}
+
+          {!isLoading && view === "projects" && overview ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">Project Usage Details</h2>
+                  <p className="text-sm text-muted-foreground">Analyze token and cost totals by project directory.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <RangeSwitcher value={range} onChange={handleRangeChange} />
+                </div>
+              </div>
+              <ProjectUsageCard projects={projects} />
             </div>
           ) : null}
 
