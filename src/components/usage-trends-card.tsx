@@ -19,6 +19,13 @@ const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
   costPerMillion: { accent: "group-hover:border-warning/30", dot: "bg-warning" },
 };
 
+const chartLegend = [
+  { label: "Input", className: "bg-blue-600/75" },
+  { label: "Cached", className: "bg-success/80" },
+  { label: "Output", className: "bg-violet-600/70" },
+  { label: "Cost", className: "bg-primary" },
+];
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const input = payload.find((p: any) => p.dataKey === "inputTokens")?.value ?? 0;
@@ -28,44 +35,44 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const total = input + cached + output;
 
     return (
-      <div className="rounded-xl border border-border/50 bg-surface/95 backdrop-blur-md p-3.5 shadow-xl select-none min-w-[200px] transition-all duration-300">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+      <div className="min-w-[220px] select-none rounded-lg border border-border/70 bg-surface/95 p-3.5 shadow-xl backdrop-blur-md">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
         <div className="space-y-1.5 text-xs">
-          <div className="flex items-center justify-between gap-4 font-semibold text-foreground border-b border-border/50 pb-1.5 mb-1.5">
+          <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-border/60 pb-1.5 font-semibold text-foreground">
             <span>Total Tokens</span>
             <span>{formatNumber(total)}</span>
           </div>
-          
+
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="h-2.5 w-2.5 rounded-full bg-indigo-500/80" />
-              Input Tokens
+              <span className="h-2 w-2 rounded-full bg-blue-600/75" />
+              Input
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(input)}</span>
           </div>
-          
+
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
-              Cached Input
+              <span className="h-2 w-2 rounded-full bg-success/80" />
+              Cached
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(cached)}</span>
           </div>
-          
+
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="h-2.5 w-2.5 rounded-full bg-purple-500/80" />
-              Output Tokens
+              <span className="h-2 w-2 rounded-full bg-violet-600/70" />
+              Output
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(output)}</span>
           </div>
-          
-          <div className="flex items-center justify-between gap-4 border-t border-border/50 pt-1.5 mt-1.5 font-semibold text-primary">
+
+          <div className="mt-1.5 flex items-center justify-between gap-4 border-t border-border/60 pt-1.5 font-semibold text-primary">
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              Estimated Cost
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              Cost
             </span>
             <span className="font-mono">{formatCurrencyShort(cost)}</span>
           </div>
@@ -95,45 +102,48 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCar
 
   return (
     <Card className="rounded-lg h-full flex flex-col">
-      <CardHeader className="flex flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5 shrink-0">
+      <CardHeader className="flex shrink-0 flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5">
         <div className="space-y-1">
           <CardTitle>Usage Trends</CardTitle>
           <CardDescription>Total token and cost movement across the selected natural-day window.</CardDescription>
           <span className="sr-only">Total Token Trend</span>
           <span className="sr-only">Cost Trend</span>
         </div>
-        <div className="flex gap-2 text-xs font-semibold text-muted-foreground">
-          <span className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 uppercase tracking-wider text-[10px]">
-            Tokens & Cost
-          </span>
-          <span className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 uppercase tracking-wider text-[10px]">
-            Daily
-          </span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:justify-end">
+          {chartLegend.map((item) => (
+            <span key={item.label} className="inline-flex items-center gap-1.5">
+              <span className={cn("h-2 w-2 rounded-full", item.className)} />
+              {item.label}
+            </span>
+          ))}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 p-4 sm:p-4.5 flex-1 flex flex-col justify-between">
-        <div className="h-64 flex-1 min-h-[256px]">
+      <CardContent className="flex flex-1 flex-col justify-between space-y-4 p-4 sm:p-4.5">
+        <div className="h-[300px] min-h-[300px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <ComposedChart data={trendData} margin={{ top: 12, right: 12, left: 12, bottom: 4 }}>
+            <ComposedChart data={trendData} barGap={4} barCategoryGap="32%" margin={{ top: 18, right: 10, left: 4, bottom: 6 }}>
               <defs>
                 <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="rgb(var(--primary))" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="rgb(var(--primary))" stopOpacity={0.0}/>
+                  <stop offset="0%" stopColor="rgb(var(--primary))" stopOpacity={0.1} />
+                  <stop offset="80%" stopColor="rgb(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="rgb(var(--border) / 0.6)" strokeDasharray="4 4" vertical={false} />
+              <CartesianGrid stroke="rgb(var(--border) / 0.45)" strokeDasharray="3 8" vertical={false} />
               <XAxis
                 dataKey="shortDate"
+                dy={10}
+                interval="preserveStartEnd"
+                minTickGap={12}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
+                tick={{ fill: "rgb(var(--muted-foreground) / 0.72)", fontSize: 11 }}
               />
               <YAxis
                 yAxisId="tokens"
                 width={tokenAxisWidth}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--primary) / 0.8)", fontSize: 12 }}
+                tick={{ fill: "rgb(var(--muted-foreground) / 0.7)", fontSize: 11 }}
                 tickFormatter={(value) => formatCompactNumber(Number(value))}
               />
               <YAxis
@@ -142,12 +152,14 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCar
                 width={costAxisWidth}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--primary))", fontSize: 12 }}
+                tick={{ fill: "rgb(var(--primary) / 0.78)", fontSize: 11 }}
                 tickFormatter={(value) => formatCurrencyShort(Number(value))}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgb(var(--border))", strokeWidth: 1 }} />
-              
-              {/* Cost Background Gradient Area */}
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ stroke: "rgb(var(--primary) / 0.22)", strokeDasharray: "4 4", strokeWidth: 1 }}
+              />
+
               <Area
                 yAxisId="cost"
                 type="monotone"
@@ -155,48 +167,54 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCar
                 fill="url(#costGradient)"
                 stroke="none"
                 activeDot={false}
+                isAnimationActive={false}
               />
-              
-              {/* Stacked Bars */}
-              <Bar 
-                yAxisId="tokens" 
-                dataKey="inputTokens" 
-                name="Input tokens" 
-                stackId="tokens" 
-                fill="rgb(var(--primary) / 0.8)" 
+
+              <Bar
+                yAxisId="tokens"
+                dataKey="inputTokens"
+                name="Input tokens"
+                stackId="tokens"
+                fill="rgb(37 99 235 / 0.72)"
+                maxBarSize={24}
+                isAnimationActive={false}
               />
               <Bar
                 yAxisId="tokens"
                 dataKey="cachedInputTokens"
                 name="Cached input tokens"
                 stackId="tokens"
-                fill="rgb(var(--success) / 0.8)"
+                fill="rgb(var(--success) / 0.78)"
+                maxBarSize={24}
+                isAnimationActive={false}
               />
-              <Bar 
-                yAxisId="tokens" 
-                dataKey="outputTokens" 
-                name="Output tokens" 
-                stackId="tokens" 
-                fill="rgb(168 85 247 / 0.8)" 
-                radius={[4, 4, 0, 0]}
+              <Bar
+                yAxisId="tokens"
+                dataKey="outputTokens"
+                name="Output tokens"
+                stackId="tokens"
+                fill="rgb(124 58 237 / 0.72)"
+                maxBarSize={24}
+                radius={[5, 5, 0, 0]}
+                isAnimationActive={false}
               />
-              
-              {/* Cost Curve Line */}
+
               <Line
                 yAxisId="cost"
                 type="monotone"
                 dataKey="costUSD"
                 name="Cost (USD)"
                 stroke="rgb(var(--primary))"
-                strokeWidth={3}
-                dot={{ r: 4, strokeWidth: 1.5, fill: "rgb(var(--surface))" }}
-                activeDot={{ r: 6, strokeWidth: 2, fill: "rgb(var(--surface))" }}
+                strokeWidth={2.75}
+                dot={{ r: 2.8, strokeWidth: 1.5, fill: "rgb(var(--surface))" }}
+                activeDot={{ r: 5.5, strokeWidth: 2.25, fill: "rgb(var(--surface))" }}
+                isAnimationActive={false}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="grid overflow-hidden rounded-xl border border-border/80 sm:grid-cols-4 shadow-sm">
+        <div className="grid overflow-hidden rounded-lg border border-border/70 bg-surface/70 sm:grid-cols-4">
           {metrics.map((metric) => (
             <SummaryCell key={metric.label} metric={metric} cacheHitRate={cacheHitRate} />
           ))}
@@ -217,10 +235,10 @@ function SummaryCell({
 
   return (
     <div className={cn(
-      "group relative border-b border-border/80 bg-surface p-3 transition-all duration-300 last:border-b-0 hover:bg-muted/10 sm:border-b-0 sm:border-r sm:p-3.5 sm:last:border-r-0",
+      "group relative border-b border-border/70 p-3 transition-all duration-300 last:border-b-0 hover:bg-muted/10 sm:border-b-0 sm:border-r sm:p-3 sm:last:border-r-0",
       style.accent,
     )}>
-      <div className="flex min-h-14 items-center justify-between gap-3">
+      <div className="flex min-h-[68px] items-center justify-between gap-3">
         <div className="space-y-1 flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={cn("h-2 w-2 rounded-full", style.dot)} />
@@ -229,7 +247,7 @@ function SummaryCell({
             </p>
           </div>
           <div className="pt-0.5">
-            <p className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={metric.value}>
+            <p className="text-lg font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={metric.value}>
               {metric.value}
             </p>
             <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
@@ -243,14 +261,14 @@ function SummaryCell({
 
 function CacheRing({ value }: { value: number }) {
   const percent = Math.min(Math.max(value * 100, 0), 100);
-  const radius = 24;
+  const radius = 22;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
 
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-      <svg viewBox="0 0 64 64" className="h-10 w-10" role="img" aria-label={`${Math.round(percent)}% cache hit`}>
-        <circle cx="32" cy="32" r={radius} fill="none" stroke="rgb(var(--border))" strokeWidth="8" />
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+      <svg viewBox="0 0 64 64" className="h-9 w-9" role="img" aria-label={`${Math.round(percent)}% cache hit`}>
+        <circle cx="32" cy="32" r={radius} fill="none" stroke="rgb(var(--border))" strokeWidth="7" />
         <circle
           cx="32"
           cy="32"
@@ -260,7 +278,7 @@ function CacheRing({ value }: { value: number }) {
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          strokeWidth="8"
+          strokeWidth="7"
           transform="rotate(-90 32 32)"
         />
       </svg>
