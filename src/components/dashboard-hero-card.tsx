@@ -1,4 +1,4 @@
-import { Cpu, Download, FileSpreadsheet, FileText, FolderGit2, Gauge, Info, RefreshCcw } from "lucide-react";
+import { CalendarDays, Cpu, Download, FileSpreadsheet, FileText, FolderGit2, Info, RefreshCcw } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
 import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
+
+type CostDriverItem = {
+  label: string;
+  costUSD: number;
+  share: number;
+};
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -35,12 +41,18 @@ export function DashboardHeroCard({
   const totalCost = overview.totals.costUSD;
   const models = overview.models ?? [];
   const projects = overview.projects ?? [];
-  const topModel = [...models].sort((left, right) => right.costUSD - left.costUSD)[0] ?? null;
-  const topProject = [...projects].sort((left, right) => right.costUSD - left.costUSD)[0] ?? null;
-  const billableInputTokens = Math.max(overview.totals.inputTokens - overview.totals.cachedInputTokens, 0);
-  const tokenMixTotal = billableInputTokens + overview.totals.cachedInputTokens + overview.totals.outputTokens;
-  const costShare = (costUSD: number) => (totalCost > 0 ? costUSD / totalCost : 0);
-  const tokenShare = (tokens: number) => (tokenMixTotal > 0 ? tokens / tokenMixTotal : 0);
+  const buildCostDrivers = (items: Array<{ label: string; costUSD: number }>): CostDriverItem[] =>
+    [...items]
+      .sort((left, right) => right.costUSD - left.costUSD)
+      .slice(0, 3)
+      .map((item) => ({
+        label: item.label,
+        costUSD: item.costUSD,
+        share: totalCost > 0 ? item.costUSD / totalCost : 0,
+      }));
+  const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
+  const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
+  const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
 
   const formatUpdatedTime = (timestamp: string) => {
     const d = new Date(timestamp);
@@ -139,66 +151,17 @@ export function DashboardHeroCard({
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-lg border border-border/70 bg-surface/55 p-4 shadow-sm sm:grid-cols-[1fr_0.9fr]">
-            <div className="space-y-3">
+          <div className="rounded-lg border border-border/70 bg-surface/55 p-4 shadow-sm">
+            <div>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cost Drivers</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">Where the selected-window spend comes from</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">Top spend by model, project, and date</p>
               </div>
 
-              <div className="grid gap-2">
-                <DriverRow
-                  icon={Cpu}
-                  label="Top model"
-                  value={topModel?.model ?? "No model data"}
-                  amount={topModel ? formatCurrencyShort(topModel.costUSD) : "$0.00"}
-                  percent={formatPercent(topModel ? costShare(topModel.costUSD) : 0)}
-                  width={topModel ? costShare(topModel.costUSD) : 0}
-                />
-                <DriverRow
-                  icon={FolderGit2}
-                  label="Top project"
-                  value={topProject?.displayName ?? "No project data"}
-                  amount={topProject ? formatCurrencyShort(topProject.costUSD) : "$0.00"}
-                  percent={formatPercent(topProject ? costShare(topProject.costUSD) : 0)}
-                  width={topProject ? costShare(topProject.costUSD) : 0}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-between gap-3 rounded-md border border-border/60 bg-background/45 p-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Token mix</p>
-                  <span className="text-xs font-medium text-foreground">{formatCompactNumber(tokenMixTotal)}</span>
-                </div>
-                <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
-                  <span
-                    className="bg-primary"
-                    style={{ width: `${tokenShare(billableInputTokens) * 100}%` }}
-                    aria-label={`Billable input ${formatPercent(tokenShare(billableInputTokens))}`}
-                  />
-                  <span
-                    className="bg-success"
-                    style={{ width: `${tokenShare(overview.totals.cachedInputTokens) * 100}%` }}
-                    aria-label={`Cached input ${formatPercent(tokenShare(overview.totals.cachedInputTokens))}`}
-                  />
-                  <span
-                    className="bg-violet-500"
-                    style={{ width: `${tokenShare(overview.totals.outputTokens) * 100}%` }}
-                    aria-label={`Output ${formatPercent(tokenShare(overview.totals.outputTokens))}`}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
-                  <TokenMixLegend label="Input" value={formatPercent(tokenShare(billableInputTokens))} className="bg-primary" />
-                  <TokenMixLegend label="Cached" value={formatPercent(tokenShare(overview.totals.cachedInputTokens))} className="bg-success" />
-                  <TokenMixLegend label="Output" value={formatPercent(tokenShare(overview.totals.outputTokens))} className="bg-violet-500" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <DriverStat icon={Gauge} label="Cache hit" value={formatPercent(overview.totals.cacheHitRate)} />
-                <DriverStat icon={Gauge} label="Cost / 1M" value={formatCurrencyShort(overview.totals.costPerMillionTokens)} />
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <DriverGroup icon={Cpu} title="Models" items={topModels} emptyLabel="No model data" />
+                <DriverGroup icon={FolderGit2} title="Projects" items={topProjects} emptyLabel="No project data" />
+                <DriverGroup icon={CalendarDays} title="Dates" items={topDates} emptyLabel="No date data" />
               </div>
             </div>
           </div>
@@ -208,73 +171,61 @@ export function DashboardHeroCard({
   );
 }
 
-function DriverRow({
+function DriverGroup({
   icon: Icon,
-  label,
-  value,
-  amount,
-  percent,
-  width,
+  title,
+  items,
+  emptyLabel,
 }: {
   icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  amount: string;
-  percent: string;
-  width: number;
+  title: string;
+  items: CostDriverItem[];
+  emptyLabel: string;
 }) {
   return (
     <div className="rounded-md border border-border/60 bg-background/45 p-3">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-md bg-primary/10 p-2 text-primary">
-          <Icon className="h-4 w-4" />
+      <div className="flex items-center gap-2">
+        <div className="rounded-md bg-primary/10 p-1.5 text-primary">
+          <Icon className="h-3.5 w-3.5" />
         </div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="mt-2.5 space-y-2">
+          {items.map((item, index) => (
+            <DriverRankRow key={`${item.label}-${index}`} item={item} rank={index + 1} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2.5 rounded-md bg-muted/45 px-3 py-2 text-xs text-muted-foreground">{emptyLabel}</p>
+      )}
+    </div>
+  );
+}
+
+function DriverRankRow({ item, rank }: { item: CostDriverItem; rank: number }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+          {rank}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-            <p className="font-mono text-xs font-semibold text-foreground">{amount}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-xs font-semibold text-foreground" title={item.label}>{item.label}</p>
+            <p className="shrink-0 font-mono text-[11px] font-semibold text-foreground">
+              {formatCurrencyShort(item.costUSD)}
+            </p>
           </div>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <p className="truncate text-sm font-semibold text-foreground" title={value}>{value}</p>
-            <p className="shrink-0 text-xs text-muted-foreground">{percent}</p>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(Math.max(width, 0), 1) * 100}%` }} />
+          <div className="mt-1 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(Math.max(item.share, 0), 1) * 100}%` }} />
+            </div>
+            <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">{formatPercent(item.share)}</span>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function TokenMixLegend({ label, value, className }: { label: string; value: string; className: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${className}`} />
-        <span className="truncate">{label}</span>
-      </div>
-      <p className="mt-0.5 font-mono text-[11px] font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function DriverStat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border border-border/60 bg-surface/70 p-2.5">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{label}</span>
-      </div>
-      <p className="mt-1 font-mono text-sm font-semibold text-foreground">{value}</p>
     </div>
   );
 }
