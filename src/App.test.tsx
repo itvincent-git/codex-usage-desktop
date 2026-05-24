@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -225,6 +225,16 @@ describe("App", () => {
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
+    const trendsCard = screen.getByRole("heading", { name: "Usage Trends" }).closest(".rounded-lg");
+    expect(trendsCard).not.toBeNull();
+    expect(within(trendsCard as HTMLElement).getByText("Token Breakdown")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Avg / Day")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Cache Hit")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Cost / 1M")).toBeInTheDocument();
+    expect(screen.queryByText("Cached Tokens")).not.toBeInTheDocument();
+    expect(screen.queryByText("Avg Daily Cost")).not.toBeInTheDocument();
+    expect(screen.queryByText("Peak Token")).not.toBeInTheDocument();
+    expect(screen.queryByText("Peak Cost")).not.toBeInTheDocument();
     expect(screen.getByText("Model Usage")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();

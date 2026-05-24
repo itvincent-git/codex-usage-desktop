@@ -4,7 +4,6 @@ import { DashboardHeroCard } from "@/components/dashboard-hero-card";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
 import { LogPanel } from "@/components/log-panel";
-import { MetricCard } from "@/components/metric-card";
 import { ModelUsageCard } from "@/components/model-usage-card";
 import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
@@ -189,26 +188,12 @@ export default function App() {
                 onExport={(format) => void handleExport(format)}
               />
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {metrics.map((metric) => (
-                  <MetricCard
-                    key={metric.label}
-                    kind={metric.kind}
-                    label={metric.label}
-                    value={metric.value}
-                    detail={metric.detail}
-                    daily={overview.daily}
-                    cacheHitRate={overview.totals.cacheHitRate}
-                  />
-                ))}
-              </div>
-
               <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr] min-w-0">
                 <div className="min-w-0">
                   <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
                 </div>
                 <div className="min-w-0">
-                  <UsageTrendsCard daily={overview.daily} />
+                  <UsageTrendsCard daily={overview.daily} metrics={metrics} cacheHitRate={overview.totals.cacheHitRate} />
                 </div>
               </div>
 

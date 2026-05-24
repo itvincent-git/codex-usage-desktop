@@ -3,11 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { OverviewResponse } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
+import type { MetricCardData, MetricCardKind } from "@/lib/usage-dashboard";
 import { cn } from "@/lib/utils";
-import { Activity, Coins, TrendingUp, Sparkles, Zap } from "lucide-react";
 
 type UsageTrendsCardProps = {
   daily: OverviewResponse["daily"];
+  metrics: MetricCardData[];
+  cacheHitRate: number;
+};
+
+const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
+  tokens: { accent: "group-hover:border-blue-500/30", dot: "bg-blue-500" },
+  average: { accent: "group-hover:border-violet-500/30", dot: "bg-violet-500" },
+  cache: { accent: "group-hover:border-success/30", dot: "bg-success" },
+  costPerMillion: { accent: "group-hover:border-warning/30", dot: "bg-warning" },
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -68,7 +77,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
+export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCardProps) {
   const trendData = daily.map((day) => ({
     date: day.date,
     shortDate: formatTrendDateLabel(day.date),
@@ -83,19 +92,6 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
   const maxDailyCost = Math.max(...daily.map((day) => day.costUSD), 0);
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatCompactNumber, 64);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
-  const totalTokens = daily.reduce((sum, day) => sum + day.totalTokens, 0);
-  const totalCost = daily.reduce((sum, day) => sum + day.costUSD, 0);
-  const cachedTokens = daily.reduce((sum, day) => sum + day.cachedInputTokens, 0);
-  const avgDailyCost = daily.length > 0 ? totalCost / daily.length : 0;
-
-  const peakTokenDay = daily.reduce<OverviewResponse["daily"][number] | null>(
-    (peak, day) => (!peak || day.totalTokens > peak.totalTokens ? day : peak),
-    null,
-  );
-  const peakCostDay = daily.reduce<OverviewResponse["daily"][number] | null>(
-    (peak, day) => (!peak || day.costUSD > peak.costUSD ? day : peak),
-    null,
-  );
 
   return (
     <Card className="rounded-lg h-full flex flex-col">
@@ -201,34 +197,9 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
         </div>
 
         <div className="grid overflow-hidden rounded-xl border border-border/80 sm:grid-cols-4 shadow-sm">
-          <SummaryCell 
-            label="Cached Tokens" 
-            value={formatCompactNumber(cachedTokens)} 
-            icon={Zap}
-            iconColor="text-emerald-500 bg-emerald-500/10"
-          />
-          <SummaryCell 
-            label="Avg Daily Cost" 
-            value={formatCurrencyShort(avgDailyCost)} 
-            icon={Coins}
-            iconColor="text-indigo-500 bg-indigo-500/10"
-          />
-          <SummaryCell
-            label="Peak Token"
-            value={peakTokenDay ? formatCompactNumber(peakTokenDay.totalTokens) : "0"}
-            detail={peakTokenDay ? formatTrendDateLabel(peakTokenDay.date) : undefined}
-            icon={TrendingUp}
-            iconColor="text-purple-500 bg-purple-500/10"
-            badgeClass="text-purple-500 bg-purple-500/10 border-purple-500/20"
-          />
-          <SummaryCell
-            label="Peak Cost"
-            value={peakCostDay ? formatCurrencyShort(peakCostDay.costUSD) : "$0.00"}
-            detail={peakCostDay ? formatTrendDateLabel(peakCostDay.date) : undefined}
-            icon={Sparkles}
-            iconColor="text-amber-500 bg-amber-500/10"
-            badgeClass="text-amber-500 bg-amber-500/10 border-amber-500/20"
-          />
+          {metrics.map((metric) => (
+            <SummaryCell key={metric.label} metric={metric} cacheHitRate={cacheHitRate} />
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -236,44 +207,63 @@ export function UsageTrendsCard({ daily }: UsageTrendsCardProps) {
 }
 
 function SummaryCell({
-  label,
-  value,
-  detail,
-  icon: Icon,
-  iconColor,
-  badgeClass,
+  metric,
+  cacheHitRate,
 }: {
-  label: string;
-  value: string;
-  detail?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor: string;
-  badgeClass?: string;
+  metric: MetricCardData;
+  cacheHitRate: number;
 }) {
+  const style = summaryStyles[metric.kind];
+
   return (
-    <div className="group relative border-b last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 border-border/80 p-3 sm:p-3.5 bg-surface transition-all duration-300 hover:bg-muted/10">
-      <div className="flex items-start justify-between gap-2 sm:gap-2.5">
+    <div className={cn(
+      "group relative border-b border-border/80 bg-surface p-3 transition-all duration-300 last:border-b-0 hover:bg-muted/10 sm:border-b-0 sm:border-r sm:p-3.5 sm:last:border-r-0",
+      style.accent,
+    )}>
+      <div className="flex min-h-14 items-center justify-between gap-3">
         <div className="space-y-1 flex-1 min-w-0">
-          <p className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">{label}</p>
+          <div className="flex items-center gap-2">
+            <span className={cn("h-2 w-2 rounded-full", style.dot)} />
+            <p className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">
+              {metric.label}
+            </p>
+          </div>
           <div className="pt-0.5">
-            <p className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={value}>{value}</p>
-            {detail ? (
-              <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
-                <span className="text-[8px] sm:text-[9px] font-semibold text-muted-foreground uppercase tracking-wider leading-none whitespace-nowrap">Peak:</span>
-                <span className={cn(
-                  "text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded leading-none uppercase tracking-wider whitespace-nowrap border border-transparent",
-                  badgeClass || "text-muted-foreground bg-muted/50 border-border/50"
-                )}>
-                  {detail}
-                </span>
-              </div>
-            ) : null}
+            <p className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={metric.value}>
+              {metric.value}
+            </p>
+            <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
           </div>
         </div>
-        <div className={cn("p-1.5 sm:p-2 rounded-lg group-hover:scale-110 transition-all duration-300 shrink-0", iconColor)}>
-          <Icon className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
-        </div>
+        {metric.kind === "cache" ? <CacheRing value={cacheHitRate} /> : null}
       </div>
+    </div>
+  );
+}
+
+function CacheRing({ value }: { value: number }) {
+  const percent = Math.min(Math.max(value * 100, 0), 100);
+  const radius = 24;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+      <svg viewBox="0 0 64 64" className="h-10 w-10" role="img" aria-label={`${Math.round(percent)}% cache hit`}>
+        <circle cx="32" cy="32" r={radius} fill="none" stroke="rgb(var(--border))" strokeWidth="8" />
+        <circle
+          cx="32"
+          cy="32"
+          r={radius}
+          fill="none"
+          stroke="rgb(var(--success))"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          strokeWidth="8"
+          transform="rotate(-90 32 32)"
+        />
+      </svg>
     </div>
   );
 }

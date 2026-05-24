@@ -1,7 +1,7 @@
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatNumber, formatPercent } from "@/lib/formatters";
 
-export type MetricCardKind = "tokens" | "cost" | "average" | "cache" | "costPerMillion";
+export type MetricCardKind = "tokens" | "average" | "cache" | "costPerMillion";
 
 export type MetricCardData = {
   kind: MetricCardKind;
