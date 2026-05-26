@@ -235,7 +235,13 @@ describe("App", () => {
     expect(screen.queryByText("Avg Daily Cost")).not.toBeInTheDocument();
     expect(screen.queryByText("Peak Token")).not.toBeInTheDocument();
     expect(screen.queryByText("Peak Cost")).not.toBeInTheDocument();
-    expect(screen.getByText("Model Usage")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Total Token" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "gpt-5" })).not.toBeInTheDocument();
+
+    const modelUsageTab = screen.getByRole("tab", { name: "Model Usage" });
+    await userEvent.click(modelUsageTab);
+
+    expect(screen.getByRole("heading", { name: "Model Usage Details" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: /codex-usage-desktop/ })).not.toBeInTheDocument();

@@ -191,10 +191,21 @@ export default function App() {
               <div className="min-w-0">
                 <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
               </div>
+            </div>
+          ) : null}
 
-              <div className="min-w-0">
-                <ModelUsageCard models={overview.models} />
+          {!isLoading && view === "models" && overview ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">Model Usage Details</h2>
+                  <p className="text-sm text-muted-foreground">Analyze your token and cost distribution by model.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <RangeSwitcher value={range} onChange={handleRangeChange} />
+                </div>
               </div>
+              <ModelUsageCard models={overview.models} />
             </div>
           ) : null}
 
