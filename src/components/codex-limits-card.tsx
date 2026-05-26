@@ -37,7 +37,7 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
             Codex limits unavailable: {error}
           </div>
         ) : (
-          <div className="grid gap-2.5 grid-cols-1 flex-1 justify-center">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-2 flex-1 justify-center">
             <LimitRow label="5 hour" window={limits?.session ?? null} />
             <LimitRow label="Weekly" window={limits?.weekly ?? null} />
           </div>

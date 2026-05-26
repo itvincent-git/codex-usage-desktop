@@ -9,7 +9,6 @@ import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CostDriversCard } from "@/components/cost-drivers-card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
@@ -189,13 +188,8 @@ export default function App() {
                 metrics={metrics}
               />
 
-              <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr] min-w-0">
-                <div className="min-w-0">
-                  <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
-                </div>
-                <div className="min-w-0">
-                  <CostDriversCard overview={overview} />
-                </div>
+              <div className="min-w-0">
+                <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
               </div>
 
               <div className="min-w-0">

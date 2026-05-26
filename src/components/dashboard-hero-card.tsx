@@ -1,13 +1,15 @@
-import { Download, FileSpreadsheet, FileText, Info, RefreshCcw } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
-import { formatCompactNumber, formatCurrencyShort } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
 import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
 import type { MetricCardData } from "@/lib/usage-dashboard";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -54,6 +56,32 @@ export function DashboardHeroCard({
         lastRescanDurationMs === null ? "" : ` · Rescan ${formatDuration(lastRescanDurationMs)}`
       }`
     : "No cached snapshot yet";
+
+  const [activeTab, setActiveTab] = useState<"models" | "projects" | "dates">("models");
+
+  const totalCost = overview.totals.costUSD;
+  const models = overview.models ?? [];
+  const projects = overview.projects ?? [];
+
+  const buildCostDrivers = (items: Array<{ label: string; costUSD: number }>) =>
+    [...items]
+      .sort((left, right) => right.costUSD - left.costUSD)
+      .slice(0, 3)
+      .map((item) => ({
+        label: item.label,
+        costUSD: item.costUSD,
+        share: totalCost > 0 ? item.costUSD / totalCost : 0,
+      }));
+
+  const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
+  const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
+  const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
+
+  const activeTabDrivers = activeTab === "models" 
+    ? topModels 
+    : activeTab === "projects" 
+    ? topProjects 
+    : topDates;
 
   return (
     <Card className="overflow-hidden rounded-lg border-border/80 bg-gradient-to-br from-surface via-surface to-primary/5">
@@ -104,31 +132,95 @@ export function DashboardHeroCard({
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-6">
-          <div className="flex flex-col justify-center gap-3 lg:gap-4">
-            <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/55 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-              <div className="flex items-center gap-1.5 font-medium text-foreground">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
-                  <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
-                </span>
-                <span>{isSynced ? "Cache Synced" : "Out of Sync"}</span>
-                <span className="text-muted-foreground/30">·</span>
-                <span className="text-muted-foreground font-normal">{scanMessage}</span>
+          <div className="flex flex-col justify-between gap-4">
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/55 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
+                    <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
+                  </span>
+                  <span>{isSynced ? "Cache Synced" : "Out of Sync"}</span>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-muted-foreground font-normal">{scanMessage}</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground/75">
+                  {updatedLabel}
+                </div>
               </div>
-              <div className="text-[11px] text-muted-foreground/75">
-                {updatedLabel}
+
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total cost ({rangeLabels[range]})</p>
+                <div className="flex flex-wrap items-end gap-2.5">
+                  <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
+                    {formatCurrencyShort(overview.totals.costUSD)}
+                  </p>
+                  <p className="pb-1 text-sm font-medium text-success">
+                    {formatCompactNumber(overview.totals.totalTokens)} tokens
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Total cost ({rangeLabels[range]})</p>
-              <div className="flex flex-wrap items-end gap-2.5">
-                <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
-                  {formatCurrencyShort(overview.totals.costUSD)}
-                </p>
-                <p className="pb-1 text-sm font-medium text-success">
-                  {formatCompactNumber(overview.totals.totalTokens)} tokens
-                </p>
+            {/* Cost Drivers tabbed view */}
+            <div className="rounded-lg border border-border/60 bg-surface/55 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Cpu className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground">Cost Drivers</span>
+                </div>
+                
+                {/* Tabs */}
+                <div className="flex p-0.5 bg-muted/40 rounded-md border border-border/40 text-[10px] font-medium">
+                  {(["models", "projects", "dates"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveTab(tab)}
+                      className={cn(
+                        "px-2 py-0.5 rounded-sm capitalize transition-all",
+                        activeTab === tab 
+                          ? "bg-background text-foreground shadow-sm font-semibold" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tab Contents */}
+              <div className="space-y-2">
+                {activeTabDrivers.length > 0 ? (
+                  activeTabDrivers.map((item, index) => (
+                    <div key={`${item.label}-${index}`} className="flex items-center gap-2">
+                      <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-muted/50 border border-border/40 text-[9px] font-bold text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-semibold text-foreground" title={item.label}>
+                            {item.label}
+                          </p>
+                          <p className="shrink-0 font-mono text-xs font-bold text-foreground">
+                            {formatCurrencyShort(item.costUSD)}
+                          </p>
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/60">
+                            <div className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-500" style={{ width: `${Math.min(Math.max(item.share, 0), 1) * 100}%` }} />
+                          </div>
+                          <span className="w-8 shrink-0 text-right text-[10px] font-semibold text-muted-foreground">
+                            {formatPercent(item.share)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="py-2 text-center text-xs text-muted-foreground">No data available</p>
+                )}
               </div>
             </div>
           </div>
