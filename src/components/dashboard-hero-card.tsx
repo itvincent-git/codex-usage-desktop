@@ -57,7 +57,7 @@ export function DashboardHeroCard({
       }`
     : "No cached snapshot yet";
 
-  const [activeTab, setActiveTab] = useState<"models" | "projects" | "dates">("models");
+  const [activeTab, setActiveTab] = useState<"projects" | "models" | "dates">("projects");
 
   const totalCost = overview.totals.costUSD;
   const models = overview.models ?? [];
@@ -172,7 +172,7 @@ export function DashboardHeroCard({
                 
                 {/* Tabs */}
                 <div className="flex p-0.5 bg-muted/40 rounded-md border border-border/40 text-[10px] font-medium">
-                  {(["models", "projects", "dates"] as const).map((tab) => (
+                  {(["projects", "models", "dates"] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
