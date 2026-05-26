@@ -1,17 +1,13 @@
-import { CalendarDays, Cpu, Download, FileSpreadsheet, FileText, FolderGit2, Info, RefreshCcw } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
-import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrencyShort } from "@/lib/formatters";
 import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
-
-type CostDriverItem = {
-  label: string;
-  costUSD: number;
-  share: number;
-};
+import type { MetricCardData } from "@/lib/usage-dashboard";
+import { UsageTrendsCard } from "@/components/usage-trends-card";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -24,6 +20,7 @@ type DashboardHeroCardProps = {
   onRangeChange: (range: RangeKey) => void;
   onRefresh: () => void;
   onExport: (format: ExportFormat) => void;
+  metrics: MetricCardData[];
 };
 
 export function DashboardHeroCard({
@@ -37,23 +34,8 @@ export function DashboardHeroCard({
   onRangeChange,
   onRefresh,
   onExport,
+  metrics,
 }: DashboardHeroCardProps) {
-  const totalCost = overview.totals.costUSD;
-  const models = overview.models ?? [];
-  const projects = overview.projects ?? [];
-  const buildCostDrivers = (items: Array<{ label: string; costUSD: number }>): CostDriverItem[] =>
-    [...items]
-      .sort((left, right) => right.costUSD - left.costUSD)
-      .slice(0, 3)
-      .map((item) => ({
-        label: item.label,
-        costUSD: item.costUSD,
-        share: totalCost > 0 ? item.costUSD / totalCost : 0,
-      }));
-  const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
-  const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
-  const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
-
   const formatUpdatedTime = (timestamp: string) => {
     const d = new Date(timestamp);
     const today = new Date();
@@ -123,7 +105,7 @@ export function DashboardHeroCard({
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-6">
           <div className="flex flex-col justify-center gap-3 lg:gap-4">
-            <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+            <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/55 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
               <div className="flex items-center gap-1.5 font-medium text-foreground">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
@@ -151,81 +133,17 @@ export function DashboardHeroCard({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border/70 bg-surface/55 p-4 shadow-sm">
-            <div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Cost Drivers</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">Top spend by model, project, and date</p>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <DriverGroup icon={Cpu} title="Models" items={topModels} emptyLabel="No model data" />
-                <DriverGroup icon={FolderGit2} title="Projects" items={topProjects} emptyLabel="No project data" />
-                <DriverGroup icon={CalendarDays} title="Dates" items={topDates} emptyLabel="No date data" />
-              </div>
-            </div>
+          <div className="min-w-0">
+            <UsageTrendsCard
+              daily={overview.daily}
+              metrics={metrics}
+              cacheHitRate={overview.totals.cacheHitRate}
+              chartHeight={220}
+              className="border-border/70 bg-surface/55 hover:translate-y-0 hover:shadow-none shadow-sm"
+            />
           </div>
         </div>
       </div>
     </Card>
-  );
-}
-
-function DriverGroup({
-  icon: Icon,
-  title,
-  items,
-  emptyLabel,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  items: CostDriverItem[];
-  emptyLabel: string;
-}) {
-  return (
-    <div className="rounded-md border border-border/60 bg-background/45 p-3">
-      <div className="flex items-center gap-2">
-        <div className="rounded-md bg-primary/10 p-1.5 text-primary">
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
-      </div>
-
-      {items.length > 0 ? (
-        <div className="mt-2.5 space-y-2">
-          {items.map((item, index) => (
-            <DriverRankRow key={`${item.label}-${index}`} item={item} rank={index + 1} />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-2.5 rounded-md bg-muted/45 px-3 py-2 text-xs text-muted-foreground">{emptyLabel}</p>
-      )}
-    </div>
-  );
-}
-
-function DriverRankRow({ item, rank }: { item: CostDriverItem; rank: number }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
-          {rank}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-xs font-semibold text-foreground" title={item.label}>{item.label}</p>
-            <p className="shrink-0 font-mono text-[11px] font-semibold text-foreground">
-              {formatCurrencyShort(item.costUSD)}
-            </p>
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(Math.max(item.share, 0), 1) * 100}%` }} />
-            </div>
-            <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">{formatPercent(item.share)}</span>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

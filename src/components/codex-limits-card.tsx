@@ -15,29 +15,29 @@ type LimitRowProps = {
 
 export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="border-b border-border p-4 sm:p-4.5 shrink-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-              <Gauge className="h-5 w-5 text-primary" />
+    <Card className="h-full flex flex-col rounded-lg">
+      <CardHeader className="border-b border-border p-3 sm:px-4 sm:py-3 shrink-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-0.5">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Gauge className="h-4.5 w-4.5 text-primary" />
               Codex Limits
             </CardTitle>
-            <CardDescription>Live account limits from the local Codex CLI.</CardDescription>
+            <CardDescription className="text-xs">Live account limits from the local Codex CLI.</CardDescription>
           </div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {limits?.updatedAt ? `Updated ${new Date(limits.updatedAt).toLocaleString()}` : "Not fetched yet"}
+          <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
+            {limits?.updatedAt ? `Updated ${new Date(limits.updatedAt).toLocaleTimeString()}` : "Not fetched yet"}
           </p>
         </div>
       </CardHeader>
 
-      <CardContent className="p-4 sm:p-4.5 flex-1 flex flex-col justify-center">
+      <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center">
         {error ? (
           <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
             Codex limits unavailable: {error}
           </div>
         ) : (
-          <div className="grid gap-3 grid-cols-1 flex-1 justify-center">
+          <div className="grid gap-2.5 grid-cols-1 flex-1 justify-center">
             <LimitRow label="5 hour" window={limits?.session ?? null} />
             <LimitRow label="Weekly" window={limits?.weekly ?? null} />
           </div>
@@ -50,15 +50,15 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
 function LimitRow({ label, window }: LimitRowProps) {
   if (!window) {
     return (
-      <div className="rounded-xl border border-border bg-muted/20 p-3.5 sm:p-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">
+      <div className="rounded-xl border border-border bg-muted/20 p-2.5 sm:p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-foreground">
             {label.toLowerCase().includes("weekly") ? "Weekly Limit" : "5-Hour Limit"}
           </p>
-          <p className="text-xs text-muted-foreground">Unavailable</p>
+          <p className="text-[10px] text-muted-foreground">Unavailable</p>
         </div>
-        <div className="mt-3 h-1.5 rounded-full bg-border" />
-        <p className="mt-2 text-xs leading-normal text-muted-foreground">
+        <div className="mt-2 h-1 rounded-full bg-border" />
+        <p className="mt-1.5 text-[11px] leading-normal text-muted-foreground">
           No rate-limit window returned by Codex.
         </p>
       </div>
@@ -73,41 +73,41 @@ function LimitRow({ label, window }: LimitRowProps) {
   const friendlyLabel = label.toLowerCase().includes("weekly") ? "Weekly Limit" : "5-Hour Limit";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-3.5 sm:p-4 transition-all duration-300 hover:border-border/80 hover:shadow-md">
-      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] items-center gap-4 sm:gap-5">
+    <div className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] items-center gap-3 sm:gap-4">
         <div className="flex justify-center">
           <LimitGauge remainingPercent={remainingPercent} tone={status.tone} />
         </div>
         
-        <div className="space-y-1.5 flex flex-col items-center sm:items-stretch text-center sm:text-left">
-          <div className="flex flex-col items-center sm:flex-row sm:justify-between gap-1.5 w-full">
-            <h4 className="text-sm sm:text-base font-semibold text-foreground leading-none">{friendlyLabel}</h4>
-            <span className={cn("rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider w-fit", status.badgeClass)}>
+        <div className="space-y-1 flex flex-col items-center sm:items-stretch text-center sm:text-left">
+          <div className="flex flex-col items-center sm:flex-row sm:justify-between gap-1 w-full">
+            <h4 className="text-xs sm:text-sm font-semibold text-foreground leading-none">{friendlyLabel}</h4>
+            <span className={cn("rounded-full px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider w-fit", status.badgeClass)}>
               {status.label}
             </span>
           </div>
 
           <div className="space-y-0.5">
-            <p className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-none">
+            <p className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-none">
               {formatLimitPercent(remainingPercent)}{" "}
-              <span className="text-xs font-normal text-muted-foreground">remaining</span>
+              <span className="text-[10px] font-normal text-muted-foreground">remaining</span>
             </p>
-            <p className="text-xs sm:text-sm font-medium text-primary leading-normal">{resetLabel}</p>
+            <p className="text-[11px] font-medium text-primary leading-normal">{resetLabel}</p>
           </div>
 
-          <div className="pt-2 grid grid-cols-2 gap-3 border-t border-border/50 text-xs text-left w-full">
+          <div className="pt-1.5 grid grid-cols-2 gap-2 border-t border-border/50 text-[10px] text-left w-full">
             <div>
-              <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">Consumed</p>
-              <p className="font-semibold text-foreground leading-normal">
+              <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">Consumed</p>
+              <p className="font-semibold text-foreground leading-none">
                 {formatLimitPercent(usedPercent)}{" "}
-                <span className="font-normal text-muted-foreground text-[9px] sm:text-[10px]">
+                <span className="font-normal text-muted-foreground text-[8px] sm:text-[9px]">
                   {formatWindowUsage(window.windowMinutes, usedPercent)}
                 </span>
               </p>
             </div>
             <div>
-              <p className="text-[9px] sm:text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">Window</p>
-              <p className="font-semibold text-foreground leading-normal">{formatWindowMinutes(window.windowMinutes)}</p>
+              <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">Window</p>
+              <p className="font-semibold text-foreground leading-none">{formatWindowMinutes(window.windowMinutes)}</p>
             </div>
           </div>
         </div>
@@ -131,14 +131,14 @@ function LimitGauge({ remainingPercent, tone }: { remainingPercent: number; tone
   // Glowing shadow based on health state
   const glowClass = 
     tone === "success" 
-      ? "shadow-[0_0_12px_rgba(var(--primary),0.12)]" 
+      ? "shadow-[0_0_8px_rgba(var(--primary),0.08)]" 
       : tone === "warning" 
-      ? "shadow-[0_0_12px_rgba(var(--warning),0.12)]" 
-      : "shadow-[0_0_12px_rgba(var(--error),0.12)]";
+      ? "shadow-[0_0_8px_rgba(var(--warning),0.08)]" 
+      : "shadow-[0_0_8px_rgba(var(--error),0.08)]";
 
   return (
-    <div className={cn("relative flex h-20 w-20 items-center justify-center rounded-full bg-muted/5 border border-border/10", glowClass)}>
-      <svg viewBox="0 0 96 96" className="h-20 w-20" role="img" aria-label={`${Math.round(remainingPercent)}% remaining`}>
+    <div className={cn("relative flex h-14 w-14 items-center justify-center rounded-full bg-muted/5 border border-border/10", glowClass)}>
+      <svg viewBox="0 0 96 96" className="h-14 w-14" role="img" aria-label={`${Math.round(remainingPercent)}% remaining`}>
         {/* Background Track Ring */}
         <circle 
           cx="48" 
@@ -164,8 +164,8 @@ function LimitGauge({ remainingPercent, tone }: { remainingPercent: number; tone
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center select-none">
-        <p className="font-mono text-lg font-bold tabular-nums text-foreground leading-none">{formatLimitPercent(remainingPercent)}</p>
-        <p className="text-[8px] uppercase tracking-wider text-muted-foreground font-bold mt-0.5">Left</p>
+        <p className="font-mono text-sm font-bold tabular-nums text-foreground leading-none">{formatLimitPercent(remainingPercent)}</p>
+        <p className="text-[7px] uppercase tracking-wider text-muted-foreground font-bold mt-0.5">Left</p>
       </div>
     </div>
   );
@@ -287,3 +287,4 @@ function getLimitStatus(remainingPercent: number): {
     barClass: "bg-primary",
   };
 }
+

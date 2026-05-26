@@ -10,6 +10,8 @@ type UsageTrendsCardProps = {
   daily: OverviewResponse["daily"];
   metrics: MetricCardData[];
   cacheHitRate: number;
+  chartHeight?: number;
+  className?: string;
 };
 
 const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
@@ -84,7 +86,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCardProps) {
+export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className }: UsageTrendsCardProps) {
   const trendData = daily.map((day) => ({
     date: day.date,
     shortDate: formatTrendDateLabel(day.date),
@@ -101,7 +103,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCar
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
 
   return (
-    <Card className="rounded-lg h-full flex flex-col">
+    <Card className={cn("rounded-lg h-full flex flex-col", className)}>
       <CardHeader className="flex shrink-0 flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5">
         <div className="space-y-1">
           <CardTitle>Usage Trends</CardTitle>
@@ -119,7 +121,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate }: UsageTrendsCar
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between space-y-4 p-4 sm:p-4.5">
-        <div className="h-[300px] min-h-[300px]">
+        <div style={{ height: chartHeight, minHeight: chartHeight }} className="min-w-0">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={trendData} barGap={4} barCategoryGap="32%" margin={{ top: 18, right: 10, left: 4, bottom: 6 }}>
               <defs>

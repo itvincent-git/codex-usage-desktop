@@ -9,7 +9,7 @@ import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { UsageTrendsCard } from "@/components/usage-trends-card";
+import { CostDriversCard } from "@/components/cost-drivers-card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
@@ -186,6 +186,7 @@ export default function App() {
                 onRangeChange={handleRangeChange}
                 onRefresh={() => void handleRefresh()}
                 onExport={(format) => void handleExport(format)}
+                metrics={metrics}
               />
 
               <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr] min-w-0">
@@ -193,7 +194,7 @@ export default function App() {
                   <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
                 </div>
                 <div className="min-w-0">
-                  <UsageTrendsCard daily={overview.daily} metrics={metrics} cacheHitRate={overview.totals.cacheHitRate} />
+                  <CostDriversCard overview={overview} />
                 </div>
               </div>
 
