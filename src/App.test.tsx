@@ -238,7 +238,7 @@ describe("App", () => {
     expect(screen.queryByRole("columnheader", { name: "Total Token" })).not.toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: "gpt-5" })).not.toBeInTheDocument();
 
-    const modelUsageTab = screen.getByRole("tab", { name: "Model Usage" });
+    const modelUsageTab = screen.getByRole("tab", { name: "Model" });
     await userEvent.click(modelUsageTab);
 
     expect(screen.getByRole("heading", { name: "Model Usage Details" })).toBeInTheDocument();
@@ -246,7 +246,7 @@ describe("App", () => {
     expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: /codex-usage-desktop/ })).not.toBeInTheDocument();
 
-    const projectUsageTab = screen.getByRole("tab", { name: "Project Usage" });
+    const projectUsageTab = screen.getByRole("tab", { name: "Project" });
     await userEvent.click(projectUsageTab);
 
     expect(screen.getByRole("heading", { name: "Project Usage Details" })).toBeInTheDocument();

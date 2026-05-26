@@ -186,6 +186,7 @@ export default function App() {
                 onRefresh={() => void handleRefresh()}
                 onExport={(format) => void handleExport(format)}
                 metrics={metrics}
+                codexLimits={codexLimits}
               />
 
               <div className="min-w-0">

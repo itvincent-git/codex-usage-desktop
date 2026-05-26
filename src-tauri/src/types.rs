@@ -176,6 +176,8 @@ pub struct CodexLimitsResponse {
     pub weekly: Option<CodexLimitWindow>,
     pub updated_at: String,
     pub source: String,
+    pub account: Option<String>,
+    pub membership_level: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

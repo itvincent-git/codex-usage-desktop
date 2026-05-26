@@ -1,9 +1,9 @@
-import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
+import type { CodexLimitsResponse, ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
 import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
 import type { MetricCardData } from "@/lib/usage-dashboard";
@@ -23,6 +23,7 @@ type DashboardHeroCardProps = {
   onRefresh: () => void;
   onExport: (format: ExportFormat) => void;
   metrics: MetricCardData[];
+  codexLimits: CodexLimitsResponse | null;
 };
 
 export function DashboardHeroCard({
@@ -37,6 +38,7 @@ export function DashboardHeroCard({
   onRefresh,
   onExport,
   metrics,
+  codexLimits,
 }: DashboardHeroCardProps) {
   const formatUpdatedTime = (timestamp: string) => {
     const d = new Date(timestamp);
@@ -160,6 +162,33 @@ export function DashboardHeroCard({
                   </p>
                 </div>
               </div>
+
+              {/* Account and Membership Info */}
+              {(codexLimits?.account || codexLimits?.membershipLevel) && (
+                <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
+                  {codexLimits.account && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                      <User className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span>{codexLimits.account}</span>
+                    </div>
+                  )}
+                  {codexLimits.membershipLevel && (
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 border",
+                        codexLimits.membershipLevel.toLowerCase() === "plus" || codexLimits.membershipLevel.toLowerCase() === "pro"
+                          ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
+                          : codexLimits.membershipLevel.toLowerCase() === "team" || codexLimits.membershipLevel.toLowerCase() === "enterprise"
+                          ? "bg-purple-500/10 border-purple-500/25 text-purple-400"
+                          : "bg-muted/50 border-border/40 text-muted-foreground"
+                      )}>
+                        <Sparkles className="h-2.5 w-2.5" />
+                        {codexLimits.membershipLevel}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Cost Drivers tabbed view */}

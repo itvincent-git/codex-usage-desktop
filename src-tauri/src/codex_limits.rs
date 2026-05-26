@@ -175,12 +175,105 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
 
 fn make_response(limits: LimitsSnapshot) -> CodexLimitsResponse {
     let (session, weekly) = normalize_windows(limits.primary, limits.secondary);
+    
+    let (account, membership_level) = match load_codex_auth() {
+        Ok(auth) => decode_jwt_info(&auth.access_token),
+        Err(_) => (None, None),
+    };
+
     CodexLimitsResponse {
         session: session.map(make_window),
         weekly: weekly.map(make_window),
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         source: limits.source.to_string(),
+        account,
+        membership_level,
     }
+}
+
+fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() < 2 {
+        return (None, None);
+    }
+    let payload_b64 = parts[1];
+
+    if let Some(decoded_bytes) = base64url_decode(payload_b64) {
+        if let Ok(decoded_str) = String::from_utf8(decoded_bytes) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&decoded_str) {
+                let email = val.get("https://api.openai.com/profile")
+                    .and_then(|p| p.get("email"))
+                    .and_then(|e| e.as_str())
+                    .map(|s| s.to_string());
+
+                let plan_type = val.get("https://api.openai.com/auth")
+                    .and_then(|a| a.get("chatgpt_plan_type"))
+                    .and_then(|p| p.as_str())
+                    .map(|s| s.to_string());
+
+                return (email, plan_type);
+            }
+        }
+    }
+    (None, None)
+}
+
+fn base64url_decode(input: &str) -> Option<Vec<u8>> {
+    let mut normalized = input.replace('-', "+").replace('_', "/");
+    let rem = normalized.len() % 4;
+    if rem > 0 {
+        normalized.push_str(&"===="[rem..]);
+    }
+
+    let bytes = normalized.as_bytes();
+    let len = bytes.len();
+    if len % 4 != 0 {
+        return None;
+    }
+
+    let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut table = [255u8; 256];
+    for (idx, &c) in alphabet.iter().enumerate() {
+        table[c as usize] = idx as u8;
+    }
+
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < len {
+        let c0 = bytes[i];
+        let c1 = bytes[i + 1];
+        let c2 = bytes[i + 2];
+        let c3 = bytes[i + 3];
+
+        let v0 = table[c0 as usize];
+        let v1 = table[c1 as usize];
+        if v0 == 255 || v1 == 255 {
+            return None;
+        }
+
+        let v2 = if c2 == b'=' { 0 } else { 
+            let v = table[c2 as usize];
+            if v == 255 { return None; }
+            v
+        };
+        let v3 = if c3 == b'=' { 0 } else { 
+            let v = table[c3 as usize];
+            if v == 255 { return None; }
+            v
+        };
+
+        let triple = ((v0 as u32) << 18) | ((v1 as u32) << 12) | ((v2 as u32) << 6) | (v3 as u32);
+
+        out.push(((triple >> 16) & 0xFF) as u8);
+        if c2 != b'=' {
+            out.push(((triple >> 8) & 0xFF) as u8);
+        }
+        if c3 != b'=' {
+            out.push((triple & 0xFF) as u8);
+        }
+        i += 4;
+    }
+    Some(out)
 }
 
 impl From<OAuthRateLimitWindow> for RpcRateLimitWindow {

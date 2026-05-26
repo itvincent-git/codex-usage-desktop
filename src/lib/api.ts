@@ -98,6 +98,8 @@ export type CodexLimitsResponse = {
   weekly: CodexLimitWindow | null;
   updatedAt: string;
   source: string;
+  account?: string | null;
+  membershipLevel?: string | null;
 };
 
 export async function scanUsage(): Promise<ScanResponse> {
