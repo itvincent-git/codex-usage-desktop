@@ -63,7 +63,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("models")}
           >
-            Model Usage
+            Model
           </button>
           <button
             type="button"
@@ -89,7 +89,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("projects")}
           >
-            Project Usage
+            Project
           </button>
           <button
             type="button"
