@@ -57,18 +57,54 @@ impl PricingSource {
     where
         F: FnOnce() -> Result<BTreeMap<String, LiteLlmModelPricing>, String>,
     {
-        let pricing = cache_path
-            .as_deref()
-            .ok_or_else(|| "Pricing cache path missing".to_string())
-            .and_then(read_cache)
-            .or_else(|_| {
-                load_remote().inspect(|pricing| {
-                    if let Some(path) = cache_path.as_deref() {
-                        let _ = write_cache(path, pricing);
+        let mut fallback_cache = None;
+        let mut use_cache = false;
+
+        if let Some(ref path) = cache_path {
+            if let Ok(cached) = read_cache(path) {
+                fallback_cache = Some(cached);
+                // Check if the cache is less than 24 hours old (24 * 3600 = 86400 seconds)
+                if let Ok(metadata) = fs::metadata(path) {
+                    if let Ok(modified) = metadata.modified() {
+                        if let Ok(duration) = std::time::SystemTime::now().duration_since(modified) {
+                            if duration.as_secs() < 86400 {
+                                use_cache = true;
+                            }
+                        }
                     }
-                })
-            })
-            .unwrap_or_else(|_| embedded_pricing());
+                }
+            }
+        }
+
+        let pricing = if use_cache {
+            fallback_cache.unwrap()
+        } else {
+            match load_remote() {
+                Ok(remote_pricing) => {
+                    if let Some(ref path) = cache_path {
+                        let _ = write_cache(path, &remote_pricing);
+                    }
+                    remote_pricing
+                }
+                Err(err) => {
+                    log::warn!("Failed to load remote pricing: {err}. Falling back to cache or embedded.");
+                    if let Some(cached) = fallback_cache {
+                        // Touch the cache file by writing it back to disk to update modification time.
+                        // This prevents repeating the slow timeout request on subsequent loads for 24 hours.
+                        if let Some(ref path) = cache_path {
+                            let _ = write_cache(path, &cached);
+                        }
+                        cached
+                    } else {
+                        let embedded = embedded_pricing();
+                        if let Some(ref path) = cache_path {
+                            let _ = write_cache(path, &embedded);
+                        }
+                        embedded
+                    }
+                }
+            }
+        };
 
         Self { pricing }
     }
