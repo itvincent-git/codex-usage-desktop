@@ -59,6 +59,7 @@ impl PricingSource {
     {
         let mut fallback_cache = None;
         let mut use_cache = false;
+        let mut cache_age_secs = None;
 
         if let Some(ref path) = cache_path {
             if let Ok(cached) = read_cache(path) {
@@ -67,7 +68,9 @@ impl PricingSource {
                 if let Ok(metadata) = fs::metadata(path) {
                     if let Ok(modified) = metadata.modified() {
                         if let Ok(duration) = std::time::SystemTime::now().duration_since(modified) {
-                            if duration.as_secs() < 86400 {
+                            let age = duration.as_secs();
+                            cache_age_secs = Some(age);
+                            if age < 86400 {
                                 use_cache = true;
                             }
                         }
@@ -77,10 +80,22 @@ impl PricingSource {
         }
 
         let pricing = if use_cache {
+            if let Some(age) = cache_age_secs {
+                log::info!("Loaded pricing from local cache (age: {}s, less than 24h).", age);
+            } else {
+                log::info!("Loaded pricing from local cache.");
+            }
             fallback_cache.unwrap()
         } else {
+            if let Some(age) = cache_age_secs {
+                log::info!("Local pricing cache is expired (age: {}s, older than 24h). Fetching remote pricing...", age);
+            } else {
+                log::info!("Local pricing cache missing or unreadable. Fetching remote pricing...");
+            }
+
             match load_remote() {
                 Ok(remote_pricing) => {
+                    log::info!("Successfully fetched and cached remote pricing.");
                     if let Some(ref path) = cache_path {
                         let _ = write_cache(path, &remote_pricing);
                     }
@@ -89,6 +104,7 @@ impl PricingSource {
                 Err(err) => {
                     log::warn!("Failed to load remote pricing: {err}. Falling back to cache or embedded.");
                     if let Some(cached) = fallback_cache {
+                        log::info!("Falling back to existing local pricing cache (touching cache timestamp to prevent retries for 24h).");
                         // Touch the cache file by writing it back to disk to update modification time.
                         // This prevents repeating the slow timeout request on subsequent loads for 24 hours.
                         if let Some(ref path) = cache_path {
@@ -96,6 +112,7 @@ impl PricingSource {
                         }
                         cached
                     } else {
+                        log::info!("Falling back to embedded pricing (creating fresh cache file to prevent retries for 24h).");
                         let embedded = embedded_pricing();
                         if let Some(ref path) = cache_path {
                             let _ = write_cache(path, &embedded);
