@@ -17,9 +17,11 @@ export function LogPanel() {
   const nextId = useRef(0);
 
   useEffect(() => {
+    let active = true;
     let unlisten: UnlistenFn | null = null;
     
     attachLogger((payload) => {
+      if (!active) return;
       setLogs((prev) => {
         const newLogs = [...prev, {
           id: nextId.current++,
@@ -30,10 +32,15 @@ export function LogPanel() {
         return newLogs.slice(-1000); // Keep last 1000 logs
       });
     }).then((fn) => {
-      unlisten = fn;
+      if (!active) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
 
     return () => {
+      active = false;
       if (unlisten) {
         unlisten();
       }
