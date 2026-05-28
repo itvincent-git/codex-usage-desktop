@@ -2,6 +2,7 @@ import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight } from "lucid
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UpdateCheckResponse } from "@/lib/api";
+import tauriConfig from "../../src-tauri/tauri.conf.json";
 
 type SettingsPageProps = {
   isResetting: boolean;
@@ -96,7 +97,7 @@ export function SettingsPage({
               <div className="space-y-1">
                 <h4 className="text-sm font-medium text-foreground">Current Version</h4>
                 <p className="text-sm text-muted-foreground">
-                  v{updateInfo?.currentVersion || "0.4.0"}
+                  v{updateInfo?.currentVersion || tauriConfig.version}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2">
