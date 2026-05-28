@@ -100,7 +100,6 @@ export type CodexLimitsResponse = {
   source: string;
   account?: string | null;
   membershipLevel?: string | null;
-  membershipExpiresAt?: string | null;
 };
 
 export async function scanUsage(): Promise<ScanResponse> {

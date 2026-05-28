@@ -176,9 +176,9 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
 fn make_response(limits: LimitsSnapshot) -> CodexLimitsResponse {
     let (session, weekly) = normalize_windows(limits.primary, limits.secondary);
     
-    let (account, membership_level, membership_expires_at) = match load_codex_auth() {
+    let (account, membership_level) = match load_codex_auth() {
         Ok(auth) => decode_jwt_info(&auth.access_token),
-        Err(_) => (None, None, None),
+        Err(_) => (None, None),
     };
 
     CodexLimitsResponse {
@@ -188,14 +188,13 @@ fn make_response(limits: LimitsSnapshot) -> CodexLimitsResponse {
         source: limits.source.to_string(),
         account,
         membership_level,
-        membership_expires_at,
     }
 }
 
-fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>, Option<String>) {
+fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() < 2 {
-        return (None, None, None);
+        return (None, None);
     }
     let payload_b64 = parts[1];
 
@@ -212,19 +211,11 @@ fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>, Option<Strin
                     .and_then(|p| p.as_str())
                     .map(|s| s.to_string());
 
-                let expires_at = val.get("exp")
-                    .and_then(|e| e.as_i64())
-                    .and_then(|ts| {
-                        Utc.timestamp_opt(ts, 0).single().map(|datetime| {
-                            datetime.to_rfc3339_opts(SecondsFormat::Millis, true)
-                        })
-                    });
-
-                return (email, plan_type, expires_at);
+                return (email, plan_type);
             }
         }
     }
-    (None, None, None)
+    (None, None)
 }
 
 fn base64url_decode(input: &str) -> Option<Vec<u8>> {

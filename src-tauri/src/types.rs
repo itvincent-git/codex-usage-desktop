@@ -178,7 +178,6 @@ pub struct CodexLimitsResponse {
     pub source: String,
     pub account: Option<String>,
     pub membership_level: Option<String>,
-    pub membership_expires_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
