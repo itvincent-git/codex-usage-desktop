@@ -208,6 +208,7 @@ pub struct SessionDetailRow {
     pub output_tokens: i64,
     pub reasoning_output_tokens: i64,
     pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
     pub cost_usd: f64,
     pub models: Vec<String>,
     pub projects: Vec<String>,
