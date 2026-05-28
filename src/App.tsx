@@ -8,6 +8,7 @@ import { ModelUsageCard } from "@/components/model-usage-card";
 import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
+import { SessionUsageTable } from "@/components/session-usage-table";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
@@ -39,6 +40,8 @@ export default function App() {
     isUpdateDismissed,
     showLogsTab,
     setShowLogsTab,
+    sessions,
+    isSessionsLoading,
     handleViewChange,
     handleRangeChange,
     handleRefresh,
@@ -172,6 +175,10 @@ export default function App() {
             <LoadingState title="Loading Monthly Usage" description="Aggregating natural-month totals." />
           ) : null}
 
+          {view === "sessions" && isSessionsLoading ? (
+            <LoadingState title="Loading Session Details" description="Parsing individual session logs." />
+          ) : null}
+
           {!isLoading && view === "dashboard" && overview ? (
             <div className="space-y-5">
               <DashboardHeroCard
@@ -242,6 +249,10 @@ export default function App() {
 
           {!isLoading && view === "monthly" && !isMonthlyLoading && sortedMonthlyUsage ? (
             <MonthlyUsageTable data={sortedMonthlyUsage} />
+          ) : null}
+
+          {!isLoading && view === "sessions" && !isSessionsLoading ? (
+            <SessionUsageTable sessions={sessions} />
           ) : null}
 
           {!isLoading && view === "settings" ? (

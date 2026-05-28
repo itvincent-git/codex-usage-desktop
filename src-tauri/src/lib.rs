@@ -13,7 +13,7 @@ use std::time::Instant;
 use tauri::Manager;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse,
+    UpdateCheckResponse, SessionDetailRow,
 };
 
 struct AppState {
@@ -76,6 +76,20 @@ async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
         .await
         .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_session_details(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<SessionDetailRow>, String> {
+    let database_path = state.database_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        db::query_session_details(&db)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -460,7 +474,8 @@ pub fn run() {
             reset_usage_state,
             export_usage,
             check_for_updates,
-            open_url
+            open_url,
+            fetch_session_details
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

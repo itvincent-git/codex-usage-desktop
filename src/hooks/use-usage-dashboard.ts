@@ -15,6 +15,8 @@ import {
   checkForUpdates,
   openUrl,
   type UpdateCheckResponse,
+  fetchSessionDetails,
+  type SessionDetailRow,
 } from "@/lib/api";
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, rangeLabels } from "@/lib/usage-dashboard";
@@ -31,6 +33,8 @@ export function useUsageDashboard() {
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMonthlyLoading, setIsMonthlyLoading] = useState(false);
+  const [sessions, setSessions] = useState<SessionDetailRow[]>([]);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
@@ -69,6 +73,12 @@ export function useUsageDashboard() {
     setError(null);
   });
 
+  const loadSessions = useEffectEvent(async () => {
+    const data = await fetchSessionDetails();
+    setSessions(data);
+    setError(null);
+  });
+
   const loadCodexLimits = useEffectEvent(async (options?: { force?: boolean }) => {
     const now = Date.now();
     const isManual = options?.force === true;
@@ -98,6 +108,9 @@ export function useUsageDashboard() {
     
     if (view === "monthly") {
       await loadMonthlyUsage();
+    }
+    if (view === "sessions") {
+      await loadSessions();
     }
     setLastRescanDurationMs(performance.now() - startedAt);
   });
@@ -279,18 +292,26 @@ export function useUsageDashboard() {
   async function handleViewChange(nextView: DashboardView) {
     setView(nextView);
 
-    if (nextView !== "monthly" || monthlyUsage || !bootstrapped) {
-      return;
+    if (nextView === "monthly" && !monthlyUsage && bootstrapped) {
+      setIsMonthlyLoading(true);
+      try {
+        await loadMonthlyUsage();
+      } catch (monthlyError) {
+        setError(monthlyError instanceof Error ? monthlyError.message : "Failed to load monthly usage.");
+      } finally {
+        setIsMonthlyLoading(false);
+      }
     }
 
-    setIsMonthlyLoading(true);
-
-    try {
-      await loadMonthlyUsage();
-    } catch (monthlyError) {
-      setError(monthlyError instanceof Error ? monthlyError.message : "Failed to load monthly usage.");
-    } finally {
-      setIsMonthlyLoading(false);
+    if (nextView === "sessions" && bootstrapped) {
+      setIsSessionsLoading(true);
+      try {
+        await loadSessions();
+      } catch (sessionsError) {
+        setError(sessionsError instanceof Error ? sessionsError.message : "Failed to load sessions.");
+      } finally {
+        setIsSessionsLoading(false);
+      }
     }
   }
 
@@ -431,6 +452,8 @@ export function useUsageDashboard() {
     isUpdateDismissed,
     showLogsTab,
     setShowLogsTab,
+    sessions,
+    isSessionsLoading,
     handleViewChange,
     handleRangeChange,
     handleRefresh,

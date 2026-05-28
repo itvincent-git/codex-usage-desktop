@@ -150,3 +150,23 @@ export async function checkForUpdates(etag?: string | null): Promise<UpdateCheck
 export async function openUrl(url: string): Promise<void> {
   return invoke<void>("open_url", { url });
 }
+
+export type SessionDetailRow = {
+  path: string;
+  sessionId: string;
+  modifiedAtMs: number;
+  sizeBytes: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  totalTokens: number;
+  costUSD: number;
+  models: string[];
+  projects: string[];
+};
+
+export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {
+  return invoke<SessionDetailRow[]>("fetch_session_details");
+}
+

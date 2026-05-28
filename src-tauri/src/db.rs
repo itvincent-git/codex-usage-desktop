@@ -1,4 +1,4 @@
-use crate::types::{DailyUsageRow, ModelUsage, ProjectUsage};
+use crate::types::{DailyUsageRow, ModelUsage, ProjectUsage, SessionDetailRow};
 use rusqlite::{params, Connection};
 use std::{collections::BTreeMap, path::Path};
 
@@ -351,6 +351,82 @@ pub fn query_latest_update_at(db: &Connection) -> Result<Option<String>, String>
         |row| row.get(0),
     )
     .map_err(|error| error.to_string())
+}
+
+pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, String> {
+    let mut statement = db
+        .prepare(
+            r#"
+            SELECT
+              path,
+              modified_at_ms,
+              size_bytes,
+              rows_json
+            FROM session_file_rollups
+            ORDER BY modified_at_ms DESC
+            "#,
+        )
+        .map_err(|error| error.to_string())?;
+
+    let rows = statement
+        .query_map([], |row| {
+            let path: String = row.get(0)?;
+            let modified_at_ms: i64 = row.get(1)?;
+            let size_bytes: i64 = row.get(2)?;
+            let rows_json: String = row.get(3)?;
+
+            let daily_rows = serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json)
+                .unwrap_or_default();
+
+            let mut input_tokens = 0;
+            let mut cached_input_tokens = 0;
+            let mut output_tokens = 0;
+            let mut reasoning_output_tokens = 0;
+            let mut total_tokens = 0;
+            let mut cost_usd = 0.0;
+            let mut models = std::collections::BTreeSet::new();
+            let mut projects = std::collections::BTreeSet::new();
+
+            for r in daily_rows {
+                input_tokens += r.input_tokens;
+                cached_input_tokens += r.cached_input_tokens;
+                output_tokens += r.output_tokens;
+                reasoning_output_tokens += r.reasoning_output_tokens;
+                total_tokens += r.total_tokens;
+                cost_usd += r.cost_usd;
+                for model in r.models.keys() {
+                    models.insert(model.clone());
+                }
+                for project in r.projects.keys() {
+                    projects.insert(project.clone());
+                }
+            }
+
+            let session_id = Path::new(&path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&path)
+                .to_string();
+
+            Ok(SessionDetailRow {
+                path,
+                session_id,
+                modified_at_ms,
+                size_bytes,
+                input_tokens,
+                cached_input_tokens,
+                output_tokens,
+                reasoning_output_tokens,
+                total_tokens,
+                cost_usd,
+                models: models.into_iter().collect(),
+                projects: projects.into_iter().collect(),
+            })
+        })
+        .map_err(|error| error.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

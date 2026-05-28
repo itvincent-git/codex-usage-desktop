@@ -195,3 +195,21 @@ pub struct UpdateCheckResponse {
     pub etag: Option<String>,
     pub not_modified: Option<bool>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDetailRow {
+    pub path: String,
+    pub session_id: String,
+    pub modified_at_ms: i64,
+    pub size_bytes: i64,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+    pub cost_usd: f64,
+    pub models: Vec<String>,
+    pub projects: Vec<String>,
+}
+

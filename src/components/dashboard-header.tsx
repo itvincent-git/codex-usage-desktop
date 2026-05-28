@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
 import type { UpdateCheckResponse } from "@/lib/api";
 
-export type DashboardView = "dashboard" | "models" | "projects" | "daily" | "monthly" | "settings" | "logs";
+export type DashboardView = "dashboard" | "models" | "projects" | "daily" | "monthly" | "sessions" | "settings" | "logs";
 
 type DashboardHeaderProps = {
   view: DashboardView;
@@ -103,6 +103,19 @@ export function DashboardHeader({
             onClick={() => onViewChange("monthly")}
           >
             Monthly
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "sessions"}
+            className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
+              view === "sessions"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => onViewChange("sessions")}
+          >
+            Sessions
           </button>
           <button
             type="button"
