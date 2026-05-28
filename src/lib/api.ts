@@ -100,6 +100,8 @@ export type CodexLimitsResponse = {
   source: string;
   account?: string | null;
   membershipLevel?: string | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionWillRenew?: boolean | null;
 };
 
 export async function scanUsage(): Promise<ScanResponse> {
@@ -148,4 +150,3 @@ export async function checkForUpdates(etag?: string | null): Promise<UpdateCheck
 export async function openUrl(url: string): Promise<void> {
   return invoke<void>("open_url", { url });
 }
-

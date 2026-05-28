@@ -87,6 +87,10 @@ describe("App", () => {
           },
           updatedAt: "2026-04-26T00:00:00.000Z",
           source: "cli-rpc",
+          account: "user@example.com",
+          membershipLevel: "plus",
+          subscriptionExpiresAt: "2026-06-12T08:22:29+00:00",
+          subscriptionWillRenew: false,
         };
       }
 
@@ -223,6 +227,9 @@ describe("App", () => {
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
+    expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Expires Jun 12, 2026")).toBeInTheDocument();
+    expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
     const trendsCard = screen.getByRole("heading", { name: "Usage Trends" }).closest(".rounded-lg");

@@ -1,5 +1,5 @@
 use crate::types::{CodexLimitWindow, CodexLimitsResponse};
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -15,6 +15,8 @@ use std::{
 const SESSION_WINDOW_MINUTES: i64 = 300;
 const WEEKLY_WINDOW_MINUTES: i64 = 10_080;
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
+const CHATGPT_ACCOUNT_CHECK_URL: &str =
+    "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -75,26 +77,41 @@ struct LimitsSnapshot {
     source: &'static str,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AccountSnapshot {
+    account: Option<String>,
+    membership_level: Option<String>,
+    subscription: SubscriptionInfo,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct SubscriptionInfo {
+    expires_at: Option<String>,
+    will_renew: Option<bool>,
+}
+
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     log::info!("Starting fetch_codex_limits...");
-    fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits)
+    fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)
 }
 
 fn fetch_codex_limits_with(
     fetch_oauth: impl FnOnce() -> Result<LimitsSnapshot, String>,
     fetch_cli: impl FnOnce() -> Result<LimitsSnapshot, String>,
+    fetch_account: impl FnOnce() -> AccountSnapshot,
 ) -> Result<CodexLimitsResponse, String> {
+    let account = fetch_account();
     match fetch_oauth() {
         Ok(limits) => {
             log::info!("Successfully fetched limits via OAuth.");
-            Ok(make_response(limits))
+            Ok(make_response(limits, account))
         }
         Err(oauth_error) => {
             log::warn!("OAuth limits fetch failed: {oauth_error}. Falling back to CLI...");
             match fetch_cli() {
                 Ok(limits) => {
                     log::info!("Successfully fetched limits via CLI fallback.");
-                    Ok(make_response(limits))
+                    Ok(make_response(limits, account))
                 }
                 Err(cli_error) => {
                     log::error!("Both OAuth and CLI failed. CLI error: {cli_error}");
@@ -128,12 +145,10 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
         request = request.header("ChatGPT-Account-Id", account_id);
     }
 
-    let response = request
-        .send()
-        .map_err(|error| {
-            log::error!("Request failed: {error:?}");
-            format!("Failed to fetch Codex usage API: {error}")
-        })?;
+    let response = request.send().map_err(|error| {
+        log::error!("Request failed: {error:?}");
+        format!("Failed to fetch Codex usage API: {error}")
+    })?;
     let status = response.status();
     let body = response
         .text()
@@ -173,22 +188,111 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
     })
 }
 
-fn make_response(limits: LimitsSnapshot) -> CodexLimitsResponse {
-    let (session, weekly) = normalize_windows(limits.primary, limits.secondary);
-    
-    let (account, membership_level) = match load_codex_auth() {
-        Ok(auth) => decode_jwt_info(&auth.access_token),
-        Err(_) => (None, None),
+fn fetch_account_snapshot() -> AccountSnapshot {
+    let Ok(auth) = load_codex_auth() else {
+        return AccountSnapshot::default();
     };
+    let (account, membership_level) = decode_jwt_info(&auth.access_token);
+    let subscription = match fetch_subscription_info(&auth) {
+        Ok(subscription) => subscription,
+        Err(error) => {
+            log::warn!("ChatGPT account check unavailable: {error}");
+            SubscriptionInfo::default()
+        }
+    };
+
+    AccountSnapshot {
+        account,
+        membership_level,
+        subscription,
+    }
+}
+
+fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimitsResponse {
+    let (session, weekly) = normalize_windows(limits.primary, limits.secondary);
 
     CodexLimitsResponse {
         session: session.map(make_window),
         weekly: weekly.map(make_window),
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         source: limits.source.to_string(),
-        account,
-        membership_level,
+        account: account.account,
+        membership_level: account.membership_level,
+        subscription_expires_at: account.subscription.expires_at,
+        subscription_will_renew: account.subscription.will_renew,
     }
+}
+
+fn fetch_subscription_info(auth: &CodexAuth) -> Result<SubscriptionInfo, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|error| format!("Failed to create ChatGPT account check client: {error}"))?;
+
+    let timezone_offset_min = chatgpt_timezone_offset_min();
+    let mut request = client
+        .get(CHATGPT_ACCOUNT_CHECK_URL)
+        .query(&[("timezone_offset_min", timezone_offset_min.to_string())])
+        .bearer_auth(&auth.access_token)
+        .header("Accept", "application/json")
+        .header("Origin", "https://chatgpt.com")
+        .header("Referer", "https://chatgpt.com/")
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+    if let Some(account_id) = &auth.account_id {
+        request = request.header("ChatGPT-Account-Id", account_id);
+    }
+
+    let response = request
+        .send()
+        .map_err(|error| format!("Failed to fetch ChatGPT account check API: {error}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .map_err(|error| format!("Failed to read ChatGPT account check response: {error}"))?;
+
+    if !status.is_success() {
+        return Err(format!(
+            "ChatGPT account check API returned {status}: {body}"
+        ));
+    }
+
+    let value = serde_json::from_str::<Value>(&body)
+        .map_err(|error| format!("Failed to parse ChatGPT account check response: {error}"))?;
+    Ok(parse_subscription_info(&value))
+}
+
+fn chatgpt_timezone_offset_min() -> i32 {
+    -Local::now().offset().local_minus_utc() / 60
+}
+
+fn parse_subscription_info(value: &Value) -> SubscriptionInfo {
+    let Some(account) = subscription_account_value(value) else {
+        return SubscriptionInfo::default();
+    };
+
+    let expires_at = account
+        .get("entitlement")
+        .and_then(|entitlement| string_field(entitlement, "expires_at"));
+    let will_renew = account
+        .get("last_active_subscription")
+        .and_then(|subscription| subscription.get("will_renew"))
+        .and_then(Value::as_bool);
+
+    SubscriptionInfo {
+        expires_at,
+        will_renew,
+    }
+}
+
+fn subscription_account_value(value: &Value) -> Option<&Value> {
+    let accounts = value.get("accounts")?;
+    accounts.get("default").or_else(|| {
+        accounts
+            .as_object()?
+            .values()
+            .find(|account| account.get("entitlement").is_some())
+    })
 }
 
 fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
@@ -201,12 +305,14 @@ fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
     if let Some(decoded_bytes) = base64url_decode(payload_b64) {
         if let Ok(decoded_str) = String::from_utf8(decoded_bytes) {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&decoded_str) {
-                let email = val.get("https://api.openai.com/profile")
+                let email = val
+                    .get("https://api.openai.com/profile")
                     .and_then(|p| p.get("email"))
                     .and_then(|e| e.as_str())
                     .map(|s| s.to_string());
 
-                let plan_type = val.get("https://api.openai.com/auth")
+                let plan_type = val
+                    .get("https://api.openai.com/auth")
                     .and_then(|a| a.get("chatgpt_plan_type"))
                     .and_then(|p| p.as_str())
                     .map(|s| s.to_string());
@@ -251,14 +357,22 @@ fn base64url_decode(input: &str) -> Option<Vec<u8>> {
             return None;
         }
 
-        let v2 = if c2 == b'=' { 0 } else { 
+        let v2 = if c2 == b'=' {
+            0
+        } else {
             let v = table[c2 as usize];
-            if v == 255 { return None; }
+            if v == 255 {
+                return None;
+            }
             v
         };
-        let v3 = if c3 == b'=' { 0 } else { 
+        let v3 = if c3 == b'=' {
+            0
+        } else {
             let v = table[c3 as usize];
-            if v == 255 { return None; }
+            if v == 255 {
+                return None;
+            }
             v
         };
 
@@ -909,11 +1023,14 @@ mod tests {
         )
         .unwrap();
         let rate_limit = usage.rate_limit.unwrap();
-        let response = make_response(LimitsSnapshot {
-            primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
-            secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
-            source: "oauth",
-        });
+        let response = make_response(
+            LimitsSnapshot {
+                primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
+                secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
+                source: "oauth",
+            },
+            AccountSnapshot::default(),
+        );
 
         assert_eq!(response.source, "oauth");
         assert_eq!(response.session.unwrap().remaining_percent, 75.0);
@@ -934,6 +1051,7 @@ mod tests {
                     source: "cli-rpc",
                 })
             },
+            AccountSnapshot::default,
         )
         .unwrap();
 
@@ -946,6 +1064,7 @@ mod tests {
         let error = fetch_codex_limits_with(
             || Err("bad token".to_string()),
             || Err("bad rpc".to_string()),
+            AccountSnapshot::default,
         )
         .unwrap_err();
 
@@ -953,6 +1072,70 @@ mod tests {
             error,
             "OAuth unavailable: bad token; CLI RPC unavailable: bad rpc"
         );
+    }
+
+    #[test]
+    fn parses_account_check_subscription_info() {
+        let value = serde_json::json!({
+            "accounts": {
+                "default": {
+                    "entitlement": {
+                        "renews_at": "2026-06-11T07:22:29+00:00",
+                        "expires_at": "2026-06-12T08:22:29+00:00"
+                    },
+                    "last_active_subscription": {
+                        "will_renew": false
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            parse_subscription_info(&value),
+            SubscriptionInfo {
+                expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
+                will_renew: Some(false),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_empty_subscription_info_when_account_check_fields_are_missing() {
+        let value = serde_json::json!({
+            "accounts": {
+                "default": {
+                    "entitlement": null,
+                    "last_active_subscription": null
+                }
+            }
+        });
+
+        assert_eq!(parse_subscription_info(&value), SubscriptionInfo::default());
+    }
+
+    #[test]
+    fn response_includes_subscription_info_from_account_snapshot() {
+        let response = make_response(
+            LimitsSnapshot {
+                primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
+                secondary: None,
+                source: "oauth",
+            },
+            AccountSnapshot {
+                account: Some("user@example.com".to_string()),
+                membership_level: Some("plus".to_string()),
+                subscription: SubscriptionInfo {
+                    expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
+                    will_renew: Some(false),
+                },
+            },
+        );
+
+        assert_eq!(
+            response.subscription_expires_at,
+            Some("2026-06-12T08:22:29+00:00".to_string())
+        );
+        assert_eq!(response.subscription_will_renew, Some(false));
     }
 
     #[test]

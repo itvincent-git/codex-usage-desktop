@@ -78,6 +78,7 @@ export function DashboardHeroCard({
   const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
   const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
+  const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null);
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -164,15 +165,15 @@ export function DashboardHeroCard({
               </div>
 
               {/* Account and Membership Info */}
-              {(codexLimits?.account || codexLimits?.membershipLevel) && (
+              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
                 <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
-                  {codexLimits.account && (
+                  {codexLimits?.account && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                       <User className="h-3.5 w-3.5 text-muted-foreground/60" />
                       <span>{codexLimits.account}</span>
                     </div>
                   )}
-                  {codexLimits.membershipLevel && (
+                  {codexLimits?.membershipLevel && (
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
                         "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 border",
@@ -185,6 +186,15 @@ export function DashboardHeroCard({
                         <Sparkles className="h-2.5 w-2.5" />
                         {codexLimits.membershipLevel}
                       </span>
+                    </div>
+                  )}
+                  {subscriptionExpiryLabel && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span>{subscriptionExpiryLabel}</span>
+                      {codexLimits?.subscriptionWillRenew === false && (
+                        <span className="text-muted-foreground/50">· Auto-renew off</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -267,4 +277,21 @@ export function DashboardHeroCard({
       </div>
     </Card>
   );
+}
+
+function formatSubscriptionExpiry(expiresAt: string | null) {
+  if (!expiresAt) {
+    return null;
+  }
+
+  const expiresDate = new Date(expiresAt);
+  if (Number.isNaN(expiresDate.getTime())) {
+    return null;
+  }
+
+  return `Expires ${expiresDate.toLocaleDateString([], {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
 }

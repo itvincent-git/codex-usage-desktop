@@ -178,6 +178,8 @@ pub struct CodexLimitsResponse {
     pub source: String,
     pub account: Option<String>,
     pub membership_level: Option<String>,
+    pub subscription_expires_at: Option<String>,
+    pub subscription_will_renew: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -193,4 +195,3 @@ pub struct UpdateCheckResponse {
     pub etag: Option<String>,
     pub not_modified: Option<bool>,
 }
-
