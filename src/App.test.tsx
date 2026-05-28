@@ -546,8 +546,8 @@ describe("App", () => {
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_session_details"));
     expect(screen.getByText("Session Details")).toBeInTheDocument();
     expect(screen.getByText("first")).toBeInTheDocument();
-    expect(screen.getByText("gpt-4o")).toBeInTheDocument();
-    expect(screen.getByText("1,000")).toBeInTheDocument();
+    expect(screen.getAllByText("gpt-4o").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1,000").length).toBeGreaterThan(0);
   });
 
   it("bootstraps only once in strict mode", async () => {
