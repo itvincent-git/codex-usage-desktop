@@ -187,6 +187,15 @@ export function DashboardHeroCard({
                       </span>
                     </div>
                   )}
+                  {codexLimits.membershipExpiresAt && (
+                    <div 
+                      className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium border bg-amber-500/5 border-amber-500/15 text-amber-500/90 cursor-help transition-all duration-200 hover:bg-amber-500/10 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400"
+                      title={`This login session expires on ${new Date(codexLimits.membershipExpiresAt).toLocaleString()}. After this, you will need to re-authenticate with the Codex CLI.`}
+                    >
+                      <CalendarDays className="h-3 w-3 text-amber-500/70 dark:text-amber-400/80" />
+                      <span>Session Expires: {new Date(codexLimits.membershipExpiresAt).toLocaleDateString()}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
