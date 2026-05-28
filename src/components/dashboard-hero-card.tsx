@@ -287,5 +287,8 @@ function formatSubscriptionExpiry(expiresAt: string | null) {
     return null;
   }
 
-  return `Expires ${expiresDate.format("YYYY-MM-DD")}`;
+  const daysLeft = Math.max(0, Math.ceil(expiresDate.diff(dayjs(), "day", true)));
+  const daysLeftLabel = daysLeft === 1 ? "1 day left" : `${daysLeft} days left`;
+
+  return `Expires ${expiresDate.format("YYYY-MM-DD")} (${daysLeftLabel})`;
 }

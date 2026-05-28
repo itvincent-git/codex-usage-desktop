@@ -228,7 +228,7 @@ describe("App", () => {
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Expires 2026-06-12")).toBeInTheDocument();
+    expect(screen.getByText(/Expires 2026-06-12 \(\d+ days left\)/)).toBeInTheDocument();
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
