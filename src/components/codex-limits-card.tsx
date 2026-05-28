@@ -2,6 +2,7 @@ import { Gauge } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
 
 type CodexLimitsCardProps = {
   limits: CodexLimitsResponse | null;
@@ -26,7 +27,7 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
             <CardDescription className="text-xs">Live account limits from the local Codex CLI.</CardDescription>
           </div>
           <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
-            {limits?.updatedAt ? `Updated ${new Date(limits.updatedAt).toLocaleTimeString()}` : "Not fetched yet"}
+            {limits?.updatedAt ? `Updated ${dayjs(limits.updatedAt).format("HH:mm:ss")}` : "Not fetched yet"}
           </p>
         </div>
       </CardHeader>
@@ -221,9 +222,8 @@ function formatWindowUsage(windowMinutes: number | null, usedPercent: number) {
 export function formatResetTime(resetsAtStr: string | null, windowMinutes: number | null): string {
   if (!resetsAtStr) return "Reset unavailable";
   
-  const resetsAt = new Date(resetsAtStr);
-  const now = new Date();
-  const diffMs = resetsAt.getTime() - now.getTime();
+  const resetsAt = dayjs(resetsAtStr);
+  const diffMs = resetsAt.diff(dayjs());
   
   if (diffMs <= 0) {
     return "Resetting soon";
@@ -231,14 +231,11 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
   
   // If session (windowMinutes <= 300, i.e., 5 hours)
   if (windowMinutes && windowMinutes <= 300) {
-    const hoursStr = String(resetsAt.getHours()).padStart(2, "0");
-    const minsStr = String(resetsAt.getMinutes()).padStart(2, "0");
-    return `Reset at ${hoursStr}:${minsStr}`;
+    return `Reset at ${resetsAt.format("HH:mm")}`;
   }
   
   // For weekly limit
-  const month = String(resetsAt.getMonth() + 1).padStart(2, "0");
-  const day = String(resetsAt.getDate()).padStart(2, "0");
+  const resetDate = resetsAt.format("YYYY-MM-DD");
   
   const diffHours = diffMs / (1000 * 60 * 60);
   let daysLeftText = "";
@@ -253,7 +250,7 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
     daysLeftText = days === 1 ? "1 day left" : `${days} days left`;
   }
   
-  return `Reset ${month}-${day} (${daysLeftText})`;
+  return `Reset ${resetDate} (${daysLeftText})`;
 }
 
 function getLimitStatus(remainingPercent: number): {
@@ -287,4 +284,3 @@ function getLimitStatus(remainingPercent: number): {
     barClass: "bg-primary",
   };
 }
-

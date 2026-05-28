@@ -10,6 +10,7 @@ import type { MetricCardData } from "@/lib/usage-dashboard";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -41,15 +42,12 @@ export function DashboardHeroCard({
   codexLimits,
 }: DashboardHeroCardProps) {
   const formatUpdatedTime = (timestamp: string) => {
-    const d = new Date(timestamp);
-    const today = new Date();
-    const isToday = d.toDateString() === today.toDateString();
-    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-    if (isToday) {
+    const updatedAt = dayjs(timestamp);
+    const timeStr = updatedAt.format("HH:mm:ss");
+    if (updatedAt.isSame(dayjs(), "day")) {
       return `Today at ${timeStr}`;
     }
-    const dateStr = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-    return `${dateStr} ${timeStr}`;
+    return `${updatedAt.format("YYYY-MM-DD")} ${timeStr}`;
   };
 
   const isSynced = !!overview.updatedAt;
@@ -284,14 +282,10 @@ function formatSubscriptionExpiry(expiresAt: string | null) {
     return null;
   }
 
-  const expiresDate = new Date(expiresAt);
-  if (Number.isNaN(expiresDate.getTime())) {
+  const expiresDate = dayjs(expiresAt);
+  if (!expiresDate.isValid()) {
     return null;
   }
 
-  return `Expires ${expiresDate.toLocaleDateString([], {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })}`;
+  return `Expires ${expiresDate.format("YYYY-MM-DD")}`;
 }
