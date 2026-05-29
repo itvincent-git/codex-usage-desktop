@@ -23,7 +23,7 @@ function cleanSessionId(sessionId: string) {
 
 function formatDateHeader(dateStr: string) {
   try {
-    return dayjs(dateStr).format("YYYY-MM-DD");
+    return dayjs(dateStr).format("YYYY-MM-DD (dddd)");
   } catch (e) {
     return dateStr;
   }
