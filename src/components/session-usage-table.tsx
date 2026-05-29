@@ -3,11 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Sparkles, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
   initialExpandedDate?: string | null;
+  selectedProject?: string | null;
+  onClearProjectFilter?: () => void;
 };
 
 function formatBytes(bytes: number) {
@@ -30,7 +33,12 @@ function formatDateHeader(dateStr: string) {
   }
 }
 
-export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsageTableProps) {
+export function SessionUsageTable({
+  sessions,
+  initialExpandedDate,
+  selectedProject = null,
+  onClearProjectFilter,
+}: SessionUsageTableProps) {
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
 
@@ -55,6 +63,10 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
   const groups = useMemo(() => {
     const map: Record<string, SessionDetailRow[]> = {};
     for (const session of sessions) {
+      // If a project filter is active, skip sessions that don't belong to the project
+      if (selectedProject && (!session.projects || !session.projects.includes(selectedProject))) {
+        continue;
+      }
       // Extract date part (local time based on timestamp) using dayjs with YYYY-MM-DD format
       const dateStr = dayjs(session.modifiedAtMs).format("YYYY-MM-DD");
       if (!map[dateStr]) {
@@ -89,7 +101,12 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
           projects,
         };
       });
-  }, [sessions]);
+  }, [sessions, selectedProject]);
+
+  const filteredCount = useMemo(() => {
+    if (!selectedProject) return sessions.length;
+    return sessions.filter((s) => s.projects && s.projects.includes(selectedProject)).length;
+  }, [sessions, selectedProject]);
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
@@ -102,9 +119,12 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
   };
 
   const isCollapsed = (date: string) => {
-    // If not explicitly set, the first date group (index 0) is expanded by default, others collapsed
     if (collapsedDates[date] !== undefined) {
       return collapsedDates[date];
+    }
+    // If filtering by project, expand all groups by default
+    if (selectedProject) {
+      return false;
     }
     const firstDate = groups[0]?.date;
     return date !== firstDate;
@@ -133,7 +153,7 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
             Session Details
             <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
-              {sessions.length} sessions
+              {selectedProject ? `Showing ${filteredCount} of ${sessions.length} sessions` : `${sessions.length} sessions`}
             </span>
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -142,8 +162,46 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
         </div>
       </div>
 
+      {selectedProject && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 backdrop-blur-md transition-all duration-300">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/15">
+              <Folder className="h-4 w-4" />
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">Filtering by Project</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="font-bold text-foreground text-sm">{selectedProject.split("/").pop() || selectedProject}</span>
+                <span className="text-[11px] font-mono text-muted-foreground truncate max-w-xs md:max-w-md">({selectedProject})</span>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onClearProjectFilter}
+            className="h-8 font-medium text-xs border-indigo-500/20 hover:bg-indigo-500/10 hover:text-indigo-400 transition"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {groups.map((group, index) => {
+        {groups.length === 0 && selectedProject ? (
+          <Card className="border-border/60 bg-card/30 backdrop-blur-md">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="mb-4 rounded-full bg-muted/60 p-4 text-muted-foreground">
+                <Folder className="h-8 w-8 text-indigo-400" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">No sessions for this project</h3>
+              <p className="mt-2 max-w-sm text-xs text-muted-foreground">
+                No active session logs were recorded in this project directory during the selected timeframe.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          groups.map((group, index) => {
           const collapsed = isCollapsed(group.date);
           const formattedDate = formatDateHeader(group.date);
           
@@ -393,7 +451,8 @@ export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsag
               )}
             </div>
           );
-        })}
+        })
+      )}
       </div>
     </div>
   );

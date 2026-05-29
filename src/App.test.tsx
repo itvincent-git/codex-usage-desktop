@@ -628,6 +628,136 @@ describe("App", () => {
     expect(screen.getByText("first")).toBeInTheDocument();
   });
 
+  it("opens project sessions modal when a project row is clicked, filters sessions, and can view in sessions tab", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-05-11T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-04-12",
+          endDate: "2026-05-11",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 1200,
+            cachedInputTokens: 200,
+            outputTokens: 400,
+            totalTokens: 1600,
+            costUSD: 0.005275,
+            avgTokensPerDay: 53.3333333,
+            avgCostPerDay: 0.0001758,
+            cacheHitRate: 0.1666,
+            costPerMillionTokens: 3.296875,
+          },
+          models: [],
+          projects: [
+            {
+              project: "/path/to/my-awesome-project",
+              displayName: "my-awesome-project",
+              inputTokens: 1000,
+              cachedInputTokens: 200,
+              outputTokens: 200,
+              totalTokens: 1200,
+              costUSD: 0.004,
+            },
+          ],
+        };
+      }
+
+      if (command === "fetch_session_details") {
+        return [
+          {
+            path: "/path/to/session/first.jsonl",
+            sessionId: "first.jsonl",
+            modifiedAtMs: 1778544000000,
+            sizeBytes: 2048,
+            inputTokens: 800,
+            cachedInputTokens: 100,
+            outputTokens: 200,
+            totalTokens: 1000,
+            costUSD: 0.0035,
+            models: ["gpt-4o"],
+            projects: ["/path/to/my-awesome-project"],
+          },
+          {
+            path: "/path/to/session/second.jsonl",
+            sessionId: "second.jsonl",
+            modifiedAtMs: 1778544000000,
+            sizeBytes: 1024,
+            inputTokens: 400,
+            cachedInputTokens: 100,
+            outputTokens: 100,
+            totalTokens: 500,
+            costUSD: 0.0017,
+            models: ["claude-3.5-sonnet"],
+            projects: ["/path/to/another-project"],
+          },
+        ];
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+
+    // Switch to Project tab
+    await userEvent.click(screen.getByRole("tab", { name: "Project" }));
+    expect(screen.getByRole("heading", { name: "Project Usage Details" })).toBeInTheDocument();
+
+    // Verify project is visible
+    expect(screen.getByText("my-awesome-project")).toBeInTheDocument();
+
+    // Click the project row
+    const projectCell = screen.getByText("my-awesome-project");
+    await userEvent.click(projectCell);
+
+    // Verify modal has opened
+    await waitFor(() => expect(screen.getByText("Project Details")).toBeInTheDocument());
+    expect(screen.getAllByText("/path/to/my-awesome-project").length).toBeGreaterThan(0);
+
+    // Modal should show only the matching session ('first') and not the non-matching one ('second')
+    expect(screen.getByText("first")).toBeInTheDocument();
+    expect(screen.queryByText("second")).not.toBeInTheDocument();
+
+    // Type a query in search that doesn't match
+    const searchInput = screen.getByPlaceholderText("Search session ID or model...");
+    await userEvent.type(searchInput, "non-existent-query");
+    await waitFor(() => expect(screen.queryByText("first")).not.toBeInTheDocument());
+
+    // Clear search query
+    await userEvent.clear(searchInput);
+    await waitFor(() => expect(screen.getByText("first")).toBeInTheDocument());
+
+    // Click the "View in Sessions Tab" button in footer
+    const viewInSessionsBtn = screen.getByRole("button", { name: "View in Sessions Tab" });
+    await userEvent.click(viewInSessionsBtn);
+
+    // Modal should be closed and tab should have changed to Sessions with filter active
+    expect(screen.queryByText("Project Details")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Session Details/ })).toBeInTheDocument();
+
+    // Should show pre-filtered sessions message and badge
+    expect(screen.getByText("Filtering by Project")).toBeInTheDocument();
+    expect(screen.getByText("first")).toBeInTheDocument();
+    expect(screen.queryByText("second")).not.toBeInTheDocument();
+
+    // Click "Clear Filter" button in Sessions tab
+    const clearFilterBtn = screen.getByRole("button", { name: "Clear Filter" });
+    await userEvent.click(clearFilterBtn);
+
+    // Both sessions should now be visible
+    expect(screen.queryByText("Filtering by Project")).not.toBeInTheDocument();
+    expect(screen.getByText("first")).toBeInTheDocument();
+    expect(screen.getByText("second")).toBeInTheDocument();
+  });
+
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {

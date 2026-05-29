@@ -4,9 +4,10 @@ import { formatCurrency, formatNumber } from "@/lib/formatters";
 
 type ProjectUsageCardProps = {
   projects: OverviewResponse["projects"];
+  onProjectClick?: (project: OverviewResponse["projects"][number]) => void;
 };
 
-export function ProjectUsageCard({ projects }: ProjectUsageCardProps) {
+export function ProjectUsageCard({ projects, onProjectClick }: ProjectUsageCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -31,10 +32,20 @@ export function ProjectUsageCard({ projects }: ProjectUsageCardProps) {
               </thead>
               <tbody>
                 {projects.map((project) => (
-                  <tr key={project.project} className="align-top">
+                  <tr
+                    key={project.project}
+                    className={`align-top group ${
+                      onProjectClick
+                        ? "cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                        : ""
+                    }`}
+                    onClick={() => onProjectClick?.(project)}
+                  >
                     <td className="border-b border-border/70 px-0 py-4">
                       <div className="max-w-72 space-y-1">
-                        <div className="truncate font-medium text-foreground">{project.displayName}</div>
+                        <div className="truncate font-medium text-foreground transition-colors group-hover:text-primary">
+                          {project.displayName}
+                        </div>
                         <div className="break-all text-xs leading-5 text-muted-foreground">{project.project}</div>
                       </div>
                     </td>

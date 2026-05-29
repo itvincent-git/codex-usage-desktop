@@ -9,6 +9,7 @@ import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { SessionUsageTable } from "@/components/session-usage-table";
+import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
@@ -20,6 +21,13 @@ import { Button } from "@/components/ui/button";
 export default function App() {
   const [showNotes, setShowNotes] = useState(false);
   const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(null);
+  const [selectedProjectForModal, setSelectedProjectForModal] = useState<{
+    project: string;
+    displayName: string;
+    totalTokens: number;
+    costUSD: number;
+  } | null>(null);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
   const {
     view,
     range,
@@ -87,7 +95,9 @@ export default function App() {
           onViewChange={(nextView) => {
             if (nextView !== "sessions") {
               setSelectedSessionDate(null);
+              setSelectedProjectFilter(null);
             }
+            setSelectedProjectForModal(null);
             void handleViewChange(nextView);
           }}
           updateInfo={updateInfo}
@@ -234,7 +244,10 @@ export default function App() {
                   <RangeSwitcher value={range} onChange={handleRangeChange} />
                 </div>
               </div>
-              <ProjectUsageCard projects={projects} />
+              <ProjectUsageCard
+                projects={projects}
+                onProjectClick={(proj) => setSelectedProjectForModal(proj)}
+              />
             </div>
           ) : null}
 
@@ -265,7 +278,12 @@ export default function App() {
           ) : null}
 
           {!isLoading && view === "sessions" && !isSessionsLoading ? (
-            <SessionUsageTable sessions={sessions} initialExpandedDate={selectedSessionDate} />
+            <SessionUsageTable
+              sessions={sessions}
+              initialExpandedDate={selectedSessionDate}
+              selectedProject={selectedProjectFilter}
+              onClearProjectFilter={() => setSelectedProjectFilter(null)}
+            />
           ) : null}
 
           {!isLoading && view === "settings" ? (
@@ -286,6 +304,19 @@ export default function App() {
           <div className={!isLoading && view === "logs" ? "block" : "hidden"}>
             <LogPanel />
           </div>
+
+          {selectedProjectForModal && (
+            <ProjectSessionsModal
+              project={selectedProjectForModal}
+              onClose={() => setSelectedProjectForModal(null)}
+              onGoToSessions={(projectPath) => {
+                setSelectedProjectForModal(null);
+                setSelectedProjectFilter(projectPath);
+                setSelectedSessionDate(null);
+                void handleViewChange("sessions");
+              }}
+            />
+          )}
         </main>
       </div>
     </div>
