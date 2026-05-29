@@ -23,6 +23,10 @@ export default {
           foreground: "rgb(var(--muted-foreground) / <alpha-value>)",
         },
         surface: "rgb(var(--surface) / <alpha-value>)",
+        card: {
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          foreground: "rgb(var(--foreground) / <alpha-value>)",
+        },
         success: "rgb(var(--success) / <alpha-value>)",
         warning: "rgb(var(--warning) / <alpha-value>)",
         error: "rgb(var(--error) / <alpha-value>)",

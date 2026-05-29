@@ -111,7 +111,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
     >
       <div
         ref={modalRef}
-        className="bg-card/95 border border-border/80 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden backdrop-blur-lg transition-transform duration-300 animate-in fade-in zoom-in-95 duration-200"
+        className="bg-surface/95 border border-border/80 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden backdrop-blur-lg transition-transform duration-300 animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Modal Header */}
         <div className="flex items-start justify-between border-b border-border/60 bg-muted/20 px-6 py-5">
