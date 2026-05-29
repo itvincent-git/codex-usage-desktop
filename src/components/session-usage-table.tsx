@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Sparkles, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
+import dayjs from "dayjs";
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
@@ -22,14 +23,7 @@ function cleanSessionId(sessionId: string) {
 
 function formatDateHeader(dateStr: string) {
   try {
-    const date = new Date(dateStr + "T00:00:00");
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    };
-    return date.toLocaleDateString(undefined, options);
+    return dayjs(dateStr).format("YYYY-MM-DD");
   } catch (e) {
     return dateStr;
   }
@@ -43,8 +37,8 @@ export function SessionUsageTable({ sessions }: SessionUsageTableProps) {
   const groups = useMemo(() => {
     const map: Record<string, SessionDetailRow[]> = {};
     for (const session of sessions) {
-      // Extract date part (local time based on timestamp)
-      const dateStr = new Date(session.modifiedAtMs).toLocaleDateString("sv-SE"); // sv-SE returns YYYY-MM-DD
+      // Extract date part (local time based on timestamp) using dayjs with YYYY-MM-DD format
+      const dateStr = dayjs(session.modifiedAtMs).format("YYYY-MM-DD");
       if (!map[dateStr]) {
         map[dateStr] = [];
       }
