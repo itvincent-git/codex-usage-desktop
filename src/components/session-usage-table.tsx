@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
+  initialExpandedDate?: string | null;
 };
 
 function formatBytes(bytes: number) {
@@ -29,9 +30,26 @@ function formatDateHeader(dateStr: string) {
   }
 }
 
-export function SessionUsageTable({ sessions }: SessionUsageTableProps) {
+export function SessionUsageTable({ sessions, initialExpandedDate }: SessionUsageTableProps) {
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (initialExpandedDate) {
+      setCollapsedDates((prev) => ({
+        ...prev,
+        [initialExpandedDate]: false,
+      }));
+      // Smoothly scroll to the element after a small timeout to let the view render
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`date-group-${initialExpandedDate}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialExpandedDate]);
 
   // Group and sort sessions
   const groups = useMemo(() => {
@@ -136,7 +154,8 @@ export function SessionUsageTable({ sessions }: SessionUsageTableProps) {
           return (
             <div
               key={group.date}
-              className="overflow-hidden rounded-xl border border-border/50 bg-card/20 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-border/80"
+              id={`date-group-${group.date}`}
+              className="overflow-hidden rounded-xl border border-border/50 bg-card/20 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-border/80 scroll-mt-6"
             >
               {/* Collapsible Accordion Header */}
               <button

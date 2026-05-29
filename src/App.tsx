@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 
 export default function App() {
   const [showNotes, setShowNotes] = useState(false);
+  const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(null);
   const {
     view,
     range,
@@ -83,7 +84,12 @@ export default function App() {
 
         <DashboardHeader
           view={view}
-          onViewChange={(nextView) => void handleViewChange(nextView)}
+          onViewChange={(nextView) => {
+            if (nextView !== "sessions") {
+              setSelectedSessionDate(null);
+            }
+            void handleViewChange(nextView);
+          }}
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           onUpgrade={() => void handleUpgrade()}
@@ -243,7 +249,14 @@ export default function App() {
                   <RangeSwitcher value={range} onChange={handleRangeChange} />
                 </div>
               </div>
-              <DailyUsageTable range={range} daily={sortedDailyUsage} />
+              <DailyUsageTable
+                range={range}
+                daily={sortedDailyUsage}
+                onRowClick={(date) => {
+                  setSelectedSessionDate(date);
+                  void handleViewChange("sessions");
+                }}
+              />
             </div>
           ) : null}
 
@@ -252,7 +265,7 @@ export default function App() {
           ) : null}
 
           {!isLoading && view === "sessions" && !isSessionsLoading ? (
-            <SessionUsageTable sessions={sessions} />
+            <SessionUsageTable sessions={sessions} initialExpandedDate={selectedSessionDate} />
           ) : null}
 
           {!isLoading && view === "settings" ? (

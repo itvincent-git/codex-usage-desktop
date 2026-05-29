@@ -6,6 +6,7 @@ import { rangeLabels } from "@/lib/usage-dashboard";
 type DailyUsageTableProps = {
   range: RangeKey;
   daily: OverviewResponse["daily"];
+  onRowClick?: (date: string) => void;
 };
 
 type DailyRow = OverviewResponse["daily"][number];
@@ -57,7 +58,7 @@ function buildDisplayRows(daily: OverviewResponse["daily"]): DisplayRow[] {
   }, []);
 }
 
-export function DailyUsageTable({ range, daily }: DailyUsageTableProps) {
+export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTableProps) {
   const maxDailyTokens = Math.max(...daily.map((day) => day.totalTokens), 1);
   const maxDailyCost = Math.max(...daily.map((day) => day.costUSD), 0);
   const displayRows = buildDisplayRows(daily);
@@ -119,8 +120,16 @@ export function DailyUsageTable({ range, daily }: DailyUsageTableProps) {
                 const costHeatAlpha = 0.1 + costHeat * 0.22;
 
                 return (
-                  <tr key={day.date} className="align-top">
-                    <td className="border-b border-border/70 px-0 py-4 font-medium text-foreground">{day.date}</td>
+                  <tr
+                    key={day.date}
+                    className={`align-top group ${
+                      onRowClick
+                        ? "cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                        : ""
+                    }`}
+                    onClick={() => onRowClick?.(day.date)}
+                  >
+                    <td className="border-b border-border/70 px-0 py-4 font-medium text-foreground transition-colors group-hover:text-primary">{day.date}</td>
                     <td className="border-b border-border/70 px-4 py-4">
                       <div className="space-y-2">
                         <div className="font-medium text-foreground">{formatNumber(day.totalTokens)}</div>

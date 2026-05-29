@@ -550,6 +550,84 @@ describe("App", () => {
     expect(screen.getAllByText("1,000").length).toBeGreaterThan(0);
   });
 
+  it("navigates to sessions view when a daily usage row is clicked", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-05-11T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-04-12",
+          endDate: "2026-05-11",
+          updatedAt: "2026-05-11T00:00:00.000Z",
+          daily: [
+            {
+              date: "2026-05-11",
+              inputTokens: 1200,
+              cachedInputTokens: 200,
+              outputTokens: 400,
+              totalTokens: 1600,
+              costUSD: 0.005275,
+            },
+          ],
+          totals: {
+            inputTokens: 1200,
+            cachedInputTokens: 200,
+            outputTokens: 400,
+            totalTokens: 1600,
+            costUSD: 0.005275,
+            avgTokensPerDay: 53.3333333,
+            avgCostPerDay: 0.0001758,
+            cacheHitRate: 0.1666,
+            costPerMillionTokens: 3.296875,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+
+      if (command === "fetch_session_details") {
+        return [
+          {
+            path: "/path/to/session/first.jsonl",
+            sessionId: "first.jsonl",
+            modifiedAtMs: 1778544000000,
+            sizeBytes: 2048,
+            inputTokens: 800,
+            cachedInputTokens: 100,
+            outputTokens: 200,
+            totalTokens: 1000,
+            costUSD: 0.0035,
+            models: ["gpt-4o"],
+            projects: ["/path/to/project"],
+          },
+        ];
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+    
+    // Switch to Daily tab
+    await userEvent.click(screen.getByRole("tab", { name: "Daily" }));
+    expect(screen.getByRole("heading", { name: "Daily Usage Details" })).toBeInTheDocument();
+
+    // Click the active daily row for 2026-05-11
+    const dailyRowCell = screen.getByRole("cell", { name: "2026-05-11" });
+    await userEvent.click(dailyRowCell);
+
+    // Verify it automatically navigated to Session Details
+    await waitFor(() => expect(screen.getByText("Session Details")).toBeInTheDocument());
+    expect(screen.getByText("first")).toBeInTheDocument();
+  });
+
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {
