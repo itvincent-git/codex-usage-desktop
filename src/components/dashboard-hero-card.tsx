@@ -285,10 +285,9 @@ function formatSubscriptionExpiryDate(expiresAt: string | null) {
     return null;
   }
 
-  // Use only the date portion (YYYY-MM-DD) to prevent dayjs from shifting the day 
-  // when converting from UTC to the local timezone.
-  const dateString = expiresAt.substring(0, 10);
-  const expiresDate = dayjs(dateString);
+  // ChatGPT's entitlement endpoint adds a 24-hour grace period to the actual billing period.
+  // To match the official billing page, we subtract 1 day from the entitlement expiration.
+  const expiresDate = dayjs(expiresAt).subtract(1, "day");
   if (!expiresDate.isValid()) {
     return null;
   }
