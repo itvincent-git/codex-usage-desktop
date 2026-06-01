@@ -21,6 +21,8 @@ import {
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, rangeLabels } from "@/lib/usage-dashboard";
 
+const AUTO_RESCAN_MS = 5 * 60_000;
+
 export function useUsageDashboard() {
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
@@ -60,6 +62,8 @@ export function useUsageDashboard() {
   const hasBootstrappedRef = useRef(false);
   const hiddenSinceRef = useRef<number | null>(null);
   const lastLimitsFetchTimeRef = useRef<number>(0);
+  const lastAutoScanTimeRef = useRef<number>(0);
+  const scanInFlightRef = useRef<Promise<void> | null>(null);
 
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
     const data = await fetchOverview(nextRange);
@@ -98,21 +102,54 @@ export function useUsageDashboard() {
   });
 
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number, options?: { force?: boolean }) => {
-    const scan = await scanUsage();
-    const cacheMessage = scan.metrics
-      ? ` (${scan.metrics.filesReused} cached, ${scan.metrics.filesParsed} parsed)`
-      : "";
-    setScanMessage(`Synced ${scan.importedDays} days${cacheMessage}`);
-    
-    await Promise.all([loadOverview(range), loadCodexLimits(options)]);
-    
-    if (view === "monthly") {
-      await loadMonthlyUsage();
+    if (scanInFlightRef.current) {
+      await scanInFlightRef.current;
+      return;
     }
-    if (view === "sessions") {
-      await loadSessions();
+
+    const scanPromise = (async () => {
+      const scan = await scanUsage();
+      const cacheMessage = scan.metrics
+        ? ` (${scan.metrics.filesReused} cached, ${scan.metrics.filesParsed} parsed)`
+        : "";
+      setScanMessage(`Synced ${scan.importedDays} days${cacheMessage}`);
+
+      await Promise.all([loadOverview(range), loadCodexLimits(options)]);
+
+      if (view === "monthly") {
+        await loadMonthlyUsage();
+      }
+      if (view === "sessions") {
+        await loadSessions();
+      }
+      setLastRescanDurationMs(performance.now() - startedAt);
+    })();
+
+    scanInFlightRef.current = scanPromise;
+    try {
+      await scanPromise;
+    } finally {
+      scanInFlightRef.current = null;
     }
-    setLastRescanDurationMs(performance.now() - startedAt);
+  });
+
+  const runAutoRescan = useEffectEvent(async () => {
+    if (document.visibilityState !== "visible" || !document.hasFocus() || isResetting) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastAutoScanTimeRef.current < AUTO_RESCAN_MS) {
+      return;
+    }
+
+    lastAutoScanTimeRef.current = now;
+    const startedAt = performance.now();
+    try {
+      await scanAndReloadOverview(startedAt);
+    } catch (scanError) {
+      setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
+    }
   });
 
   const runBackgroundUpdateCheck = useEffectEvent(async () => {
@@ -244,11 +281,9 @@ export function useUsageDashboard() {
     void bootstrap();
   }, [bootstrap]);
 
-  // Re-fetch limits when the page/window regains focus or visibility after being inactive ≥5 min.
+  // Re-fetch limits and usage when the page/window regains focus after being inactive ≥5 min.
   useEffect(() => {
     if (!bootstrapped) return;
-
-    const STALE_MS = 5 * 60_000;
 
     function handleInactive() {
       if (hiddenSinceRef.current === null) {
@@ -260,8 +295,9 @@ export function useUsageDashboard() {
       if (document.visibilityState === "visible" && document.hasFocus()) {
         const inactiveDuration = hiddenSinceRef.current;
         hiddenSinceRef.current = null;
-        if (inactiveDuration !== null && Date.now() - inactiveDuration >= STALE_MS) {
+        if (inactiveDuration !== null && Date.now() - inactiveDuration >= AUTO_RESCAN_MS) {
           void loadCodexLimits();
+          void runAutoRescan();
         }
       }
     }
@@ -278,6 +314,10 @@ export function useUsageDashboard() {
     window.addEventListener("blur", handleInactive);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    const intervalId = window.setInterval(() => {
+      void runAutoRescan();
+    }, AUTO_RESCAN_MS);
+
     if (document.visibilityState === "hidden" || !document.hasFocus()) {
       hiddenSinceRef.current = Date.now();
     }
@@ -286,8 +326,9 @@ export function useUsageDashboard() {
       window.removeEventListener("focus", handleActive);
       window.removeEventListener("blur", handleInactive);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(intervalId);
     };
-  }, [bootstrapped, loadCodexLimits]);
+  }, [bootstrapped, loadCodexLimits, runAutoRescan]);
 
   async function handleViewChange(nextView: DashboardView) {
     setView(nextView);
