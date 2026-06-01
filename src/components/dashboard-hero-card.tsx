@@ -76,7 +76,13 @@ export function DashboardHeroCard({
   const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
   const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
-  const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null);
+
+  const expiryDateString = formatSubscriptionExpiryDate(codexLimits?.subscriptionExpiresAt ?? null);
+  const subscriptionText = expiryDateString
+    ? codexLimits?.subscriptionWillRenew === false
+      ? `Your plan will be canceled on ${expiryDateString}`
+      : `Your plan will auto-renew on ${expiryDateString}`
+    : null;
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -163,7 +169,7 @@ export function DashboardHeroCard({
               </div>
 
               {/* Account and Membership Info */}
-              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
+              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionText) && (
                 <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
                   {codexLimits?.account && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
@@ -186,13 +192,10 @@ export function DashboardHeroCard({
                       </span>
                     </div>
                   )}
-                  {subscriptionExpiryLabel && (
+                  {subscriptionText && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                       <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/60" />
-                      <span>{subscriptionExpiryLabel}</span>
-                      {codexLimits?.subscriptionWillRenew === false && (
-                        <span className="text-muted-foreground/50">· Auto-renew off</span>
-                      )}
+                      <span>{subscriptionText}</span>
                     </div>
                   )}
                 </div>
@@ -277,18 +280,18 @@ export function DashboardHeroCard({
   );
 }
 
-function formatSubscriptionExpiry(expiresAt: string | null) {
+function formatSubscriptionExpiryDate(expiresAt: string | null) {
   if (!expiresAt) {
     return null;
   }
 
-  const expiresDate = dayjs(expiresAt);
+  // Use only the date portion (YYYY-MM-DD) to prevent dayjs from shifting the day 
+  // when converting from UTC to the local timezone.
+  const dateString = expiresAt.substring(0, 10);
+  const expiresDate = dayjs(dateString);
   if (!expiresDate.isValid()) {
     return null;
   }
 
-  const daysLeft = Math.max(0, Math.ceil(expiresDate.diff(dayjs(), "day", true)));
-  const daysLeftLabel = daysLeft === 1 ? "1 day left" : `${daysLeft} days left`;
-
-  return `Expires ${expiresDate.format("YYYY-MM-DD")} (${daysLeftLabel})`;
+  return expiresDate.format("MMM D, YYYY");
 }
