@@ -76,13 +76,7 @@ export function DashboardHeroCard({
   const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
   const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
-
-  const expiryDateString = formatSubscriptionExpiryDate(codexLimits?.subscriptionExpiresAt ?? null);
-  const subscriptionText = expiryDateString
-    ? codexLimits?.subscriptionWillRenew === false
-      ? `Your plan will be canceled on ${expiryDateString}`
-      : `Your plan will auto-renew on ${expiryDateString}`
-    : null;
+  const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null);
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -169,7 +163,7 @@ export function DashboardHeroCard({
               </div>
 
               {/* Account and Membership Info */}
-              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionText) && (
+              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
                 <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
                   {codexLimits?.account && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
@@ -192,10 +186,13 @@ export function DashboardHeroCard({
                       </span>
                     </div>
                   )}
-                  {subscriptionText && (
+                  {subscriptionExpiryLabel && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                       <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/60" />
-                      <span>{subscriptionText}</span>
+                      <span>{subscriptionExpiryLabel}</span>
+                      {codexLimits?.subscriptionWillRenew === false && (
+                        <span className="text-muted-foreground/50">· Auto-renew off</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -280,17 +277,20 @@ export function DashboardHeroCard({
   );
 }
 
-function formatSubscriptionExpiryDate(expiresAt: string | null) {
+function formatSubscriptionExpiry(expiresAt: string | null) {
   if (!expiresAt) {
     return null;
   }
 
-  // ChatGPT's entitlement endpoint adds a 24-hour grace period to the actual billing period.
-  // To match the official billing page, we subtract 1 day from the entitlement expiration.
+  // ChatGPT's API includes a 24-hour grace period on the token entitlement.
+  // Subtract 1 day to match the user's actual billing cycle date.
   const expiresDate = dayjs(expiresAt).subtract(1, "day");
   if (!expiresDate.isValid()) {
     return null;
   }
 
-  return expiresDate.format("MMM D, YYYY");
+  const daysLeft = Math.max(0, Math.ceil(expiresDate.diff(dayjs(), "day", true)));
+  const daysLeftLabel = daysLeft === 1 ? "1 day left" : `${daysLeft} days left`;
+
+  return `Expires ${expiresDate.format("YYYY-MM-DD")} (${daysLeftLabel})`;
 }
