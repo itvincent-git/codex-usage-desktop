@@ -89,7 +89,7 @@ Known pitfalls to avoid:
 - If data is already on screen, avoid replacing the whole view with a full-page loading card for background refreshes unless that behavior is explicitly desired.
 
 ## Git
-After completing the task, if there are no issues, commit the changes to Git. Write in English.
+After completing the task, if there are no issues, commit the changes to Git. Write by Conventional Commits style in English.
 
 ---
 

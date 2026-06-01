@@ -235,7 +235,7 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
   }
   
   // For weekly limit
-  const resetDate = resetsAt.format("YYYY-MM-DD");
+  const resetDate = resetsAt.format("MMM D, YYYY h:mm A");
   
   const diffHours = diffMs / (1000 * 60 * 60);
   let daysLeftText = "";
@@ -250,7 +250,7 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
     daysLeftText = days === 1 ? "1 day left" : `${days} days left`;
   }
   
-  return `Reset ${resetDate} (${daysLeftText})`;
+  return `Resets ${resetDate} (${daysLeftText})`;
 }
 
 function getLimitStatus(remainingPercent: number): {
