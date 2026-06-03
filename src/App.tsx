@@ -13,7 +13,7 @@ import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
-import { buildMetricCards, rangeLabels } from "@/lib/usage-dashboard";
+import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,7 @@ export default function App() {
         : null,
     [monthlyUsage],
   );
-  const loadingTitle = overview ? `Loading ${rangeLabels[range]}` : "Preparing local cache";
+  const loadingTitle = overview ? `Loading ${getRangeLabel(range)}` : "Preparing local cache";
   const loadingDescription = overview
     ? "Loading usage and cost data for the selected window."
     : "Loading the cached dashboard snapshot.";

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { rangeLabels } from "@/lib/usage-dashboard";
+import { getRangeLabel } from "@/lib/usage-dashboard";
 
 type DailyUsageTableProps = {
   range: RangeKey;
@@ -66,7 +66,7 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{rangeLabels[range]}</CardTitle>
+        <CardTitle>{getRangeLabel(range)}</CardTitle>
         <CardDescription>Natural-day buckets written from the native cache after the latest scan.</CardDescription>
       </CardHeader>
       <CardContent>

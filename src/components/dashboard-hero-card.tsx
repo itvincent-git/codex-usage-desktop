@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { CodexLimitsResponse, ExportFormat, OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatPercent } from "@/lib/formatters";
-import { formatDuration, rangeLabels } from "@/lib/usage-dashboard";
+import { formatDuration, getRangeLabel } from "@/lib/usage-dashboard";
 import type { MetricCardData } from "@/lib/usage-dashboard";
 import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useState } from "react";
@@ -151,7 +151,7 @@ export function DashboardHeroCard({
               </div>
 
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total cost ({rangeLabels[range]})</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total cost ({getRangeLabel(range)})</p>
                 <div className="flex flex-wrap items-end gap-2.5">
                   <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
                     {formatCurrencyShort(overview.totals.costUSD)}

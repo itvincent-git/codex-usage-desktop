@@ -12,15 +12,19 @@ use rusqlite::Connection;
 use std::collections::BTreeMap;
 
 fn range_days(range: &str) -> Option<i64> {
-    match range {
-        "1d" => Some(1),
-        "2d" => Some(2),
-        "7d" => Some(7),
-        "14d" => Some(14),
-        "30d" => Some(30),
-        "60d" => Some(60),
-        "90d" => Some(90),
-        _ => None,
+    if range.ends_with('d') {
+        range[..range.len() - 1].parse::<i64>().ok()
+    } else {
+        match range {
+            "1d" => Some(1),
+            "2d" => Some(2),
+            "7d" => Some(7),
+            "14d" => Some(14),
+            "30d" => Some(30),
+            "60d" => Some(60),
+            "90d" => Some(90),
+            _ => None,
+        }
     }
 }
 
@@ -31,9 +35,30 @@ pub fn get_overview(
     pricing_source: &PricingSource,
 ) -> Result<OverviewResponse, String> {
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
-    let days = range_days(range).ok_or_else(|| format!("Unsupported range: {range}"))?;
-    let end_date = date_key_in_timezone(Utc::now(), &timezone);
-    let start_date = shift_date_key(&end_date, -(days - 1))?;
+    
+    let (start_date, end_date, days) = if range.starts_with("custom:") {
+        let parts: Vec<&str> = range["custom:".len()..].split('_').collect();
+        if parts.len() != 2 {
+            return Err(format!("Invalid custom range format: {}", range));
+        }
+        let start_str = parts[0];
+        let end_str = parts[1];
+        let start_parsed = NaiveDate::parse_from_str(start_str, "%Y-%m-%d")
+            .map_err(|e| format!("Invalid start date {}: {}", start_str, e))?;
+        let end_parsed = NaiveDate::parse_from_str(end_str, "%Y-%m-%d")
+            .map_err(|e| format!("Invalid end date {}: {}", end_str, e))?;
+        if end_parsed < start_parsed {
+            return Err("End date must be after or equal to start date".to_string());
+        }
+        let days = end_parsed.signed_duration_since(start_parsed).num_days() + 1;
+        (start_str.to_string(), end_str.to_string(), days)
+    } else {
+        let days = range_days(range).ok_or_else(|| format!("Unsupported range: {range}"))?;
+        let end_date = date_key_in_timezone(Utc::now(), &timezone);
+        let start_date = shift_date_key(&end_date, -(days - 1))?;
+        (start_date, end_date, days)
+    };
+
     let rows = query_daily_rows(db, &start_date, &end_date)?;
     let rows_by_date = rows
         .into_iter()

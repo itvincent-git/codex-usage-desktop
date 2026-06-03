@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d" | "60d" | "90d";
+export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d" | "60d" | "90d" | "180d" | "365d" | string;
 export type ExportFormat = "xlsx" | "markdown";
 
 export type OverviewResponse = {

@@ -10,7 +10,7 @@ export type MetricCardData = {
   detail: string;
 };
 
-export const rangeLabels: Record<RangeKey, string> = {
+export const rangeLabels: Record<string, string> = {
   "1d": "Last 1 Day",
   "2d": "Last 2 Days",
   "7d": "Last 7 Days",
@@ -18,7 +18,20 @@ export const rangeLabels: Record<RangeKey, string> = {
   "30d": "Last 30 Days",
   "60d": "Last 60 Days",
   "90d": "Last 90 Days",
+  "180d": "Last 180 Days",
+  "365d": "Last 365 Days",
 };
+
+export function getRangeLabel(range: RangeKey): string {
+  if (range.startsWith("custom:")) {
+    const dates = range.slice("custom:".length).split("_");
+    if (dates.length === 2) {
+      return `${dates[0]} ~ ${dates[1]}`;
+    }
+    return range;
+  }
+  return rangeLabels[range] || `Last ${range}`;
+}
 
 export function formatTrendDateLabel(date: string) {
   return date.slice(5);

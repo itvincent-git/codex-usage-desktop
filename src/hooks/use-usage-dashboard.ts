@@ -19,7 +19,7 @@ import {
   type SessionDetailRow,
 } from "@/lib/api";
 import type { DashboardView } from "@/components/dashboard-header";
-import { getExportDialogOptions, getExportFileName, rangeLabels } from "@/lib/usage-dashboard";
+import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 
 const AUTO_RESCAN_MS = 5 * 60_000;
 
@@ -425,7 +425,7 @@ export function useUsageDashboard() {
 
     try {
       const exported = await exportUsage(range, format, selectedPath);
-      setScanMessage(`Exported ${rangeLabels[range]} to ${exported.path}.`);
+      setScanMessage(`Exported ${getRangeLabel(range)} to ${exported.path}.`);
       setError(null);
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Export failed.");
