@@ -122,7 +122,21 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               </button>
             </div>
 
-            <div className="flex flex-col items-center py-2">
+            <div className="flex flex-col items-center py-2 space-y-3">
+              <div className="text-center text-xs text-muted-foreground min-h-[1.25rem]">
+                {dateRange?.from ? (
+                  <span>
+                    Selected: <strong className="text-foreground">{dayjs(dateRange.from).format("YYYY-MM-DD")}</strong>
+                    {dateRange.to ? (
+                      <> to <strong className="text-foreground">{dayjs(dateRange.to).format("YYYY-MM-DD")}</strong></>
+                    ) : (
+                      <> (Choose end date...)</>
+                    )}
+                  </span>
+                ) : (
+                  <span>Choose start date...</span>
+                )}
+              </div>
               <Calendar
                 mode="range"
                 selected={dateRange}
@@ -136,18 +150,25 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               <p className="text-xs text-error font-medium text-center">{error}</p>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDateRange(undefined)}
+                className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer text-muted-foreground"
+              >
+                Clear
+              </button>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium hover:bg-muted transition cursor-pointer"
+                className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApply}
-                className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
+                className="flex-1 rounded-lg bg-primary py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
               >
                 Apply Range
               </button>
