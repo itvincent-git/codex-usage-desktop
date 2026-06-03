@@ -58,6 +58,10 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
       setError("Please select both start and end dates.");
       return;
     }
+    if (dayjs(dateRange.to).isBefore(dayjs(dateRange.from), "day")) {
+      setError("End date cannot be earlier than start date.");
+      return;
+    }
     const startStr = dayjs(dateRange.from).format("YYYY-MM-DD");
     const endStr = dayjs(dateRange.to).format("YYYY-MM-DD");
     setError(null);
