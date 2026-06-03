@@ -65,6 +65,19 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
     setIsModalOpen(false);
   };
 
+  const handleSelect = (range: DateRange | undefined, selectedDay: Date) => {
+    if (dateRange?.from && dateRange?.to) {
+      setDateRange({
+        from: selectedDay,
+        to: undefined,
+      });
+      setError(null);
+    } else {
+      setDateRange(range);
+      setError(null);
+    }
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -140,7 +153,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               <Calendar
                 mode="range"
                 selected={dateRange}
-                onSelect={setDateRange}
+                onSelect={handleSelect}
                 disabled={{ after: new Date() }}
                 className="rounded-md border bg-card border-border/60"
               />
