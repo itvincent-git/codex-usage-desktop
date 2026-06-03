@@ -22,6 +22,14 @@ export default {
           DEFAULT: "rgb(var(--muted) / <alpha-value>)",
           foreground: "rgb(var(--muted-foreground) / <alpha-value>)",
         },
+        popover: {
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          foreground: "rgb(var(--foreground) / <alpha-value>)",
+        },
+        accent: {
+          DEFAULT: "rgb(var(--muted) / <alpha-value>)",
+          foreground: "rgb(var(--foreground) / <alpha-value>)",
+        },
         surface: "rgb(var(--surface) / <alpha-value>)",
         card: {
           DEFAULT: "rgb(var(--surface) / <alpha-value>)",

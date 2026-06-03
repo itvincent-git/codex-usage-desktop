@@ -8,11 +8,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { RangeKey } from "@/lib/api";
 import { useState } from "react";
 import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
+import type { DateRange } from "react-day-picker";
 
 type RangeSwitcherProps = {
   value: RangeKey;
@@ -36,32 +38,30 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
   const displayLabel = selectedRange ? selectedRange.label : getRangeLabel(value);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [startDate, setStartDate] = useState(() => {
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     if (value.startsWith("custom:")) {
-      return value.slice("custom:".length).split("_")[0];
+      const [start, end] = value.slice("custom:".length).split("_");
+      return {
+        from: start ? new Date(start) : undefined,
+        to: end ? new Date(end) : undefined,
+      };
     }
-    return dayjs().subtract(30, "day").format("YYYY-MM-DD");
-  });
-  const [endDate, setEndDate] = useState(() => {
-    if (value.startsWith("custom:")) {
-      return value.slice("custom:".length).split("_")[1];
-    }
-    return dayjs().format("YYYY-MM-DD");
+    return {
+      from: new Date(dayjs().subtract(30, "day").format("YYYY-MM-DD")),
+      to: new Date(),
+    };
   });
   const [error, setError] = useState<string | null>(null);
 
-  const handleApply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!startDate || !endDate) {
+  const handleApply = () => {
+    if (!dateRange?.from || !dateRange?.to) {
       setError("Please select both start and end dates.");
       return;
     }
-    if (dayjs(endDate).isBefore(dayjs(startDate))) {
-      setError("End date must be after or equal to start date.");
-      return;
-    }
+    const startStr = dayjs(dateRange.from).format("YYYY-MM-DD");
+    const endStr = dayjs(dateRange.to).format("YYYY-MM-DD");
     setError(null);
-    onChange(`custom:${startDate}_${endDate}`);
+    onChange(`custom:${startStr}_${endStr}`);
     setIsModalOpen(false);
   };
 
@@ -110,7 +110,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <h3 className="text-lg font-bold text-foreground">Select Custom Range</h3>
               <button
                 type="button"
@@ -122,52 +122,36 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               </button>
             </div>
 
-            <form onSubmit={handleApply} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Start Date</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  max={endDate || dayjs().format("YYYY-MM-DD")}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition"
-                  required
-                />
-              </div>
+            <div className="flex flex-col items-center py-2">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                disabled={{ after: new Date() }}
+                className="rounded-md border bg-card border-border/60"
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">End Date</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate}
-                  max={dayjs().format("YYYY-MM-DD")}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition"
-                  required
-                />
-              </div>
+            {error && (
+              <p className="text-xs text-error font-medium text-center">{error}</p>
+            )}
 
-              {error && (
-                <p className="text-xs text-error font-medium">{error}</p>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 rounded-lg border border-border py-2 text-sm font-medium hover:bg-muted transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
-                >
-                  Apply Range
-                </button>
-              </div>
-            </form>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 rounded-lg border border-border py-2 text-sm font-medium hover:bg-muted transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApply}
+                className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
+              >
+                Apply Range
+              </button>
+            </div>
           </div>
         </div>
       )}
