@@ -1,4 +1,4 @@
-import { Gauge } from "lucide-react";
+import { Gauge, LogIn } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,19 @@ type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
 };
+
+function isOAuthLoginError(err: string | null): boolean {
+  if (!err) return false;
+  const lowercaseErr = err.toLowerCase();
+  return (
+    lowercaseErr.includes("no such file or directory") ||
+    lowercaseErr.includes("failed to read codex auth") ||
+    lowercaseErr.includes("contains no tokens") ||
+    lowercaseErr.includes("contains no access token") ||
+    lowercaseErr.includes("unauthorized") ||
+    lowercaseErr.includes("401")
+  );
+}
 
 export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
   return (
@@ -34,9 +47,30 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
 
       <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center">
         {error ? (
-          <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
-            Codex limits unavailable: {error}
-          </div>
+          isOAuthLoginError(error) ? (
+            <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-warning font-semibold">
+                  <LogIn className="h-4.5 w-4.5" />
+                  <span>Not Logged In / 尚未登录</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-normal">
+                  To view live rate limits, please authenticate Codex by running the login command in your terminal or via the browser/IDE extension:
+                </p>
+                <div className="bg-muted/60 hover:bg-muted p-2.5 rounded-lg font-mono text-xs select-all border border-border flex items-center justify-between group transition-colors">
+                  <span className="text-foreground select-all">codex auth login</span>
+                  <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">Click to select</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground/80 leading-normal mt-2 pt-2 border-t border-border/40">
+                提示：请在终端中运行上述命令，或通过浏览器/IDE 插件登录您的 Codex 账号。
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
+              Codex limits unavailable: {error}
+            </div>
+          )
         ) : (
           <div className="grid gap-3 grid-cols-1 md:grid-cols-2 flex-1 justify-center">
             <LimitRow label="5 hour" window={limits?.session ?? null} />

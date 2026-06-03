@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { formatResetTime } from "./codex-limits-card";
+import { formatResetTime, CodexLimitsCard } from "./codex-limits-card";
 import dayjs from "dayjs";
+import { render, screen } from "@testing-library/react";
 
 describe("formatResetTime", () => {
   beforeEach(() => {
@@ -78,5 +80,24 @@ describe("formatResetTime", () => {
     const resetsAtStr = "2026-05-22T12:35:00.000Z"; // 35 minutes in future
     const resetDate = dayjs(resetsAtStr).format("YYYY-MM-DD h:mm A");
     expect(formatResetTime(resetsAtStr, 10080)).toBe(`Resets ${resetDate} (35 mins left)`);
+  });
+});
+
+describe("CodexLimitsCard component", () => {
+  it("renders friendly tip for OAuth login / no credentials error", () => {
+    const errorMsg = "OAuth unavailable: Failed to read Codex auth at /Users/vincent/.codex/auth.json: No such file or directory (os error 2); CLI RPC unavailable: Codex CLI not found.";
+    render(<CodexLimitsCard limits={null} error={errorMsg} />);
+
+    expect(screen.getByText("Not Logged In / 尚未登录")).toBeInTheDocument();
+    expect(screen.getByText("codex auth login")).toBeInTheDocument();
+    expect(screen.queryByText("Codex limits unavailable:")).not.toBeInTheDocument();
+  });
+
+  it("renders default error message for other errors", () => {
+    const errorMsg = "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.";
+    render(<CodexLimitsCard limits={null} error={errorMsg} />);
+
+    expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
+    expect(screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.")).toBeInTheDocument();
   });
 });
