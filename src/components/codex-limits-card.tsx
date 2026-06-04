@@ -263,28 +263,27 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
     return "Resetting soon";
   }
   
+  const diffHours = diffMs / (1000 * 60 * 60);
+  let timeLeftText = "";
+  if (diffHours < 1) {
+    const mins = Math.ceil(diffMs / (1000 * 60));
+    timeLeftText = mins === 1 ? "1 min left" : `${mins} mins left`;
+  } else if (diffHours < 24) {
+    const hours = Math.ceil(diffHours);
+    timeLeftText = hours === 1 ? "1 hour left" : `${hours} hours left`;
+  } else {
+    const days = Math.round(diffHours / 24);
+    timeLeftText = days === 1 ? "1 day left" : `${days} days left`;
+  }
+  
   // If session (windowMinutes <= 300, i.e., 5 hours)
   if (windowMinutes && windowMinutes <= 300) {
-    return `Reset at ${resetsAt.format("HH:mm")}`;
+    return `Reset at ${resetsAt.format("HH:mm")} (${timeLeftText})`;
   }
   
   // For weekly limit
   const resetDate = resetsAt.format("YYYY-MM-DD h:mm A");
-  
-  const diffHours = diffMs / (1000 * 60 * 60);
-  let daysLeftText = "";
-  if (diffHours < 1) {
-    const mins = Math.ceil(diffMs / (1000 * 60));
-    daysLeftText = mins === 1 ? "1 min left" : `${mins} mins left`;
-  } else if (diffHours < 24) {
-    const hours = Math.ceil(diffHours);
-    daysLeftText = hours === 1 ? "1 hour left" : `${hours} hours left`;
-  } else {
-    const days = Math.round(diffHours / 24);
-    daysLeftText = days === 1 ? "1 day left" : `${days} days left`;
-  }
-  
-  return `Resets ${resetDate} (${daysLeftText})`;
+  return `Resets ${resetDate} (${timeLeftText})`;
 }
 
 function getLimitStatus(remainingPercent: number): {

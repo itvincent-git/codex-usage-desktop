@@ -30,7 +30,18 @@ describe("formatResetTime", () => {
     const expectedHours = String(expectedResetDate.getHours()).padStart(2, "0");
     const expectedMins = String(expectedResetDate.getMinutes()).padStart(2, "0");
     
-    expect(formatResetTime(resetsAtStr, 300)).toBe(`Reset at ${expectedHours}:${expectedMins}`);
+    expect(formatResetTime(resetsAtStr, 300)).toBe(`Reset at ${expectedHours}:${expectedMins} (5 hours left)`);
+  });
+
+  it("returns formatted Reset at HH:MM with minutes left for session limits", () => {
+    vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    
+    const resetsAtStr = "2026-05-22T12:10:00.000Z";
+    const expectedResetDate = new Date(resetsAtStr);
+    const expectedHours = String(expectedResetDate.getHours()).padStart(2, "0");
+    const expectedMins = String(expectedResetDate.getMinutes()).padStart(2, "0");
+    
+    expect(formatResetTime(resetsAtStr, 300)).toBe(`Reset at ${expectedHours}:${expectedMins} (10 mins left)`);
   });
 
   it("returns formatted weekly limit style for windowMinutes > 300", () => {
