@@ -4,6 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { UpdateCheckResponse } from "@/lib/api";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type SettingsPageProps = {
   isResetting: boolean;
@@ -110,15 +117,19 @@ export function SettingsPage({
               <h4 className="text-sm font-medium text-foreground">{t("settings.language_label")}</h4>
             </div>
             <div className="flex items-center gap-2">
-              <select
+              <Select
                 value={currentLanguage}
-                onChange={(e) => handleLanguageChange(e.target.value)}
+                onValueChange={handleLanguageChange}
                 disabled={isDisabled}
-                className="bg-neutral-800 text-foreground border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="en">{t("settings.lang_en")}</option>
-                <option value="zh">{t("settings.lang_zh")}</option>
-              </select>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder={t("settings.language_label")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">{t("settings.lang_en")}</SelectItem>
+                  <SelectItem value="zh">{t("settings.lang_zh")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
