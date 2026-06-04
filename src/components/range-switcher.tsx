@@ -16,6 +16,7 @@ import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
+import { zhCN, enUS } from "date-fns/locale";
 
 type RangeSwitcherProps = {
   value: RangeKey;
@@ -35,7 +36,8 @@ const ranges: Array<{ value: RangeKey; label: string }> = [
 ];
 
 export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLocale = i18n.resolvedLanguage?.startsWith("zh") ? zhCN : enUS;
   const selectedRange = ranges.find((range) => range.value === value);
   const displayLabel = selectedRange ? t(`ranges.${selectedRange.value}`, { defaultValue: selectedRange.label }) : getRangeLabel(value, t);
 
@@ -168,6 +170,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
                 onSelect={handleSelect}
                 disabled={{ after: new Date() }}
                 className="rounded-md border bg-card border-border/60"
+                locale={currentLocale}
               />
             </div>
 
