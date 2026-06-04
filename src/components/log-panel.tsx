@@ -3,6 +3,7 @@ import { attachLogger, LogLevel } from "@tauri-apps/plugin-log";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { Terminal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 interface LogEntry {
   id: number;
@@ -12,6 +13,7 @@ interface LogEntry {
 }
 
 export function LogPanel() {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
@@ -80,16 +82,16 @@ export function LogPanel() {
       <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Terminal className="h-4 w-4" />
-          Diagnostics Log
+          {t("logs.title", { defaultValue: "Diagnostics Log" })}
         </div>
         <Button variant="secondary" size="sm" onClick={() => setLogs([])}>
           <Trash2 className="mr-2 h-4 w-4" />
-          Clear
+          {t("logs.btn_clear", { defaultValue: "Clear" })}
         </Button>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
         {logs.length === 0 ? (
-          <div className="text-center text-muted-foreground mt-10">Waiting for logs...</div>
+          <div className="text-center text-muted-foreground mt-10">{t("logs.waiting", { defaultValue: "Waiting for logs..." })}</div>
         ) : (
           logs.map((log) => (
             <div key={log.id} className="mb-1 flex gap-3 hover:bg-muted/30">

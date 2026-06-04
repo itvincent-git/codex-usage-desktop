@@ -11,6 +11,7 @@ import { UsageTrendsCard } from "@/components/usage-trends-card";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -41,21 +42,24 @@ export function DashboardHeroCard({
   metrics,
   codexLimits,
 }: DashboardHeroCardProps) {
+  const { t } = useTranslation();
+
   const formatUpdatedTime = (timestamp: string) => {
     const updatedAt = dayjs(timestamp);
     const timeStr = updatedAt.format("HH:mm:ss");
     if (updatedAt.isSame(dayjs(), "day")) {
-      return `Today at ${timeStr}`;
+      return t("hero.updated_today", { time: timeStr, defaultValue: `Today at ${timeStr}` });
     }
     return `${updatedAt.format("YYYY-MM-DD")} ${timeStr}`;
   };
 
   const isSynced = !!overview.updatedAt;
   const updatedLabel = overview.updatedAt
-    ? `Updated ${formatUpdatedTime(overview.updatedAt)}${
-        lastRescanDurationMs === null ? "" : ` · Rescan ${formatDuration(lastRescanDurationMs)}`
-      }`
-    : "No cached snapshot yet";
+    ? t("hero.last_updated", {
+        time: formatUpdatedTime(overview.updatedAt),
+        duration: lastRescanDurationMs === null ? "" : ` · ${t("hero.rescan_duration", { duration: formatDuration(lastRescanDurationMs) })}`
+      })
+    : t("hero.last_updated_never");
 
   const [activeTab, setActiveTab] = useState<"projects" | "models" | "dates">("projects");
 
@@ -76,7 +80,7 @@ export function DashboardHeroCard({
   const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
   const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
-  const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null);
+  const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null, t);
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -89,16 +93,16 @@ export function DashboardHeroCard({
       <div className="p-5 lg:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Overview</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{t("hero.overview_label", { defaultValue: "Overview" })}</p>
             <div className="flex items-center gap-2">
               <h1 className="font-display text-2xl font-bold tracking-display text-foreground sm:text-3xl">
-                Codex Cost Intelligence
+                {t("hero.title")}
               </h1>
               <div className="group relative flex items-center">
                 <Info className="h-4 w-4 text-muted-foreground/50 transition-colors hover:text-muted-foreground cursor-help" />
                 <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-2.5 w-64 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
-                  <p className="font-semibold text-foreground">Codex Cost Intelligence</p>
-                  <p className="mt-1 leading-relaxed text-muted-foreground">A compact local dashboard for recent Codex usage and cost.</p>
+                  <p className="font-semibold text-foreground">{t("hero.title")}</p>
+                  <p className="mt-1 leading-relaxed text-muted-foreground">{t("hero.subtitle")}</p>
                   <div className="absolute right-1 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface sm:left-1/2 sm:right-auto" />
                 </div>
               </div>
@@ -111,23 +115,23 @@ export function DashboardHeroCard({
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="lg" disabled={isBusy}>
                   <Download className="h-4 w-4" />
-                  {isExporting === null ? "Export" : "Exporting"}
+                  {isExporting === null ? t("hero.export") : t("hero.exporting")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => onExport("xlsx")}>
                   <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Excel (.xlsx)
+                  {t("hero.export_excel")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => onExport("markdown")}>
                   <FileText className="mr-2 h-4 w-4" />
-                  Markdown (.md)
+                  {t("hero.export_markdown")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="primary" size="lg" onClick={onRefresh} disabled={isBusy}>
               <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              Rescan local logs
+              {t("hero.rescan", { defaultValue: "Rescan local logs" })}
             </Button>
           </div>
         </div>
@@ -141,7 +145,7 @@ export function DashboardHeroCard({
                     <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
                     <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
                   </span>
-                  <span>{isSynced ? "Cache Synced" : "Out of Sync"}</span>
+                  <span>{isSynced ? t("hero.cache_synced", { defaultValue: "Cache Synced" }) : t("hero.out_of_sync", { defaultValue: "Out of Sync" })}</span>
                   <span className="text-muted-foreground/30">·</span>
                   <span className="text-muted-foreground font-normal">{scanMessage}</span>
                 </div>
@@ -151,7 +155,7 @@ export function DashboardHeroCard({
               </div>
 
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total cost ({getRangeLabel(range)})</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t("hero.total_cost_label", { defaultValue: "Total cost" })} ({getRangeLabel(range, t)})</p>
                 <div className="flex flex-wrap items-end gap-2.5">
                   <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
                     {formatCurrencyShort(overview.totals.costUSD)}
@@ -191,7 +195,7 @@ export function DashboardHeroCard({
                       <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/60" />
                       <span>{subscriptionExpiryLabel}</span>
                       {codexLimits?.subscriptionWillRenew === false && (
-                        <span className="text-muted-foreground/50">· Auto-renew off</span>
+                        <span className="text-muted-foreground/50">· {t("limits.auto_renew_off", { defaultValue: "Auto-renew off" })}</span>
                       )}
                     </div>
                   )}
@@ -204,7 +208,7 @@ export function DashboardHeroCard({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <Cpu className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground">Cost Drivers</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground">{t("hero.cost_drivers", { defaultValue: "Cost Drivers" })}</span>
                 </div>
                 
                 {/* Tabs */}
@@ -221,7 +225,7 @@ export function DashboardHeroCard({
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {tab}
+                      {tab === "projects" ? t("common.project") : tab === "models" ? t("common.model") : t("common.date")}
                     </button>
                   ))}
                 </div>
@@ -256,7 +260,7 @@ export function DashboardHeroCard({
                     </div>
                   ))
                 ) : (
-                  <p className="py-2 text-center text-xs text-muted-foreground">No data available</p>
+                  <p className="py-2 text-center text-xs text-muted-foreground">{t("project_modal.no_sessions")}</p>
                 )}
               </div>
             </div>
@@ -277,7 +281,7 @@ export function DashboardHeroCard({
   );
 }
 
-function formatSubscriptionExpiry(expiresAt: string | null) {
+function formatSubscriptionExpiry(expiresAt: string | null, t?: any) {
   if (!expiresAt) {
     return null;
   }
@@ -290,7 +294,11 @@ function formatSubscriptionExpiry(expiresAt: string | null) {
   }
 
   const daysLeft = Math.max(0, Math.ceil(expiresDate.diff(dayjs(), "day", true)));
-  const daysLeftLabel = daysLeft === 1 ? "1 day left" : `${daysLeft} days left`;
+  const daysLeftLabel = t
+    ? (daysLeft === 1 ? t("limits.days_left_one") : t("limits.days_left_other", { count: daysLeft }))
+    : (daysLeft === 1 ? "1 day left" : `${daysLeft} days left`);
 
-  return `Expires ${expiresDate.format("YYYY-MM-DD")} (${daysLeftLabel})`;
+  return t
+    ? t("limits.subscription_expires", { date: expiresDate.format("YYYY-MM-DD"), timeLeft: daysLeftLabel })
+    : `Expires ${expiresDate.format("YYYY-MM-DD")} (${daysLeftLabel})`;
 }

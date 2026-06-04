@@ -4,6 +4,7 @@ import { fetchSessionDetails, type SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 type ProjectSessionsModalProps = {
   project: {
@@ -29,6 +30,7 @@ function cleanSessionId(sessionId: string) {
 }
 
 export function ProjectSessionsModal({ project, onClose, onGoToSessions }: ProjectSessionsModalProps) {
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState<SessionDetailRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
         setSessions(projectSessions);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load session details.");
+        setError(err instanceof Error ? err.message : t("project_modal.no_sessions"));
       } finally {
         setIsLoading(false);
       }
@@ -123,7 +125,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
               <h3 id="modal-project-title" className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
                 {project.displayName}
                 <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
-                  Project Details
+                  {t("project_modal.project_details", { defaultValue: "Project Details" })}
                 </span>
               </h3>
               <p className="font-mono text-xs text-muted-foreground truncate max-w-lg md:max-w-xl" title={project.project}>
@@ -135,7 +137,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition cursor-pointer"
-            aria-label="Close details modal"
+            aria-label={t("range_switcher.modal_close_aria")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -146,7 +148,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500/20 border-t-indigo-500" />
-              <p className="text-sm text-muted-foreground font-medium">Fetching project sessions...</p>
+              <p className="text-sm text-muted-foreground font-medium">{t("loading.loading_sessions")}</p>
             </div>
           ) : error ? (
             <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error/95">
@@ -158,29 +160,29 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {/* Total Sessions Card */}
                 <div className="rounded-xl border border-border bg-surface p-4 shadow-sm space-y-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sessions</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("common.sessions")}</span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-foreground">{sessions.length}</span>
-                    <span className="text-xs text-muted-foreground">active files</span>
+                    <span className="text-xs text-muted-foreground">{t("project_modal.active_files", { defaultValue: "active files" })}</span>
                   </div>
                 </div>
 
                 {/* Total Tokens Card */}
                 <div className="rounded-xl border border-border bg-surface p-4 shadow-sm space-y-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total Tokens</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("project_modal.tokens_breakdown")}</span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-bold text-foreground">{formatNumber(totals.totalTokens)}</span>
                   </div>
                   {totals.totalTokens > 0 && (
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span>Cache: {formatPercent(cacheHitRate)}</span>
+                      <span>{t("common.cache")}: {formatPercent(cacheHitRate)}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Total Cost Card */}
                 <div className="rounded-xl border border-border bg-surface p-4 shadow-sm space-y-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total Cost</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("project_modal.estimated_cost")}</span>
                   <div>
                     <span className="inline-flex rounded-full bg-secondary/10 px-2.5 py-0.5 font-bold text-secondary text-base border border-secondary/10">
                       {formatCurrency(totals.costUSD)}
@@ -193,16 +195,16 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-0.5">
-                    <h4 className="text-sm font-bold text-foreground">Project Sessions List</h4>
+                    <h4 className="text-sm font-bold text-foreground">{t("project_modal.sessions_list")}</h4>
                     <p className="text-xs text-muted-foreground">
-                      {searchQuery ? `Showing ${filteredSessions.length} matching sessions` : "Individual sessions writing to this directory"}
+                      {searchQuery ? t("project_modal.showing_filtered", { filtered: filteredSessions.length, defaultValue: `Showing ${filteredSessions.length} matching sessions` }) : t("project_modal.subtitle_desc", { defaultValue: "Individual sessions writing to this directory" })}
                     </p>
                   </div>
                   <div className="relative w-full sm:max-w-xs">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder="Search session ID or model..."
+                      placeholder={t("project_modal.search_placeholder", { defaultValue: "Search session ID or model..." })}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full rounded-lg border border-border bg-surface pl-9 pr-4 py-2 text-xs font-medium text-foreground placeholder:text-muted-foreground outline-none focus:border-indigo-500/80 focus:ring-4 focus:ring-indigo-500/10 transition"
@@ -213,8 +215,8 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                 {filteredSessions.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/80 p-8 text-center space-y-2">
                     <Terminal className="h-6 w-6 text-muted-foreground/60 mx-auto" />
-                    <p className="text-sm font-medium text-foreground">No sessions match your search query</p>
-                    <p className="text-xs text-muted-foreground">Try clearing your search query or searching for another term.</p>
+                    <p className="text-sm font-medium text-foreground">{t("project_modal.no_matching_sessions", { defaultValue: "No sessions match your search query" })}</p>
+                    <p className="text-xs text-muted-foreground">{t("project_modal.clear_search_hint", { defaultValue: "Try clearing your search query or searching for another term." })}</p>
                   </div>
                 ) : (
                   <div className="border border-border/60 rounded-xl overflow-hidden bg-surface shadow-sm">
@@ -222,13 +224,13 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                       <table className="min-w-full border-separate border-spacing-0 text-sm">
                         <thead className="sticky top-0 bg-surface z-10">
                           <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground border-b border-border bg-muted/20">
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold">Session ID / File</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold">Models</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">Total Tokens</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">Input</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">Cache</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">Output</th>
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">Cost</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold">{t("project_modal.session_id_file", { defaultValue: "Session ID / File" })}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold">{t("common.model")}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("common.tokens")}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("project_modal.input")}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("common.cache")}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("project_modal.output")}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("common.cost")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/40">
@@ -270,7 +272,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                                       ))}
                                     </div>
                                   ) : (
-                                    <span className="text-[10px] text-muted-foreground italic">No models</span>
+                                    <span className="text-[10px] text-muted-foreground italic">{t("project_modal.no_models", { defaultValue: "No models" })}</span>
                                   )}
                                 </td>
 
@@ -329,7 +331,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-6 py-4">
           <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
+            {t("common.close")}
           </Button>
 
           {!isLoading && !error && sessions.length > 0 && (
@@ -339,7 +341,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
               onClick={() => onGoToSessions(project.project)}
               className="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 font-medium shadow-sm transition"
             >
-              View in Sessions Tab
+              {t("project_modal.view_in_sessions_tab", { defaultValue: "View in Sessions Tab" })}
               <ArrowRight className="h-4 w-4" />
             </Button>
           )}

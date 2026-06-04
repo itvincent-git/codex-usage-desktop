@@ -1,0 +1,300 @@
+{
+  "common": {
+    "dashboard": "仪表盘",
+    "model": "模型",
+    "daily": "按日",
+    "project": "项目",
+    "monthly": "按月",
+    "sessions": "会话",
+    "settings": "设置",
+    "logs": "日志",
+    "loading": "加载中",
+    "error": "错误",
+    "close": "关闭",
+    "search": "搜索",
+    "clear": "清空",
+    "actions": "操作",
+    "date": "日期",
+    "tokens": "Tokens",
+    "cost": "成本",
+    "cache": "缓存",
+    "path": "路径",
+    "mode": "模式",
+    "type": "类型",
+    "session": "会话",
+    "time": "时间",
+    "command": "命令",
+    "percent": "占比"
+  },
+  "header": {
+    "app_title": "Codex Usage Desktop",
+    "upgrade": "升级至 v{{version}}",
+    "upgrade_title": "点击升级您的应用"
+  },
+  "update": {
+    "new_version": "有新版本可用：v{{version}}",
+    "latest_badge": "最新",
+    "banner_text": "新版本的 Codex Usage Desktop 已就绪。您当前的运行版本是 v{{currentVersion}}。",
+    "hide_release_notes": "隐藏更新说明",
+    "view_release_notes": "查看更新说明",
+    "upgrade_now": "立即升级",
+    "dismiss_aria": "关闭更新提示"
+  },
+  "error": {
+    "sync_failed": "数据同步失败"
+  },
+  "loading": {
+    "preparing_cache": "正在准备本地缓存",
+    "loading_range": "正在加载 {{range}} 数据",
+    "loading_monthly": "正在加载月度使用情况",
+    "loading_sessions": "正在加载会话详情",
+    "cached_snapshot_desc": "正在加载本地缓存的仪表盘快照。",
+    "selected_window_desc": "正在加载所选时间窗口的使用与花费数据。",
+    "natural_month_desc": "正在汇总各自然月的使用总量。",
+    "session_logs_desc": "正在解析各项会话日志详情。",
+    "reading_sessions": "读取会话记录",
+    "aggregating_tokens": "统计 Token 消耗",
+    "estimating_cost": "估算成本花费"
+  },
+  "hero": {
+    "title": "Codex Token 使用概览",
+    "subtitle": "本地开发 Token 追踪与花费估算工具。",
+    "last_updated": "最后更新于 {{time}}",
+    "last_updated_never": "未曾更新",
+    "rescan_duration": "重扫耗时 {{duration}}",
+    "refresh": "刷新数据",
+    "refreshing": "正在刷新...",
+    "export": "数据导出",
+    "exporting": "正在导出...",
+    "export_excel": "Excel (.xlsx)",
+    "export_markdown": "Markdown (.md)"
+  },
+  "metrics": {
+    "tokens": {
+      "label": "Token 消耗",
+      "detail": "{{days}}天总计"
+    },
+    "average": {
+      "label": "日均消耗",
+      "detail": "每日 Tokens 与成本"
+    },
+    "cache": {
+      "label": "缓存命中",
+      "detail": "已缓存 {{tokens}} tokens"
+    },
+    "costPerMillion": {
+      "label": "百万 Token 成本",
+      "detail": "综合百万 tokens 均价"
+    }
+  },
+  "limits": {
+    "title": "Codex 额度限制",
+    "description": "来自本地 Codex CLI 的实时账户额度限制状态。",
+    "updated": "更新于 {{time}}",
+    "not_fetched": "尚未获取",
+    "not_logged_in": "尚未登录",
+    "login_instruction": "为了查看实时速率限制，请在终端运行登录命令或通过浏览器/IDE 插件登录授权 Codex：",
+    "click_to_select": "点击选中",
+    "login_hint": "提示：请在终端中运行上述命令，或通过浏览器/IDE 插件登录您的 Codex 账号。",
+    "unavailable_reason": "无法获取额度限制信息：{{error}}",
+    "window_5hour": "5 小时限制",
+    "window_weekly": "周度限制",
+    "unavailable": "不可用",
+    "no_window_returned": "Codex 未返回此额度窗口信息。",
+    "remaining": "剩余",
+    "consumed": "已消耗",
+    "window": "窗口时长",
+    "left": "剩余",
+    "status_near_limit": "接近额度上限",
+    "status_moderate": "中等消耗",
+    "status_healthy": "健康",
+    "reset_unavailable": "重置时间不可用",
+    "resetting_soon": "即将重置",
+    "reset_at": "将在 {{time}} 重置 (还剩 {{timeLeft}})",
+    "resets_at": "将在 {{time}} 重置 (还剩 {{timeLeft}})",
+    "mins_left_one": "1 分钟",
+    "mins_left_other": "{{count}} 分钟",
+    "hours_left_one": "1 小时",
+    "hours_left_other": "{{count}} 小时",
+    "days_left_one": "1 天",
+    "days_left_other": "{{count}} 天",
+    "window_min": "{{count}} 分钟",
+    "window_hours": "{{count}} 小时",
+    "window_days": "{{count}} 天",
+    "window_unknown": "未知",
+    "subscription_expires": "到期时间 {{date}} (还剩 {{timeLeft}})",
+    "auto_renew_off": "自动续订已关闭"
+  },
+  "daily": {
+    "title": "按日使用明细",
+    "subtitle": "按日期排列的 Token 消耗和成本明细列表。",
+    "cols": {
+      "date": "日期",
+      "tokens": "Tokens 消耗",
+      "cost": "成本",
+      "cache": "缓存命中率",
+      "actions": "操作"
+    },
+    "action_view_sessions": "查看会话",
+    "no_data": "在所选的时间范围内未找到使用数据。",
+    "pagination_prev": "上一页",
+    "pagination_next": "下一页",
+    "pagination_info": "显示第 {{start}} 到 {{end}} 条，共 {{total}} 天数据",
+    "date_range": "{{start}} 至 {{end}}",
+    "no_activity": "无数据",
+    "no_activity_days": "无数据 ({{count}} 天)"
+  },
+  "monthly": {
+    "title": "月度使用明细",
+    "subtitle": "自 {{start}} 至 {{end}} 的自然月度使用总量 (时区: {{tz}})。",
+    "cols": {
+      "month": "月份",
+      "tokens": "Tokens 消耗",
+      "cost": "成本",
+      "cache": "缓存命中率"
+    },
+    "no_data": "尚无按月汇总的数据。",
+    "month_range": "{{start}} 至 {{end}}",
+    "no_usage": "无数据",
+    "no_usage_months": "无数据 ({{count}} 个月)"
+  },
+  "models": {
+    "title": "模型使用详情",
+    "subtitle": "分析不同 AI 模型下的 Token 消耗与成本分布。",
+    "card_title": "模型使用",
+    "card_subtitle": "在所选时间范围内按模型分组的 Token 与成本总计。",
+    "cols": {
+      "model": "模型",
+      "tokens": "Tokens 消耗",
+      "cost": "成本",
+      "cache": "缓存命中率",
+      "percent": "占总比"
+    }
+  },
+  "projects": {
+    "title": "项目使用详情",
+    "subtitle": "分析各项目目录下的 Token 消耗和成本总计。",
+    "card_title": "项目使用",
+    "card_subtitle": "在所选时间范围内按项目分组的 Token 与成本总计。",
+    "cols": {
+      "project": "项目路径/名称",
+      "tokens": "Tokens 消耗",
+      "cost": "成本",
+      "percent": "占总比",
+      "actions": "操作"
+    },
+    "action_view_sessions": "查看会话",
+    "no_projects": "日志中尚无追踪的项目目录数据。"
+  },
+  "project_modal": {
+    "title": "{{projectName}} 项目会话详情",
+    "all_projects": "所有项目",
+    "tokens_breakdown": "Token 消耗细分",
+    "input": "输入 (Input)",
+    "output": "输出 (Output)",
+    "cached": "已缓存",
+    "estimated_cost": "预估成本",
+    "sessions_list": "会话明细列表",
+    "no_sessions": "该项目下没有找到会话数据。"
+  },
+  "ranges": {
+    "1d": "最近 1 天",
+    "2d": "最近 2 天",
+    "7d": "最近 7 天",
+    "14d": "最近 14 天",
+    "30d": "最近 30 天",
+    "60d": "最近 60 天",
+    "90d": "最近 90 天",
+    "180d": "最近 180 天",
+    "365d": "最近 365 天"
+  },
+  "range_switcher": {
+    "aria_select_range": "选择时间范围",
+    "custom_range": "自定义时间范围...",
+    "modal_title": "自定义时间范围",
+    "modal_close_aria": "关闭自定义范围弹窗",
+    "selected_range": "已选范围：从 {{start}} 至 {{end}}",
+    "selected_start_only": "已选起始：{{start}} (请选择结束日期...)",
+    "choose_start": "选择起始日期...",
+    "err_select_both": "请同时选择开始和结束日期。",
+    "err_end_before_start": "结束日期不能早于开始日期。",
+    "btn_clear": "清空",
+    "btn_cancel": "取消",
+    "btn_apply": "应用范围"
+  },
+  "sessions": {
+    "title": "会话日志明细",
+    "subtitle": "逐条命令或文件编辑的详细历史记录。",
+    "search_placeholder": "搜索项目路径、文件名或命令...",
+    "filter_all_modes": "所有模式",
+    "filter_all_types": "所有请求类型",
+    "btn_clear_filters": "清空筛选",
+    "cols": {
+      "time": "时间",
+      "project": "项目 / 文件",
+      "type": "类型",
+      "cache": "缓存",
+      "mode": "模式",
+      "tokens": "Tokens",
+      "cost": "成本"
+    },
+    "no_data": "没有找到符合当前搜索筛选条件的会话记录。",
+    "showing_info": "当前显示 {{count}} 条会话",
+    "showing_info_filtered": "当前显示 {{filtered}} / 共 {{total}} 条会话",
+    "detail": {
+      "modal_title": "会话详情",
+      "timestamp": "记录时间",
+      "project_path": "项目路径",
+      "trigger": "触发命令 / 上下文",
+      "file_path": "文件路径",
+      "mode": "调用模式",
+      "type": "请求类型",
+      "tokens": "Token 消耗",
+      "tokens_breakdown": "消耗细分 (输入 / 输出 / 已缓存)",
+      "estimated_cost": "预估成本",
+      "model": "所用模型"
+    }
+  },
+  "settings": {
+    "title": "系统设置",
+    "subtitle": "管理本地应用缓存数据和恢复操作。",
+    "cache_title": "本地缓存管理",
+    "cache_desc": "清理本地缓存的使用数据、增量扫描数据和价格配置，并从本地 Codex 日志中重新构建。",
+    "btn_resetting": "正在重置",
+    "btn_reset": "重置缓存",
+    "display_title": "界面显示设置",
+    "display_desc": "自定义仪表盘界面的功能模块。",
+    "show_logs_title": "显示日志页签",
+    "show_logs_desc": "在顶部导航栏显示“日志”页签，用于实时查看本地运行日志。",
+    "toggle_logs_aria": "切换显示日志页签",
+    "updates_title": "应用更新",
+    "updates_desc": "检查新版本并管理桌面客户端的更新升级。",
+    "current_version": "当前运行版本",
+    "btn_checking": "正在检查...",
+    "btn_check_updates": "检查更新",
+    "update_available": "新版本 v{{version}} 已发布！",
+    "update_available_desc": "在 GitHub 上发现更新的发布版本。",
+    "btn_upgrade": "立即升级",
+    "up_to_date": "您已是最新版本！",
+    "up_to_date_desc": "v{{version}} 是当前最新的可用版本。",
+    "language_title": "语言设置",
+    "language_desc": "修改应用的界面显示语言。",
+    "language_label": "应用语言",
+    "lang_en": "English",
+    "lang_zh": "简体中文"
+  },
+  "logs": {
+    "title": "实时系统日志",
+    "subtitle": "来自后台索引器和底层原生扫描器的诊断日志源。",
+    "search_placeholder": "过滤日志内容...",
+    "btn_pause": "暂停滚动",
+    "btn_resume": "恢复滚动",
+    "btn_clear": "清空日志"
+  },
+  "trends": {
+    "title_tokens": "Token 消耗趋势",
+    "title_cost": "预估成本趋势",
+    "tab_tokens": "Tokens 消耗",
+    "tab_cost": "预估花费"
+  }
+}

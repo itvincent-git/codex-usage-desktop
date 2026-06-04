@@ -5,6 +5,7 @@ import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Sparkles, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
@@ -39,6 +40,7 @@ export function SessionUsageTable({
   selectedProject = null,
   onClearProjectFilter,
 }: SessionUsageTableProps) {
+  const { t } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
 
@@ -137,9 +139,9 @@ export function SessionUsageTable({
           <div className="mb-4 rounded-full bg-muted/60 p-4 text-muted-foreground">
             <Terminal className="h-8 w-8 animate-pulse text-indigo-400" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground">No active sessions found</h3>
+          <h3 className="text-lg font-semibold text-foreground">{t("sessions.no_data")}</h3>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Codex CLI session logs could not be found or contain no usage events. Click "Rescan local logs" to check again.
+            {t("sessions.no_sessions_desc", { defaultValue: "Codex CLI session logs could not be found or contain no usage events. Click \"Rescan local logs\" to check again." })}
           </p>
         </CardContent>
       </Card>
@@ -151,13 +153,13 @@ export function SessionUsageTable({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-1">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            Session Details
+            {t("sessions.title")}
             <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
-              {selectedProject ? `Showing ${filteredCount} of ${sessions.length} sessions` : `${sessions.length} sessions`}
+              {selectedProject ? t("sessions.showing_info_filtered", { filtered: filteredCount, total: sessions.length }) : t("sessions.showing_info", { count: sessions.length })}
             </span>
           </h2>
           <p className="text-sm text-muted-foreground">
-            Parse individual Codex sessions, grouped by date from newest to oldest. Click on a group header to expand/collapse.
+            {t("sessions.subtitle")}
           </p>
         </div>
       </div>
@@ -169,7 +171,7 @@ export function SessionUsageTable({
               <Folder className="h-4 w-4" />
             </div>
             <div className="space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">Filtering by Project</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">{t("projects.filtering_by_project", { defaultValue: "Filtering by Project" })}</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                 <span className="font-bold text-foreground text-sm">{selectedProject.split("/").pop() || selectedProject}</span>
                 <span className="text-[11px] font-mono text-muted-foreground truncate max-w-xs md:max-w-md">({selectedProject})</span>
@@ -182,7 +184,7 @@ export function SessionUsageTable({
             onClick={onClearProjectFilter}
             className="h-8 font-medium text-xs border-indigo-500/20 hover:bg-indigo-500/10 hover:text-indigo-400 transition"
           >
-            Clear Filter
+            {t("sessions.btn_clear_filters")}
           </Button>
         </div>
       )}
@@ -194,9 +196,9 @@ export function SessionUsageTable({
               <div className="mb-4 rounded-full bg-muted/60 p-4 text-muted-foreground">
                 <Folder className="h-8 w-8 text-indigo-400" />
               </div>
-              <h3 className="text-base font-semibold text-foreground">No sessions for this project</h3>
+              <h3 className="text-base font-semibold text-foreground">{t("project_modal.no_sessions")}</h3>
               <p className="mt-2 max-w-sm text-xs text-muted-foreground">
-                No active session logs were recorded in this project directory during the selected timeframe.
+                {t("projects.no_projects")}
               </p>
             </CardContent>
           </Card>
@@ -238,7 +240,7 @@ export function SessionUsageTable({
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                       <span className="inline-flex rounded bg-muted/80 px-2 py-0.5 font-semibold text-muted-foreground border border-border/20">
-                        {group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}
+                        {t("sessions.count_sessions", { count: group.sessions.length, defaultValue: group.sessions.length === 1 ? "1 session" : `${group.sessions.length} sessions` })}
                       </span>
                       {group.models.length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -261,7 +263,7 @@ export function SessionUsageTable({
                   {/* Day total tokens indicator */}
                   {group.totalTokens > 0 ? (
                     <div className="space-y-1.5 min-w-[120px] text-right">
-                      <div className="text-xs text-muted-foreground">Day Total Tokens</div>
+                      <div className="text-xs text-muted-foreground">{t("sessions.day_total_tokens", { defaultValue: "Day Total Tokens" })}</div>
                       <div className="font-bold text-foreground tabular-nums text-sm">
                         {formatNumber(group.totalTokens)}
                       </div>
@@ -274,13 +276,13 @@ export function SessionUsageTable({
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-muted-foreground italic">No activity</div>
+                    <div className="text-xs text-muted-foreground italic">{t("daily.no_activity")}</div>
                   )}
 
                   {/* Day total cost */}
                   {group.totalTokens > 0 && (
                     <div className="text-right">
-                      <div className="text-xs text-muted-foreground mb-1">Day Cost</div>
+                      <div className="text-xs text-muted-foreground mb-1">{t("sessions.day_cost", { defaultValue: "Day Cost" })}</div>
                       <span
                         className="inline-flex rounded-full px-3 py-0.5 font-bold text-foreground text-xs border border-white/5 shadow-sm"
                         style={{
@@ -301,13 +303,13 @@ export function SessionUsageTable({
                     <table className="min-w-full border-separate border-spacing-0 text-sm">
                       <thead>
                         <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                          <th className="border-b border-border/60 pb-3 font-medium">Session ID / File</th>
-                          <th className="border-b border-border/60 px-4 pb-3 font-medium">Projects & Models</th>
-                          <th className="border-b border-border/60 px-4 pb-3 font-medium">Total Tokens</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">Input</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">Cache</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">Output</th>
-                          <th className="border-b border-border/60 pb-3 text-right font-medium">Cost</th>
+                          <th className="border-b border-border/60 pb-3 font-medium">{t("project_modal.session_id_file")}</th>
+                          <th className="border-b border-border/60 px-4 pb-3 font-medium">{t("sessions.projects_models", { defaultValue: "Projects & Models" })}</th>
+                          <th className="border-b border-border/60 px-4 pb-3 font-medium">{t("common.tokens")}</th>
+                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("project_modal.input")}</th>
+                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("common.cache")}</th>
+                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("project_modal.output")}</th>
+                          <th className="border-b border-border/60 pb-3 text-right font-medium">{t("common.cost")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -337,8 +339,8 @@ export function SessionUsageTable({
                                     </span>
                                   </div>
                                   <div className="text-[10px] text-muted-foreground tabular-nums flex flex-col gap-0.5">
-                                    <span>Time: {formattedTime}</span>
-                                    <span className="opacity-80">Size: {formatBytes(session.sizeBytes)}</span>
+                                    <span>{t("sessions.time_label", { time: formattedTime, defaultValue: `Time: ${formattedTime}` })}</span>
+                                    <span className="opacity-80">{t("sessions.size_label", { size: formatBytes(session.sizeBytes), defaultValue: `Size: ${formatBytes(session.sizeBytes)}` })}</span>
                                   </div>
                                 </div>
                               </td>
@@ -364,7 +366,7 @@ export function SessionUsageTable({
                                       })}
                                     </div>
                                   ) : (
-                                    <span className="text-[10px] text-muted-foreground/60 italic">No workspace</span>
+                                    <span className="text-[10px] text-muted-foreground/60 italic">{t("sessions.no_workspace", { defaultValue: "No workspace" })}</span>
                                   )}
 
                                   {/* Models */}
@@ -380,7 +382,7 @@ export function SessionUsageTable({
                                       ))}
                                     </div>
                                   ) : (
-                                    <span className="text-[10px] text-muted-foreground/60 italic">No models</span>
+                                    <span className="text-[10px] text-muted-foreground/60 italic">{t("project_modal.no_models")}</span>
                                   )}
                                 </div>
                               </td>
@@ -389,7 +391,7 @@ export function SessionUsageTable({
                               <td className="border-b border-border/30 px-4 py-4">
                                 {isInactive ? (
                                   <span className="inline-flex rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                    No activity
+                                    {t("daily.no_activity")}
                                   </span>
                                 ) : (
                                   <div className="space-y-1.5 min-w-[90px]">

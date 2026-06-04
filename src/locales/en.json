@@ -1,0 +1,300 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "model": "Model",
+    "daily": "Daily",
+    "project": "Project",
+    "monthly": "Monthly",
+    "sessions": "Sessions",
+    "settings": "Settings",
+    "logs": "Logs",
+    "loading": "Loading",
+    "error": "Error",
+    "close": "Close",
+    "search": "Search",
+    "clear": "Clear",
+    "actions": "Actions",
+    "date": "Date",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "cache": "Cache",
+    "path": "Path",
+    "mode": "Mode",
+    "type": "Type",
+    "session": "Session",
+    "time": "Time",
+    "command": "Command",
+    "percent": "Percent"
+  },
+  "header": {
+    "app_title": "Codex Usage Desktop",
+    "upgrade": "Upgrade v{{version}}",
+    "upgrade_title": "Click to upgrade your application"
+  },
+  "update": {
+    "new_version": "New update available: v{{version}}",
+    "latest_badge": "Latest",
+    "banner_text": "A newer version of Codex Usage Desktop is ready. You are currently on v{{currentVersion}}.",
+    "hide_release_notes": "Hide release notes",
+    "view_release_notes": "View release notes",
+    "upgrade_now": "Upgrade Now",
+    "dismiss_aria": "Dismiss update notification"
+  },
+  "error": {
+    "sync_failed": "Data sync failed"
+  },
+  "loading": {
+    "preparing_cache": "Preparing local cache",
+    "loading_range": "Loading {{range}}",
+    "loading_monthly": "Loading Monthly Usage",
+    "loading_sessions": "Loading Session Details",
+    "cached_snapshot_desc": "Loading the cached dashboard snapshot.",
+    "selected_window_desc": "Loading usage and cost data for the selected window.",
+    "natural_month_desc": "Aggregating natural-month totals.",
+    "session_logs_desc": "Parsing individual session logs.",
+    "reading_sessions": "Reading sessions",
+    "aggregating_tokens": "Aggregating tokens",
+    "estimating_cost": "Estimating cost"
+  },
+  "hero": {
+    "title": "Codex Token Usage",
+    "subtitle": "Local developer token tracking and cost estimator.",
+    "last_updated": "Last updated {{time}}",
+    "last_updated_never": "Never updated",
+    "rescan_duration": "Rescan completed in {{duration}}",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "export": "Export",
+    "exporting": "Exporting...",
+    "export_excel": "Excel (.xlsx)",
+    "export_markdown": "Markdown (.md)"
+  },
+  "metrics": {
+    "tokens": {
+      "label": "Token Breakdown",
+      "detail": "{{days}}-day total"
+    },
+    "average": {
+      "label": "Avg / Day",
+      "detail": "Tokens & cost per day"
+    },
+    "cache": {
+      "label": "Cache Hit",
+      "detail": "{{tokens}} cached tokens"
+    },
+    "costPerMillion": {
+      "label": "Cost / 1M",
+      "detail": "Blended cost per million"
+    }
+  },
+  "limits": {
+    "title": "Codex Limits",
+    "description": "Live account limits from the local Codex CLI.",
+    "updated": "Updated {{time}}",
+    "not_fetched": "Not fetched yet",
+    "not_logged_in": "Not Logged In",
+    "login_instruction": "To view live rate limits, please authenticate Codex by running the login command in your terminal or via the browser/IDE extension:",
+    "click_to_select": "Click to select",
+    "login_hint": "Hint: Please run the command above in your terminal, or log in to your Codex account via the browser/IDE extension.",
+    "unavailable_reason": "Codex limits unavailable: {{error}}",
+    "window_5hour": "5-Hour Limit",
+    "window_weekly": "Weekly Limit",
+    "unavailable": "Unavailable",
+    "no_window_returned": "No rate-limit window returned by Codex.",
+    "remaining": "remaining",
+    "consumed": "Consumed",
+    "window": "Window",
+    "left": "Left",
+    "status_near_limit": "Near Limit",
+    "status_moderate": "Moderate",
+    "status_healthy": "Healthy",
+    "reset_unavailable": "Reset unavailable",
+    "resetting_soon": "Resetting soon",
+    "reset_at": "Reset at {{time}} ({{timeLeft}})",
+    "resets_at": "Resets {{time}} ({{timeLeft}})",
+    "mins_left_one": "1 min left",
+    "mins_left_other": "{{count}} mins left",
+    "hours_left_one": "1 hour left",
+    "hours_left_other": "{{count}} hours left",
+    "days_left_one": "1 day left",
+    "days_left_other": "{{count}} days left",
+    "window_min": "{{count}} min",
+    "window_hours": "{{count}} hrs",
+    "window_days": "{{count}} days",
+    "window_unknown": "Unknown",
+    "subscription_expires": "Expires {{date}} ({{timeLeft}})",
+    "auto_renew_off": "Auto-renew off"
+  },
+  "daily": {
+    "title": "Daily Usage",
+    "subtitle": "A chronological list of daily usage and cost.",
+    "cols": {
+      "date": "Date",
+      "tokens": "Total Tokens",
+      "cost": "Cost",
+      "cache": "Cache Hit",
+      "actions": "Actions"
+    },
+    "action_view_sessions": "View Sessions",
+    "no_data": "No usage data found for the selected range.",
+    "pagination_prev": "Previous",
+    "pagination_next": "Next",
+    "pagination_info": "Showing {{start}} to {{end}} of {{total}} days",
+    "date_range": "{{start}} to {{end}}",
+    "no_activity": "No activity",
+    "no_activity_days": "No activity ({{count}} days)"
+  },
+  "monthly": {
+    "title": "Monthly Usage",
+    "subtitle": "Natural-month totals from {{start}} to {{end}} in {{tz}}.",
+    "cols": {
+      "month": "Month",
+      "tokens": "Total Tokens",
+      "cost": "Cost",
+      "cache": "Cache Hit Rate"
+    },
+    "no_data": "No monthly data accumulated yet.",
+    "month_range": "{{start}} to {{end}}",
+    "no_usage": "No usage",
+    "no_usage_months": "No usage ({{count}} months)"
+  },
+  "models": {
+    "title": "Model Usage Details",
+    "subtitle": "Analyze your token and cost distribution by model.",
+    "card_title": "Model Usage",
+    "card_subtitle": "Token and cost totals grouped by model for the selected window.",
+    "cols": {
+      "model": "Model",
+      "tokens": "Total Token",
+      "cost": "Cost",
+      "cache": "Cache Hit",
+      "percent": "% of Total"
+    }
+  },
+  "projects": {
+    "title": "Project Usage Details",
+    "subtitle": "Analyze token and cost totals by project directory.",
+    "card_title": "Project Usage",
+    "card_subtitle": "Token and cost totals grouped by project directory for the selected window.",
+    "cols": {
+      "project": "Project Directory",
+      "tokens": "Total Tokens",
+      "cost": "Cost",
+      "percent": "% of Total",
+      "actions": "Actions"
+    },
+    "action_view_sessions": "View Sessions",
+    "no_projects": "No project directories tracked in logs yet."
+  },
+  "project_modal": {
+    "title": "Sessions for {{projectName}}",
+    "all_projects": "All Projects",
+    "tokens_breakdown": "Tokens Breakdown",
+    "input": "Input",
+    "output": "Output",
+    "cached": "Cached",
+    "estimated_cost": "Estimated Cost",
+    "sessions_list": "Sessions List",
+    "no_sessions": "No sessions found for this project."
+  },
+  "ranges": {
+    "1d": "Last 1 Day",
+    "2d": "Last 2 Days",
+    "7d": "Last 7 Days",
+    "14d": "Last 14 Days",
+    "30d": "Last 30 Days",
+    "60d": "Last 60 Days",
+    "90d": "Last 90 Days",
+    "180d": "Last 180 Days",
+    "365d": "Last 365 Days"
+  },
+  "range_switcher": {
+    "aria_select_range": "Select time range",
+    "custom_range": "Select Custom Range...",
+    "modal_title": "Select Custom Range",
+    "modal_close_aria": "Close custom range modal",
+    "selected_range": "Selected: {{start}} to {{end}}",
+    "selected_start_only": "Selected: {{start}} (Choose end date...)",
+    "choose_start": "Choose start date...",
+    "err_select_both": "Please select both start and end dates.",
+    "err_end_before_start": "End date cannot be earlier than start date.",
+    "btn_clear": "Clear",
+    "btn_cancel": "Cancel",
+    "btn_apply": "Apply Range"
+  },
+  "sessions": {
+    "title": "Session Details",
+    "subtitle": "Granular command-by-command or file-edit history.",
+    "search_placeholder": "Search path or command...",
+    "filter_all_modes": "All Modes",
+    "filter_all_types": "All Types",
+    "btn_clear_filters": "Clear Filters",
+    "cols": {
+      "time": "Time",
+      "project": "Project / File",
+      "type": "Type",
+      "cache": "Cache",
+      "mode": "Mode",
+      "tokens": "Tokens",
+      "cost": "Cost"
+    },
+    "no_data": "No session logs match the current search filters.",
+    "showing_info": "Showing {{count}} sessions",
+    "showing_info_filtered": "Showing {{filtered}} of {{total}} sessions",
+    "detail": {
+      "modal_title": "Session Details",
+      "timestamp": "Timestamp",
+      "project_path": "Project Path",
+      "trigger": "Trigger / Command",
+      "file_path": "File Path",
+      "mode": "Invocation Mode",
+      "type": "Request Type",
+      "tokens": "Tokens",
+      "tokens_breakdown": "Breakdown (Input / Output / Cached)",
+      "estimated_cost": "Estimated Cost",
+      "model": "Model Name"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage local app state and recovery actions.",
+    "cache_title": "Local cache",
+    "cache_desc": "Clear cached usage, incremental scan data, and pricing data, then rebuild from local Codex logs.",
+    "btn_resetting": "Resetting",
+    "btn_reset": "Reset cache",
+    "display_title": "Display Settings",
+    "display_desc": "Customize the dashboard user interface.",
+    "show_logs_title": "Show Logs Tab",
+    "show_logs_desc": "Display the 'Logs' tab in the navigation header to view real-time log output.",
+    "toggle_logs_aria": "Toggle Logs Tab",
+    "updates_title": "App Updates",
+    "updates_desc": "Check for updates and manage desktop application versions.",
+    "current_version": "Current Version",
+    "btn_checking": "Checking...",
+    "btn_check_updates": "Check for updates",
+    "update_available": "Version v{{version}} is available!",
+    "update_available_desc": "A newer release was found on GitHub.",
+    "btn_upgrade": "Upgrade",
+    "up_to_date": "You are up to date!",
+    "up_to_date_desc": "v{{version}} is the latest version available.",
+    "language_title": "Language Settings",
+    "language_desc": "Change the application display language.",
+    "language_label": "App Language",
+    "lang_en": "English",
+    "lang_zh": "简体中文"
+  },
+  "logs": {
+    "title": "Real-Time System Logs",
+    "subtitle": "Diagnostic log feed from the background indexer and native scanner.",
+    "search_placeholder": "Filter logs...",
+    "btn_pause": "Pause",
+    "btn_resume": "Resume",
+    "btn_clear": "Clear"
+  },
+  "trends": {
+    "title_tokens": "Token Usage Trends",
+    "title_cost": "Estimated Cost Trends",
+    "tab_tokens": "Tokens",
+    "tab_cost": "Cost"
+  }
+}

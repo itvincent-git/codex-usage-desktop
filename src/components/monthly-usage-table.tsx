@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MonthlyUsageResponse } from "@/lib/api";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { useTranslation } from "react-i18next";
 
 type MonthlyUsageTableProps = {
   data: MonthlyUsageResponse;
@@ -56,14 +57,15 @@ function buildDisplayRows(monthly: MonthlyUsageResponse["monthly"]): DisplayRow[
 }
 
 export function MonthlyUsageTable({ data }: MonthlyUsageTableProps) {
+  const { t } = useTranslation();
   const displayRows = buildDisplayRows(data.monthly);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Monthly Usage</CardTitle>
+        <CardTitle>{t("monthly.title")}</CardTitle>
         <CardDescription>
-          Natural-month totals from {data.startMonth} to {data.endMonth} in {data.timezone}.
+          {t("monthly.subtitle", { start: data.startMonth, end: data.endMonth, tz: data.timezone })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -71,20 +73,22 @@ export function MonthlyUsageTable({ data }: MonthlyUsageTableProps) {
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                <th className="border-b border-border px-0 pb-3 font-medium">Month</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Total Tokens</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Input</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Cache</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Output</th>
-                <th className="border-b border-border px-0 pb-3 text-right font-medium">Cost</th>
+                <th className="border-b border-border px-0 pb-3 font-medium">{t("monthly.cols.month")}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("monthly.cols.tokens")}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("project_modal.input", { defaultValue: "Input" })}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("common.cache")}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("project_modal.output", { defaultValue: "Output" })}</th>
+                <th className="border-b border-border px-0 pb-3 text-right font-medium">{t("monthly.cols.cost")}</th>
               </tr>
             </thead>
             <tbody>
               {displayRows.map((row) => {
                 if (row.type === "inactive") {
                   const monthLabel =
-                    row.startMonth === row.endMonth ? row.startMonth : `${row.startMonth} to ${row.endMonth}`;
-                  const usageLabel = row.months.length === 1 ? "No usage" : `No usage (${row.months.length} months)`;
+                    row.startMonth === row.endMonth ? row.startMonth : t("monthly.month_range", { start: row.startMonth, end: row.endMonth, defaultValue: `${row.startMonth} to ${row.endMonth}` });
+                  const usageLabel = row.months.length === 1 
+                    ? t("monthly.no_usage", { defaultValue: "No usage" }) 
+                    : t("monthly.no_usage_months", { count: row.months.length, defaultValue: `No usage (${row.months.length} months)` });
 
                   return (
                     <tr key={`inactive-${row.startMonth}-${row.endMonth}`} className="align-top">

@@ -22,13 +22,16 @@ export const rangeLabels: Record<string, string> = {
   "365d": "Last 365 Days",
 };
 
-export function getRangeLabel(range: RangeKey): string {
+export function getRangeLabel(range: RangeKey, t?: (key: string, options?: any) => string): string {
   if (range.startsWith("custom:")) {
     const dates = range.slice("custom:".length).split("_");
     if (dates.length === 2) {
       return `${dates[0]} ~ ${dates[1]}`;
     }
     return range;
+  }
+  if (t) {
+    return t(`ranges.${range}`, { defaultValue: rangeLabels[range] || `Last ${range}` });
   }
   return rangeLabels[range] || `Last ${range}`;
 }
@@ -71,31 +74,40 @@ export function getExportDialogOptions(format: ExportFormat, defaultPath: string
   };
 }
 
-export function buildMetricCards(overview: OverviewResponse, range: RangeKey): MetricCardData[] {
+export function buildMetricCards(
+  overview: OverviewResponse,
+  range: RangeKey,
+  t?: (key: string, options?: any) => string,
+): MetricCardData[] {
+  const formatDays = t ? t("metrics.tokens.detail", { days: overview.days }) : `${overview.days}-day total`;
+  const formatAvg = t ? t("metrics.average.detail") : "Tokens & cost per day";
+  const formatCache = t ? t("metrics.cache.detail", { tokens: formatCompactNumber(overview.totals.cachedInputTokens) }) : `${formatCompactNumber(overview.totals.cachedInputTokens)} cached tokens`;
+  const formatCostM = t ? t("metrics.costPerMillion.detail") : "Blended cost per million";
+
   return [
     {
       kind: "tokens",
-      label: "Token Breakdown",
+      label: t ? t("metrics.tokens.label") : "Token Breakdown",
       value: formatCompactNumber(overview.totals.totalTokens),
-      detail: `${overview.days}-day total`,
+      detail: formatDays,
     },
     {
       kind: "average",
-      label: "Avg / Day",
+      label: t ? t("metrics.average.label") : "Avg / Day",
       value: `${formatCompactNumber(overview.totals.avgTokensPerDay)} / ${formatCurrencyShort(overview.totals.avgCostPerDay)}`,
-      detail: "Tokens & cost per day",
+      detail: formatAvg,
     },
     {
       kind: "cache",
-      label: "Cache Hit",
+      label: t ? t("metrics.cache.label") : "Cache Hit",
       value: formatPercent(overview.totals.cacheHitRate),
-      detail: `${formatCompactNumber(overview.totals.cachedInputTokens)} cached tokens`,
+      detail: formatCache,
     },
     {
       kind: "costPerMillion",
-      label: "Cost / 1M",
+      label: t ? t("metrics.costPerMillion.label") : "Cost / 1M",
       value: `${formatCurrencyShort(overview.totals.costPerMillionTokens)}`,
-      detail: "Blended cost per million",
+      detail: formatCostM,
     },
   ];
 }

@@ -17,8 +17,10 @@ import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 export default function App() {
+  const { t } = useTranslation();
   const [showNotes, setShowNotes] = useState(false);
   const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(null);
   const [selectedProjectForModal, setSelectedProjectForModal] = useState<{
@@ -61,7 +63,7 @@ export default function App() {
     handleUpgrade,
   } = useUsageDashboard();
 
-  const metrics = overview ? buildMetricCards(overview, range) : [];
+  const metrics = overview ? buildMetricCards(overview, range, t) : [];
   const projects = overview?.projects ?? [];
   const sortedDailyUsage = useMemo(
     () => (overview ? [...overview.daily].sort((left, right) => right.date.localeCompare(left.date)) : []),
@@ -77,10 +79,10 @@ export default function App() {
         : null,
     [monthlyUsage],
   );
-  const loadingTitle = overview ? `Loading ${getRangeLabel(range)}` : "Preparing local cache";
+  const loadingTitle = overview ? t("loading.loading_range", { range: getRangeLabel(range, t) }) : t("loading.preparing_cache");
   const loadingDescription = overview
-    ? "Loading usage and cost data for the selected window."
-    : "Loading the cached dashboard snapshot.";
+    ? t("loading.selected_window_desc")
+    : t("loading.cached_snapshot_desc");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -116,13 +118,13 @@ export default function App() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-foreground flex items-center gap-2">
-                      New update available: v{updateInfo.latestVersion}
-                      <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-400">
-                        Latest
+                      {t("update.new_version", { version: updateInfo.latestVersion })}
+                      <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-medium text-indigo-400">
+                        {t("update.latest_badge")}
                       </span>
                     </h3>
                     <p className="text-sm text-muted-foreground leading-normal">
-                      A newer version of Codex Usage Desktop is ready. You are currently on v{updateInfo.currentVersion}. 
+                      {t("update.banner_text", { currentVersion: updateInfo.currentVersion })}
                       {updateInfo.releaseName ? ` "${updateInfo.releaseName}"` : ""}
                     </p>
                     
@@ -135,11 +137,11 @@ export default function App() {
                         >
                           {showNotes ? (
                             <>
-                              Hide release notes <ChevronUp className="h-3 w-3" />
+                              {t("update.hide_release_notes")} <ChevronUp className="h-3 w-3" />
                             </>
                           ) : (
                             <>
-                              View release notes <ChevronDown className="h-3 w-3" />
+                              {t("update.view_release_notes")} <ChevronDown className="h-3 w-3" />
                             </>
                           )}
                         </button>
@@ -161,13 +163,13 @@ export default function App() {
                     className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
                     onClick={() => void handleUpgrade()}
                   >
-                    Upgrade Now
+                    {t("update.upgrade_now")}
                   </Button>
                   <button
                     type="button"
                     onClick={handleDismissUpdate}
                     className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition"
-                    aria-label="Dismiss update notification"
+                    aria-label={t("update.dismiss_aria")}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -179,7 +181,7 @@ export default function App() {
           {error ? (
             <Card className="border-error/30">
               <CardHeader>
-                <CardTitle className="text-2xl">Data sync failed</CardTitle>
+                <CardTitle className="text-2xl">{t("error.sync_failed")}</CardTitle>
                 <CardDescription>{error}</CardDescription>
               </CardHeader>
             </Card>
@@ -188,11 +190,11 @@ export default function App() {
           {isLoading ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
 
           {view === "monthly" && isMonthlyLoading ? (
-            <LoadingState title="Loading Monthly Usage" description="Aggregating natural-month totals." />
+            <LoadingState title={t("loading.loading_monthly")} description={t("loading.natural_month_desc")} />
           ) : null}
 
           {view === "sessions" && isSessionsLoading ? (
-            <LoadingState title="Loading Session Details" description="Parsing individual session logs." />
+            <LoadingState title={t("loading.loading_sessions")} description={t("loading.session_logs_desc")} />
           ) : null}
 
           {!isLoading && view === "dashboard" && overview ? (
@@ -222,8 +224,8 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Model Usage Details</h2>
-                  <p className="text-sm text-muted-foreground">Analyze your token and cost distribution by model.</p>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">{t("models.title")}</h2>
+                  <p className="text-sm text-muted-foreground">{t("models.subtitle")}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <RangeSwitcher value={range} onChange={handleRangeChange} />
@@ -237,8 +239,8 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Project Usage Details</h2>
-                  <p className="text-sm text-muted-foreground">Analyze token and cost totals by project directory.</p>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">{t("projects.title")}</h2>
+                  <p className="text-sm text-muted-foreground">{t("projects.subtitle")}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <RangeSwitcher value={range} onChange={handleRangeChange} />
@@ -255,8 +257,8 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Daily Usage Details</h2>
-                  <p className="text-sm text-muted-foreground">Analyze your natural-day token and cost distribution.</p>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">{t("daily.title", { defaultValue: "Daily Usage Details" })}</h2>
+                  <p className="text-sm text-muted-foreground">{t("daily.subtitle")}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <RangeSwitcher value={range} onChange={handleRangeChange} />

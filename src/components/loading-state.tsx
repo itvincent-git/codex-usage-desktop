@@ -1,10 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const loadingRows = [
-  { label: "Reading sessions", tokens: "tokens", cost: "cost" },
-  { label: "Aggregating tokens", tokens: "input", cost: "cache" },
-  { label: "Estimating cost", tokens: "models", cost: "usd" },
-];
+import { useTranslation } from "react-i18next";
 
 type LoadingStateProps = {
   title: string;
@@ -12,6 +7,14 @@ type LoadingStateProps = {
 };
 
 export function LoadingState({ title, description }: LoadingStateProps) {
+  const { t } = useTranslation();
+
+  const localizedRows = [
+    { label: t("loading.reading_sessions"), tokens: "tokens", cost: "cost" },
+    { label: t("loading.aggregating_tokens"), tokens: "input", cost: "cache" },
+    { label: t("loading.estimating_cost"), tokens: "models", cost: "usd" },
+  ];
+
   return (
     <Card
       role="status"
@@ -47,12 +50,12 @@ export function LoadingState({ title, description }: LoadingStateProps) {
 
           <div className="grid grid-cols-[1fr_4rem_4rem] gap-2 border-b border-border px-4 py-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[1fr_5.5rem_5.5rem] sm:gap-3">
             <span>Pipeline</span>
-            <span className="text-right">Tokens</span>
-            <span className="text-right">Cost</span>
+            <span className="text-right">{t("common.tokens")}</span>
+            <span className="text-right">{t("common.cost")}</span>
           </div>
 
           <div className="divide-y divide-border/70">
-            {loadingRows.map((row, index) => (
+            {localizedRows.map((row, index) => (
               <div
                 key={row.label}
                 className="grid grid-cols-[1fr_4rem_4rem] items-center gap-2 px-4 py-4 text-[13px] sm:grid-cols-[1fr_5.5rem_5.5rem] sm:gap-3 sm:text-sm"

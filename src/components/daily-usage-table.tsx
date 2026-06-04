@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { OverviewResponse, RangeKey } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { getRangeLabel } from "@/lib/usage-dashboard";
+import { useTranslation } from "react-i18next";
 
 type DailyUsageTableProps = {
   range: RangeKey;
@@ -59,6 +60,7 @@ function buildDisplayRows(daily: OverviewResponse["daily"]): DisplayRow[] {
 }
 
 export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTableProps) {
+  const { t } = useTranslation();
   const maxDailyTokens = Math.max(...daily.map((day) => day.totalTokens), 1);
   const maxDailyCost = Math.max(...daily.map((day) => day.costUSD), 0);
   const displayRows = buildDisplayRows(daily);
@@ -66,28 +68,30 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{getRangeLabel(range)}</CardTitle>
-        <CardDescription>Natural-day buckets written from the native cache after the latest scan.</CardDescription>
+        <CardTitle>{getRangeLabel(range, t)}</CardTitle>
+        <CardDescription>{t("daily.subtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="-mx-2 overflow-x-auto px-2">
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                <th className="border-b border-border px-0 pb-3 font-medium">Date</th>
-                <th className="border-b border-border px-4 pb-3 font-medium">Total Tokens</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Input</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Cache</th>
-                <th className="border-b border-border px-4 pb-3 text-right font-medium">Output</th>
-                <th className="border-b border-border px-0 pb-3 text-right font-medium">Cost</th>
+                <th className="border-b border-border px-0 pb-3 font-medium">{t("daily.cols.date")}</th>
+                <th className="border-b border-border px-4 pb-3 font-medium">{t("daily.cols.tokens")}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("project_modal.input", { defaultValue: "Input" })}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("common.cache")}</th>
+                <th className="border-b border-border px-4 pb-3 text-right font-medium">{t("project_modal.output", { defaultValue: "Output" })}</th>
+                <th className="border-b border-border px-0 pb-3 text-right font-medium">{t("daily.cols.cost")}</th>
               </tr>
             </thead>
             <tbody>
               {displayRows.map((row) => {
                 if (row.type === "inactive") {
-                  const dateLabel = row.startDate === row.endDate ? row.startDate : `${row.startDate} to ${row.endDate}`;
+                  const dateLabel = row.startDate === row.endDate ? row.startDate : t("daily.date_range", { start: row.startDate, end: row.endDate, defaultValue: `${row.startDate} to ${row.endDate}` });
                   const activityLabel =
-                    row.days.length === 1 ? "No activity" : `No activity (${row.days.length} days)`;
+                    row.days.length === 1 
+                      ? t("daily.no_activity", { defaultValue: "No activity" }) 
+                      : t("daily.no_activity_days", { count: row.days.length, defaultValue: `No activity (${row.days.length} days)` });
 
                   return (
                     <tr key={`inactive-${row.startDate}-${row.endDate}`} className="align-top">

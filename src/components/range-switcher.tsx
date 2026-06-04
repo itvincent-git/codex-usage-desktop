@@ -15,6 +15,7 @@ import { useState } from "react";
 import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
 import type { DateRange } from "react-day-picker";
+import { useTranslation } from "react-i18next";
 
 type RangeSwitcherProps = {
   value: RangeKey;
@@ -34,8 +35,9 @@ const ranges: Array<{ value: RangeKey; label: string }> = [
 ];
 
 export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
+  const { t } = useTranslation();
   const selectedRange = ranges.find((range) => range.value === value);
-  const displayLabel = selectedRange ? selectedRange.label : getRangeLabel(value);
+  const displayLabel = selectedRange ? t(`ranges.${selectedRange.value}`, { defaultValue: selectedRange.label }) : getRangeLabel(value, t);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -55,11 +57,11 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
 
   const handleApply = () => {
     if (!dateRange?.from || !dateRange?.to) {
-      setError("Please select both start and end dates.");
+      setError(t("range_switcher.err_select_both"));
       return;
     }
     if (dayjs(dateRange.to).isBefore(dayjs(dateRange.from), "day")) {
-      setError("End date cannot be earlier than start date.");
+      setError(t("range_switcher.err_end_before_start"));
       return;
     }
     const startStr = dayjs(dateRange.from).format("YYYY-MM-DD");
@@ -89,7 +91,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
           <button
             type="button"
             className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "min-w-[11rem] justify-between")}
-            aria-label="Select time range"
+            aria-label={t("range_switcher.aria_select_range")}
           >
             <span>{displayLabel}</span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -99,12 +101,12 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
           <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as RangeKey)}>
             {ranges.map((range) => (
               <DropdownMenuRadioItem key={range.value} value={range.value}>
-                {range.label}
+                {t(`ranges.${range.value}`, { defaultValue: range.label })}
               </DropdownMenuRadioItem>
             ))}
             {value.startsWith("custom:") && (
               <DropdownMenuRadioItem value={value}>
-                {getRangeLabel(value)}
+                {getRangeLabel(value, t)}
               </DropdownMenuRadioItem>
             )}
           </DropdownMenuRadioGroup>
@@ -113,7 +115,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             onSelect={() => setIsModalOpen(true)}
             className="text-primary font-medium focus:text-primary cursor-pointer justify-center"
           >
-            Select Custom Range...
+            {t("range_switcher.custom_range")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -128,12 +130,12 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="text-lg font-bold text-foreground">Select Custom Range</h3>
+              <h3 className="text-lg font-bold text-foreground">{t("range_switcher.modal_title")}</h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground transition cursor-pointer"
-                aria-label="Close custom range modal"
+                aria-label={t("range_switcher.modal_close_aria")}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -143,15 +145,21 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               <div className="text-center text-xs text-muted-foreground min-h-[1.25rem]">
                 {dateRange?.from ? (
                   <span>
-                    Selected: <strong className="text-foreground">{dayjs(dateRange.from).format("YYYY-MM-DD")}</strong>
                     {dateRange.to ? (
-                      <> to <strong className="text-foreground">{dayjs(dateRange.to).format("YYYY-MM-DD")}</strong></>
+                      t("range_switcher.selected_range", {
+                        start: dayjs(dateRange.from).format("YYYY-MM-DD"),
+                        end: dayjs(dateRange.to).format("YYYY-MM-DD"),
+                        defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} to ${dayjs(dateRange.to).format("YYYY-MM-DD")}`
+                      })
                     ) : (
-                      <> (Choose end date...)</>
+                      t("range_switcher.selected_start_only", {
+                        start: dayjs(dateRange.from).format("YYYY-MM-DD"),
+                        defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} (Choose end date...)`
+                      })
                     )}
                   </span>
                 ) : (
-                  <span>Choose start date...</span>
+                  <span>{t("range_switcher.choose_start")}</span>
                 )}
               </div>
               <Calendar
@@ -173,21 +181,21 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
                 onClick={() => setDateRange(undefined)}
                 className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer text-muted-foreground"
               >
-                Clear
+                {t("range_switcher.btn_clear")}
               </button>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer"
               >
-                Cancel
+                {t("range_switcher.btn_cancel")}
               </button>
               <button
                 type="button"
                 onClick={handleApply}
                 className="flex-1 rounded-lg bg-primary py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
               >
-                Apply Range
+                {t("range_switcher.btn_apply")}
               </button>
             </div>
           </div>

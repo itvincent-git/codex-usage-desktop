@@ -1,5 +1,6 @@
 import { Sparkles } from "lucide-react";
 import type { UpdateCheckResponse } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 
 export type DashboardView = "dashboard" | "models" | "projects" | "daily" | "monthly" | "sessions" | "settings" | "logs";
 
@@ -20,25 +21,27 @@ export function DashboardHeader({
   onUpgrade,
   showLogsTab = false,
 }: DashboardHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <header className="flex flex-col gap-3 pb-2">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">Codex Usage Desktop</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-secondary">{t("header.app_title")}</p>
           {updateInfo?.hasUpdate && isUpdateDismissed && (
             <button
               type="button"
               onClick={onUpgrade}
               className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/30 transition-all duration-200 animate-pulse hover:animate-none active:scale-95 cursor-pointer"
-              title="Click to upgrade your application"
+              title={t("header.upgrade_title")}
             >
               <Sparkles className="h-3 w-3 animate-pulse" />
-              Upgrade v{updateInfo.latestVersion}
+              {t("header.upgrade", { version: updateInfo.latestVersion })}
             </button>
           )}
         </div>
 
-        <nav className="flex max-w-full items-center gap-6 overflow-x-auto border-b border-border/80 sm:gap-8" aria-label="Usage view">
+        <nav className="flex max-w-full items-center gap-6 overflow-x-auto border-b border-border/80 sm:gap-8" aria-label={t("range_switcher.aria_select_range")}>
           <button
             type="button"
             role="tab"
@@ -50,7 +53,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("dashboard")}
           >
-            Dashboard
+            {t("common.dashboard")}
           </button>
           <button
             type="button"
@@ -63,7 +66,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("models")}
           >
-            Model
+            {t("common.model")}
           </button>
           <button
             type="button"
@@ -76,7 +79,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("daily")}
           >
-            Daily
+            {t("common.daily")}
           </button>
           <button
             type="button"
@@ -89,7 +92,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("projects")}
           >
-            Project
+            {t("common.project")}
           </button>
           <button
             type="button"
@@ -102,7 +105,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("monthly")}
           >
-            Monthly
+            {t("common.monthly")}
           </button>
           <button
             type="button"
@@ -115,7 +118,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("sessions")}
           >
-            Sessions
+            {t("common.sessions")}
           </button>
           <button
             type="button"
@@ -128,7 +131,7 @@ export function DashboardHeader({
             }`}
             onClick={() => onViewChange("settings")}
           >
-            Settings
+            {t("common.settings")}
           </button>
           {showLogsTab && (
             <button
@@ -142,7 +145,7 @@ export function DashboardHeader({
               }`}
               onClick={() => onViewChange("logs")}
             >
-              Logs
+              {t("common.logs")}
             </button>
           )}
         </nav>
