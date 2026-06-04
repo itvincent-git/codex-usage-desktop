@@ -1,5 +1,6 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   exportUsage,
   fetchCodexLimits,
@@ -24,13 +25,14 @@ import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/
 const AUTO_RESCAN_MS = 5 * 60_000;
 
 export function useUsageDashboard() {
+  const { t } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
-  const [scanMessage, setScanMessage] = useState("Sync local logs to cache");
+  const [scanMessage, setScanMessage] = useState(() => t("hero.sync_logs_to_cache_desc", { defaultValue: "Sync local logs to cache" }));
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,10 +111,14 @@ export function useUsageDashboard() {
 
     const scanPromise = (async () => {
       const scan = await scanUsage();
-      const cacheMessage = scan.metrics
-        ? ` (${scan.metrics.filesReused} cached, ${scan.metrics.filesParsed} parsed)`
-        : "";
-      setScanMessage(`Synced ${scan.importedDays} days${cacheMessage}`);
+      const filesReused = scan.metrics?.filesReused ?? 0;
+      const filesParsed = scan.metrics?.filesParsed ?? 0;
+      setScanMessage(t("hero.synced_message", {
+        days: scan.importedDays,
+        reused: filesReused,
+        parsed: filesParsed,
+        defaultValue: `Synced ${scan.importedDays} days (${filesReused} cached, ${filesParsed} parsed)`
+      }));
 
       await Promise.all([loadOverview(range), loadCodexLimits(options)]);
 
@@ -389,7 +395,7 @@ export function useUsageDashboard() {
 
   async function handleReset() {
     const confirmed = window.confirm(
-      "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted.",
+      t("settings.reset_confirm", { defaultValue: "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted." })
     );
     if (!confirmed) {
       return;
@@ -397,13 +403,13 @@ export function useUsageDashboard() {
 
     setIsResetting(true);
     setMonthlyUsage(null);
-    setScanMessage("Resetting local cache and rebuilding usage data.");
+    setScanMessage(t("hero.resetting_message", { defaultValue: "Resetting local cache and rebuilding usage data." }));
     const startedAt = performance.now();
 
     try {
       await resetUsageState();
       await scanAndReloadOverview(startedAt, { force: true });
-      setScanMessage("Reset local cache and rebuilt usage data from local Codex logs.");
+      setScanMessage(t("hero.reset_rebuilt_message", { defaultValue: "Reset local cache and rebuilt usage data from local Codex logs." }));
     } catch (resetError) {
       setError(resetError instanceof Error ? resetError.message : "Reset failed.");
     } finally {
@@ -416,7 +422,7 @@ export function useUsageDashboard() {
       return;
     }
 
-    const selectedPath = await save(getExportDialogOptions(format, getExportFileName(range, overview, format)));
+    const selectedPath = await save(getExportDialogOptions(format, getExportFileName(range, overview, format), t));
     if (!selectedPath) {
       return;
     }
@@ -425,7 +431,11 @@ export function useUsageDashboard() {
 
     try {
       const exported = await exportUsage(range, format, selectedPath);
-      setScanMessage(`Exported ${getRangeLabel(range)} to ${exported.path}.`);
+      setScanMessage(t("hero.exported_message", {
+        range: getRangeLabel(range, t),
+        path: exported.path,
+        defaultValue: `Exported ${getRangeLabel(range, t)} to ${exported.path}.`
+      }));
       setError(null);
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Export failed.");

@@ -67,7 +67,18 @@
     "export": "数据导出",
     "exporting": "正在导出...",
     "export_excel": "Excel (.xlsx)",
-    "export_markdown": "Markdown (.md)"
+    "export_markdown": "Markdown (.md)",
+    "overview_label": "概览",
+    "rescan": "重新扫描本地日志",
+    "cache_synced": "缓存已同步",
+    "out_of_sync": "未同步",
+    "total_cost_label": "总花费",
+    "cost_drivers": "成本分布",
+    "sync_logs_to_cache_desc": "同步本地日志到缓存",
+    "synced_message": "已同步 {{days}} 天数据 ({{reused}} 个缓存，{{parsed}} 个解析)",
+    "resetting_message": "正在重置本地缓存并重新构建使用数据。",
+    "reset_rebuilt_message": "本地缓存已重置，已从本地 Codex 日志重新构建使用数据。",
+    "exported_message": "已将 {{range}} 数据导出至 {{path}}。"
   },
   "metrics": {
     "tokens": {
@@ -169,7 +180,8 @@
       "cost": "成本",
       "cache": "缓存命中率",
       "percent": "占总比"
-    }
+    },
+    "no_data": "在所选时间范围内没有模型活动。"
   },
   "projects": {
     "title": "项目使用详情",
@@ -195,7 +207,17 @@
     "cached": "已缓存",
     "estimated_cost": "预估成本",
     "sessions_list": "会话明细列表",
-    "no_sessions": "该项目下没有找到会话数据。"
+    "no_sessions": "该项目下没有找到会话数据。",
+    "project_details": "项目详情",
+    "active_files": "个活动文件",
+    "showing_filtered": "当前显示 {{filtered}} 个匹配会话",
+    "subtitle_desc": "写入该目录的各个独立会话记录",
+    "search_placeholder": "搜索会话 ID 或模型...",
+    "no_matching_sessions": "没有找到符合搜索条件的会话",
+    "clear_search_hint": "尝试清空搜索框或搜索其他关键词。",
+    "session_id_file": "会话 ID / 文件",
+    "no_models": "无模型",
+    "view_in_sessions_tab": "在会话页签中查看"
   },
   "ranges": {
     "1d": "最近 1 天",
@@ -241,6 +263,16 @@
     "no_data": "没有找到符合当前搜索筛选条件的会话记录。",
     "showing_info": "当前显示 {{count}} 条会话",
     "showing_info_filtered": "当前显示 {{filtered}} / 共 {{total}} 条会话",
+    "no_sessions_desc": "未找到 Codex CLI 会话日志，或日志不包含使用记录。请点击“重新扫描本地日志”重试。",
+    "filtering_by_project": "当前按项目筛选",
+    "count_sessions_one": "1 个会话",
+    "count_sessions_other": "{{count}} 个会话",
+    "day_total_tokens": "单日 Tokens 总数",
+    "day_cost": "单日花费",
+    "projects_models": "项目与模型",
+    "time_label": "时间: {{time}}",
+    "size_label": "大小: {{size}}",
+    "no_workspace": "无工作区",
     "detail": {
       "modal_title": "会话详情",
       "timestamp": "记录时间",
@@ -281,7 +313,8 @@
     "language_desc": "修改应用的界面显示语言。",
     "language_label": "应用语言",
     "lang_en": "English",
-    "lang_zh": "简体中文"
+    "lang_zh": "简体中文",
+    "reset_confirm": "重置缓存的使用和价格数据，并从本地 Codex 日志中重新构建？源日志文件不会被删除。"
   },
   "logs": {
     "title": "实时系统日志",
@@ -289,12 +322,24 @@
     "search_placeholder": "过滤日志内容...",
     "btn_pause": "暂停滚动",
     "btn_resume": "恢复滚动",
-    "btn_clear": "清空日志"
+    "btn_clear": "清空日志",
+    "waiting": "正在等待系统日志输出..."
   },
   "trends": {
     "title_tokens": "Token 消耗趋势",
     "title_cost": "预估成本趋势",
     "tab_tokens": "Tokens 消耗",
-    "tab_cost": "预估花费"
+    "tab_cost": "预估花费",
+    "title": "使用趋势",
+    "description": "所选自然日窗口内的 Token 消耗与成本变化趋势。",
+    "total_tokens": "Tokens 总计",
+    "total_token_trend": "Token 消耗趋势",
+    "cost_trend": "成本趋势"
+  },
+  "export": {
+    "dialog_title_excel": "导出 Codex 使用情况至 Excel",
+    "dialog_title_markdown": "导出 Codex 使用情况至 Markdown",
+    "excel_filter_name": "Excel 工作簿",
+    "markdown_filter_name": "Markdown 文档"
   }
 }

@@ -5,6 +5,7 @@ import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/fo
 import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
 import type { MetricCardData, MetricCardKind } from "@/lib/usage-dashboard";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type UsageTrendsCardProps = {
   daily: OverviewResponse["daily"];
@@ -22,13 +23,13 @@ const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
 };
 
 const chartLegend = [
-  { label: "Input", className: "bg-blue-600/75" },
-  { label: "Cached", className: "bg-success/80" },
-  { label: "Output", className: "bg-violet-600/70" },
-  { label: "Cost", className: "bg-primary" },
+  { labelKey: "project_modal.input", defaultLabel: "Input", className: "bg-blue-600/75" },
+  { labelKey: "project_modal.cached", defaultLabel: "Cached", className: "bg-success/80" },
+  { labelKey: "project_modal.output", defaultLabel: "Output", className: "bg-violet-600/70" },
+  { labelKey: "common.cost", defaultLabel: "Cost", className: "bg-primary" },
 ];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, t }: any) => {
   if (active && payload && payload.length) {
     const input = payload.find((p: any) => p.dataKey === "inputTokens")?.value ?? 0;
     const cached = payload.find((p: any) => p.dataKey === "cachedInputTokens")?.value ?? 0;
@@ -43,14 +44,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </p>
         <div className="space-y-1.5 text-xs">
           <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-border/60 pb-1.5 font-semibold text-foreground">
-            <span>Total Tokens</span>
+            <span>{t("trends.total_tokens", { defaultValue: "Total Tokens" })}</span>
             <span>{formatNumber(total)}</span>
           </div>
 
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-blue-600/75" />
-              Input
+              {t("project_modal.input", { defaultValue: "Input" })}
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(input)}</span>
           </div>
@@ -58,7 +59,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-success/80" />
-              Cached
+              {t("project_modal.cached", { defaultValue: "Cached" })}
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(cached)}</span>
           </div>
@@ -66,7 +67,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-violet-600/70" />
-              Output
+              {t("project_modal.output", { defaultValue: "Output" })}
             </span>
             <span className="font-mono font-medium text-foreground">{formatNumber(output)}</span>
           </div>
@@ -74,7 +75,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <div className="mt-1.5 flex items-center justify-between gap-4 border-t border-border/60 pt-1.5 font-semibold text-primary">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-primary" />
-              Cost
+              {t("common.cost", { defaultValue: "Cost" })}
             </span>
             <span className="font-mono">{formatCurrencyShort(cost)}</span>
           </div>
@@ -87,6 +88,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className }: UsageTrendsCardProps) {
+  const { t } = useTranslation();
   const trendData = daily.map((day) => ({
     date: day.date,
     shortDate: formatTrendDateLabel(day.date),
@@ -106,16 +108,16 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
     <Card className={cn("rounded-lg h-full flex flex-col", className)}>
       <CardHeader className="flex shrink-0 flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5">
         <div className="space-y-1">
-          <CardTitle>Usage Trends</CardTitle>
-          <CardDescription>Total token and cost movement across the selected natural-day window.</CardDescription>
-          <span className="sr-only">Total Token Trend</span>
-          <span className="sr-only">Cost Trend</span>
+          <CardTitle>{t("trends.title", { defaultValue: "Usage Trends" })}</CardTitle>
+          <CardDescription>{t("trends.description", { defaultValue: "Total token and cost movement across the selected natural-day window." })}</CardDescription>
+          <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
+          <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:justify-end">
           {chartLegend.map((item) => (
-            <span key={item.label} className="inline-flex items-center gap-1.5">
+            <span key={item.labelKey} className="inline-flex items-center gap-1.5">
               <span className={cn("h-2 w-2 rounded-full", item.className)} />
-              {item.label}
+              {t(item.labelKey, { defaultValue: item.defaultLabel })}
             </span>
           ))}
         </div>
@@ -158,7 +160,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 tickFormatter={(value) => formatCurrencyShort(Number(value))}
               />
               <Tooltip
-                content={<CustomTooltip />}
+                content={<CustomTooltip t={t} />}
                 cursor={{ stroke: "rgb(var(--primary) / 0.22)", strokeDasharray: "4 4", strokeWidth: 1 }}
               />
 

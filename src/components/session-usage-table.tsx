@@ -171,7 +171,7 @@ export function SessionUsageTable({
               <Folder className="h-4 w-4" />
             </div>
             <div className="space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">{t("projects.filtering_by_project", { defaultValue: "Filtering by Project" })}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">{t("sessions.filtering_by_project", { defaultValue: "Filtering by Project" })}</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                 <span className="font-bold text-foreground text-sm">{selectedProject.split("/").pop() || selectedProject}</span>
                 <span className="text-[11px] font-mono text-muted-foreground truncate max-w-xs md:max-w-md">({selectedProject})</span>

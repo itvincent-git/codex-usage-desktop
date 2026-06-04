@@ -67,7 +67,18 @@
     "export": "Export",
     "exporting": "Exporting...",
     "export_excel": "Excel (.xlsx)",
-    "export_markdown": "Markdown (.md)"
+    "export_markdown": "Markdown (.md)",
+    "overview_label": "Overview",
+    "rescan": "Rescan local logs",
+    "cache_synced": "Cache Synced",
+    "out_of_sync": "Out of Sync",
+    "total_cost_label": "Total cost",
+    "cost_drivers": "Cost Drivers",
+    "sync_logs_to_cache_desc": "Sync local logs to cache",
+    "synced_message": "Synced {{days}} days ({{reused}} cached, {{parsed}} parsed)",
+    "resetting_message": "Resetting local cache and rebuilding usage data.",
+    "reset_rebuilt_message": "Reset local cache and rebuilt usage data from local Codex logs.",
+    "exported_message": "Exported {{range}} to {{path}}."
   },
   "metrics": {
     "tokens": {
@@ -169,7 +180,8 @@
       "cost": "Cost",
       "cache": "Cache Hit",
       "percent": "% of Total"
-    }
+    },
+    "no_data": "No model activity in this window."
   },
   "projects": {
     "title": "Project Usage Details",
@@ -195,7 +207,17 @@
     "cached": "Cached",
     "estimated_cost": "Estimated Cost",
     "sessions_list": "Sessions List",
-    "no_sessions": "No sessions found for this project."
+    "no_sessions": "No sessions found for this project.",
+    "project_details": "Project Details",
+    "active_files": "active files",
+    "showing_filtered": "Showing {{filtered}} matching sessions",
+    "subtitle_desc": "Individual sessions writing to this directory",
+    "search_placeholder": "Search session ID or model...",
+    "no_matching_sessions": "No sessions match your search query",
+    "clear_search_hint": "Try clearing your search query or searching for another term.",
+    "session_id_file": "Session ID / File",
+    "no_models": "No models",
+    "view_in_sessions_tab": "View in Sessions Tab"
   },
   "ranges": {
     "1d": "Last 1 Day",
@@ -241,6 +263,16 @@
     "no_data": "No session logs match the current search filters.",
     "showing_info": "Showing {{count}} sessions",
     "showing_info_filtered": "Showing {{filtered}} of {{total}} sessions",
+    "no_sessions_desc": "Codex CLI session logs could not be found or contain no usage events. Click \"Rescan local logs\" to check again.",
+    "filtering_by_project": "Filtering by Project",
+    "count_sessions_one": "1 session",
+    "count_sessions_other": "{{count}} sessions",
+    "day_total_tokens": "Day Total Tokens",
+    "day_cost": "Day Cost",
+    "projects_models": "Projects & Models",
+    "time_label": "Time: {{time}}",
+    "size_label": "Size: {{size}}",
+    "no_workspace": "No workspace",
     "detail": {
       "modal_title": "Session Details",
       "timestamp": "Timestamp",
@@ -281,7 +313,8 @@
     "language_desc": "Change the application display language.",
     "language_label": "App Language",
     "lang_en": "English",
-    "lang_zh": "简体中文"
+    "lang_zh": "简体中文",
+    "reset_confirm": "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted."
   },
   "logs": {
     "title": "Real-Time System Logs",
@@ -289,12 +322,24 @@
     "search_placeholder": "Filter logs...",
     "btn_pause": "Pause",
     "btn_resume": "Resume",
-    "btn_clear": "Clear"
+    "btn_clear": "Clear",
+    "waiting": "Waiting for logs..."
   },
   "trends": {
     "title_tokens": "Token Usage Trends",
     "title_cost": "Estimated Cost Trends",
     "tab_tokens": "Tokens",
-    "tab_cost": "Cost"
+    "tab_cost": "Cost",
+    "title": "Usage Trends",
+    "description": "Total token and cost movement across the selected natural-day window.",
+    "total_tokens": "Total Tokens",
+    "total_token_trend": "Total Token Trend",
+    "cost_trend": "Cost Trend"
+  },
+  "export": {
+    "dialog_title_excel": "Export Codex usage to Excel",
+    "dialog_title_markdown": "Export Codex usage to Markdown",
+    "excel_filter_name": "Excel Workbook",
+    "markdown_filter_name": "Markdown"
   }
 }

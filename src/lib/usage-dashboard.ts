@@ -58,19 +58,29 @@ export function getExportFileName(range: RangeKey, overview: OverviewResponse, f
   return `codex-usage-${range}-${overview.startDate}_to_${overview.endDate}.${extension}`;
 }
 
-export function getExportDialogOptions(format: ExportFormat, defaultPath: string) {
+export function getExportDialogOptions(
+  format: ExportFormat,
+  defaultPath: string,
+  t?: (key: string, options?: any) => string,
+) {
   if (format === "xlsx") {
     return {
-      title: "Export Codex usage to Excel",
+      title: t ? t("export.dialog_title_excel", { defaultValue: "Export Codex usage to Excel" }) : "Export Codex usage to Excel",
       defaultPath,
-      filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
+      filters: [{
+        name: t ? t("export.excel_filter_name", { defaultValue: "Excel Workbook" }) : "Excel Workbook",
+        extensions: ["xlsx"]
+      }],
     };
   }
 
   return {
-    title: "Export Codex usage to Markdown",
+    title: t ? t("export.dialog_title_markdown", { defaultValue: "Export Codex usage to Markdown" }) : "Export Codex usage to Markdown",
     defaultPath,
-    filters: [{ name: "Markdown", extensions: ["md"] }],
+    filters: [{
+      name: t ? t("export.markdown_filter_name", { defaultValue: "Markdown" }) : "Markdown",
+      extensions: ["md"]
+    }],
   };
 }
 
