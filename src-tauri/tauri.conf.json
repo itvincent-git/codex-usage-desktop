@@ -27,10 +27,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "macOS": {
       "signingIdentity": "-"
     },
-    "icon": ["icons/icon.icns", "icons/icon.png"]
+    "icon": [
+      "icons/icon.icns",
+      "icons/icon.png"
+    ]
   }
 }

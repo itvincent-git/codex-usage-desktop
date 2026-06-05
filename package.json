@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-desktop",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Local-first macOS dashboard for Codex CLI token usage and cost estimates.",
@@ -27,7 +27,9 @@
     "build": "pnpm build:web",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bump": "node scripts/bump-version.cjs",
+    "version": "node scripts/bump-version.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",
