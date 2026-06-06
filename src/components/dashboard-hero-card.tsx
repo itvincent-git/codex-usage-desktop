@@ -18,11 +18,9 @@ type DashboardHeroCardProps = {
   range: RangeKey;
   scanMessage: string;
   isBusy: boolean;
-  isRefreshing: boolean;
   isExporting: ExportFormat | null;
   lastRescanDurationMs: number | null;
   onRangeChange: (range: RangeKey) => void;
-  onRefresh: () => void;
   onExport: (format: ExportFormat) => void;
   metrics: MetricCardData[];
   codexLimits: CodexLimitsResponse | null;
@@ -33,11 +31,9 @@ export function DashboardHeroCard({
   range,
   scanMessage,
   isBusy,
-  isRefreshing,
   isExporting,
   lastRescanDurationMs,
   onRangeChange,
-  onRefresh,
   onExport,
   metrics,
   codexLimits,
@@ -55,11 +51,11 @@ export function DashboardHeroCard({
 
   const isSynced = !!overview.updatedAt;
   const updatedLabel = overview.updatedAt
-    ? t("hero.last_updated", {
+      ? t("hero.last_updated", {
         time: formatUpdatedTime(overview.updatedAt),
         duration: lastRescanDurationMs === null ? "" : ` · ${t("hero.rescan_duration", { duration: formatDuration(lastRescanDurationMs) })}`
       })
-    : t("hero.last_updated_never");
+      : t("hero.last_updated_never");
 
   const [activeTab, setActiveTab] = useState<"projects" | "models" | "dates">("projects");
 
@@ -129,10 +125,6 @@ export function DashboardHeroCard({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="primary" size="lg" onClick={onRefresh} disabled={isBusy}>
-              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              {t("hero.rescan", { defaultValue: "Rescan local logs" })}
-            </Button>
           </div>
         </div>
 

@@ -106,6 +106,9 @@ export default function App() {
           isUpdateDismissed={isUpdateDismissed}
           onUpgrade={() => void handleUpgrade()}
           showLogsTab={showLogsTab}
+          onRefresh={() => void handleRefresh()}
+          isRefreshing={isRefreshing}
+          isBusy={isLoading || isRefreshing || isResetting || isExporting !== null}
         />
 
         <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
@@ -204,11 +207,9 @@ export default function App() {
                 range={range}
                 scanMessage={scanMessage}
                 isBusy={isLoading || isRefreshing || isResetting || isExporting !== null}
-                isRefreshing={isRefreshing}
                 isExporting={isExporting}
                 lastRescanDurationMs={lastRescanDurationMs}
                 onRangeChange={handleRangeChange}
-                onRefresh={() => void handleRefresh()}
                 onExport={(format) => void handleExport(format)}
                 metrics={metrics}
                 codexLimits={codexLimits}
