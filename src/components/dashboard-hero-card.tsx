@@ -263,7 +263,7 @@ export function DashboardHeroCard({
               daily={overview.daily}
               metrics={metrics}
               cacheHitRate={overview.totals.cacheHitRate}
-              chartHeight={220}
+              chartHeight={175}
               className="border-border/70 bg-surface/55 hover:translate-y-0 hover:shadow-none shadow-sm"
             />
           </div>

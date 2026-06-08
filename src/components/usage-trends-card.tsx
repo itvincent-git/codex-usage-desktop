@@ -1,5 +1,5 @@
 import { Bar, CartesianGrid, ComposedChart, Line, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { OverviewResponse } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
@@ -105,15 +105,11 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
 
   return (
-    <Card className={cn("rounded-lg h-full flex flex-col", className)}>
-      <CardHeader className="flex shrink-0 flex-col gap-3.5 border-b border-border/80 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-4.5">
-        <div className="space-y-1">
-          <CardTitle>{t("trends.title", { defaultValue: "Usage Trends" })}</CardTitle>
-          <CardDescription>{t("trends.description", { defaultValue: "Total token and cost movement across the selected natural-day window." })}</CardDescription>
-          <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
-          <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:justify-end">
+    <Card data-testid="usage-trends-card" className={cn("rounded-lg h-full flex flex-col", className)}>
+      <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-3 sm:px-4 sm:py-2.5">
+        <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
+        <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {chartLegend.map((item) => (
             <span key={item.labelKey} className="inline-flex items-center gap-1.5">
               <span className={cn("h-2 w-2 rounded-full", item.className)} />

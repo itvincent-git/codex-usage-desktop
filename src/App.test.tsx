@@ -232,8 +232,7 @@ describe("App", () => {
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
-    const trendsCard = screen.getByRole("heading", { name: "Usage Trends" }).closest(".rounded-lg");
-    expect(trendsCard).not.toBeNull();
+    const trendsCard = screen.getByTestId("usage-trends-card");
     expect(within(trendsCard as HTMLElement).getByText("Token Breakdown")).toBeInTheDocument();
     expect(within(trendsCard as HTMLElement).getByText("Avg / Day")).toBeInTheDocument();
     expect(within(trendsCard as HTMLElement).getByText("Cache Hit")).toBeInTheDocument();
@@ -471,7 +470,7 @@ describe("App", () => {
     expect(screen.queryByRole("cell", { name: "2026-04" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Usage Trends")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("usage-trends-card")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
 
