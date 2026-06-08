@@ -75,10 +75,10 @@ export function DashboardHeroCard({
               </h1>
               <div className="group relative flex items-center">
                 <Info className="h-4 w-4 text-muted-foreground/50 transition-colors hover:text-muted-foreground cursor-help" />
-                <div className="pointer-events-none absolute bottom-full right-0 z-50 mb-2.5 w-64 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+                <div className="pointer-events-none absolute top-full right-0 z-50 mt-2.5 w-64 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
                   <p className="font-semibold text-foreground">{t("hero.title")}</p>
                   <p className="mt-1 leading-relaxed text-muted-foreground">{t("hero.subtitle")}</p>
-                  <div className="absolute right-1 top-full h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-border bg-surface sm:left-1/2 sm:right-auto" />
+                  <div className="absolute right-1 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-t border-l border-border bg-surface sm:left-1/2 sm:right-auto" />
                 </div>
               </div>
             </div>
