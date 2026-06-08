@@ -106,10 +106,10 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
 
   return (
     <Card data-testid="usage-trends-card" className={cn("rounded-lg h-full flex flex-col", className)}>
-      <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-3 sm:px-4 sm:py-2.5">
+      <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-2 sm:px-3 sm:py-1.5">
         <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
         <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {chartLegend.map((item) => (
             <span key={item.labelKey} className="inline-flex items-center gap-1.5">
               <span className={cn("h-2 w-2 rounded-full", item.className)} />
@@ -118,7 +118,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
           ))}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col justify-between space-y-4 p-4 sm:p-4.5">
+      <CardContent className="flex flex-1 flex-col justify-between space-y-3 p-3 sm:p-3.5">
         <div style={{ height: chartHeight, minHeight: chartHeight }} className="min-w-0">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={trendData} barGap={4} barCategoryGap="32%" margin={{ top: 18, right: 10, left: 4, bottom: 6 }}>
@@ -235,11 +235,11 @@ function SummaryCell({
 
   return (
     <div className={cn(
-      "group relative border-b border-border/70 p-3 transition-all duration-300 last:border-b-0 hover:bg-muted/10 sm:border-b-0 sm:border-r sm:p-3 sm:last:border-r-0",
+      "group relative border-b border-border/70 p-2 sm:p-2.5 transition-all duration-300 last:border-b-0 hover:bg-muted/10 sm:border-b-0 sm:border-r sm:last:border-r-0",
       style.accent,
     )}>
-      <div className="flex min-h-[68px] items-center justify-between gap-3">
-        <div className="space-y-1 flex-1 min-w-0">
+      <div className="flex min-h-[56px] items-center justify-between gap-3">
+        <div className="space-y-0.5 flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={cn("h-2 w-2 rounded-full", style.dot)} />
             <p className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">
@@ -247,10 +247,10 @@ function SummaryCell({
             </p>
           </div>
           <div className="pt-0.5">
-            <p className="text-lg font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={metric.value}>
+            <p className="text-base sm:text-lg font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap" title={metric.value}>
               {metric.value}
             </p>
-            <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
+            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
           </div>
         </div>
         {metric.kind === "cache" ? <CacheRing value={cacheHitRate} /> : null}

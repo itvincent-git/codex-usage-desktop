@@ -16,10 +16,8 @@ import { useTranslation } from "react-i18next";
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
   range: RangeKey;
-  scanMessage: string;
   isBusy: boolean;
   isExporting: ExportFormat | null;
-  lastRescanDurationMs: number | null;
   onRangeChange: (range: RangeKey) => void;
   onExport: (format: ExportFormat) => void;
   metrics: MetricCardData[];
@@ -29,33 +27,14 @@ type DashboardHeroCardProps = {
 export function DashboardHeroCard({
   overview,
   range,
-  scanMessage,
   isBusy,
   isExporting,
-  lastRescanDurationMs,
   onRangeChange,
   onExport,
   metrics,
   codexLimits,
 }: DashboardHeroCardProps) {
   const { t } = useTranslation();
-
-  const formatUpdatedTime = (timestamp: string) => {
-    const updatedAt = dayjs(timestamp);
-    const timeStr = updatedAt.format("HH:mm:ss");
-    if (updatedAt.isSame(dayjs(), "day")) {
-      return t("hero.updated_today", { time: timeStr, defaultValue: `Today at ${timeStr}` });
-    }
-    return `${updatedAt.format("YYYY-MM-DD")} ${timeStr}`;
-  };
-
-  const isSynced = !!overview.updatedAt;
-  const updatedLabel = overview.updatedAt
-      ? t("hero.last_updated", {
-        time: formatUpdatedTime(overview.updatedAt),
-        duration: lastRescanDurationMs === null ? "" : ` · ${t("hero.rescan_duration", { duration: formatDuration(lastRescanDurationMs) })}`
-      })
-      : t("hero.last_updated_never");
 
   const [activeTab, setActiveTab] = useState<"projects" | "models" | "dates">("projects");
 
@@ -86,12 +65,12 @@ export function DashboardHeroCard({
 
   return (
     <Card className="overflow-hidden rounded-lg border-border/80 bg-gradient-to-br from-surface via-surface to-primary/5">
-      <div className="p-5 lg:p-6">
+      <div className="p-4 lg:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{t("hero.overview_label", { defaultValue: "Overview" })}</p>
             <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl font-bold tracking-display text-foreground sm:text-3xl">
+              <h1 className="font-display text-2.5xl font-bold tracking-display text-foreground sm:text-3xl">
                 {t("hero.title")}
               </h1>
               <div className="group relative flex items-center">
@@ -128,24 +107,9 @@ export function DashboardHeroCard({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-6">
-          <div className="flex flex-col justify-between gap-4">
-            <div className="space-y-4">
-              <div className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-surface/55 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                <div className="flex items-center gap-1.5 font-medium text-foreground">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
-                    <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
-                  </span>
-                  <span>{isSynced ? t("hero.cache_synced", { defaultValue: "Cache Synced" }) : t("hero.out_of_sync", { defaultValue: "Out of Sync" })}</span>
-                  <span className="text-muted-foreground/30">·</span>
-                  <span className="text-muted-foreground font-normal">{scanMessage}</span>
-                </div>
-                <div className="text-[11px] text-muted-foreground/75">
-                  {updatedLabel}
-                </div>
-              </div>
-
+        <div className="mt-3.5 grid gap-4 lg:grid-cols-[0.8fr_1.4fr] lg:gap-5">
+          <div className="flex flex-col justify-between gap-3.5">
+            <div className="space-y-3.5">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t("hero.total_cost_label", { defaultValue: "Total cost" })} ({getRangeLabel(range, t)})</p>
                 <div className="flex flex-wrap items-end gap-2.5">
@@ -196,7 +160,7 @@ export function DashboardHeroCard({
             </div>
 
             {/* Cost Drivers tabbed view */}
-            <div className="rounded-lg border border-border/60 bg-surface/55 p-3 space-y-3">
+            <div className="rounded-lg border border-border/60 bg-surface/55 p-2.5 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <Cpu className="h-3.5 w-3.5 text-primary" />
@@ -263,7 +227,7 @@ export function DashboardHeroCard({
               daily={overview.daily}
               metrics={metrics}
               cacheHitRate={overview.totals.cacheHitRate}
-              chartHeight={175}
+              chartHeight={145}
               className="border-border/70 bg-surface/55 hover:translate-y-0 hover:shadow-none shadow-sm"
             />
           </div>
