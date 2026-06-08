@@ -42,11 +42,27 @@ if (fs.existsSync(cargoPath)) {
   cargo = cargo.replace(/(^\[package\][\s\S]*?^version\s*=\s*")[^"]*(")/m, `$1${version}$2`);
   fs.writeFileSync(cargoPath, cargo, 'utf8');
   console.log(`Updated src-tauri/Cargo.toml version to ${version}`);
+
+  // Update src-tauri/Cargo.lock if it exists
+  const cargoLockPath = path.join(__dirname, '../src-tauri/Cargo.lock');
+  if (fs.existsSync(cargoLockPath)) {
+    try {
+      console.log('Updating src-tauri/Cargo.lock...');
+      execSync('cargo update -p codex-usage-desktop --manifest-path src-tauri/Cargo.toml');
+    } catch (e) {
+      console.warn('Warning: Failed to update Cargo.lock using cargo. Please check if Cargo is installed.');
+    }
+  }
 }
 
 // 4. Stage the updated files in git
 try {
-  execSync('git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml');
+  const cargoLockPath = path.join(__dirname, '../src-tauri/Cargo.lock');
+  const filesToStage = ['package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml'];
+  if (fs.existsSync(cargoLockPath)) {
+    filesToStage.push('src-tauri/Cargo.lock');
+  }
+  execSync(`git add ${filesToStage.join(' ')}`);
   console.log('Successfully staged version files in git.');
 } catch (e) {
   // Silent fail if not in a git repo
