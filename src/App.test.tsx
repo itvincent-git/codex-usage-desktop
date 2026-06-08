@@ -221,7 +221,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(screen.getByText("Codex Limits")).toBeInTheDocument();
     expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
@@ -230,6 +230,14 @@ describe("App", () => {
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
     expect(screen.getByText(/Expires 2026-06-11 \(\d+ days left\)/)).toBeInTheDocument();
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
+    expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
+    expect(screen.getByText("Cost Trend")).toBeInTheDocument();
+    const trendsCard = screen.getByRole("heading", { name: "Usage Trends" }).closest(".rounded-lg");
+    expect(trendsCard).not.toBeNull();
+    expect(within(trendsCard as HTMLElement).getByText("Token Breakdown")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Avg / Day")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Cache Hit")).toBeInTheDocument();
+    expect(within(trendsCard as HTMLElement).getByText("Cost / 1M")).toBeInTheDocument();
     expect(screen.queryByText("Cached Tokens")).not.toBeInTheDocument();
     expect(screen.queryByText("Avg Daily Cost")).not.toBeInTheDocument();
     expect(screen.queryByText("Peak Token")).not.toBeInTheDocument();
@@ -327,7 +335,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Last 90 Days" }));
 
@@ -448,7 +456,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/1,600/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
     expect(screen.queryByText("Monthly Usage")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
@@ -462,7 +470,7 @@ describe("App", () => {
     expect(screen.getByText("No usage (3 months)")).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: "2026-04" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/1,600/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
     expect(screen.queryByText("Usage Trends")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
@@ -538,7 +546,7 @@ describe("App", () => {
       </StrictMode>,
     );
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
@@ -584,9 +592,9 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.getByText("scan failed")).toBeInTheDocument());
-    expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3,400").length).toBeGreaterThan(0);
   });
 
   it("keeps the dashboard visible when Codex limits are unavailable", async () => {
@@ -629,7 +637,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(
       screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command."),
     ).toBeInTheDocument();
@@ -701,7 +709,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/1,600/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
     await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
 
     expect(screen.getByText("Manage local app state and recovery actions.")).toBeInTheDocument();
@@ -832,7 +840,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/3,400/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     await userEvent.click(screen.getByRole("button", { name: "Export" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Excel (.xlsx)" }));
 
