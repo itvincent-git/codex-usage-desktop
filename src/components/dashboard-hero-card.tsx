@@ -222,13 +222,13 @@ export function DashboardHeroCard({
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 lg:h-full flex flex-col">
             <UsageTrendsCard
               daily={overview.daily}
               metrics={metrics}
               cacheHitRate={overview.totals.cacheHitRate}
-              chartHeight={145}
-              className="border-border/70 bg-surface/55 hover:translate-y-0 hover:shadow-none shadow-sm"
+              chartHeight="100%"
+              className="flex-1 border-border/70 bg-surface/55 hover:translate-y-0 hover:shadow-none shadow-sm"
             />
           </div>
         </div>

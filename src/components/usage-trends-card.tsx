@@ -11,7 +11,7 @@ type UsageTrendsCardProps = {
   daily: OverviewResponse["daily"];
   metrics: MetricCardData[];
   cacheHitRate: number;
-  chartHeight?: number;
+  chartHeight?: number | string;
   className?: string;
 };
 
@@ -119,7 +119,14 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between space-y-3 p-3 sm:p-3.5">
-        <div style={{ height: chartHeight, minHeight: chartHeight }} className="min-w-0">
+        <div
+          style={
+            typeof chartHeight === "number"
+              ? { height: chartHeight, minHeight: chartHeight }
+              : { height: chartHeight }
+          }
+          className={cn("min-w-0", typeof chartHeight === "string" && "flex-1 min-h-[145px]")}
+        >
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={trendData} barGap={4} barCategoryGap="32%" margin={{ top: 18, right: 10, left: 4, bottom: 6 }}>
               <defs>
