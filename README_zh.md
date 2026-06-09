@@ -31,12 +31,16 @@ Codex 的使用量增长极快，但监控它不应以牺牲你的隐私或凭�
 
 ## 功能亮点
 
-- 本地扫描 Codex CLI session 日志。
-- 支持从 1 天到 90 天的 Dashboard 时间窗口。
-- 提供 Monthly 视图，查看更长期的自然月汇总。
-- 展示 token、缓存、成本、模型和项目维度的拆分。
-- 可导出 Excel (`.xlsx`) 和 Markdown (`.md`)。
-- 支持清空本地 SQLite 缓存，并从 Codex 日志重新构建 usage 数据。
+*   🔍 **本地日志扫描器 (Local-First Scanner)**：实时、零配置地解析本机 `~/.codex/sessions` 目录下的 Codex CLI 会话日志，完全基于本地运行。
+*   📊 **多维交互仪表盘 (Interactive Dashboard)**：
+    *   **多时间窗口切换**：支持 1d、7d、14d、30d、60d、90d 等时间跨度切换。
+    *   **直观趋势图表**：使用动态 Recharts 展示输入/输出 token、缓存命中量以及每日费用趋势。
+*   💼 **细粒度多维度拆分**：
+    *   **项目用量分析**：精准统计各个本地项目目录（CWD）所消耗的 Token 和预算。
+    *   **模型用量与成本**：按模型细化分类（如 `gpt-4o`, `gpt-3.5-turbo` 等），费用分布一目了然。
+*   🗓️ **自然月长期概览 (Monthly View)**：以自然月为单位聚合用量和成本，方便进行中长期的用量规划与预算复盘。
+*   💾 **多样化数据导出**：支持一键将当前时间窗口下的看板用量数据导出为 Excel (`.xlsx`) 或 Markdown (`.md`) 报告。
+*   ⚙️ **便捷缓存管理**：可在设置中一键重建或清空本地 SQLite 用量数据库，随时从原始日志重新同步数据。
 
 ## 下载和安装
 
@@ -48,17 +52,6 @@ Codex 的使用量增长极快，但监控它不应以牺牲你的隐私或凭�
 - macOS Intel
 
 Windows 和 Linux 构建在计划中；当前 release workflow 只发布 macOS 桌面安装包。
-
-## 工作方式
-
-1. 打开桌面应用。
-2. 首次启动时，应用会从 `~/.codex` 读取本地 Codex session 日志，并建立本地 usage 缓存。
-3. 在 Dashboard 视图查看总 tokens、预估成本、日均、缓存命中率、每百万 token 成本、每日趋势、模型用量和项目用量。
-4. 在 Dashboard 中切换 1d / 2d / 7d / 14d / 30d / 60d / 90d 时间窗口。
-5. 打开 Monthly 视图查看自然月汇总。
-6. 新的 Codex session 产生后，点击 `Rescan local logs` 刷新看板。
-7. 点击 `Export`，将当前 Dashboard 时间窗口导出为 Excel (`.xlsx`) 或 Markdown (`.md`)。
-8. 如果本地缓存需要重建，在 Settings 中点击 `Reset cache`，应用会清空缓存并从 Codex 日志重新构建。
 
 ## 隐私与安全
 

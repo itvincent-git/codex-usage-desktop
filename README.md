@@ -22,23 +22,27 @@ Unlike traditional analytics platforms that require cloud logins and API key upl
 
 ### 📊 Local-First vs. Cloud SaaS Analytics
 
-| Feature | Codex Usage Desktop (Local-First) | Traditional Cloud SaaS |
-| :--- | :--- | :--- |
-| **Data Privacy** | 🟢 **100% Local**. Your logs never leave your machine. | 🔴 Uploads logs to third-party cloud servers. |
-| **Credentials Security** | 🟢 **Zero API Keys required**. No keys are stored. | 🔴 Requires uploading master API keys/tokens. |
-| **Costs** | 🟢 **Free & Open Source**. No subscription. | 🔴 Pay-per-seat subscription models. |
-| **Performance** | 🟢 **Blazing fast SQLite**. Local TUI/JSONL log indexing. | 🔴 Subject to network latency and API rate limits. |
+| Feature                  | Codex Usage Desktop (Local-First)                         | Traditional Cloud SaaS                             |
+|:------------------------ |:--------------------------------------------------------- |:-------------------------------------------------- |
+| **Data Privacy**         | 🟢 **100% Local**. Your logs never leave your machine.    | 🔴 Uploads logs to third-party cloud servers.      |
+| **Credentials Security** | 🟢 **Zero API Keys required**. No keys are stored.        | 🔴 Requires uploading master API keys/tokens.      |
+| **Costs**                | 🟢 **Free & Open Source**. No subscription.               | 🔴 Pay-per-seat subscription models.               |
+| **Performance**          | 🟢 **Blazing fast SQLite**. Local TUI/JSONL log indexing. | 🔴 Subject to network latency and API rate limits. |
 
 ---
 
 ## Features
 
-- Local-first scanning of Codex CLI session logs.
-- Dashboard windows from 1 day to 90 days.
-- Monthly usage totals for longer-term review.
-- Token, cache, cost, model, and project breakdowns.
-- Excel (`.xlsx`) and Markdown (`.md`) exports.
-- Local SQLite cache reset and rebuild when usage data needs to be refreshed from scratch.
+* 🔍 **Local-First Log Scanner**: Automatically parses Codex CLI session logs (`~/.codex/sessions`) on your machine in real-time. No cloud API keys or accounts required.
+* 📊 **Interactive Dashboard**:
+  * **Multiple Windows**: Filter metrics over different timeframes (1d, 7d, 14d, 30d, 60d, 90d).
+  * **Aggregated Trends**: Real-time charts for input/output tokens, cached tokens, and daily cost estimates.
+* 💼 **Granular Breakdown**:
+  * **Project Analysis**: Track which project directories or repositories are consuming the most tokens.
+  * **Model Cost Estimates**: Segment usage by models (e.g., `gpt-4o`, `gpt-3.5-turbo`) to see where your budget goes.
+* 🗓️ **Natural Month Overview**: Track aggregate monthly spending and token budgets for long-term project planning.
+* 💾 **Flexible Data Export**: One-click export of current dashboard datasets to Excel (`.xlsx`) or Markdown (`.md`) reports.
+* ⚙️ **Cache Management**: Instantly rebuild or purge the local SQLite usage index directly from settings to refresh data.
 
 ## Download And Install
 
@@ -51,21 +55,11 @@ Current release builds:
 
 Windows and Linux builds are planned, but the current release workflow only publishes macOS desktop packages.
 
-## How It Works
-
-1. Open the desktop app.
-2. On first launch, the app reads your local Codex session logs from `~/.codex` and builds a local usage cache.
-3. Use the Dashboard view to see total tokens, estimated cost, daily averages, cache hit rate, cost per million tokens, daily trends, model usage, and project usage.
-4. Switch the dashboard window between 1d / 2d / 7d / 14d / 30d / 60d / 90d.
-5. Open the Monthly view to see natural-month usage totals.
-6. Click `Rescan local logs` after new Codex sessions to refresh the dashboard.
-7. Use `Export` to save the selected dashboard window as Excel (`.xlsx`) or Markdown (`.md`).
-8. Use Settings -> `Reset cache` if the local cache needs to be cleared and rebuilt from your Codex logs.
-
 ## Privacy & Security
 
 > [!IMPORTANT]
 > **Zero Cloud Telemetry & Credentials Security Guarantee**
+> 
 > * **No API Keys Stored**: The app **does not require or store** your OpenAI/LiteLLM API keys. It parses local logs that already contain token counts.
 > * **Logs Stay Local**: Source session files in `~/.codex` are read strictly on your device and are never uploaded, shared, or modified.
 > * **Local-first SQLite Cache**: Summarized metrics are stored in a local SQLite cache in your system's app data directory.
