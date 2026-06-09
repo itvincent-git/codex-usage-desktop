@@ -16,13 +16,20 @@ No cloud account. No API key. No log upload. Reads your local ~/.codex logs.
 
 ## Why this exists
 
-Codex usage can grow quickly, but it is hard to see:
+Codex usage can grow quickly, but tracking it shouldn't cost you your privacy or credentials security. 
 
-- which projects cost the most
-- which sessions burned tokens
-- which models are expensive
-- whether cache is helping
-- how usage changes over days/months
+Unlike traditional analytics platforms that require cloud logins and API key uploads, **Codex Usage Desktop** is built with a local-first philosophy.
+
+### 📊 Local-First vs. Cloud SaaS Analytics
+
+| Feature | Codex Usage Desktop (Local-First) | Traditional Cloud SaaS |
+| :--- | :--- | :--- |
+| **Data Privacy** | 🟢 **100% Local**. Your logs never leave your machine. | 🔴 Uploads logs to third-party cloud servers. |
+| **Credentials Security** | 🟢 **Zero API Keys required**. No keys are stored. | 🔴 Requires uploading master API keys/tokens. |
+| **Costs** | 🟢 **Free & Open Source**. No subscription. | 🔴 Pay-per-seat subscription models. |
+| **Performance** | 🟢 **Blazing fast SQLite**. Local TUI/JSONL log indexing. | 🔴 Subject to network latency and API rate limits. |
+
+---
 
 ## Features
 
@@ -55,12 +62,14 @@ Windows and Linux builds are planned, but the current release workflow only publ
 7. Use `Export` to save the selected dashboard window as Excel (`.xlsx`) or Markdown (`.md`).
 8. Use Settings -> `Reset cache` if the local cache needs to be cleared and rebuilt from your Codex logs.
 
-## Privacy
+## Privacy & Security
 
-- Source Codex logs are read locally and are not deleted by scan or reset actions.
-- Usage summaries are stored in a local SQLite cache in the app data directory.
-- Pricing data is cached locally. If the pricing cache is missing, the app tries to fetch Codex model pricing from LiteLLM; if that fails, it uses the bundled pricing table.
-- Cost values are estimates based on the pricing data available to the app.
+> [!IMPORTANT]
+> **Zero Cloud Telemetry & Credentials Security Guarantee**
+> * **No API Keys Stored**: The app **does not require or store** your OpenAI/LiteLLM API keys. It parses local logs that already contain token counts.
+> * **Logs Stay Local**: Source session files in `~/.codex` are read strictly on your device and are never uploaded, shared, or modified.
+> * **Local-first SQLite Cache**: Summarized metrics are stored in a local SQLite cache in your system's app data directory.
+> * **Minimal Network Activity**: Pricing data is cached locally. If missing, the app fetches public pricing lists from LiteLLM over HTTPS, without sending any user credentials or usage metrics.
 
 ## Advanced Options
 
