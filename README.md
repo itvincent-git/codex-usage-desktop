@@ -7,19 +7,22 @@
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-24c8db.svg)](https://tauri.app/)
 [![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#privacy)
 
-A local-first macOS dashboard for Codex CLI token usage, cost estimates, model usage, and project usage from your local `~/.codex` logs.
+> See where your Codex tokens and dollars go — locally.
+
+A local-first macOS dashboard for OpenAI Codex CLI usage.
+No cloud account. No API key. No log upload. Reads your local ~/.codex logs.
 
 [Download the latest release](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) · [中文 README](README_zh.md)
 
-Use Codex Usage Desktop if you run Codex CLI on your machine and want an OpenAI Codex usage tracker that helps you review recent token usage, cost trends, cache behavior, model usage, and project usage without uploading local logs.
+## Why this exists
 
-## Why Use It
+Codex usage can grow quickly, but it is hard to see:
 
-- Understand how many Codex tokens you use across recent work.
-- Estimate Codex CLI costs by model, day, and project.
-- See cache hit rate, cost per million tokens, and daily usage trends.
-- Keep usage analysis local by reading `~/.codex` session logs on your machine.
-- Export the selected dashboard window to Excel or Markdown for reporting.
+- which projects cost the most
+- which sessions burned tokens
+- which models are expensive
+- whether cache is helping
+- how usage changes over days/months
 
 ## Features
 
