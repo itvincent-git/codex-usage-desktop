@@ -39,7 +39,7 @@ Unlike traditional analytics platforms that require cloud logins and API key upl
   * **Aggregated Trends**: Real-time charts for input/output tokens, cached tokens, and daily cost estimates.
 * 💼 **Granular Breakdown**:
   * **Project Analysis**: Track which project directories or repositories are consuming the most tokens.
-  * **Model Cost Estimates**: Segment usage by models (e.g., `gpt-4o`, `gpt-3.5-turbo`) to see where your budget goes.
+  * **Model Cost Estimates**: Segment usage by models (e.g., `gpt-5.5`, `gpt-5.4`) to see where your budget goes.
 * 🗓️ **Natural Month Overview**: Track aggregate monthly spending and token budgets for long-term project planning.
 * 💾 **Flexible Data Export**: One-click export of current dashboard datasets to Excel (`.xlsx`) or Markdown (`.md`) reports.
 * ⚙️ **Cache Management**: Instantly rebuild or purge the local SQLite usage index directly from settings to refresh data.
