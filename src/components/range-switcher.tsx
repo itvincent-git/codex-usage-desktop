@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { RangeKey } from "@/lib/api";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
 import type { DateRange } from "react-day-picker";
@@ -122,88 +123,90 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300"
-          onClick={() => setIsModalOpen(false)}
-        >
+      {isModalOpen &&
+        createPortal(
           <div
-            className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300"
+            onClick={() => setIsModalOpen(false)}
           >
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="text-lg font-bold text-foreground">{t("range_switcher.modal_title")}</h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground transition cursor-pointer"
-                aria-label={t("range_switcher.modal_close_aria")}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center py-2 space-y-3">
-              <div className="text-center text-xs text-muted-foreground min-h-[1.25rem]">
-                {dateRange?.from ? (
-                  <span>
-                    {dateRange.to ? (
-                      t("range_switcher.selected_range", {
-                        start: dayjs(dateRange.from).format("YYYY-MM-DD"),
-                        end: dayjs(dateRange.to).format("YYYY-MM-DD"),
-                        defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} to ${dayjs(dateRange.to).format("YYYY-MM-DD")}`
-                      })
-                    ) : (
-                      t("range_switcher.selected_start_only", {
-                        start: dayjs(dateRange.from).format("YYYY-MM-DD"),
-                        defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} (Choose end date...)`
-                      })
-                    )}
-                  </span>
-                ) : (
-                  <span>{t("range_switcher.choose_start")}</span>
-                )}
+            <div
+              className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <h3 className="text-lg font-bold text-foreground">{t("range_switcher.modal_title")}</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground transition cursor-pointer"
+                  aria-label={t("range_switcher.modal_close_aria")}
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={handleSelect}
-                disabled={{ after: new Date() }}
-                className="rounded-md border bg-card border-border/60"
-                locale={currentLocale}
-              />
-            </div>
 
-            {error && (
-              <p className="text-xs text-error font-medium text-center">{error}</p>
-            )}
+              <div className="flex flex-col items-center py-2 space-y-3">
+                <div className="text-center text-xs text-muted-foreground min-h-[1.25rem]">
+                  {dateRange?.from ? (
+                    <span>
+                      {dateRange.to ? (
+                        t("range_switcher.selected_range", {
+                          start: dayjs(dateRange.from).format("YYYY-MM-DD"),
+                          end: dayjs(dateRange.to).format("YYYY-MM-DD"),
+                          defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} to ${dayjs(dateRange.to).format("YYYY-MM-DD")}`
+                        })
+                      ) : (
+                        t("range_switcher.selected_start_only", {
+                          start: dayjs(dateRange.from).format("YYYY-MM-DD"),
+                          defaultValue: `Selected: ${dayjs(dateRange.from).format("YYYY-MM-DD")} (Choose end date...)`
+                        })
+                      )}
+                    </span>
+                  ) : (
+                    <span>{t("range_switcher.choose_start")}</span>
+                  )}
+                </div>
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={handleSelect}
+                  disabled={{ after: new Date() }}
+                  className="rounded-md border bg-card border-border/60"
+                  locale={currentLocale}
+                />
+              </div>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setDateRange(undefined)}
-                className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer text-muted-foreground"
-              >
-                {t("range_switcher.btn_clear")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer"
-              >
-                {t("range_switcher.btn_cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="flex-1 rounded-lg bg-primary py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
-              >
-                {t("range_switcher.btn_apply")}
-              </button>
+              {error && (
+                <p className="text-xs text-error font-medium text-center">{error}</p>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDateRange(undefined)}
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer text-muted-foreground"
+                >
+                  {t("range_switcher.btn_clear")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition cursor-pointer"
+                >
+                  {t("range_switcher.btn_cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="flex-1 rounded-lg bg-primary py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition shadow-glow cursor-pointer"
+                >
+                  {t("range_switcher.btn_apply")}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
