@@ -523,11 +523,12 @@ pub fn run() {
             });
 
             // Set up system tray icon
-            let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate.png");
+            let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate@2x.png");
             let tray_icon_image = tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
 
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(tray_icon_image)
+                .icon_as_template(true)
                 .tooltip("Codex Usage")
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
