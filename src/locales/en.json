@@ -322,6 +322,8 @@
     "menu_bar_opt_weekly": "Weekly Limit",
     "menu_bar_opt_tokens": "Today's Total Tokens",
     "menu_bar_opt_cost": "Today's Cost",
+    "menu_bar_show_main": "Show Main Window",
+    "menu_bar_quit": "Quit",
     "reset_confirm": "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted."
   },
   "logs": {

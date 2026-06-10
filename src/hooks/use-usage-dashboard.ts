@@ -424,7 +424,12 @@ export function useUsageDashboard() {
       items.push({ id: "status_cost", text, enabled: false });
     }
 
-    void updateTray({ title, items }).catch((err) => {
+    void updateTray({
+      title,
+      items,
+      show_main_text: t("settings.menu_bar_show_main", { defaultValue: "Show Main Window" }),
+      quit_text: t("settings.menu_bar_quit", { defaultValue: "Quit" }),
+    }).catch((err) => {
       console.warn("Failed to update tray", err);
     });
   }, [

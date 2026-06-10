@@ -179,6 +179,8 @@ export type TrayMenuItemDto = {
 export type TrayMenuUpdate = {
   title: string;
   items: TrayMenuItemDto[];
+  show_main_text?: string;
+  quit_text?: string;
 };
 
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {

@@ -322,6 +322,8 @@
     "menu_bar_opt_weekly": "周度额度限制",
     "menu_bar_opt_tokens": "今日消耗总 Token",
     "menu_bar_opt_cost": "今日预估成本",
+    "menu_bar_show_main": "显示主窗口",
+    "menu_bar_quit": "退出",
     "reset_confirm": "重置缓存的使用和价格数据，并从本地 Codex 日志中重新构建？源日志文件不会被删除。"
   },
   "logs": {

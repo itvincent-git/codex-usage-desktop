@@ -447,6 +447,8 @@ struct TrayMenuItemDto {
 struct TrayMenuUpdate {
     title: String,
     items: Vec<TrayMenuItemDto>,
+    show_main_text: Option<String>,
+    quit_text: Option<String>,
 }
 
 #[tauri::command]
@@ -468,10 +470,13 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
             }
         }
         
+        let show_main_label = payload.show_main_text.unwrap_or_else(|| "显示主窗口 / Show Main Window".to_string());
+        let quit_label = payload.quit_text.unwrap_or_else(|| "退出 / Quit".to_string());
+
         menu_builder = menu_builder
             .separator()
-            .item(&tauri::menu::MenuItemBuilder::with_id("show_main", "显示主窗口 / Show Main Window").build(&app).map_err(|e| e.to_string())?)
-            .item(&tauri::menu::MenuItemBuilder::with_id("quit", "退出 / Quit").build(&app).map_err(|e| e.to_string())?);
+            .item(&tauri::menu::MenuItemBuilder::with_id("show_main", &show_main_label).build(&app).map_err(|e| e.to_string())?)
+            .item(&tauri::menu::MenuItemBuilder::with_id("quit", &quit_label).build(&app).map_err(|e| e.to_string())?);
             
         let menu = menu_builder.build().map_err(|e| e.to_string())?;
         let _ = tray.set_menu(Some(menu));
