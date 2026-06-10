@@ -10,7 +10,12 @@ const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: invokeMock,
+  invoke: (command: string, ...args: any[]) => {
+    if (command === "update_tray") {
+      return Promise.resolve();
+    }
+    return invokeMock(command, ...args);
+  },
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({

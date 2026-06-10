@@ -29,6 +29,13 @@ type SettingsPageProps = {
   onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
 };
 
+const TRAY_OPTION_KEYS = {
+  limit5h: "5h",
+  limitWeekly: "weekly",
+  tokens: "tokens",
+  cost: "cost",
+} as const;
+
 export function SettingsPage({
   isResetting,
   isDisabled,
@@ -133,7 +140,7 @@ export function SettingsPage({
                     className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
                   />
                   <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {t(`settings.menu_bar_opt_${key === "limit5h" ? "5h" : key}`)}
+                    {t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
                   </span>
                 </label>
               ))}
@@ -153,7 +160,7 @@ export function SettingsPage({
                     className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
                   />
                   <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {t(`settings.menu_bar_opt_${key === "limit5h" ? "5h" : key}`)}
+                    {t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
                   </span>
                 </label>
               ))}
