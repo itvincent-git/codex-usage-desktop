@@ -151,13 +151,16 @@ export function useUsageDashboard() {
         defaultValue: `Synced ${scan.importedDays} days (${filesReused} cached, ${filesParsed} parsed)`
       }));
 
-      await Promise.all([loadOverview(range), loadCodexLimits(options)]);
+      const isForeground = document.visibilityState === "visible" || options?.force === true;
+      if (isForeground || filesParsed > 0) {
+        await Promise.all([loadOverview(range), loadCodexLimits(options)]);
 
-      if (view === "monthly") {
-        await loadMonthlyUsage();
-      }
-      if (view === "sessions") {
-        await loadSessions();
+        if (view === "monthly") {
+          await loadMonthlyUsage();
+        }
+        if (view === "sessions") {
+          await loadSessions();
+        }
       }
       setLastRescanDurationMs(performance.now() - startedAt);
     })();
@@ -171,7 +174,7 @@ export function useUsageDashboard() {
   });
 
   const runAutoRescan = useEffectEvent(async () => {
-    if (document.visibilityState !== "visible" || !document.hasFocus() || isResetting) {
+    if (isResetting) {
       return;
     }
 

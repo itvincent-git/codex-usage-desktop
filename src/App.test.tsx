@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import i18n from "./i18n";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
@@ -47,6 +48,8 @@ describe("App", () => {
         disconnect() {}
       },
     );
+    vi.stubGlobal("navigator", { language: "en-US" });
+    void i18n.changeLanguage("en");
   });
 
   it("shows the initial loading state while loading the cached overview", () => {
@@ -233,7 +236,7 @@ describe("App", () => {
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
-    expect(screen.getByText(/Expires 2026-06-11 \(\d+ days left\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Expires 2026-06-11 \(\d+ days? left\)/)).toBeInTheDocument();
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
     expect(screen.getByText("Cost Trend")).toBeInTheDocument();
