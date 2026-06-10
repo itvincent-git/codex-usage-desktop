@@ -314,6 +314,14 @@
     "language_label": "应用语言",
     "lang_en": "English",
     "lang_zh": "简体中文",
+    "menu_bar_title": "菜单栏设置",
+    "menu_bar_desc": "配置在 macOS 菜单栏标题和托盘下拉菜单中显示哪些数据项。",
+    "menu_bar_show_title": "显示在菜单栏（托盘标题）",
+    "menu_bar_show_menu": "显示在下拉菜单中",
+    "menu_bar_opt_5h": "5 小时额度限制",
+    "menu_bar_opt_weekly": "周度额度限制",
+    "menu_bar_opt_tokens": "今日消耗总 Token",
+    "menu_bar_opt_cost": "今日预估成本",
     "reset_confirm": "重置缓存的使用和价格数据，并从本地 Codex 日志中重新构建？源日志文件不会被删除。"
   },
   "logs": {

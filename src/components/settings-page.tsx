@@ -23,6 +23,10 @@ type SettingsPageProps = {
   onUpgrade: () => void;
   showLogsTab: boolean;
   onShowLogsTabChange: (show: boolean) => void;
+  trayTitleShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
+  onTrayTitleShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
+  trayMenuShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
+  onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
 };
 
 export function SettingsPage({
@@ -36,6 +40,10 @@ export function SettingsPage({
   onUpgrade,
   showLogsTab,
   onShowLogsTabChange,
+  trayTitleShow,
+  onTrayTitleShowChange,
+  trayMenuShow,
+  onTrayMenuShowChange,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
   const currentLanguage = i18n.language || "en";
@@ -102,6 +110,54 @@ export function SettingsPage({
                 }`}
               />
             </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.menu_bar_title")}</CardTitle>
+          <CardDescription>{t("settings.menu_bar_desc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="border-t border-border pt-5 space-y-4">
+            <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_title")}</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(["limit5h", "limitWeekly", "tokens", "cost"] as const).map((key) => (
+                <label key={`title-${key}`} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={trayTitleShow[key]}
+                    onChange={(e) => onTrayTitleShowChange(key, e.target.checked)}
+                    disabled={isDisabled}
+                    className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
+                  />
+                  <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    {t(`settings.menu_bar_opt_${key === "limit5h" ? "5h" : key}`)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-5 space-y-4">
+            <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_menu")}</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(["limit5h", "limitWeekly", "tokens", "cost"] as const).map((key) => (
+                <label key={`menu-${key}`} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={trayMenuShow[key]}
+                    onChange={(e) => onTrayMenuShowChange(key, e.target.checked)}
+                    disabled={isDisabled}
+                    className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
+                  />
+                  <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    {t(`settings.menu_bar_opt_${key === "limit5h" ? "5h" : key}`)}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

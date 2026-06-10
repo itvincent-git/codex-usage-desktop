@@ -11,6 +11,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::Manager;
+use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
     UpdateCheckResponse, SessionDetailRow,
@@ -435,6 +436,49 @@ async fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+struct TrayMenuItemDto {
+    id: String,
+    text: String,
+    enabled: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct TrayMenuUpdate {
+    title: String,
+    items: Vec<TrayMenuItemDto>,
+}
+
+#[tauri::command]
+fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_title(Some(payload.title));
+        
+        let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
+        
+        for item in payload.items {
+            if item.id == "separator" {
+                menu_builder = menu_builder.separator();
+            } else {
+                let menu_item = tauri::menu::MenuItemBuilder::with_id(&item.id, &item.text)
+                    .enabled(item.enabled)
+                    .build(&app)
+                    .map_err(|e| e.to_string())?;
+                menu_builder = menu_builder.item(&menu_item);
+            }
+        }
+        
+        menu_builder = menu_builder
+            .separator()
+            .item(&tauri::menu::MenuItemBuilder::with_id("show_main", "显示主窗口 / Show Main Window").build(&app).map_err(|e| e.to_string())?)
+            .item(&tauri::menu::MenuItemBuilder::with_id("quit", "退出 / Quit").build(&app).map_err(|e| e.to_string())?);
+            
+        let menu = menu_builder.build().map_err(|e| e.to_string())?;
+        let _ = tray.set_menu(Some(menu));
+    }
+    Ok(())
+}
+
 fn delete_pricing_cache(path: &Path) -> Result<(), String> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -457,6 +501,14 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+        })
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -464,6 +516,43 @@ pub fn run() {
                 database_path: app_data_dir.join("codex-usage-desktop.db"),
                 pricing_cache_path: app_data_dir.join("codex-pricing-cache.json"),
             });
+
+            // Set up system tray icon
+            let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate.png");
+            let tray_icon_image = tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
+
+            let _tray = TrayIconBuilder::with_id("main")
+                .icon(tray_icon_image)
+                .tooltip("Codex Usage")
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show_main" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        ..
+                    } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)
+                .map_err(|e| e.to_string())?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -475,7 +564,8 @@ pub fn run() {
             export_usage,
             check_for_updates,
             open_url,
-            fetch_session_details
+            fetch_session_details,
+            update_tray
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

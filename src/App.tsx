@@ -61,6 +61,10 @@ export default function App() {
     handleDismissUpdate,
     handleManualUpdateCheck,
     handleUpgrade,
+    trayTitleShow,
+    handleTrayTitleShowChange,
+    trayMenuShow,
+    handleTrayMenuShowChange,
   } = useUsageDashboard();
 
   const metrics = overview ? buildMetricCards(overview, range, t) : [];
@@ -302,6 +306,10 @@ export default function App() {
               onUpgrade={() => void handleUpgrade()}
               showLogsTab={showLogsTab}
               onShowLogsTabChange={setShowLogsTab}
+              trayTitleShow={trayTitleShow}
+              onTrayTitleShowChange={handleTrayTitleShowChange}
+              trayMenuShow={trayMenuShow}
+              onTrayMenuShowChange={handleTrayMenuShowChange}
             />
           ) : null}
 

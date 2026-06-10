@@ -170,3 +170,19 @@ export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {
   return invoke<SessionDetailRow[]>("fetch_session_details");
 }
 
+export type TrayMenuItemDto = {
+  id: string;
+  text: string;
+  enabled: boolean;
+};
+
+export type TrayMenuUpdate = {
+  title: string;
+  items: TrayMenuItemDto[];
+};
+
+export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
+  return invoke<void>("update_tray", { payload });
+}
+
+

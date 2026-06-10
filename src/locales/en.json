@@ -314,6 +314,14 @@
     "language_label": "App Language",
     "lang_en": "English",
     "lang_zh": "简体中文",
+    "menu_bar_title": "Menu Bar Settings",
+    "menu_bar_desc": "Configure what data is shown on the macOS menu bar title and the tray dropdown menu.",
+    "menu_bar_show_title": "Show in Menu Bar (Tray Title)",
+    "menu_bar_show_menu": "Show in Dropdown Menu",
+    "menu_bar_opt_5h": "5-Hour Limit",
+    "menu_bar_opt_weekly": "Weekly Limit",
+    "menu_bar_opt_tokens": "Today's Total Tokens",
+    "menu_bar_opt_cost": "Today's Cost",
     "reset_confirm": "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted."
   },
   "logs": {

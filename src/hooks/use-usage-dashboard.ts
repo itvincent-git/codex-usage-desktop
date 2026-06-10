@@ -18,14 +18,17 @@ import {
   type UpdateCheckResponse,
   fetchSessionDetails,
   type SessionDetailRow,
+  updateTray,
+  type TrayMenuItemDto,
 } from "@/lib/api";
+import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 
 const AUTO_RESCAN_MS = 5 * 60_000;
 
 export function useUsageDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -59,6 +62,34 @@ export function useUsageDashboard() {
     if (!show && view === "logs") {
       setView("dashboard");
     }
+  };
+
+  const [trayTitleShow, setTrayTitleShowState] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tray_title_show");
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return { limit5h: false, limitWeekly: false, tokens: false, cost: true };
+  });
+
+  const [trayMenuShow, setTrayMenuShowState] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tray_menu_show");
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return { limit5h: true, limitWeekly: true, tokens: true, cost: true };
+  });
+
+  const handleTrayTitleShowChange = (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => {
+    const next = { ...trayTitleShow, [key]: value };
+    localStorage.setItem("tray_title_show", JSON.stringify(next));
+    setTrayTitleShowState(next);
+  };
+
+  const handleTrayMenuShowChange = (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => {
+    const next = { ...trayMenuShow, [key]: value };
+    localStorage.setItem("tray_menu_show", JSON.stringify(next));
+    setTrayMenuShowState(next);
   };
 
   const hasBootstrappedRef = useRef(false);
@@ -336,6 +367,76 @@ export function useUsageDashboard() {
     };
   }, [bootstrapped, loadCodexLimits, runAutoRescan]);
 
+  // Update tray icon whenever limits, overview, translation, or tray settings change
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    const tz = overview?.timezone;
+    const todayStr = getTodayDateString(tz);
+    const todayRow = overview?.daily?.find((d) => d.date === todayStr) || overview?.daily?.[overview.daily.length - 1];
+    const todayTokens = todayRow ? todayRow.totalTokens : 0;
+    const todayCost = todayRow ? todayRow.costUSD : 0;
+
+    const titleParts: string[] = [];
+    if (trayTitleShow.limit5h) {
+      const val = codexLimits?.session ? `${Math.round(codexLimits.session.remainingPercent)}%` : "-";
+      titleParts.push(`5h: ${val}`);
+    }
+    if (trayTitleShow.limitWeekly) {
+      const val = codexLimits?.weekly ? `${Math.round(codexLimits.weekly.remainingPercent)}%` : "-";
+      titleParts.push(`W: ${val}`);
+    }
+    if (trayTitleShow.tokens) {
+      titleParts.push(`T: ${formatCompactNumber(todayTokens)}`);
+    }
+    if (trayTitleShow.cost) {
+      titleParts.push(formatCurrencyShort(todayCost));
+    }
+    const title = titleParts.join(" | ");
+
+    const items: TrayMenuItemDto[] = [];
+
+    if (trayMenuShow.limit5h) {
+      const text = codexLimits?.session
+        ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%)`
+        : `${t("limits.window_5hour")}: ${t("limits.unavailable")}`;
+      items.push({ id: "status_5h", text, enabled: false });
+    }
+
+    if (trayMenuShow.limitWeekly) {
+      const text = codexLimits?.weekly
+        ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%)`
+        : `${t("limits.window_weekly")}: ${t("limits.unavailable")}`;
+      items.push({ id: "status_weekly", text, enabled: false });
+    }
+
+    if ((trayMenuShow.limit5h || trayMenuShow.limitWeekly) && (trayMenuShow.tokens || trayMenuShow.cost)) {
+      items.push({ id: "separator", text: "", enabled: false });
+    }
+
+    if (trayMenuShow.tokens) {
+      const text = `${t("settings.menu_bar_opt_tokens")}: ${formatNumber(todayTokens)}`;
+      items.push({ id: "status_tokens", text, enabled: false });
+    }
+
+    if (trayMenuShow.cost) {
+      const text = `${t("settings.menu_bar_opt_cost")}: ${formatCurrency(todayCost)}`;
+      items.push({ id: "status_cost", text, enabled: false });
+    }
+
+    void updateTray({ title, items }).catch((err) => {
+      console.warn("Failed to update tray", err);
+    });
+  }, [
+    bootstrapped,
+    codexLimits,
+    overview,
+    trayTitleShow,
+    trayMenuShow,
+    t,
+    i18n.language,
+  ]);
+
   async function handleViewChange(nextView: DashboardView) {
     setView(nextView);
 
@@ -513,7 +614,33 @@ export function useUsageDashboard() {
     handleDismissUpdate,
     handleManualUpdateCheck,
     handleUpgrade,
+    trayTitleShow,
+    handleTrayTitleShowChange,
+    trayMenuShow,
+    handleTrayMenuShowChange,
   };
+}
+
+function getTodayDateString(tz?: string) {
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    };
+    if (tz) {
+      options.timeZone = tz;
+    }
+    const formatter = new Intl.DateTimeFormat("en-US", options);
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch (_) {}
+  return new Date().toLocaleDateString("sv-SE");
 }
 
 function errorMessage(error: unknown, fallback: string) {
