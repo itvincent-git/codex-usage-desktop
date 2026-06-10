@@ -88,7 +88,7 @@ Windows 和 Linux 构建在计划中；当前 release workflow 只发布 macOS �
 
 ```bash
 pnpm install
-pnpm dev:app
+pnpm tauri dev
 ```
 
 常用检查命令：
@@ -102,6 +102,5 @@ cd src-tauri && cargo test
 打包命令：
 
 ```bash
-pnpm build
 pnpm tauri build
 ```

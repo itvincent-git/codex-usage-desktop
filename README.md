@@ -90,7 +90,7 @@ Install Node.js `>= 24`, `pnpm`, Rust, and Tauri v2 system dependencies, then ru
 
 ```bash
 pnpm install
-pnpm dev:app
+pnpm tauri dev
 ```
 
 Useful checks:
@@ -104,6 +104,5 @@ cd src-tauri && cargo test
 Packaged builds use:
 
 ```bash
-pnpm build
 pnpm tauri build
 ```
