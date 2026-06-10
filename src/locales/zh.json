@@ -29,6 +29,8 @@
   "header": {
     "app_title": "Codex Usage Desktop",
     "upgrade": "升级至 v{{version}}",
+    "downloading_update": "正在下载...",
+    "restart_update": "重启完成更新",
     "upgrade_title": "点击升级您的应用"
   },
   "update": {
@@ -38,6 +40,9 @@
     "hide_release_notes": "隐藏更新说明",
     "view_release_notes": "查看更新说明",
     "upgrade_now": "立即升级",
+    "downloading": "正在下载...",
+    "restart_now": "重启完成更新",
+    "view_release": "查看发布页",
     "dismiss_aria": "关闭更新提示"
   },
   "error": {
@@ -307,6 +312,10 @@
     "update_available": "新版本 v{{version}} 已发布！",
     "update_available_desc": "在 GitHub 上发现更新的发布版本。",
     "btn_upgrade": "立即升级",
+    "btn_download_update": "下载并安装",
+    "btn_downloading_update": "正在下载...",
+    "btn_restart_update": "重启完成更新",
+    "btn_view_release": "查看发布页",
     "up_to_date": "您已是最新版本！",
     "up_to_date_desc": "v{{version}} 是当前最新的可用版本。",
     "language_title": "语言设置",

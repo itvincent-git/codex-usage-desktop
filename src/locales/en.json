@@ -29,6 +29,8 @@
   "header": {
     "app_title": "Codex Usage Desktop",
     "upgrade": "Upgrade v{{version}}",
+    "downloading_update": "Downloading...",
+    "restart_update": "Restart to update",
     "upgrade_title": "Click to upgrade your application"
   },
   "update": {
@@ -38,6 +40,9 @@
     "hide_release_notes": "Hide release notes",
     "view_release_notes": "View release notes",
     "upgrade_now": "Upgrade Now",
+    "downloading": "Downloading...",
+    "restart_now": "Restart to Update",
+    "view_release": "View release",
     "dismiss_aria": "Dismiss update notification"
   },
   "error": {
@@ -307,6 +312,10 @@
     "update_available": "Version v{{version}} is available!",
     "update_available_desc": "A newer release was found on GitHub.",
     "btn_upgrade": "Upgrade",
+    "btn_download_update": "Download and install",
+    "btn_downloading_update": "Downloading...",
+    "btn_restart_update": "Restart to update",
+    "btn_view_release": "View release page",
     "up_to_date": "You are up to date!",
     "up_to_date_desc": "v{{version}} is the latest version available.",
     "language_title": "Language Settings",

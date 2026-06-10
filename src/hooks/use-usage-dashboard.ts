@@ -14,7 +14,9 @@ import {
   type OverviewResponse,
   type RangeKey,
   checkForUpdates,
+  downloadAndInstallUpdate,
   openUrl,
+  restartApp,
   type UpdateCheckResponse,
   fetchSessionDetails,
   type SessionDetailRow,
@@ -26,6 +28,8 @@ import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 
 const AUTO_RESCAN_MS = 5 * 60_000;
+
+export type UpdateInstallStatus = "idle" | "downloading" | "installed";
 
 export function useUsageDashboard() {
   const { t, i18n } = useTranslation();
@@ -50,6 +54,8 @@ export function useUsageDashboard() {
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
   const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
+  const [updateInstallStatus, setUpdateInstallStatus] = useState<UpdateInstallStatus>("idle");
+  const [updateInstallError, setUpdateInstallError] = useState<string | null>(null);
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
 
   const [showLogsTab, setShowLogsTabState] = useState(() => {
@@ -573,6 +579,8 @@ export function useUsageDashboard() {
 
       if (info.hasUpdate) {
         setIsUpdateDismissed(false); // Reset dismissal on manual trigger
+        setUpdateInstallStatus("idle");
+        setUpdateInstallError(null);
       }
     } catch (e) {
       setUpdateCheckError(errorMessage(e, "Failed to check for updates."));
@@ -582,6 +590,31 @@ export function useUsageDashboard() {
   };
 
   const handleUpgrade = async () => {
+    if (updateInstallStatus === "installed") {
+      try {
+        await restartApp();
+      } catch (e) {
+        setUpdateInstallError(errorMessage(e, "Failed to restart the app."));
+      }
+      return;
+    }
+
+    if (!updateInfo?.hasUpdate || updateInstallStatus === "downloading") {
+      return;
+    }
+
+    setUpdateInstallStatus("downloading");
+    setUpdateInstallError(null);
+    try {
+      await downloadAndInstallUpdate();
+      setUpdateInstallStatus("installed");
+    } catch (e) {
+      setUpdateInstallStatus("idle");
+      setUpdateInstallError(errorMessage(e, "Failed to download and install the update."));
+    }
+  };
+
+  const handleOpenUpdateRelease = async () => {
     if (updateInfo?.releaseUrl) {
       try {
         await openUrl(updateInfo.releaseUrl);
@@ -609,6 +642,8 @@ export function useUsageDashboard() {
     updateInfo,
     isUpdateChecking,
     updateCheckError,
+    updateInstallStatus,
+    updateInstallError,
     isUpdateDismissed,
     showLogsTab,
     setShowLogsTab,
@@ -622,6 +657,7 @@ export function useUsageDashboard() {
     handleDismissUpdate,
     handleManualUpdateCheck,
     handleUpgrade,
+    handleOpenUpdateRelease,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,

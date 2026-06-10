@@ -1,5 +1,6 @@
 import { Sparkles, RefreshCcw } from "lucide-react";
 import type { OverviewResponse, UpdateCheckResponse } from "@/lib/api";
+import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/usage-dashboard";
@@ -12,6 +13,7 @@ type DashboardHeaderProps = {
   onViewChange: (view: DashboardView) => void;
   updateInfo: UpdateCheckResponse | null;
   isUpdateDismissed: boolean;
+  updateInstallStatus: UpdateInstallStatus;
   onUpgrade: () => void;
   showLogsTab?: boolean;
   onRefresh: () => void;
@@ -27,6 +29,7 @@ export function DashboardHeader({
   onViewChange,
   updateInfo,
   isUpdateDismissed,
+  updateInstallStatus,
   onUpgrade,
   showLogsTab = false,
   onRefresh,
@@ -39,6 +42,12 @@ export function DashboardHeader({
   const { t } = useTranslation();
 
   const isSynced = overview ? !!overview.updatedAt : false;
+  const isInstallingUpdate = updateInstallStatus === "downloading";
+  const headerUpgradeLabel = updateInstallStatus === "installed"
+    ? t("header.restart_update")
+    : isInstallingUpdate
+      ? t("header.downloading_update")
+      : t("header.upgrade", { version: updateInfo?.latestVersion });
 
   const formatUpdatedTime = (timestamp: string) => {
     const updatedAt = dayjs(timestamp);
@@ -172,11 +181,12 @@ export function DashboardHeader({
             <button
               type="button"
               onClick={onUpgrade}
+              disabled={isInstallingUpdate}
               className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/30 transition-all duration-200 animate-pulse hover:animate-none active:scale-95 cursor-pointer mb-2"
               title={t("header.upgrade_title")}
             >
               <Sparkles className="h-3 w-3 animate-pulse" />
-              {t("header.upgrade", { version: updateInfo.latestVersion })}
+              {headerUpgradeLabel}
             </button>
           )}
         </div>

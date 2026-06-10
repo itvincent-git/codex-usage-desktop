@@ -1,7 +1,8 @@
-import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight } from "lucide-react";
+import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UpdateCheckResponse } from "@/lib/api";
+import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
 import {
@@ -19,8 +20,11 @@ type SettingsPageProps = {
   updateInfo: UpdateCheckResponse | null;
   isUpdateChecking: boolean;
   updateCheckError: string | null;
+  updateInstallStatus: UpdateInstallStatus;
+  updateInstallError: string | null;
   onCheckUpdates: () => void;
   onUpgrade: () => void;
+  onOpenUpdateRelease: () => void;
   showLogsTab: boolean;
   onShowLogsTabChange: (show: boolean) => void;
   trayTitleShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
@@ -43,8 +47,11 @@ export function SettingsPage({
   updateInfo,
   isUpdateChecking,
   updateCheckError,
+  updateInstallStatus,
+  updateInstallError,
   onCheckUpdates,
   onUpgrade,
+  onOpenUpdateRelease,
   showLogsTab,
   onShowLogsTabChange,
   trayTitleShow,
@@ -63,6 +70,14 @@ export function SettingsPage({
       // Ignore
     }
   };
+
+  const isInstallingUpdate = updateInstallStatus === "downloading";
+  const isUpdateInstalled = updateInstallStatus === "installed";
+  const upgradeLabel = isUpdateInstalled
+    ? t("settings.btn_restart_update")
+    : isInstallingUpdate
+      ? t("settings.btn_downloading_update")
+      : t("settings.btn_download_update");
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -231,6 +246,12 @@ export function SettingsPage({
               </div>
             ) : null}
 
+            {updateInstallError ? (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">
+                {updateInstallError}
+              </div>
+            ) : null}
+
             {updateInfo ? (
               <div className="border-t border-border pt-5 space-y-4">
                 {updateInfo.hasUpdate ? (
@@ -245,14 +266,26 @@ export function SettingsPage({
                           {t("settings.update_available_desc")} {updateInfo.releaseName ? `"${updateInfo.releaseName}"` : ""}
                         </p>
                       </div>
-                      <Button variant="primary" size="sm" onClick={onUpgrade} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                        {t("settings.btn_upgrade")} <ArrowUpRight className="h-3.5 w-3.5" />
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={onUpgrade}
+                        disabled={isDisabled || isInstallingUpdate}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                      >
+                        {isUpdateInstalled ? <RotateCw className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                        {upgradeLabel}
                       </Button>
                     </div>
                     {updateInfo.releaseNotes ? (
                       <div className="rounded-lg bg-black/10 border border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                         {updateInfo.releaseNotes}
                       </div>
+                    ) : null}
+                    {updateInstallError && updateInfo.releaseUrl ? (
+                      <Button variant="ghost" size="sm" onClick={onOpenUpdateRelease}>
+                        {t("settings.btn_view_release")} <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Button>
                     ) : null}
                   </div>
                 ) : (
@@ -272,4 +305,3 @@ export function SettingsPage({
     </div>
   );
 }
-

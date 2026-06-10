@@ -196,6 +196,12 @@ pub struct UpdateCheckResponse {
     pub not_modified: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInstallResponse {
+    pub version: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionDetailRow {
@@ -213,4 +219,3 @@ pub struct SessionDetailRow {
     pub models: Vec<String>,
     pub projects: Vec<String>,
 }
-

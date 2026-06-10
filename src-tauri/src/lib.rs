@@ -12,9 +12,10 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
+use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse, SessionDetailRow,
+    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow,
 };
 
 struct AppState {
@@ -411,6 +412,40 @@ async fn check_for_updates(
 }
 
 #[tauri::command]
+async fn download_and_install_update(
+    app: tauri::AppHandle,
+) -> Result<UpdateInstallResponse, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "No update available.".to_string())?;
+
+    let version = update.version.clone();
+    update
+        .download_and_install(
+            |chunk_length, content_length| {
+                log::debug!("Downloaded updater chunk: {chunk_length} bytes of {content_length:?}");
+            },
+            || {
+                log::info!("Update download finished.");
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    log::info!("Update {version} installed. Waiting for user restart.");
+    Ok(UpdateInstallResponse { version })
+}
+
+#[tauri::command]
+async fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
+    app.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
 async fn open_url(url: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -506,6 +541,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
@@ -569,6 +605,8 @@ pub fn run() {
             reset_usage_state,
             export_usage,
             check_for_updates,
+            download_and_install_update,
+            restart_app,
             open_url,
             fetch_session_details,
             update_tray

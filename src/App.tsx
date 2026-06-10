@@ -48,6 +48,8 @@ export default function App() {
     updateInfo,
     isUpdateChecking,
     updateCheckError,
+    updateInstallStatus,
+    updateInstallError,
     isUpdateDismissed,
     showLogsTab,
     setShowLogsTab,
@@ -61,6 +63,7 @@ export default function App() {
     handleDismissUpdate,
     handleManualUpdateCheck,
     handleUpgrade,
+    handleOpenUpdateRelease,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,
@@ -87,6 +90,13 @@ export default function App() {
   const loadingDescription = overview
     ? t("loading.selected_window_desc")
     : t("loading.cached_snapshot_desc");
+  const isInstallingUpdate = updateInstallStatus === "downloading";
+  const isUpdateInstalled = updateInstallStatus === "installed";
+  const updateButtonLabel = isUpdateInstalled
+    ? t("update.restart_now")
+    : isInstallingUpdate
+      ? t("update.downloading")
+      : t("update.upgrade_now");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -108,6 +118,7 @@ export default function App() {
           }}
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
+          updateInstallStatus={updateInstallStatus}
           onUpgrade={() => void handleUpgrade()}
           showLogsTab={showLogsTab}
           onRefresh={() => void handleRefresh()}
@@ -163,6 +174,20 @@ export default function App() {
                         ) : null}
                       </div>
                     ) : null}
+                    {updateInstallError ? (
+                      <div className="pt-2 text-xs text-red-200">
+                        {updateInstallError}
+                        {updateInfo.releaseUrl ? (
+                          <button
+                            type="button"
+                            className="ml-2 font-medium text-indigo-300 hover:text-indigo-200"
+                            onClick={() => void handleOpenUpdateRelease()}
+                          >
+                            {t("update.view_release")}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 
@@ -172,8 +197,9 @@ export default function App() {
                     size="sm"
                     className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
                     onClick={() => void handleUpgrade()}
+                    disabled={isInstallingUpdate}
                   >
-                    {t("update.upgrade_now")}
+                    {updateButtonLabel}
                   </Button>
                   <button
                     type="button"
@@ -302,8 +328,11 @@ export default function App() {
               updateInfo={updateInfo}
               isUpdateChecking={isUpdateChecking}
               updateCheckError={updateCheckError}
+              updateInstallStatus={updateInstallStatus}
+              updateInstallError={updateInstallError}
               onCheckUpdates={() => void handleManualUpdateCheck()}
               onUpgrade={() => void handleUpgrade()}
+              onOpenUpdateRelease={() => void handleOpenUpdateRelease()}
               showLogsTab={showLogsTab}
               onShowLogsTabChange={setShowLogsTab}
               trayTitleShow={trayTitleShow}

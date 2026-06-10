@@ -140,11 +140,23 @@ export type UpdateCheckResponse = {
   notModified?: boolean | null;
 };
 
+export type UpdateInstallResponse = {
+  version: string;
+};
+
 export async function checkForUpdates(etag?: string | null): Promise<UpdateCheckResponse> {
   if (etag) {
     return invoke<UpdateCheckResponse>("check_for_updates", { etag });
   }
   return invoke<UpdateCheckResponse>("check_for_updates");
+}
+
+export async function downloadAndInstallUpdate(): Promise<UpdateInstallResponse> {
+  return invoke<UpdateInstallResponse>("download_and_install_update");
+}
+
+export async function restartApp(): Promise<void> {
+  return invoke<void>("restart_app");
 }
 
 export async function openUrl(url: string): Promise<void> {
@@ -186,5 +198,4 @@ export type TrayMenuUpdate = {
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
   return invoke<void>("update_tray", { payload });
 }
-
 

@@ -962,7 +962,11 @@ describe("App", () => {
         };
       }
 
-      if (command === "open_url" && args?.url === "https://github.com/test/release") {
+      if (command === "download_and_install_update") {
+        return { version: "0.5.0" };
+      }
+
+      if (command === "restart_app") {
         return null;
       }
 
@@ -988,9 +992,13 @@ describe("App", () => {
     const headerUpgradeButton = screen.getByRole("button", { name: "Upgrade v0.5.0" });
     expect(headerUpgradeButton).toBeInTheDocument();
 
-    // Click the header upgrade button to open the release URL
+    // Click the header upgrade button to download and install the update
     await userEvent.click(headerUpgradeButton);
-    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://github.com/test/release" });
+    expect(invokeMock).toHaveBeenCalledWith("download_and_install_update");
+
+    const restartButton = await screen.findByRole("button", { name: "Restart to update" });
+    await userEvent.click(restartButton);
+    expect(invokeMock).toHaveBeenCalledWith("restart_app");
   });
 
   it("defaults to hiding the Logs tab, and shows it when toggled in Settings", async () => {
