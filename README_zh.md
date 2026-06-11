@@ -44,14 +44,6 @@ Codex 的使用量增长极快，但监控它不应以牺牲你的隐私或凭�
 
 ## 下载和安装
 
-### Homebrew
-
-```bash
-brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
-brew trust itvincent-git/codex-usage-desktop
-brew install --cask codex-usage-desktop
-```
-
 ### 一键安装脚本
 
 ```bash

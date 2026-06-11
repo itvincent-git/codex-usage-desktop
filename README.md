@@ -46,14 +46,6 @@ Unlike traditional analytics platforms that require cloud logins and API key upl
 
 ## Download And Install
 
-### Homebrew
-
-```bash
-brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
-brew trust itvincent-git/codex-usage-desktop
-brew install --cask codex-usage-desktop
-```
-
 ### Install Script
 
 ```bash
