@@ -9,18 +9,91 @@ mod types;
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow,
+    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow, UsageRefreshResponse,
 };
+
+const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 struct AppState {
     database_path: PathBuf,
     pricing_cache_path: PathBuf,
+}
+
+fn scan_usage_blocking(
+    database_path: &Path,
+    pricing_cache_path: &Path,
+) -> Result<ScanResponse, String> {
+    let mut db = db::open_database(database_path)?;
+    let pricing_started = Instant::now();
+    let pricing_source =
+        pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path.to_path_buf()));
+    let pricing_ms = pricing_started.elapsed().as_millis();
+    let mut response = scanner::scan_codex_usage(&mut db, &pricing_source, None, None)?;
+    response.metrics.pricing_ms = pricing_ms;
+    Ok(response)
+}
+
+fn refresh_usage_data_with<S, L>(
+    force_limits: bool,
+    scan_fn: S,
+    limits_fn: L,
+) -> Result<UsageRefreshResponse, String>
+where
+    S: FnOnce() -> Result<ScanResponse, String>,
+    L: FnOnce() -> Result<CodexLimitsResponse, String>,
+{
+    log::info!("Background rescan started. force_limits={force_limits}");
+    let scan = scan_fn()?;
+    let files_scanned = scan.metrics.files_scanned;
+    let files_parsed = scan.metrics.files_parsed;
+    let files_reused = scan.metrics.files_reused;
+    log::info!(
+        "Background rescan completed. filesScanned={files_scanned} filesParsed={files_parsed} filesReused={files_reused}"
+    );
+
+    let should_fetch_limits = force_limits || files_parsed > 0;
+    let (limits, limits_error, limits_skipped) = if should_fetch_limits {
+        log::info!("Starting fetch_codex_limits after rescan.");
+        match limits_fn() {
+            Ok(limits) => {
+                log::info!("Completed fetch_codex_limits after rescan.");
+                (Some(limits), None, false)
+            }
+            Err(error) => {
+                log::warn!("fetch_codex_limits failed after rescan: {error}");
+                (None, Some(error), false)
+            }
+        }
+    } else {
+        log::info!("Skipping fetch_codex_limits because no Codex session files changed.");
+        (None, None, true)
+    };
+
+    Ok(UsageRefreshResponse {
+        scan,
+        limits,
+        limits_error,
+        limits_skipped,
+        refreshed_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+    })
+}
+
+fn refresh_usage_data_blocking(
+    database_path: &Path,
+    pricing_cache_path: &Path,
+    force_limits: bool,
+) -> Result<UsageRefreshResponse, String> {
+    refresh_usage_data_with(
+        force_limits,
+        || scan_usage_blocking(database_path, pricing_cache_path),
+        codex_limits::fetch_codex_limits,
+    )
 }
 
 #[tauri::command]
@@ -29,14 +102,22 @@ async fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, S
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let mut db = db::open_database(&database_path)?;
-        let pricing_started = Instant::now();
-        let pricing_source =
-            pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path));
-        let pricing_ms = pricing_started.elapsed().as_millis();
-        let mut response = scanner::scan_codex_usage(&mut db, &pricing_source, None, None)?;
-        response.metrics.pricing_ms = pricing_ms;
-        Ok(response)
+        scan_usage_blocking(&database_path, &pricing_cache_path)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn refresh_usage_data(
+    state: tauri::State<'_, AppState>,
+    force_limits: bool,
+) -> Result<UsageRefreshResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -553,9 +634,11 @@ pub fn run() {
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
+            let database_path = app_data_dir.join("codex-usage-desktop.db");
+            let pricing_cache_path = app_data_dir.join("codex-pricing-cache.json");
             app.manage(AppState {
-                database_path: app_data_dir.join("codex-usage-desktop.db"),
-                pricing_cache_path: app_data_dir.join("codex-pricing-cache.json"),
+                database_path: database_path.clone(),
+                pricing_cache_path: pricing_cache_path.clone(),
             });
 
             // Set up system tray icon
@@ -595,10 +678,21 @@ pub fn run() {
                 .build(app)
                 .map_err(|e| e.to_string())?;
 
+            tauri::async_runtime::spawn_blocking(move || loop {
+                std::thread::sleep(BACKGROUND_RESCAN_INTERVAL);
+
+                if let Err(error) =
+                    refresh_usage_data_blocking(&database_path, &pricing_cache_path, false)
+                {
+                    log::warn!("Background usage refresh failed: {error}");
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             scan_usage,
+            refresh_usage_data,
             fetch_overview,
             fetch_monthly_usage,
             fetch_codex_limits,
@@ -619,6 +713,34 @@ pub fn run() {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use std::cell::Cell;
+
+    fn scan_response(files_parsed: usize) -> ScanResponse {
+        ScanResponse {
+            imported_days: 1,
+            scanned_at: "2026-06-11T00:00:00.000Z".to_string(),
+            timezone: "UTC".to_string(),
+            metrics: types::ScanMetrics {
+                files_scanned: 2,
+                files_parsed,
+                files_reused: 2usize.saturating_sub(files_parsed),
+                ..types::ScanMetrics::default()
+            },
+        }
+    }
+
+    fn limits_response() -> CodexLimitsResponse {
+        CodexLimitsResponse {
+            session: None,
+            weekly: None,
+            updated_at: "2026-06-11T00:00:00.000Z".to_string(),
+            source: "test".to_string(),
+            account: None,
+            membership_level: None,
+            subscription_expires_at: None,
+            subscription_will_renew: None,
+        }
+    }
 
     #[test]
     fn delete_pricing_cache_removes_existing_file() {
@@ -660,5 +782,80 @@ mod tests {
         assert!(!is_newer("0.4.0", "0.4.0"));
         assert!(!is_newer("0.4.0", "0.3.9"));
         assert!(!is_newer("0.4.0", "invalid"));
+    }
+
+    #[test]
+    fn refresh_skips_limits_when_scan_has_no_changed_files() {
+        let limits_called = Cell::new(false);
+
+        let response = refresh_usage_data_with(
+            false,
+            || Ok(scan_response(0)),
+            || {
+                limits_called.set(true);
+                Ok(limits_response())
+            },
+        )
+        .unwrap();
+
+        assert!(!limits_called.get());
+        assert!(response.limits.is_none());
+        assert!(response.limits_error.is_none());
+        assert!(response.limits_skipped);
+    }
+
+    #[test]
+    fn refresh_fetches_limits_when_scan_has_changed_files() {
+        let limits_called = Cell::new(false);
+
+        let response = refresh_usage_data_with(
+            false,
+            || Ok(scan_response(1)),
+            || {
+                limits_called.set(true);
+                Ok(limits_response())
+            },
+        )
+        .unwrap();
+
+        assert!(limits_called.get());
+        assert!(response.limits.is_some());
+        assert!(response.limits_error.is_none());
+        assert!(!response.limits_skipped);
+    }
+
+    #[test]
+    fn refresh_force_mode_always_fetches_limits() {
+        let limits_called = Cell::new(false);
+
+        let response = refresh_usage_data_with(
+            true,
+            || Ok(scan_response(0)),
+            || {
+                limits_called.set(true);
+                Ok(limits_response())
+            },
+        )
+        .unwrap();
+
+        assert!(limits_called.get());
+        assert!(response.limits.is_some());
+        assert!(response.limits_error.is_none());
+        assert!(!response.limits_skipped);
+    }
+
+    #[test]
+    fn refresh_returns_scan_when_limits_fetch_fails() {
+        let response = refresh_usage_data_with(
+            true,
+            || Ok(scan_response(0)),
+            || Err("limits unavailable".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(response.scan.metrics.files_parsed, 0);
+        assert!(response.limits.is_none());
+        assert_eq!(response.limits_error.as_deref(), Some("limits unavailable"));
+        assert!(!response.limits_skipped);
     }
 }

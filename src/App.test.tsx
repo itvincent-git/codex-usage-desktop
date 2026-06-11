@@ -15,6 +15,40 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "update_tray") {
       return Promise.resolve();
     }
+    if (command === "refresh_usage_data") {
+      return invokeMock("scan_usage").then(async (scan: any) => {
+        const filesParsed = scan.metrics?.filesParsed ?? 0;
+        const forceLimits = args[0]?.forceLimits === true;
+        if (!forceLimits && filesParsed === 0) {
+          return {
+            scan,
+            limits: null,
+            limitsError: null,
+            limitsSkipped: true,
+            refreshedAt: scan.scannedAt,
+          };
+        }
+
+        try {
+          const limits = await invokeMock("fetch_codex_limits");
+          return {
+            scan,
+            limits,
+            limitsError: null,
+            limitsSkipped: false,
+            refreshedAt: scan.scannedAt,
+          };
+        } catch (error) {
+          return {
+            scan,
+            limits: null,
+            limitsError: error instanceof Error ? error.message : String(error),
+            limitsSkipped: false,
+            refreshedAt: scan.scannedAt,
+          };
+        }
+      });
+    }
     return invokeMock(command, ...args);
   },
 }));
@@ -33,6 +67,71 @@ vi.mock("@tauri-apps/plugin-log", () => ({
     Error: 4,
   },
 }));
+
+function overview(totalTokens = 1600) {
+  return {
+    range: "30d",
+    days: 30,
+    timezone: "UTC",
+    startDate: "2026-05-13",
+    endDate: "2026-06-11",
+    updatedAt: "2026-06-11T00:00:00.000Z",
+    daily: [],
+    totals: {
+      inputTokens: totalTokens,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      totalTokens,
+      costUSD: 0,
+      avgTokensPerDay: totalTokens / 30,
+      avgCostPerDay: 0,
+      cacheHitRate: 0,
+      costPerMillionTokens: 0,
+    },
+    models: [],
+    projects: [],
+  };
+}
+
+function scan(filesParsed: number) {
+  return {
+    importedDays: 1,
+    scannedAt: "2026-06-11T00:00:00.000Z",
+    timezone: "UTC",
+    metrics: {
+      totalMs: 1,
+      pricingMs: 0,
+      parseMs: 1,
+      dbMs: 0,
+      filesScanned: 1,
+      filesParsed,
+      filesReused: filesParsed > 0 ? 0 : 1,
+      bytesRead: filesParsed > 0 ? 100 : 0,
+    },
+  };
+}
+
+function limits(remainingPercent = 80) {
+  return {
+    session: {
+      usedPercent: 100 - remainingPercent,
+      remainingPercent,
+      windowMinutes: 300,
+      resetsAt: "2026-06-11T05:00:00.000Z",
+    },
+    weekly: null,
+    updatedAt: "2026-06-11T00:00:00.000Z",
+    source: "cli-rpc",
+  };
+}
+
+function setPageActive(active: boolean) {
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    get: () => (active ? "visible" : "hidden"),
+  });
+  vi.spyOn(document, "hasFocus").mockReturnValue(active);
+}
 
 describe("App", () => {
   beforeEach(() => {
@@ -71,6 +170,105 @@ describe("App", () => {
     expect(screen.getByText("Estimating cost")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset cache" })).not.toBeInTheDocument();
+  });
+
+  it("rescans after returning from the background but skips limits when files are unchanged", async () => {
+    let now = 10_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    setPageActive(true);
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return limits(80);
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+
+    setPageActive(false);
+    window.dispatchEvent(new Event("blur"));
+    now += 5 * 60_000 + 1;
+    setPageActive(true);
+    window.dispatchEvent(new Event("focus"));
+
+    await waitFor(() => {
+      expect(invokeMock.mock.calls.filter(([command]) => command === "scan_usage")).toHaveLength(2);
+    });
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(1);
+  });
+
+  it("updates overview and limits after a background resume scan finds changed files", async () => {
+    let now = 10_000;
+    let scanCount = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    setPageActive(true);
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return limits(scanCount >= 2 ? 65 : 80);
+      }
+      if (command === "scan_usage") {
+        scanCount += 1;
+        return scan(scanCount >= 2 ? 1 : 0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview(scanCount >= 2 ? 2400 : 1600);
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+
+    setPageActive(false);
+    window.dispatchEvent(new Event("blur"));
+    now += 5 * 60_000 + 1;
+    setPageActive(true);
+    window.dispatchEvent(new Event("focus"));
+
+    await waitFor(() => expect(screen.getAllByText("2,400").length).toBeGreaterThan(0));
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
+  });
+
+  it("forces limits refresh on manual rescan even when files are unchanged", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return limits(80);
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rescan local logs" })).toBeEnabled());
+
+    await userEvent.click(screen.getByRole("button", { name: "Rescan local logs" }));
+
+    await waitFor(() => {
+      expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
+    });
   });
 
   it("loads the last 30 day overview and switches to last 1 day", async () => {
@@ -733,8 +931,8 @@ describe("App", () => {
     const resetCallIndex = calls.findIndex(([command]) => command === "reset_usage_state");
     expect(resetCallIndex).toBeGreaterThan(-1);
     expect(calls[resetCallIndex + 1]).toEqual(["scan_usage", undefined]);
-    expect(calls[resetCallIndex + 2]).toEqual(["fetch_overview", { range: "30d" }]);
-    expect(calls[resetCallIndex + 3]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 2]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 3]).toEqual(["fetch_overview", { range: "30d" }]);
   });
 
   it("does not reset when confirmation is canceled", async () => {

@@ -104,8 +104,20 @@ export type CodexLimitsResponse = {
   subscriptionWillRenew?: boolean | null;
 };
 
+export type UsageRefreshResponse = {
+  scan: ScanResponse;
+  limits: CodexLimitsResponse | null;
+  limitsError: string | null;
+  limitsSkipped: boolean;
+  refreshedAt: string;
+};
+
 export async function scanUsage(): Promise<ScanResponse> {
   return invoke<ScanResponse>("scan_usage");
+}
+
+export async function refreshUsageData(forceLimits: boolean): Promise<UsageRefreshResponse> {
+  return invoke<UsageRefreshResponse>("refresh_usage_data", { forceLimits });
 }
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
@@ -198,4 +210,3 @@ export type TrayMenuUpdate = {
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
   return invoke<void>("update_tray", { payload });
 }
-

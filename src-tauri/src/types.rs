@@ -129,7 +129,7 @@ pub struct MonthlyUsageResponse {
     pub monthly: Vec<MonthlyUsageRow>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanResponse {
     pub imported_days: usize,
@@ -138,7 +138,7 @@ pub struct ScanResponse {
     pub metrics: ScanMetrics,
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanMetrics {
     pub total_ms: u128,
@@ -180,6 +180,16 @@ pub struct CodexLimitsResponse {
     pub membership_level: Option<String>,
     pub subscription_expires_at: Option<String>,
     pub subscription_will_renew: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageRefreshResponse {
+    pub scan: ScanResponse,
+    pub limits: Option<CodexLimitsResponse>,
+    pub limits_error: Option<String>,
+    pub limits_skipped: bool,
+    pub refreshed_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

@@ -8,7 +8,6 @@ import {
   fetchOverview,
   resetUsageState,
   type CodexLimitsResponse,
-  scanUsage,
   type ExportFormat,
   type MonthlyUsageResponse,
   type OverviewResponse,
@@ -22,6 +21,7 @@ import {
   type SessionDetailRow,
   updateTray,
   type TrayMenuItemDto,
+  refreshUsageData,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { DashboardView } from "@/components/dashboard-header";
@@ -99,7 +99,6 @@ export function useUsageDashboard() {
   };
 
   const hasBootstrappedRef = useRef(false);
-  const hiddenSinceRef = useRef<number | null>(null);
   const lastLimitsFetchTimeRef = useRef<number>(0);
   const lastAutoScanTimeRef = useRef<number>(0);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
@@ -147,7 +146,8 @@ export function useUsageDashboard() {
     }
 
     const scanPromise = (async () => {
-      const scan = await scanUsage();
+      const refresh = await refreshUsageData(options?.force === true);
+      const scan = refresh.scan;
       const filesReused = scan.metrics?.filesReused ?? 0;
       const filesParsed = scan.metrics?.filesParsed ?? 0;
       setScanMessage(t("hero.synced_message", {
@@ -157,9 +157,18 @@ export function useUsageDashboard() {
         defaultValue: `Synced ${scan.importedDays} days (${filesReused} cached, ${filesParsed} parsed)`
       }));
 
+      if (refresh.limits) {
+        setCodexLimits(refresh.limits);
+        setCodexLimitsError(null);
+        lastLimitsFetchTimeRef.current = Date.now();
+      } else if (refresh.limitsError) {
+        setCodexLimitsError(refresh.limitsError);
+        lastLimitsFetchTimeRef.current = Date.now();
+      }
+
       const isForeground = document.visibilityState === "visible" || options?.force === true;
       if (isForeground || filesParsed > 0) {
-        await Promise.all([loadOverview(range), loadCodexLimits(options)]);
+        await loadOverview(range);
 
         if (view === "monthly") {
           await loadMonthlyUsage();
@@ -327,22 +336,23 @@ export function useUsageDashboard() {
     void bootstrap();
   }, [bootstrap]);
 
-  // Re-fetch limits and usage when the page/window regains focus after being inactive ≥5 min.
+  // Re-fetch usage when the page/window regains focus after being inactive ≥5 min.
   useEffect(() => {
     if (!bootstrapped) return;
 
+    let hiddenSince: number | null = null;
+
     function handleInactive() {
-      if (hiddenSinceRef.current === null) {
-        hiddenSinceRef.current = Date.now();
+      if (hiddenSince === null) {
+        hiddenSince = Date.now();
       }
     }
 
     function handleActive() {
       if (document.visibilityState === "visible" && document.hasFocus()) {
-        const inactiveDuration = hiddenSinceRef.current;
-        hiddenSinceRef.current = null;
+        const inactiveDuration = hiddenSince;
+        hiddenSince = null;
         if (inactiveDuration !== null && Date.now() - inactiveDuration >= AUTO_RESCAN_MS) {
-          void loadCodexLimits();
           void runAutoRescan();
         }
       }
@@ -360,21 +370,16 @@ export function useUsageDashboard() {
     window.addEventListener("blur", handleInactive);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    const intervalId = window.setInterval(() => {
-      void runAutoRescan();
-    }, AUTO_RESCAN_MS);
-
     if (document.visibilityState === "hidden" || !document.hasFocus()) {
-      hiddenSinceRef.current = Date.now();
+      hiddenSince = Date.now();
     }
 
     return () => {
       window.removeEventListener("focus", handleActive);
       window.removeEventListener("blur", handleInactive);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.clearInterval(intervalId);
     };
-  }, [bootstrapped, loadCodexLimits, runAutoRescan]);
+  }, [bootstrapped, runAutoRescan]);
 
   // Update tray icon whenever limits, overview, translation, or tray settings change
   useEffect(() => {
