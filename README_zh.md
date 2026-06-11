@@ -44,7 +44,25 @@ Codex 的使用量增长极快，但监控它不应以牺牲你的隐私或凭�
 
 ## 下载和安装
 
-从 [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) 下载最新 macOS 版本。
+### Homebrew
+
+```bash
+brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
+brew trust itvincent-git/codex-usage-desktop
+brew install --cask codex-usage-desktop
+```
+
+### 一键安装脚本
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/scripts/install.sh | sh
+```
+
+脚本会按当前 Mac 架构下载最新 DMG，并将 `Codex Usage Desktop.app` 安装到 `/Applications`。脚本不会绕过 macOS Gatekeeper。如果首次启动被系统拦截，请在“系统设置 > 隐私与安全性”中允许打开。
+
+### 手动下载
+
+也可以从 [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) 下载最新 macOS 版本。
 
 当前 release 构建：
 

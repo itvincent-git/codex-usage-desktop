@@ -28,9 +28,11 @@ jobs:
           - label: macOS Intel
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
+            stableAsset: codex-usage-desktop-macos-x64.dmg
           - label: macOS Apple Silicon
             target: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
+            stableAsset: codex-usage-desktop-macos-arm64.dmg
 
     steps:
       - name: Checkout
@@ -141,3 +143,38 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Prepare stable DMG asset
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          search_dirs=()
+          for dir in \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" \
+            "src-tauri/target/release/bundle/dmg"
+          do
+            if [[ -d "${dir}" ]]; then
+              search_dirs+=("${dir}")
+            fi
+          done
+
+          if [[ "${#search_dirs[@]}" -eq 0 ]]; then
+            echo "No Tauri DMG bundle directories were found."
+            exit 1
+          fi
+
+          dmg="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
+          if [[ -z "${dmg}" ]]; then
+            echo "No DMG bundle was found."
+            exit 1
+          fi
+
+          mkdir -p release-assets
+          cp "${dmg}" "release-assets/${{ matrix.stableAsset }}"
+
+      - name: Upload stable DMG asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: release-assets/${{ matrix.stableAsset }}

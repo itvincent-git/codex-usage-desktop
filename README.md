@@ -46,7 +46,25 @@ Unlike traditional analytics platforms that require cloud logins and API key upl
 
 ## Download And Install
 
-Download the latest macOS build from [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
+### Homebrew
+
+```bash
+brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
+brew trust itvincent-git/codex-usage-desktop
+brew install --cask codex-usage-desktop
+```
+
+### Install Script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/scripts/install.sh | sh
+```
+
+The script downloads the latest macOS DMG for your architecture and installs `Codex Usage Desktop.app` to `/Applications`. It does not bypass macOS Gatekeeper. If macOS blocks the first launch, open System Settings > Privacy & Security and allow the app.
+
+### Manual Download
+
+You can also download the latest macOS build from [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
 
 Current release builds:
 
