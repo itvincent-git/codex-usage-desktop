@@ -1286,4 +1286,71 @@ describe("App", () => {
     expect(localStorage.getItem("show_logs_tab")).toBe("false");
     expect(screen.getByRole("tab", { name: "Settings" })).toHaveAttribute("aria-selected", "true");
   });
+
+  it("does not show update banner when cached latest version matches or is older than the current running version", async () => {
+    localStorage.clear();
+    // Cache says update is available to 1.6.2, but the app is already at 1.6.2 (our current tauriConfig.version)
+    localStorage.setItem("last_update_check_result", JSON.stringify({
+      hasUpdate: true,
+      currentVersion: "0.4.0",
+      latestVersion: "1.6.2",
+      latestTag: "v1.6.2",
+      releaseName: "Big Release",
+      releaseNotes: "Details",
+      releaseUrl: "https://url"
+    }));
+    localStorage.setItem("last_update_check_time", Date.now().toString());
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+      if (command === "fetch_codex_limits") {
+        return {
+          session: { usedPercent: 20, remainingPercent: 80, windowMinutes: 300, resetsAt: "2026-04-26T05:00:00.000Z" },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-04-30T00:00:00.000Z" },
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          source: "cli-rpc",
+        };
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return {
+          range: "30d",
+          days: 30,
+          timezone: "UTC",
+          startDate: "2026-03-28",
+          endDate: "2026-04-26",
+          updatedAt: "2026-04-26T00:00:00.000Z",
+          daily: [],
+          totals: {
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            costUSD: 0,
+            avgTokensPerDay: 0,
+            avgCostPerDay: 0,
+            cacheHitRate: 0,
+            costPerMillionTokens: 0,
+          },
+          models: [],
+          projects: [],
+        };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    // Wait for the overview to load
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument());
+
+    // The update banner should NOT be in the document
+    expect(screen.queryByText(/New update available/i)).not.toBeInTheDocument();
+    
+    // Check that the cached result in localStorage was corrected to hasUpdate = false
+    const parsedCache = JSON.parse(localStorage.getItem("last_update_check_result") || "{}");
+    expect(parsedCache.hasUpdate).toBe(false);
+    expect(parsedCache.currentVersion).toBe("1.6.2");
+  });
 });

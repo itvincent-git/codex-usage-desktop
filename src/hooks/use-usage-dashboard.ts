@@ -26,6 +26,20 @@ import {
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
+import tauriConfig from "../../src-tauri/tauri.conf.json";
+
+function isNewerVersion(current: string, target: string): boolean {
+  const parse = (v: string) => {
+    const cleaned = v.replace(/^(app-v|v)/, "");
+    const parts = cleaned.split(".").map(p => parseInt(p, 10));
+    return parts.length >= 3 ? parts.slice(0, 3) : [0, 0, 0];
+  };
+  const [cMaj, cMin, cPat] = parse(current);
+  const [tMaj, tMin, tPat] = parse(target);
+  if (tMaj !== cMaj) return tMaj > cMaj;
+  if (tMin !== cMin) return tMin > cMin;
+  return tPat > cPat;
+}
 
 const AUTO_RESCAN_MS = 5 * 60_000;
 
@@ -218,6 +232,19 @@ export function useUsageDashboard() {
       if (lastCheckResultStr) {
         try {
           cachedInfo = JSON.parse(lastCheckResultStr) as UpdateCheckResponse;
+          if (cachedInfo) {
+            const currentRunningVersion = tauriConfig.version;
+            if (!isNewerVersion(currentRunningVersion, cachedInfo.latestVersion)) {
+              // The running version is equal to or newer than the cached latest version,
+              // meaning we've successfully updated. Mark as no update available.
+              cachedInfo = {
+                ...cachedInfo,
+                hasUpdate: false,
+                currentVersion: currentRunningVersion,
+              };
+              localStorage.setItem("last_update_check_result", JSON.stringify(cachedInfo));
+            }
+          }
         } catch (jsonErr) {
           console.warn("Failed to parse cached update check result", jsonErr);
         }
@@ -597,6 +624,8 @@ export function useUsageDashboard() {
   const handleUpgrade = async () => {
     if (updateInstallStatus === "installed") {
       try {
+        localStorage.removeItem("last_update_check_result");
+        localStorage.removeItem("last_update_check_time");
         await restartApp();
       } catch (e) {
         setUpdateInstallError(errorMessage(e, "Failed to restart the app."));
