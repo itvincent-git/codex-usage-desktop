@@ -66,6 +66,10 @@ export function SettingsPage({
   const hasSub = hasSubscription(codexLimits);
   const currentLanguage = i18n.language || "en";
 
+  const optionKeys: Array<"limit5h" | "limitWeekly" | "tokens" | "cost"> = hasSub
+    ? ["limit5h", "limitWeekly", "tokens", "cost"]
+    : ["limitWeekly", "tokens", "cost"];
+
   const handleLanguageChange = (lang: string) => {
     void i18n.changeLanguage(lang);
     try {
@@ -149,7 +153,7 @@ export function SettingsPage({
           <div className="border-t border-border pt-5 space-y-4">
             <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_title")}</h4>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {((hasSub ? ["limit5h", "limitWeekly", "tokens", "cost"] : ["limitWeekly", "tokens", "cost"]) as const).map((key) => (
+              {optionKeys.map((key) => (
                 <label key={`title-${key}`} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -171,7 +175,7 @@ export function SettingsPage({
           <div className="border-t border-border pt-5 space-y-4">
             <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_menu")}</h4>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {((hasSub ? ["limit5h", "limitWeekly", "tokens", "cost"] : ["limitWeekly", "tokens", "cost"]) as const).map((key) => (
+              {optionKeys.map((key) => (
                 <label key={`menu-${key}`} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
