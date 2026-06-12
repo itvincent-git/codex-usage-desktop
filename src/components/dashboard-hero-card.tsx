@@ -141,7 +141,9 @@ export function DashboardHeroCard({
                           ? "bg-purple-500/10 border-purple-500/25 text-purple-400"
                           : "bg-muted/50 border-border/40 text-muted-foreground"
                       )}>
-                        <Sparkles className="h-2.5 w-2.5" />
+                        {["plus", "pro", "team", "enterprise"].includes(codexLimits.membershipLevel.toLowerCase()) && (
+                          <Sparkles className="h-2.5 w-2.5" />
+                        )}
                         {codexLimits.membershipLevel}
                       </span>
                     </div>

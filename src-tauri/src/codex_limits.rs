@@ -88,6 +88,7 @@ struct AccountSnapshot {
 struct SubscriptionInfo {
     expires_at: Option<String>,
     will_renew: Option<bool>,
+    has_active_subscription: Option<bool>,
 }
 
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
@@ -192,9 +193,26 @@ fn fetch_account_snapshot() -> AccountSnapshot {
     let Ok(auth) = load_codex_auth() else {
         return AccountSnapshot::default();
     };
-    let (account, membership_level) = decode_jwt_info(&auth.access_token);
+    let (account, mut membership_level) = decode_jwt_info(&auth.access_token);
     let subscription = match fetch_subscription_info(&auth) {
-        Ok(subscription) => subscription,
+        Ok(subscription) => {
+            let is_expired = if let Some(ref expires_at_str) = subscription.expires_at {
+                if let Ok(expires_at) = chrono::DateTime::parse_from_rfc3339(expires_at_str) {
+                    Utc::now() > expires_at.with_timezone(&Utc)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            let has_active = subscription.has_active_subscription.unwrap_or(true);
+            if !has_active || is_expired {
+                membership_level = Some("free".to_string());
+            }
+
+            subscription
+        }
         Err(error) => {
             log::warn!("ChatGPT account check unavailable: {error}");
             SubscriptionInfo::default()
@@ -278,10 +296,15 @@ fn parse_subscription_info(value: &Value) -> SubscriptionInfo {
         .get("last_active_subscription")
         .and_then(|subscription| subscription.get("will_renew"))
         .and_then(Value::as_bool);
+    let has_active_subscription = account
+        .get("entitlement")
+        .and_then(|entitlement| entitlement.get("has_active_subscription"))
+        .and_then(Value::as_bool);
 
     SubscriptionInfo {
         expires_at,
         will_renew,
+        has_active_subscription,
     }
 }
 
@@ -1081,7 +1104,8 @@ mod tests {
                 "default": {
                     "entitlement": {
                         "renews_at": "2026-06-11T07:22:29+00:00",
-                        "expires_at": "2026-06-12T08:22:29+00:00"
+                        "expires_at": "2026-06-12T08:22:29+00:00",
+                        "has_active_subscription": true
                     },
                     "last_active_subscription": {
                         "will_renew": false
@@ -1095,6 +1119,7 @@ mod tests {
             SubscriptionInfo {
                 expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
                 will_renew: Some(false),
+                has_active_subscription: Some(true),
             }
         );
     }
@@ -1127,6 +1152,7 @@ mod tests {
                 subscription: SubscriptionInfo {
                     expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
                     will_renew: Some(false),
+                    has_active_subscription: Some(true),
                 },
             },
         );
