@@ -111,4 +111,31 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
     expect(screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.")).toBeInTheDocument();
   });
+
+  it("renders a single monthly limit row when the user is not subscribed to any membership", () => {
+    const freeLimits = {
+      session: {
+        usedPercent: 10,
+        remainingPercent: 90,
+        windowMinutes: 300,
+        resetsAt: "2026-05-22T16:30:00.000Z",
+      },
+      weekly: {
+        usedPercent: 45,
+        remainingPercent: 55,
+        windowMinutes: 10080,
+        resetsAt: "2026-05-24T05:00:00.000Z",
+      },
+      updatedAt: "2026-05-22T12:00:00.000Z",
+      source: "cli-rpc",
+      account: "free@example.com",
+      membershipLevel: "free",
+    };
+
+    render(<CodexLimitsCard limits={freeLimits} error={null} />);
+
+    expect(screen.getByText("Monthly usage limit")).toBeInTheDocument();
+    expect(screen.queryByText("5-Hour Limit")).not.toBeInTheDocument();
+    expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
+  });
 });

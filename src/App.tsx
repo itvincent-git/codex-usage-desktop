@@ -339,6 +339,7 @@ export default function App() {
               onTrayTitleShowChange={handleTrayTitleShowChange}
               trayMenuShow={trayMenuShow}
               onTrayMenuShowChange={handleTrayMenuShowChange}
+              codexLimits={codexLimits}
             />
           ) : null}
 

@@ -27,6 +27,7 @@ import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber 
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
+import { hasSubscription } from "@/components/codex-limits-card";
 
 function isNewerVersion(current: string, target: string): boolean {
   const parse = (v: string) => {
@@ -418,15 +419,26 @@ export function useUsageDashboard() {
     const todayTokens = todayRow ? todayRow.totalTokens : 0;
     const todayCost = todayRow ? todayRow.costUSD : 0;
 
+    const hasSub = hasSubscription(codexLimits);
+
     const titleParts: string[] = [];
-    if (trayTitleShow.limit5h) {
-      const val = codexLimits?.session ? `${Math.round(codexLimits.session.remainingPercent)}%` : "-";
-      titleParts.push(`5h: ${val}`);
+    if (hasSub) {
+      if (trayTitleShow.limit5h) {
+        const val = codexLimits?.session ? `${Math.round(codexLimits.session.remainingPercent)}%` : "-";
+        titleParts.push(`5h: ${val}`);
+      }
+      if (trayTitleShow.limitWeekly) {
+        const val = codexLimits?.weekly ? `${Math.round(codexLimits.weekly.remainingPercent)}%` : "-";
+        titleParts.push(`W: ${val}`);
+      }
+    } else {
+      if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
+        const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
+        const val = activeWindow ? `${Math.round(activeWindow.remainingPercent)}%` : "-";
+        titleParts.push(`M: ${val}`);
+      }
     }
-    if (trayTitleShow.limitWeekly) {
-      const val = codexLimits?.weekly ? `${Math.round(codexLimits.weekly.remainingPercent)}%` : "-";
-      titleParts.push(`W: ${val}`);
-    }
+
     if (trayTitleShow.tokens) {
       titleParts.push(`T: ${formatCompactNumber(todayTokens)}`);
     }
@@ -437,18 +449,28 @@ export function useUsageDashboard() {
 
     const items: TrayMenuItemDto[] = [];
 
-    if (trayMenuShow.limit5h) {
-      const text = codexLimits?.session
-        ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%)`
-        : `${t("limits.window_5hour")}: ${t("limits.unavailable")}`;
-      items.push({ id: "status_5h", text, enabled: false });
-    }
+    if (hasSub) {
+      if (trayMenuShow.limit5h) {
+        const text = codexLimits?.session
+          ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%)`
+          : `${t("limits.window_5hour")}: ${t("limits.unavailable")}`;
+        items.push({ id: "status_5h", text, enabled: false });
+      }
 
-    if (trayMenuShow.limitWeekly) {
-      const text = codexLimits?.weekly
-        ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%)`
-        : `${t("limits.window_weekly")}: ${t("limits.unavailable")}`;
-      items.push({ id: "status_weekly", text, enabled: false });
+      if (trayMenuShow.limitWeekly) {
+        const text = codexLimits?.weekly
+          ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%)`
+          : `${t("limits.window_weekly")}: ${t("limits.unavailable")}`;
+        items.push({ id: "status_weekly", text, enabled: false });
+      }
+    } else {
+      if (trayMenuShow.limit5h || trayMenuShow.limitWeekly) {
+        const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
+        const text = activeWindow
+          ? `${t("limits.window_monthly")}: ${Math.round(activeWindow.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(activeWindow.usedPercent)}%)`
+          : `${t("limits.window_monthly")}: ${t("limits.unavailable")}`;
+        items.push({ id: "status_monthly", text, enabled: false });
+      }
     }
 
     if ((trayMenuShow.limit5h || trayMenuShow.limitWeekly) && (trayMenuShow.tokens || trayMenuShow.cost)) {

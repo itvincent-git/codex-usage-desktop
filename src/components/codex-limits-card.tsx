@@ -28,6 +28,12 @@ function isOAuthLoginError(err: string | null): boolean {
   );
 }
 
+export function hasSubscription(limits: CodexLimitsResponse | null | undefined): boolean {
+  if (!limits || !limits.membershipLevel) return false;
+  const level = limits.membershipLevel.toLowerCase();
+  return ["plus", "pro", "team", "enterprise"].includes(level);
+}
+
 export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
   const { t } = useTranslation();
 
@@ -75,9 +81,18 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
             </div>
           )
         ) : (
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2 flex-1 justify-center">
-            <LimitRow label="5 hour" window={limits?.session ?? null} />
-            <LimitRow label="Weekly" window={limits?.weekly ?? null} />
+          <div className={cn(
+            "grid gap-3 flex-1 justify-center",
+            hasSubscription(limits) ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+          )}>
+            {hasSubscription(limits) ? (
+              <>
+                <LimitRow label="5 hour" window={limits?.session ?? null} />
+                <LimitRow label="Weekly" window={limits?.weekly ?? null} />
+              </>
+            ) : (
+              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
+            )}
           </div>
         )}
       </CardContent>
@@ -93,7 +108,11 @@ function LimitRow({ label, window }: LimitRowProps) {
       <div className="rounded-xl border border-border bg-muted/20 p-2.5 sm:p-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-semibold text-foreground">
-            {label.toLowerCase().includes("weekly") ? t("limits.window_weekly") : t("limits.window_5hour")}
+            {label.toLowerCase().includes("monthly")
+              ? t("limits.window_monthly")
+              : label.toLowerCase().includes("weekly")
+              ? t("limits.window_weekly")
+              : t("limits.window_5hour")}
           </p>
           <p className="text-[10px] text-muted-foreground">{t("limits.unavailable")}</p>
         </div>
@@ -110,7 +129,11 @@ function LimitRow({ label, window }: LimitRowProps) {
   const status = getLimitStatus(remainingPercent, t);
   const resetLabel = formatResetTime(window.resetsAt, window.windowMinutes, t);
 
-  const friendlyLabel = label.toLowerCase().includes("weekly") ? t("limits.window_weekly") : t("limits.window_5hour");
+  const friendlyLabel = label.toLowerCase().includes("monthly")
+    ? t("limits.window_monthly")
+    : label.toLowerCase().includes("weekly")
+    ? t("limits.window_weekly")
+    : t("limits.window_5hour");
 
   return (
     <div className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm">
@@ -229,10 +252,11 @@ function formatWindowMinutes(windowMinutes: number | null, t?: any) {
   if (windowMinutes === 300) {
     return t ? t("limits.window_min", { count: 300 }) : "300 min";
   }
-  if (windowMinutes === 10080) {
-    return t ? t("limits.window_days", { count: 7 }) : "7 days";
-  }
   if (windowMinutes) {
+    if (windowMinutes >= 1440) {
+      const days = Math.round(windowMinutes / 1440);
+      return t ? t("limits.window_days", { count: days }) : `${days} days`;
+    }
     if (windowMinutes >= 60) {
       return t ? t("limits.window_hours", { count: Math.round(windowMinutes / 60) }) : `${Math.round(windowMinutes / 60)} hrs`;
     }

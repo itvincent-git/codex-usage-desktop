@@ -1,8 +1,9 @@
 import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { UpdateCheckResponse } from "@/lib/api";
+import type { UpdateCheckResponse, CodexLimitsResponse } from "@/lib/api";
 import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
+import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
 import {
@@ -31,6 +32,7 @@ type SettingsPageProps = {
   onTrayTitleShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
   trayMenuShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
   onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
+  codexLimits: CodexLimitsResponse | null;
 };
 
 const TRAY_OPTION_KEYS = {
@@ -58,8 +60,10 @@ export function SettingsPage({
   onTrayTitleShowChange,
   trayMenuShow,
   onTrayMenuShowChange,
+  codexLimits,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
+  const hasSub = hasSubscription(codexLimits);
   const currentLanguage = i18n.language || "en";
 
   const handleLanguageChange = (lang: string) => {
@@ -145,7 +149,7 @@ export function SettingsPage({
           <div className="border-t border-border pt-5 space-y-4">
             <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_title")}</h4>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(["limit5h", "limitWeekly", "tokens", "cost"] as const).map((key) => (
+              {((hasSub ? ["limit5h", "limitWeekly", "tokens", "cost"] : ["limitWeekly", "tokens", "cost"]) as const).map((key) => (
                 <label key={`title-${key}`} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -155,7 +159,9 @@ export function SettingsPage({
                     className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
                   />
                   <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
+                    {key === "limitWeekly" && !hasSub
+                      ? t("settings.menu_bar_opt_monthly")
+                      : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
                   </span>
                 </label>
               ))}
@@ -165,7 +171,7 @@ export function SettingsPage({
           <div className="border-t border-border pt-5 space-y-4">
             <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_menu")}</h4>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(["limit5h", "limitWeekly", "tokens", "cost"] as const).map((key) => (
+              {((hasSub ? ["limit5h", "limitWeekly", "tokens", "cost"] : ["limitWeekly", "tokens", "cost"]) as const).map((key) => (
                 <label key={`menu-${key}`} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -175,7 +181,9 @@ export function SettingsPage({
                     className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
                   />
                   <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
+                    {key === "limitWeekly" && !hasSub
+                      ? t("settings.menu_bar_opt_monthly")
+                      : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
                   </span>
                 </label>
               ))}
