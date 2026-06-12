@@ -131,16 +131,16 @@ export default function App() {
 
         <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
           {updateInfo?.hasUpdate && !isUpdateDismissed ? (
-            <div className="mb-6 overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/30 via-purple-950/20 to-background p-5 text-card-foreground shadow-lg backdrop-blur-md transition-all duration-300 hover:border-indigo-500/30">
+            <div className="mb-6 overflow-hidden rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-indigo-50/20 p-5 text-card-foreground shadow-sm backdrop-blur-md transition-all duration-300 hover:border-indigo-200 hover:shadow-md dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-indigo-950/35 dark:via-purple-950/20 dark:to-indigo-950/10 dark:hover:border-indigo-500/30">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+                  <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
                     <Sparkles className="h-5 w-5 animate-pulse" />
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-foreground flex items-center gap-2">
                       {t("update.new_version", { version: updateInfo.latestVersion })}
-                      <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-medium text-indigo-400">
+                      <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-medium text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300">
                         {t("update.latest_badge")}
                       </span>
                     </h3>
@@ -153,7 +153,7 @@ export default function App() {
                       <div className="pt-2">
                         <button
                           type="button"
-                          className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition"
+                          className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition"
                           onClick={() => setShowNotes(!showNotes)}
                         >
                           {showNotes ? (
@@ -168,19 +168,19 @@ export default function App() {
                         </button>
                         
                         {showNotes ? (
-                          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-black/20 p-3 text-xs text-muted-foreground border border-white/5 font-mono whitespace-pre-wrap leading-relaxed">
+                          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-indigo-50/50 dark:bg-black/25 p-3 text-xs text-muted-foreground border border-indigo-100 dark:border-white/5 font-mono whitespace-pre-wrap leading-relaxed">
                             {updateInfo.releaseNotes}
                           </div>
                         ) : null}
                       </div>
                     ) : null}
                     {updateInstallError ? (
-                      <div className="pt-2 text-xs text-red-200">
+                      <div className="pt-2 text-xs text-error dark:text-red-400">
                         {updateInstallError}
                         {updateInfo.releaseUrl ? (
                           <button
                             type="button"
-                            className="ml-2 font-medium text-indigo-300 hover:text-indigo-200"
+                            className="ml-2 font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
                             onClick={() => void handleOpenUpdateRelease()}
                           >
                             {t("update.view_release")}
@@ -204,7 +204,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleDismissUpdate}
-                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition"
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-indigo-100/50 dark:hover:bg-white/5 hover:text-foreground transition"
                     aria-label={t("update.dismiss_aria")}
                   >
                     <X className="h-4 w-4" />
