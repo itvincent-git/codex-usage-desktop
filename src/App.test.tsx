@@ -6,6 +6,7 @@ import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import i18n from "./i18n";
+import tauriConfig from "../src-tauri/tauri.conf.json";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
@@ -1289,12 +1290,12 @@ describe("App", () => {
 
   it("does not show update banner when cached latest version matches or is older than the current running version", async () => {
     localStorage.clear();
-    // Cache says update is available to 1.6.2, but the app is already at 1.6.2 (our current tauriConfig.version)
+    // Cache says update is available, but the app version is already newer or equal to the cached latest version
     localStorage.setItem("last_update_check_result", JSON.stringify({
       hasUpdate: true,
       currentVersion: "0.4.0",
-      latestVersion: "1.6.2",
-      latestTag: "v1.6.2",
+      latestVersion: tauriConfig.version,
+      latestTag: `v${tauriConfig.version}`,
       releaseName: "Big Release",
       releaseNotes: "Details",
       releaseUrl: "https://url"
@@ -1351,6 +1352,6 @@ describe("App", () => {
     // Check that the cached result in localStorage was corrected to hasUpdate = false
     const parsedCache = JSON.parse(localStorage.getItem("last_update_check_result") || "{}");
     expect(parsedCache.hasUpdate).toBe(false);
-    expect(parsedCache.currentVersion).toBe("1.6.2");
+    expect(parsedCache.currentVersion).toBe(tauriConfig.version);
   });
 });
