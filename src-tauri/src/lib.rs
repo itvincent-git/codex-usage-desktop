@@ -678,13 +678,21 @@ pub fn run() {
                 .build(app)
                 .map_err(|e| e.to_string())?;
 
+            let database_path = database_path.clone();
+            let pricing_cache_path = pricing_cache_path.clone();
+            let app_handle = app.handle().clone();
+
             tauri::async_runtime::spawn_blocking(move || loop {
                 std::thread::sleep(BACKGROUND_RESCAN_INTERVAL);
 
-                if let Err(error) =
-                    refresh_usage_data_blocking(&database_path, &pricing_cache_path, false)
-                {
-                    log::warn!("Background usage refresh failed: {error}");
+                match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
+                    Ok(refresh_response) => {
+                        use tauri::Emitter;
+                        let _ = app_handle.emit("background-refresh-completed", refresh_response);
+                    }
+                    Err(error) => {
+                        log::warn!("Background usage refresh failed: {error}");
+                    }
                 }
             });
 

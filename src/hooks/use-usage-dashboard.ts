@@ -1,4 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,6 +23,7 @@ import {
   updateTray,
   type TrayMenuItemDto,
   refreshUsageData,
+  type UsageRefreshResponse,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { DashboardView } from "@/components/dashboard-header";
@@ -408,6 +410,54 @@ export function useUsageDashboard() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [bootstrapped, runAutoRescan]);
+
+  // Listen for background refresh events emitted from the Rust backend
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    let unlistenFn: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        const unsubscribe = await listen<UsageRefreshResponse>("background-refresh-completed", async (event) => {
+          const refresh = event.payload;
+
+          if (refresh.limits) {
+            setCodexLimits(refresh.limits);
+            setCodexLimitsError(null);
+            lastLimitsFetchTimeRef.current = Date.now();
+          } else if (refresh.limitsError) {
+            setCodexLimitsError(refresh.limitsError);
+            lastLimitsFetchTimeRef.current = Date.now();
+          }
+
+          // Reload overview to keep UI fresh
+          const filesParsed = refresh.scan?.metrics?.filesParsed ?? 0;
+          const isForeground = document.visibilityState === "visible";
+          if (isForeground || filesParsed > 0) {
+            await loadOverview(range);
+            if (view === "monthly") {
+              await loadMonthlyUsage();
+            }
+            if (view === "sessions") {
+              await loadSessions();
+            }
+          }
+        });
+        unlistenFn = unsubscribe;
+      } catch (err) {
+        console.error("Failed to setup background refresh listener:", err);
+      }
+    };
+
+    void setupListener();
+
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [bootstrapped, range, view, loadOverview, loadMonthlyUsage, loadSessions]);
 
   // Update tray icon whenever limits, overview, translation, or tray settings change
   useEffect(() => {
