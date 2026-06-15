@@ -43,7 +43,8 @@
     "downloading": "Downloading...",
     "restart_now": "Restart to Update",
     "view_release": "View release",
-    "dismiss_aria": "Dismiss update notification"
+    "dismiss_aria": "Dismiss update notification",
+    "rate_limit_error": "GitHub API rate limit exceeded or network timeout. Please check the release page to view update logs and download the latest version."
   },
   "error": {
     "sync_failed": "Data sync failed"

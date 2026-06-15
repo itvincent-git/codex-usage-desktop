@@ -15,7 +15,7 @@ import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { useMemo, useState } from "react";
-import { Sparkles, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
@@ -69,6 +69,11 @@ export default function App() {
     trayMenuShow,
     handleTrayMenuShowChange,
   } = useUsageDashboard();
+
+  const isRateLimitError = !!(
+    updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||
+    updateInfo?.releaseNotes?.includes("GitHub API 访问受限")
+  );
 
   const metrics = overview ? buildMetricCards(overview, range, t) : [];
   const projects = overview?.projects ?? [];
@@ -168,9 +173,18 @@ export default function App() {
                         </button>
                         
                         {showNotes ? (
-                          <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-indigo-50/50 dark:bg-black/25 p-3 text-xs text-muted-foreground border border-indigo-100 dark:border-white/5 font-mono whitespace-pre-wrap leading-relaxed">
-                            {updateInfo.releaseNotes}
-                          </div>
+                          isRateLimitError ? (
+                            <div className="mt-2 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300 leading-normal flex items-start gap-2 select-text font-sans">
+                              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                              <div className="whitespace-pre-wrap">
+                                {t("update.rate_limit_error")}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-indigo-50/50 dark:bg-black/25 p-3 text-xs text-muted-foreground border border-indigo-100 dark:border-white/5 font-mono whitespace-pre-wrap leading-relaxed select-text">
+                              {updateInfo.releaseNotes}
+                            </div>
+                          )
                         ) : null}
                       </div>
                     ) : null}

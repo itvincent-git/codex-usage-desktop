@@ -43,7 +43,8 @@
     "downloading": "正在下载...",
     "restart_now": "重启完成更新",
     "view_release": "查看发布页",
-    "dismiss_aria": "关闭更新提示"
+    "dismiss_aria": "关闭更新提示",
+    "rate_limit_error": "GitHub API 访问受限或网络超时，请直接前往发布页面查看更新日志并下载最新版本。"
   },
   "error": {
     "sync_failed": "数据同步失败"
