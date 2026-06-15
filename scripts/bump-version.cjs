@@ -23,6 +23,13 @@ if (!version) {
   console.log(`Updated package.json version to ${version}`);
 }
 
+// 1.5. Update changelog.json based on git log since last tag
+try {
+  updateChangelog(version);
+} catch (e) {
+  console.warn('Warning: Failed to update changelog.json automatically:', e.message);
+}
+
 console.log(`Syncing version ${version} to Tauri configuration...`);
 
 // 2. Update src-tauri/tauri.conf.json
@@ -58,7 +65,7 @@ if (fs.existsSync(cargoPath)) {
 // 4. Stage the updated files in git
 try {
   const cargoLockPath = path.join(__dirname, '../src-tauri/Cargo.lock');
-  const filesToStage = ['package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml'];
+  const filesToStage = ['package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'changelog.json'];
   if (fs.existsSync(cargoLockPath)) {
     filesToStage.push('src-tauri/Cargo.lock');
   }
@@ -66,4 +73,64 @@ try {
   console.log('Successfully staged version files in git.');
 } catch (e) {
   // Silent fail if not in a git repo
+}
+
+function updateChangelog(version) {
+  const changelogPath = path.join(__dirname, '../changelog.json');
+  let changelog = {};
+  if (fs.existsSync(changelogPath)) {
+    try {
+      changelog = JSON.parse(fs.readFileSync(changelogPath, 'utf8'));
+    } catch (e) {
+      console.warn('Warning: Failed to parse changelog.json, starting fresh.');
+    }
+  }
+
+  // Get the last release tag of format app-v*
+  let previousTag = '';
+  try {
+    previousTag = execSync("git describe --tags --match 'app-v*' --abbrev=0 2>/dev/null", { encoding: 'utf8' }).trim();
+  } catch (e) {
+    // No previous tag found
+  }
+
+  let range = '';
+  if (previousTag) {
+    range = `${previousTag}..HEAD`;
+  }
+
+  let commits = [];
+  try {
+    const gitLogCmd = range ? `git log --format=%s --reverse ${range}` : 'git log --format=%s --reverse';
+    const logOutput = execSync(gitLogCmd, { encoding: 'utf8' });
+    commits = logOutput.split('\n').map(s => s.trim()).filter(Boolean);
+  } catch (e) {
+    console.warn('Warning: Failed to get git log.');
+  }
+
+  // Filter commits (e.g. skip version bumps or merges)
+  const versionBumpRegex = /^chore(\([^)]*\))?:\s*\d+\.\d+\.\d+$/i;
+  const mergeCommitRegex = /^merge\b/i;
+  const filteredCommits = commits.filter(subject => {
+    return !versionBumpRegex.test(subject) && !mergeCommitRegex.test(subject);
+  });
+
+  if (filteredCommits.length === 0) {
+    filteredCommits.push('Minor updates and bug fixes.');
+  }
+
+  // Format as bullet points
+  const bulletPoints = filteredCommits.map(c => `- ${c}`).join('\n');
+
+  // Order keys: put the new version at the top of the json object
+  const newChangelog = {
+    [version]: {
+      zh: bulletPoints,
+      en: bulletPoints
+    },
+    ...changelog
+  };
+
+  fs.writeFileSync(changelogPath, JSON.stringify(newChangelog, null, 2) + '\n', 'utf8');
+  console.log(`Updated changelog.json with version ${version}`);
 }
