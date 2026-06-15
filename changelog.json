@@ -1,0 +1,10 @@
+{
+  "1.8.1": {
+    "zh": "- 优化更新提示的视觉设计，支持深色/浅色模式。\n- 优化在 GitHub API 访问受限时的错误呈现与自适应本地化错误提示。\n- 增加从 jsDelivr CDN 获取静态 Changelog 的备用更新日志方案。",
+    "en": "- Optimize update banner styling with full dark/light mode support.\n- Improve error display and fallback mechanisms when GitHub API is rate-limited.\n- Add a fallback CDN mechanism to fetch release notes from changelog.json."
+  },
+  "1.8.0": {
+    "zh": "- 更新和修复部分细节功能。",
+    "en": "- Minor updates and bug fixes."
+  }
+}

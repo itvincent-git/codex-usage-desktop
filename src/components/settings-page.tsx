@@ -6,6 +6,7 @@ import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -67,6 +68,19 @@ export function SettingsPage({
     updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||
     updateInfo?.releaseNotes?.includes("GitHub API 访问受限")
   );
+  const parsedReleaseNotes = useMemo(() => {
+    if (!updateInfo?.releaseNotes) return "";
+    try {
+      const parsed = JSON.parse(updateInfo.releaseNotes);
+      if (parsed && typeof parsed === "object") {
+        const lang = i18n.language?.startsWith("zh") ? "zh" : "en";
+        return parsed[lang] || parsed["en"] || updateInfo.releaseNotes;
+      }
+    } catch (e) {
+      // Ignored: not a JSON object
+    }
+    return updateInfo.releaseNotes;
+  }, [updateInfo?.releaseNotes, i18n.language]);
   const hasSub = hasSubscription(codexLimits);
   const currentLanguage = i18n.language || "en";
 
@@ -303,7 +317,7 @@ export function SettingsPage({
                         </div>
                       ) : (
                         <div className="rounded-lg bg-indigo-50/50 dark:bg-black/25 border border-indigo-100 dark:border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
-                          {updateInfo.releaseNotes}
+                          {parsedReleaseNotes}
                         </div>
                       )
                     ) : null}

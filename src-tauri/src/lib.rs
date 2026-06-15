@@ -390,15 +390,39 @@ async fn check_for_updates(
             }
 
             // Fallback response if GitHub API fails but we know there is an update
+            // Try to retrieve release notes from CDN changelog.json as a fallback
+            let mut notes = "GitHub API rate limit exceeded or network timeout. Please check the release page to view update logs and download the latest version.\n\nGitHub API 访问受限或超时，请直接前往发布页面查看更新日志并下载最新版本。".to_string();
+            let cdn_changelog_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/changelog.json";
+            
+            match client
+                .get(cdn_changelog_url)
+                .header("User-Agent", "codex-usage-desktop")
+                .header("Accept", "application/json")
+                .send()
+            {
+                Ok(res) if res.status().is_success() => {
+                    if let Ok(changelog) = res.json::<serde_json::Value>() {
+                        if let Some(entry) = changelog.get(&version) {
+                            if entry.is_string() {
+                                if let Some(s) = entry.as_str() {
+                                    notes = s.to_string();
+                                }
+                            } else {
+                                notes = entry.to_string();
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+
             return Ok(UpdateCheckResponse {
                 has_update: true,
                 current_version,
                 latest_version: version.clone(),
                 latest_tag: format!("app-v{}", version),
                 release_name: Some(format!("Codex Usage Desktop v{}", version)),
-                release_notes: Some(
-                    "GitHub API rate limit exceeded or network timeout. Please check the release page to view update logs and download the latest version.\n\nGitHub API 访问受限或超时，请直接前往发布页面查看更新日志并下载最新版本。".to_string()
-                ),
+                release_notes: Some(notes),
                 release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
                 etag: None,
                 not_modified: Some(false),

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [showNotes, setShowNotes] = useState(false);
   const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(null);
   const [selectedProjectForModal, setSelectedProjectForModal] = useState<{
@@ -74,6 +74,20 @@ export default function App() {
     updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||
     updateInfo?.releaseNotes?.includes("GitHub API 访问受限")
   );
+
+  const parsedReleaseNotes = useMemo(() => {
+    if (!updateInfo?.releaseNotes) return "";
+    try {
+      const parsed = JSON.parse(updateInfo.releaseNotes);
+      if (parsed && typeof parsed === "object") {
+        const lang = i18n.language?.startsWith("zh") ? "zh" : "en";
+        return parsed[lang] || parsed["en"] || updateInfo.releaseNotes;
+      }
+    } catch (e) {
+      // Ignored: not a JSON object
+    }
+    return updateInfo.releaseNotes;
+  }, [updateInfo?.releaseNotes, i18n.language]);
 
   const metrics = overview ? buildMetricCards(overview, range, t) : [];
   const projects = overview?.projects ?? [];
@@ -182,7 +196,7 @@ export default function App() {
                             </div>
                           ) : (
                             <div className="mt-2 max-h-36 overflow-y-auto rounded-lg bg-indigo-50/50 dark:bg-black/25 p-3 text-xs text-muted-foreground border border-indigo-100 dark:border-white/5 font-mono whitespace-pre-wrap leading-relaxed select-text">
-                              {updateInfo.releaseNotes}
+                              {parsedReleaseNotes}
                             </div>
                           )
                         ) : null}
