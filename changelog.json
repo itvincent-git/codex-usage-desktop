@@ -1,4 +1,8 @@
 {
+  "1.9.0": {
+    "zh": "- style: optimize update banner styling for light and dark themes\n- ci: upgrade github actions to node 24 compatible versions\n- fix(scripts): resolve temporary directory symlink for installer cleanup\n- style: optimize update block styling in settings page\n- style: format and localize GitHub API rate limit error message in update notes\n- feat: parse and localize release notes from CDN fallback\n- feat: automate changelog.json generation during version bump",
+    "en": "- style: optimize update banner styling for light and dark themes\n- ci: upgrade github actions to node 24 compatible versions\n- fix(scripts): resolve temporary directory symlink for installer cleanup\n- style: optimize update block styling in settings page\n- style: format and localize GitHub API rate limit error message in update notes\n- feat: parse and localize release notes from CDN fallback\n- feat: automate changelog.json generation during version bump"
+  },
   "1.8.1": {
     "zh": "- 优化更新提示的视觉设计，支持深色/浅色模式。\n- 优化在 GitHub API 访问受限时的错误呈现与自适应本地化错误提示。\n- 增加从 jsDelivr CDN 获取静态 Changelog 的备用更新日志方案。",
     "en": "- Optimize update banner styling with full dark/light mode support.\n- Improve error display and fallback mechanisms when GitHub API is rate-limited.\n- Add a fallback CDN mechanism to fetch release notes from changelog.json."
