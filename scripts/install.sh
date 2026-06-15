@@ -7,6 +7,7 @@ REPO="itvincent-git/codex-usage-desktop"
 INSTALL_DIR="/Applications"
 MOUNT_POINT=""
 TMP_DIR="$(mktemp -d)"
+TMP_DIR="$(cd "${TMP_DIR}" && pwd -P)"
 
 cleanup() {
   if [ -n "${MOUNT_POINT}" ] && mount | grep -q "on ${MOUNT_POINT} "; then
