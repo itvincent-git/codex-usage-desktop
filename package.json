@@ -29,7 +29,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bump": "node scripts/bump-version.cjs",
-    "version": "node scripts/bump-version.cjs"
+    "version": "node scripts/bump-version.cjs",
+    "postversion": "node scripts/postversion.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",
