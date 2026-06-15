@@ -253,13 +253,13 @@ export function SettingsPage({
             </div>
 
             {updateCheckError ? (
-              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
                 {updateCheckError}
               </div>
             ) : null}
 
             {updateInstallError ? (
-              <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-200">
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
                 {updateInstallError}
               </div>
             ) : null}
@@ -267,11 +267,11 @@ export function SettingsPage({
             {updateInfo ? (
               <div className="border-t border-border pt-5 space-y-4">
                 {updateInfo.hasUpdate ? (
-                  <div className="rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 to-transparent p-5 space-y-3">
+                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-indigo-50/20 dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-indigo-950/35 dark:via-purple-950/20 dark:to-indigo-950/10 p-5 space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <h5 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-indigo-400 animate-pulse" />
+                          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
                           {t("settings.update_available", { version: updateInfo.latestVersion })}
                         </h5>
                         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -290,7 +290,7 @@ export function SettingsPage({
                       </Button>
                     </div>
                     {updateInfo.releaseNotes ? (
-                      <div className="rounded-lg bg-black/10 border border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                      <div className="rounded-lg bg-indigo-50/50 dark:bg-black/25 border border-indigo-100 dark:border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                         {updateInfo.releaseNotes}
                       </div>
                     ) : null}
@@ -301,8 +301,8 @@ export function SettingsPage({
                     ) : null}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-200/90">
-                    <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <div className="flex items-center gap-3 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-4 text-sm">
+                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <div>
                       <p className="font-medium text-foreground">{t("settings.up_to_date")}</p>
                       <p className="text-xs text-muted-foreground">{t("settings.up_to_date_desc", { version: updateInfo.currentVersion })}</p>
