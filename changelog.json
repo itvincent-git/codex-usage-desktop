@@ -1,4 +1,8 @@
 {
+  "1.10.0": {
+    "zh": "- feat: show tray limit reset countdowns\n- chore: pin node version",
+    "en": "- feat: show tray limit reset countdowns\n- chore: pin node version"
+  },
   "1.9.0": {
     "zh": "- style: optimize update banner styling for light and dark themes\n- ci: upgrade github actions to node 24 compatible versions\n- fix(scripts): resolve temporary directory symlink for installer cleanup\n- style: optimize update block styling in settings page\n- style: format and localize GitHub API rate limit error message in update notes\n- feat: parse and localize release notes from CDN fallback\n- feat: automate changelog.json generation during version bump",
     "en": "- style: optimize update banner styling for light and dark themes\n- ci: upgrade github actions to node 24 compatible versions\n- fix(scripts): resolve temporary directory symlink for installer cleanup\n- style: optimize update block styling in settings page\n- style: format and localize GitHub API rate limit error message in update notes\n- feat: parse and localize release notes from CDN fallback\n- feat: automate changelog.json generation during version bump"
