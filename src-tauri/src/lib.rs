@@ -268,40 +268,40 @@ async fn check_for_updates(
 
         let mut latest_version_from_static: Option<String> = None;
 
-        // --- Tier 1: Try jsDelivr CDN ---
-        log::info!("Checking version via jsDelivr CDN.");
-        let cdn_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/src-tauri/tauri.conf.json";
-        match client.get(cdn_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
+        // --- Tier 1: Try Raw GitHub ---
+        log::info!("Checking version via Raw GitHub.");
+        let raw_url = "https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/src-tauri/tauri.conf.json";
+        match client.get(raw_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
             Ok(response) if response.status().is_success() => {
                 if let Ok(conf) = response.json::<TauriConfDto>() {
-                    log::info!("jsDelivr CDN returned version: {}", conf.version);
+                    log::info!("Raw GitHub returned version: {}", conf.version);
                     latest_version_from_static = Some(conf.version);
                 }
             }
             Ok(response) => {
-                log::warn!("jsDelivr CDN check failed with status: {}", response.status());
+                log::warn!("Raw GitHub check failed with status: {}", response.status());
             }
             Err(err) => {
-                log::warn!("jsDelivr CDN check failed with error: {}", err);
+                log::warn!("Raw GitHub check failed with error: {}", err);
             }
         }
 
-        // --- Tier 2: Try Raw GitHub (Fallback) ---
+        // --- Tier 2: Try jsDelivr CDN (Fallback) ---
         if latest_version_from_static.is_none() {
-            log::info!("Checking version via Raw GitHub.");
-            let raw_url = "https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/src-tauri/tauri.conf.json";
-            match client.get(raw_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
+            log::info!("Checking version via jsDelivr CDN.");
+            let cdn_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/src-tauri/tauri.conf.json";
+            match client.get(cdn_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
                 Ok(response) if response.status().is_success() => {
                     if let Ok(conf) = response.json::<TauriConfDto>() {
-                        log::info!("Raw GitHub returned version: {}", conf.version);
+                        log::info!("jsDelivr CDN returned version: {}", conf.version);
                         latest_version_from_static = Some(conf.version);
                     }
                 }
                 Ok(response) => {
-                    log::warn!("Raw GitHub check failed with status: {}", response.status());
+                    log::warn!("jsDelivr CDN check failed with status: {}", response.status());
                 }
                 Err(err) => {
-                    log::warn!("Raw GitHub check failed with error: {}", err);
+                    log::warn!("jsDelivr CDN check failed with error: {}", err);
                 }
             }
         }
