@@ -19,6 +19,7 @@ import {
   restartApp,
   type UpdateCheckResponse,
   fetchSessionDetails,
+  type CodexLimitWindow,
   type SessionDetailRow,
   updateTray,
   type TrayMenuItemDto,
@@ -29,7 +30,7 @@ import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber 
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
-import { hasSubscription } from "@/components/codex-limits-card";
+import { formatResetTime, hasSubscription } from "@/components/codex-limits-card";
 
 function isNewerVersion(current: string, target: string): boolean {
   const parse = (v: string) => {
@@ -45,6 +46,32 @@ function isNewerVersion(current: string, target: string): boolean {
 }
 
 const AUTO_RESCAN_MS = 5 * 60_000;
+
+function formatCompactResetCountdown(resetsAt: string | null): string | null {
+  if (!resetsAt) return null;
+
+  const resetTime = new Date(resetsAt).getTime();
+  if (!Number.isFinite(resetTime)) return null;
+
+  const diffMs = resetTime - Date.now();
+  if (diffMs <= 0) return "soon";
+
+  const minutes = Math.ceil(diffMs / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+
+  return `${Math.ceil(hours / 24)}d`;
+}
+
+function formatTrayLimitTitle(prefix: string, window: CodexLimitWindow | null | undefined): string {
+  if (!window) return `${prefix}: -`;
+
+  const remaining = `${Math.round(window.remainingPercent)}%`;
+  const resetCountdown = formatCompactResetCountdown(window.resetsAt);
+  return resetCountdown ? `${prefix}: ${remaining}/${resetCountdown}` : `${prefix}: ${remaining}`;
+}
 
 export type UpdateInstallStatus = "idle" | "downloading" | "installed";
 
@@ -74,6 +101,7 @@ export function useUsageDashboard() {
   const [updateInstallStatus, setUpdateInstallStatus] = useState<UpdateInstallStatus>("idle");
   const [updateInstallError, setUpdateInstallError] = useState<string | null>(null);
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
+  const [trayClockMinute, setTrayClockMinute] = useState(() => Math.floor(Date.now() / 60_000));
 
   const [showLogsTab, setShowLogsTabState] = useState(() => {
     return localStorage.getItem("show_logs_tab") === "true";
@@ -114,6 +142,16 @@ export function useUsageDashboard() {
     localStorage.setItem("tray_menu_show", JSON.stringify(next));
     setTrayMenuShowState(next);
   };
+
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    const timer = window.setInterval(() => {
+      setTrayClockMinute(Math.floor(Date.now() / 60_000));
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, [bootstrapped]);
 
   const hasBootstrappedRef = useRef(false);
   const lastLimitsFetchTimeRef = useRef<number>(0);
@@ -474,18 +512,15 @@ export function useUsageDashboard() {
     const titleParts: string[] = [];
     if (hasSub) {
       if (trayTitleShow.limit5h) {
-        const val = codexLimits?.session ? `${Math.round(codexLimits.session.remainingPercent)}%` : "-";
-        titleParts.push(`5h: ${val}`);
+        titleParts.push(formatTrayLimitTitle("5h", codexLimits?.session));
       }
       if (trayTitleShow.limitWeekly) {
-        const val = codexLimits?.weekly ? `${Math.round(codexLimits.weekly.remainingPercent)}%` : "-";
-        titleParts.push(`W: ${val}`);
+        titleParts.push(formatTrayLimitTitle("W", codexLimits?.weekly));
       }
     } else {
       if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
         const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
-        const val = activeWindow ? `${Math.round(activeWindow.remainingPercent)}%` : "-";
-        titleParts.push(`M: ${val}`);
+        titleParts.push(formatTrayLimitTitle("M", activeWindow));
       }
     }
 
@@ -502,14 +537,14 @@ export function useUsageDashboard() {
     if (hasSub) {
       if (trayMenuShow.limit5h) {
         const text = codexLimits?.session
-          ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%)`
+          ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%); ${formatResetTime(codexLimits.session.resetsAt, codexLimits.session.windowMinutes, t)}`
           : `${t("limits.window_5hour")}: ${t("limits.unavailable")}`;
         items.push({ id: "status_5h", text, enabled: false });
       }
 
       if (trayMenuShow.limitWeekly) {
         const text = codexLimits?.weekly
-          ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%)`
+          ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%); ${formatResetTime(codexLimits.weekly.resetsAt, codexLimits.weekly.windowMinutes, t)}`
           : `${t("limits.window_weekly")}: ${t("limits.unavailable")}`;
         items.push({ id: "status_weekly", text, enabled: false });
       }
@@ -551,6 +586,7 @@ export function useUsageDashboard() {
     overview,
     trayTitleShow,
     trayMenuShow,
+    trayClockMinute,
     t,
     i18n.language,
   ]);

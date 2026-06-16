@@ -10,10 +10,12 @@ import tauriConfig from "../src-tauri/tauri.conf.json";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
+const updateTrayMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (command: string, ...args: any[]) => {
     if (command === "update_tray") {
+      updateTrayMock(...args);
       return Promise.resolve();
     }
     if (command === "refresh_usage_data") {
@@ -143,6 +145,7 @@ describe("App", () => {
     localStorage.clear();
     invokeMock.mockReset();
     saveMock.mockReset();
+    updateTrayMock.mockReset();
     vi.unstubAllGlobals();
     vi.stubGlobal(
       "ResizeObserver",
@@ -852,6 +855,51 @@ describe("App", () => {
       screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Data sync failed")).not.toBeInTheDocument();
+  });
+
+  it("shows reset countdowns for 5-hour and weekly limits in the tray", async () => {
+    const now = new Date().getTime();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const sessionReset = new Date(now + 3 * 60 * 60_000).toISOString();
+    const weeklyReset = new Date(now + 4 * 24 * 60 * 60_000).toISOString();
+    localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: false, cost: false }));
+    localStorage.setItem("tray_menu_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: false, cost: false }));
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return {
+          session: { usedPercent: 20, remainingPercent: 80, windowMinutes: 300, resetsAt: sessionReset },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: weeklyReset },
+          updatedAt: new Date().toISOString(),
+          source: "cli-rpc",
+          membershipLevel: "pro",
+        };
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
+        payload: expect.objectContaining({
+          title: "5h: 80%/3h | W: 55%/4d",
+          items: expect.arrayContaining([
+            expect.objectContaining({ id: "status_5h", text: expect.stringContaining("3 hours left") }),
+            expect.objectContaining({ id: "status_weekly", text: expect.stringContaining("4 days left") }),
+          ]),
+        }),
+      }));
+    });
   });
 
   it("resets the local cache and rebuilds usage data", async () => {
