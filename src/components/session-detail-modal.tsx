@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clipboard, FileJson, Loader2, MessageSquare, Terminal, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
@@ -63,6 +64,7 @@ function TextBlock({ title, text }: { title: string; text: string }) {
 }
 
 export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
+  const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
@@ -143,7 +145,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                 ))}
               </div>
             </div>
-            <Button variant="secondary" size="sm" onClick={onClose} aria-label="Close session detail">
+            <Button variant="secondary" size="sm" onClick={onClose} aria-label={t("sessions.detail.close_aria")}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -151,13 +153,13 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
         <section className="border-b border-border/60 bg-background px-5 py-3">
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
-            {metric("Duration", formatDuration(detail?.summary.durationMs))}
-            {metric("Total tokens", formatNumber(detail?.summary.totalTokens ?? session.totalTokens))}
-            {metric("Cost", formatCurrency(detail?.summary.costUSD ?? session.costUSD))}
-            {metric("Cache", formatPercent(cacheRate))}
-            {metric("Tool calls", formatNumber(detail?.summary.toolCallCount ?? 0))}
-            {metric("Patches", formatNumber(detail?.summary.patchCount ?? 0))}
-            {metric("Errors", formatNumber(detail?.summary.errorCount ?? 0), (detail?.summary.errorCount ?? 0) > 0 ? "danger" : "default")}
+            {metric(t("sessions.detail.duration"), formatDuration(detail?.summary.durationMs))}
+            {metric(t("sessions.detail.total_tokens"), formatNumber(detail?.summary.totalTokens ?? session.totalTokens))}
+            {metric(t("sessions.detail.cost"), formatCurrency(detail?.summary.costUSD ?? session.costUSD))}
+            {metric(t("sessions.detail.cache"), formatPercent(cacheRate))}
+            {metric(t("sessions.detail.tool_calls"), formatNumber(detail?.summary.toolCallCount ?? 0))}
+            {metric(t("sessions.detail.patches"), formatNumber(detail?.summary.patchCount ?? 0))}
+            {metric(t("sessions.detail.errors"), formatNumber(detail?.summary.errorCount ?? 0), (detail?.summary.errorCount ?? 0) > 0 ? "danger" : "default")}
           </div>
         </section>
 
@@ -167,14 +169,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
             onClick={() => setActiveTab("timeline")}
             className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${activeTab === "timeline" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
-            Timeline
+            {t("sessions.detail.timeline")}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("raw")}
             className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${activeTab === "raw" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
-            Raw JSONL
+            {t("sessions.detail.raw_jsonl")}
           </button>
         </nav>
 
@@ -187,20 +189,20 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
           ) : !detail ? (
             <div className="flex h-full items-center justify-center gap-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading session replay
+              {t("sessions.detail.loading_replay")}
             </div>
           ) : activeTab === "timeline" ? (
             <div className="mx-auto max-w-6xl space-y-4">
               <section className="rounded-lg border border-border/60 bg-surface p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                   <CheckCircle2 className="h-4 w-4 text-success" />
-                  Session summary
+                  {t("sessions.detail.session_summary")}
                 </div>
                 <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                  <div>Started: {formatTimestamp(detail.summary.startTime)}</div>
-                  <div>Ended: {formatTimestamp(detail.summary.endTime)}</div>
-                  <div>First token: {formatDuration(detail.summary.timeToFirstTokenMs)}</div>
-                  <div>CLI: {detail.summary.cliVersion ?? "--"}</div>
+                  <div>{t("sessions.detail.started", { value: formatTimestamp(detail.summary.startTime) })}</div>
+                  <div>{t("sessions.detail.ended", { value: formatTimestamp(detail.summary.endTime) })}</div>
+                  <div>{t("sessions.detail.first_token", { value: formatDuration(detail.summary.timeToFirstTokenMs) })}</div>
+                  <div>{t("sessions.detail.cli", { value: detail.summary.cliVersion ?? "--" })}</div>
                 </div>
               </section>
 
@@ -209,48 +211,48 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2 font-bold">
                       <MessageSquare className="h-4 w-4 text-primary" />
-                      Turn {turn.turnId}
+                      {t("sessions.detail.turn", { id: turn.turnId })}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {formatTimestamp(turn.startedAt)} · {formatDuration(turn.durationMs)}
                     </div>
                   </div>
                   <div className="space-y-3">
-                    {turn.userMessages.map((message, i) => <TextBlock key={`u-${i}`} title="User" text={message.text} />)}
-                    {turn.assistantMessages.map((message, i) => <TextBlock key={`a-${i}`} title="Assistant" text={message.text} />)}
-                    {turn.reasoningSummaries.map((message, i) => <TextBlock key={`r-${i}`} title="Reasoning summary" text={message.text} />)}
+                    {turn.userMessages.map((message, i) => <TextBlock key={`u-${i}`} title={t("sessions.detail.user")} text={message.text} />)}
+                    {turn.assistantMessages.map((message, i) => <TextBlock key={`a-${i}`} title={t("sessions.detail.assistant")} text={message.text} />)}
+                    {turn.reasoningSummaries.map((message, i) => <TextBlock key={`r-${i}`} title={t("sessions.detail.reasoning_summary")} text={message.text} />)}
                     {turn.toolCalls.map((tool, i) => (
                       <details key={`t-${i}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
                         <summary className="cursor-pointer text-xs font-semibold">
                           <Terminal className="mr-1 inline h-3.5 w-3.5" />
                           {tool.name} {tool.status ? `· ${tool.status}` : ""}
                         </summary>
-                        {tool.arguments ? <TextBlock title="Arguments" text={tool.arguments} /> : null}
-                        {tool.output ? <TextBlock title="Output" text={tool.output} /> : null}
-                        {tool.stderr ? <TextBlock title="Stderr" text={tool.stderr} /> : null}
+                        {tool.arguments ? <TextBlock title={t("sessions.detail.arguments")} text={tool.arguments} /> : null}
+                        {tool.output ? <TextBlock title={t("sessions.detail.output")} text={tool.output} /> : null}
+                        {tool.stderr ? <TextBlock title={t("sessions.detail.stderr")} text={tool.stderr} /> : null}
                       </details>
                     ))}
                     {turn.patchResults.map((patch, i) => (
                       <details key={`p-${i}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
                         <summary className="cursor-pointer text-xs font-semibold">
-                          Patch {patch.success === false ? "failed" : "result"}
+                          {patch.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}
                         </summary>
-                        {patch.output ? <TextBlock title="Patch output" text={patch.output} /> : null}
+                        {patch.output ? <TextBlock title={t("sessions.detail.patch_output")} text={patch.output} /> : null}
                       </details>
                     ))}
                     {turn.tokenEvents.length > 0 ? (
                       <div className="rounded-lg border border-border/50 bg-muted/35 p-3 text-xs">
-                        <div className="mb-2 font-semibold">Token events</div>
+                        <div className="mb-2 font-semibold">{t("sessions.detail.token_events")}</div>
                         <div className="space-y-1 font-mono">
                           {turn.tokenEvents.map((event, i) => (
                             <div key={`tok-${i}`}>
-                              {formatTimestamp(event.timestamp)} · {event.model} · {formatNumber(event.totalTokens)} tokens
+                              {formatTimestamp(event.timestamp)} · {event.model} · {t("sessions.detail.tokens_count", { value: formatNumber(event.totalTokens) })}
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : null}
-                    {turn.errors.map((turnError, i) => <TextBlock key={`e-${i}`} title="Error" text={turnError} />)}
+                    {turn.errors.map((turnError, i) => <TextBlock key={`e-${i}`} title={t("sessions.detail.error")} text={turnError} />)}
                   </div>
                 </section>
               ))}
@@ -260,7 +262,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <div className="flex justify-end">
                 <Button variant="secondary" size="sm" onClick={() => void copyRawJsonl()}>
                   <Clipboard className="mr-2 h-4 w-4" />
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? t("sessions.detail.copied") : t("sessions.detail.copy")}
                 </Button>
               </div>
               <pre className="min-h-[60vh] overflow-auto rounded-lg border border-border/60 bg-surface p-4 font-mono text-xs leading-relaxed text-foreground">
