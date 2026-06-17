@@ -1,4 +1,8 @@
 {
+  "1.11.0": {
+    "zh": "- fix: prefer raw GitHub for update version checks\n- feat: add session replay detail modal\n- fix: internationalize session detail modal\n- feat: show update download progress\n- fix: prevent session detail scroll chaining\n- feat(session): show system prompts in replay turns",
+    "en": "- fix: prefer raw GitHub for update version checks\n- feat: add session replay detail modal\n- fix: internationalize session detail modal\n- feat: show update download progress\n- fix: prevent session detail scroll chaining\n- feat(session): show system prompts in replay turns"
+  },
   "1.10.0": {
     "zh": "- feat: show tray limit reset countdowns\n- chore: pin node version",
     "en": "- feat: show tray limit reset countdowns\n- chore: pin node version"
