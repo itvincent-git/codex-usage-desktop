@@ -229,3 +229,102 @@ pub struct SessionDetailRow {
     pub models: Vec<String>,
     pub projects: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplaySummary {
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub time_to_first_token_ms: Option<i64>,
+    pub cwd: Option<String>,
+    pub projects: Vec<String>,
+    pub models: Vec<String>,
+    pub cli_version: Option<String>,
+    pub git: BTreeMap<String, String>,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
+    pub cost_usd: f64,
+    pub turn_count: usize,
+    pub message_count: usize,
+    pub tool_call_count: usize,
+    pub patch_count: usize,
+    pub error_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayMessage {
+    pub timestamp: Option<String>,
+    pub kind: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayToolCall {
+    pub call_id: Option<String>,
+    pub name: String,
+    pub status: Option<String>,
+    pub arguments: Option<String>,
+    pub output: Option<String>,
+    pub stderr: Option<String>,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub is_error: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayPatchResult {
+    pub call_id: Option<String>,
+    pub success: Option<bool>,
+    pub output: Option<String>,
+    pub timestamp: Option<String>,
+    pub is_error: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayTokenEvent {
+    pub timestamp: Option<String>,
+    pub model: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayTurn {
+    pub turn_id: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub user_messages: Vec<SessionReplayMessage>,
+    pub assistant_messages: Vec<SessionReplayMessage>,
+    pub reasoning_summaries: Vec<SessionReplayMessage>,
+    pub tool_calls: Vec<SessionReplayToolCall>,
+    pub patch_results: Vec<SessionReplayPatchResult>,
+    pub token_events: Vec<SessionReplayTokenEvent>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReplayDetail {
+    pub path: String,
+    pub session_id: String,
+    pub modified_at_ms: i64,
+    pub size_bytes: i64,
+    pub raw_jsonl: String,
+    pub summary: SessionReplaySummary,
+    pub turns: Vec<SessionReplayTurn>,
+}

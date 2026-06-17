@@ -5,6 +5,7 @@ mod exporter;
 mod overview;
 mod pricing;
 mod scanner;
+mod session_replay;
 mod types;
 
 use std::io::ErrorKind;
@@ -15,7 +16,7 @@ use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow, UsageRefreshResponse,
+    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow, SessionReplayDetail, UsageRefreshResponse,
 };
 
 const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -170,6 +171,21 @@ async fn fetch_session_details(
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
         db::query_session_details(&db)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_session_detail(
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> Result<SessionReplayDetail, String> {
+    let database_path = state.database_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = db::open_database(&database_path)?;
+        session_replay::fetch_session_detail(&db, &path)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -735,6 +751,7 @@ pub fn run() {
             restart_app,
             open_url,
             fetch_session_details,
+            fetch_session_detail,
             update_tray
         ])
         .run(tauri::generate_context!())

@@ -12,6 +12,7 @@ type SessionUsageTableProps = {
   initialExpandedDate?: string | null;
   selectedProject?: string | null;
   onClearProjectFilter?: () => void;
+  onSessionClick?: (session: SessionDetailRow) => void;
 };
 
 function formatBytes(bytes: number) {
@@ -39,6 +40,7 @@ export function SessionUsageTable({
   initialExpandedDate,
   selectedProject = null,
   onClearProjectFilter,
+  onSessionClick,
 }: SessionUsageTableProps) {
   const { t } = useTranslation();
   // Track which date groups are collapsed
@@ -327,7 +329,17 @@ export function SessionUsageTable({
                           return (
                             <tr
                               key={session.path}
-                              className="align-top hover:bg-white/[0.01] transition-colors duration-150"
+                              tabIndex={onSessionClick ? 0 : undefined}
+                              role={onSessionClick ? "button" : undefined}
+                              onClick={() => onSessionClick?.(session)}
+                              onKeyDown={(event) => {
+                                if (!onSessionClick) return;
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  onSessionClick(session);
+                                }
+                              }}
+                              className="align-top hover:bg-white/[0.01] transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                             >
                               {/* Session Name & Time */}
                               <td className="border-b border-border/30 py-4">

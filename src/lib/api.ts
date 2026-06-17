@@ -194,6 +194,78 @@ export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {
   return invoke<SessionDetailRow[]>("fetch_session_details");
 }
 
+export type SessionReplayDetail = {
+  path: string;
+  sessionId: string;
+  modifiedAtMs: number;
+  sizeBytes: number;
+  rawJsonl: string;
+  summary: {
+    startTime: string | null;
+    endTime: string | null;
+    durationMs: number | null;
+    timeToFirstTokenMs: number | null;
+    cwd: string | null;
+    projects: string[];
+    models: string[];
+    cliVersion: string | null;
+    git: Record<string, string>;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
+    reasoningOutputTokens: number;
+    totalTokens: number;
+    costUSD: number;
+    turnCount: number;
+    messageCount: number;
+    toolCallCount: number;
+    patchCount: number;
+    errorCount: number;
+  };
+  turns: Array<{
+    turnId: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    durationMs: number | null;
+    userMessages: Array<{ timestamp: string | null; kind: string; text: string }>;
+    assistantMessages: Array<{ timestamp: string | null; kind: string; text: string }>;
+    reasoningSummaries: Array<{ timestamp: string | null; kind: string; text: string }>;
+    toolCalls: Array<{
+      callId: string | null;
+      name: string;
+      status: string | null;
+      arguments: string | null;
+      output: string | null;
+      stderr: string | null;
+      startedAt: string | null;
+      completedAt: string | null;
+      durationMs: number | null;
+      isError: boolean;
+    }>;
+    patchResults: Array<{
+      callId: string | null;
+      success: boolean | null;
+      output: string | null;
+      timestamp: string | null;
+      isError: boolean;
+    }>;
+    tokenEvents: Array<{
+      timestamp: string | null;
+      model: string;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      reasoningOutputTokens: number;
+      totalTokens: number;
+    }>;
+    errors: string[];
+  }>;
+};
+
+export async function fetchSessionDetail(path: string): Promise<SessionReplayDetail> {
+  return invoke<SessionReplayDetail>("fetch_session_detail", { path });
+}
+
 export type TrayMenuItemDto = {
   id: string;
   text: string;

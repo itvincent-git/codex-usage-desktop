@@ -688,6 +688,115 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
 
+  it("opens a session replay modal from a session row", async () => {
+    const rawJsonl = [
+      JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
+      JSON.stringify({ timestamp: "2026-06-11T00:00:01.000Z", type: "event_msg", payload: { type: "debug_note", text: "raw-only-marker" } }),
+    ].join("\n");
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string; path?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return limits(80);
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      if (command === "fetch_session_details") {
+        return [
+          {
+            path: "/tmp/session-replay.jsonl",
+            sessionId: "session-replay.jsonl",
+            modifiedAtMs: new Date("2026-06-11T00:00:02.000Z").getTime(),
+            sizeBytes: rawJsonl.length,
+            inputTokens: 100,
+            cachedInputTokens: 20,
+            outputTokens: 40,
+            reasoningOutputTokens: 0,
+            totalTokens: 140,
+            costUSD: 0.001,
+            models: ["gpt-5"],
+            projects: ["/repo/app"],
+          },
+        ];
+      }
+      if (command === "fetch_session_detail" && args?.path === "/tmp/session-replay.jsonl") {
+        return {
+          path: "/tmp/session-replay.jsonl",
+          sessionId: "session-replay.jsonl",
+          modifiedAtMs: new Date("2026-06-11T00:00:02.000Z").getTime(),
+          sizeBytes: rawJsonl.length,
+          rawJsonl,
+          summary: {
+            startTime: "2026-06-11T00:00:00.000Z",
+            endTime: "2026-06-11T00:00:02.000Z",
+            durationMs: 2000,
+            timeToFirstTokenMs: 1000,
+            cwd: "/repo/app",
+            projects: ["/repo/app"],
+            models: ["gpt-5"],
+            cliVersion: "1.0.0",
+            git: {},
+            inputTokens: 100,
+            cachedInputTokens: 20,
+            outputTokens: 40,
+            reasoningOutputTokens: 0,
+            totalTokens: 140,
+            costUSD: 0.001,
+            turnCount: 1,
+            messageCount: 1,
+            toolCallCount: 0,
+            patchCount: 0,
+            errorCount: 0,
+          },
+          turns: [
+            {
+              turnId: "turn-1",
+              startedAt: "2026-06-11T00:00:00.000Z",
+              completedAt: "2026-06-11T00:00:02.000Z",
+              durationMs: 2000,
+              userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session" }],
+              assistantMessages: [],
+              reasoningSummaries: [],
+              toolCalls: [],
+              patchResults: [],
+              tokenEvents: [],
+              errors: [],
+            },
+          ],
+        };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+
+    await userEvent.click(screen.getByRole("tab", { name: "Sessions" }));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_session_details"));
+
+    await userEvent.click(await screen.findByText("session-replay"));
+
+    expect(await screen.findByRole("dialog", { name: "session-replay" })).toBeInTheDocument();
+    expect(screen.getByText("Session summary")).toBeInTheDocument();
+    expect(screen.getByText("Turn turn-1")).toBeInTheDocument();
+    expect(screen.getByText("Replay this session")).toBeInTheDocument();
+    expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Raw JSONL" }));
+    expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close session detail" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "session-replay" })).not.toBeInTheDocument());
+    expect(screen.getByText("session-replay")).toBeInTheDocument();
+  });
+
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {

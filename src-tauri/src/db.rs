@@ -57,6 +57,14 @@ pub struct SessionFileRollup {
     pub rows: Vec<DailyUsageRow>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SessionRollupRecord {
+    pub path: String,
+    pub modified_at_ms: i64,
+    pub size_bytes: i64,
+    pub rows: Vec<DailyUsageRow>,
+}
+
 fn ensure_column(
     db: &Connection,
     table: &str,
@@ -210,6 +218,37 @@ pub fn query_session_file_rollup(
         Ok(rows_json) => serde_json::from_str(&rows_json)
             .map(Some)
             .map_err(|error| error.to_string()),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+pub fn query_session_rollup_record(
+    db: &Connection,
+    path: &str,
+) -> Result<Option<SessionRollupRecord>, String> {
+    let result = db.query_row(
+        r#"
+        SELECT path, modified_at_ms, size_bytes, rows_json
+        FROM session_file_rollups
+        WHERE path = ?
+        "#,
+        params![path],
+        |row| {
+            let rows_json: String = row.get(3)?;
+            let rows = serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
+
+            Ok(SessionRollupRecord {
+                path: row.get(0)?,
+                modified_at_ms: row.get(1)?,
+                size_bytes: row.get(2)?,
+                rows,
+            })
+        },
+    );
+
+    match result {
+        Ok(record) => Ok(Some(record)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(error) => Err(error.to_string()),
     }
@@ -375,8 +414,8 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let size_bytes: i64 = row.get(2)?;
             let rows_json: String = row.get(3)?;
 
-            let daily_rows = serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json)
-                .unwrap_or_default();
+            let daily_rows =
+                serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
 
             let mut input_tokens = 0;
             let mut cached_input_tokens = 0;

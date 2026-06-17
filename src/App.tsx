@@ -9,11 +9,13 @@ import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { SessionUsageTable } from "@/components/session-usage-table";
+import { SessionDetailModal } from "@/components/session-detail-modal";
 import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
+import type { SessionDetailRow } from "@/lib/api";
 import { useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ export default function App() {
     costUSD: number;
   } | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionDetailRow | null>(null);
   const {
     view,
     range,
@@ -133,6 +136,7 @@ export default function App() {
               setSelectedProjectFilter(null);
             }
             setSelectedProjectForModal(null);
+            setSelectedSession(null);
             void handleViewChange(nextView);
           }}
           updateInfo={updateInfo}
@@ -345,6 +349,7 @@ export default function App() {
               initialExpandedDate={selectedSessionDate}
               selectedProject={selectedProjectFilter}
               onClearProjectFilter={() => setSelectedProjectFilter(null)}
+              onSessionClick={setSelectedSession}
             />
           ) : null}
 
@@ -385,6 +390,13 @@ export default function App() {
                 setSelectedSessionDate(null);
                 void handleViewChange("sessions");
               }}
+            />
+          )}
+
+          {selectedSession && (
+            <SessionDetailModal
+              session={selectedSession}
+              onClose={() => setSelectedSession(null)}
             />
           )}
         </main>
