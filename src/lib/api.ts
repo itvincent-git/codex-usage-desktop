@@ -233,6 +233,7 @@ export type SessionReplayDetail = {
     startedAt: string | null;
     completedAt: string | null;
     durationMs: number | null;
+    systemMessages: Array<{ timestamp: string | null; kind: string; text: string }>;
     userMessages: Array<{ timestamp: string | null; kind: string; text: string }>;
     assistantMessages: Array<{ timestamp: string | null; kind: string; text: string }>;
     reasoningSummaries: Array<{ timestamp: string | null; kind: string; text: string }>;

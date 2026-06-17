@@ -311,6 +311,7 @@
       "first_token": "First token: {{value}}",
       "cli": "CLI: {{value}}",
       "turn": "Turn {{id}}",
+      "system": "System prompt",
       "user": "User",
       "assistant": "Assistant",
       "reasoning_summary": "Reasoning summary",

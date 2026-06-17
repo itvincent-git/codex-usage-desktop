@@ -39,6 +39,7 @@ struct ReplayParseState {
     cli_version: Option<String>,
     cwd: Option<String>,
     git: BTreeMap<String, String>,
+    system_messages: Vec<SessionReplayMessage>,
     turns: BTreeMap<String, SessionReplayTurn>,
     turn_order: Vec<String>,
     pending_tools: BTreeMap<String, (String, String, Option<String>)>,
@@ -143,7 +144,7 @@ impl ReplayParseState {
 
         match entry_type {
             "session_meta" => {
-                self.capture_meta(payload);
+                self.capture_meta(payload, timestamp);
                 return;
             }
             "turn_context" => {
@@ -263,7 +264,7 @@ impl ReplayParseState {
         }
     }
 
-    fn capture_meta(&mut self, payload: &Value) {
+    fn capture_meta(&mut self, payload: &Value, timestamp: Option<String>) {
         if let Some(cwd) = string_field(payload, "cwd") {
             self.cwd = Some(cwd.clone());
             self.current_project_path = Some(cwd);
@@ -278,6 +279,20 @@ impl ReplayParseState {
                 if let Some(value) = value.as_str() {
                     self.git.insert(key.clone(), value.to_string());
                 }
+            }
+        }
+
+        if let Some(text) = extract_system_prompt_text(payload) {
+            if !self
+                .system_messages
+                .iter()
+                .any(|message| message.text == text)
+            {
+                self.system_messages.push(SessionReplayMessage {
+                    timestamp,
+                    kind: "base_instructions".to_string(),
+                    text,
+                });
             }
         }
     }
@@ -444,7 +459,9 @@ impl ReplayParseState {
     fn turn_mut(&mut self, turn_id: &str) -> &mut SessionReplayTurn {
         if !self.turns.contains_key(turn_id) {
             self.turn_order.push(turn_id.to_string());
-            self.turns.insert(turn_id.to_string(), empty_turn(turn_id));
+            let mut turn = empty_turn(turn_id);
+            turn.system_messages = self.system_messages.clone();
+            self.turns.insert(turn_id.to_string(), turn);
         }
         self.turns.get_mut(turn_id).expect("turn exists")
     }
@@ -456,6 +473,7 @@ fn empty_turn(turn_id: &str) -> SessionReplayTurn {
         started_at: None,
         completed_at: None,
         duration_ms: None,
+        system_messages: Vec::new(),
         user_messages: Vec::new(),
         assistant_messages: Vec::new(),
         reasoning_summaries: Vec::new(),
@@ -591,6 +609,15 @@ fn extract_message_text(value: &Value) -> Option<String> {
                 .filter(|content| content.is_array() || content.is_object())
                 .map(value_to_compact_string)
         })
+}
+
+fn extract_system_prompt_text(value: &Value) -> Option<String> {
+    value
+        .get("base_instructions")
+        .and_then(|instructions| string_field(instructions, "text"))
+        .or_else(|| string_field(value, "system_prompt"))
+        .or_else(|| string_field(value, "systemPrompt"))
+        .or_else(|| string_field(value, "instructions"))
 }
 
 fn extract_call_id(value: &Value) -> Option<String> {
@@ -812,6 +839,29 @@ mod tests {
     }
 
     #[test]
+    fn attaches_base_instructions_to_each_turn() {
+        let raw = [
+            session_meta_with_base_instructions(
+                "2026-06-01T00:00:00.000Z",
+                "/repo/app",
+                "Use the repository instructions.",
+            ),
+            turn_context("2026-06-01T00:00:01.000Z", "turn-1", "gpt-5", "/repo/app"),
+            turn_context("2026-06-01T00:01:00.000Z", "turn-2", "gpt-5", "/repo/app"),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+
+        assert_eq!(detail.turns.len(), 2);
+        assert_eq!(
+            detail.turns[0].system_messages[0].text,
+            "Use the repository instructions."
+        );
+        assert_eq!(detail.turns[1].system_messages[0].kind, "base_instructions");
+    }
+
+    #[test]
     fn rejects_unindexed_session_path() {
         let temp_dir = tempfile_dir();
         let db = open_database(&temp_dir.join("usage.sqlite")).unwrap();
@@ -920,6 +970,19 @@ mod tests {
             "timestamp": timestamp,
             "type": "session_meta",
             "payload": { "cwd": cwd, "cli_version": "1.2.3", "git": { "branch": "main" } }
+        })
+        .to_string()
+    }
+
+    fn session_meta_with_base_instructions(timestamp: &str, cwd: &str, text: &str) -> String {
+        serde_json::json!({
+            "timestamp": timestamp,
+            "type": "session_meta",
+            "payload": {
+                "cwd": cwd,
+                "cli_version": "1.2.3",
+                "base_instructions": { "text": text }
+            }
         })
         .to_string()
     }

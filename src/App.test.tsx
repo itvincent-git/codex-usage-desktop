@@ -770,6 +770,9 @@ describe("App", () => {
               startedAt: "2026-06-11T00:00:00.000Z",
               completedAt: "2026-06-11T00:00:02.000Z",
               durationMs: 2000,
+              systemMessages: [
+                { timestamp: "2026-06-11T00:00:00.000Z", kind: "base_instructions", text: "Use the repo instructions." },
+              ],
               userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session" }],
               assistantMessages: [],
               reasoningSummaries: [],
@@ -798,6 +801,8 @@ describe("App", () => {
     expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByText("Session summary")).toBeInTheDocument();
     expect(screen.getByText("Turn turn-1")).toBeInTheDocument();
+    expect(screen.getByText("System prompt")).toBeInTheDocument();
+    expect(screen.getByText("Use the repo instructions.")).not.toBeVisible();
     expect(screen.getByText("Replay this session")).toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 

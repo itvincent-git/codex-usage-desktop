@@ -42,8 +42,16 @@ function metric(label: string, value: string, tone: "default" | "danger" = "defa
   );
 }
 
-function TextBlock({ title, text }: { title: string; text: string }) {
-  const collapsed = text.length > 360;
+function TextBlock({
+  title,
+  text,
+  defaultCollapsed = false,
+}: {
+  title: string;
+  text: string;
+  defaultCollapsed?: boolean;
+}) {
+  const collapsed = defaultCollapsed || text.length > 360;
   if (!collapsed) {
     return (
       <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
@@ -226,6 +234,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     </div>
                   </div>
                   <div className="space-y-3">
+                    {turn.systemMessages.map((message, i) => (
+                      <TextBlock
+                        key={`s-${i}`}
+                        title={t("sessions.detail.system")}
+                        text={message.text}
+                        defaultCollapsed
+                      />
+                    ))}
                     {turn.userMessages.map((message, i) => <TextBlock key={`u-${i}`} title={t("sessions.detail.user")} text={message.text} />)}
                     {turn.assistantMessages.map((message, i) => <TextBlock key={`a-${i}`} title={t("sessions.detail.assistant")} text={message.text} />)}
                     {turn.reasoningSummaries.map((message, i) => <TextBlock key={`r-${i}`} title={t("sessions.detail.reasoning_summary")} text={message.text} />)}

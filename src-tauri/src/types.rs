@@ -316,6 +316,7 @@ pub struct SessionReplayTurn {
     pub started_at: Option<String>,
     pub completed_at: Option<String>,
     pub duration_ms: Option<i64>,
+    pub system_messages: Vec<SessionReplayMessage>,
     pub user_messages: Vec<SessionReplayMessage>,
     pub assistant_messages: Vec<SessionReplayMessage>,
     pub reasoning_summaries: Vec<SessionReplayMessage>,

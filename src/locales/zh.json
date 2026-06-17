@@ -311,6 +311,7 @@
       "first_token": "首个 token: {{value}}",
       "cli": "CLI: {{value}}",
       "turn": "回合 {{id}}",
+      "system": "系统提示词",
       "user": "用户",
       "assistant": "助手",
       "reasoning_summary": "推理摘要",
