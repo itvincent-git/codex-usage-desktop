@@ -162,7 +162,7 @@ impl ReplayParseState {
             _ => {}
         }
 
-        let event = if entry_type == "event_msg" {
+        let event = if matches!(entry_type, "event_msg" | "response_item") {
             payload
         } else {
             entry
@@ -194,7 +194,7 @@ impl ReplayParseState {
                 let turn = self.turn_mut(&turn_id);
                 turn.completed_at = timestamp;
             }
-            _ if is_user_message(event_type) => {
+            _ if is_user_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
                     turn.user_messages.push(SessionReplayMessage {
@@ -204,7 +204,7 @@ impl ReplayParseState {
                     });
                 }
             }
-            _ if is_assistant_message(event_type) => {
+            _ if is_assistant_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
                     turn.assistant_messages.push(SessionReplayMessage {
@@ -537,19 +537,21 @@ fn build_summary(
     summary
 }
 
-fn is_user_message(event_type: &str) -> bool {
+fn is_user_message(event_type: &str, event: &Value) -> bool {
     matches!(
         event_type,
         "user_message" | "user_message_delta" | "input_text"
     ) || event_type.contains("user_message")
+        || (event_type == "message" && string_field(event, "role").as_deref() == Some("user"))
 }
 
-fn is_assistant_message(event_type: &str) -> bool {
+fn is_assistant_message(event_type: &str, event: &Value) -> bool {
     matches!(
         event_type,
         "assistant_message" | "agent_message" | "assistant_message_delta" | "output_text"
     ) || event_type.contains("assistant_message")
         || event_type.contains("agent_message")
+        || (event_type == "message" && string_field(event, "role").as_deref() == Some("assistant"))
 }
 
 fn is_reasoning_message(event_type: &str) -> bool {
@@ -603,12 +605,26 @@ fn extract_message_text(value: &Value) -> Option<String> {
                 string_field(item, "text").or_else(|| string_field(item, "content"))
             })
         })
+        .or_else(|| extract_content_text(value.get("content")?))
         .or_else(|| {
             value
                 .get("content")
                 .filter(|content| content.is_array() || content.is_object())
                 .map(value_to_compact_string)
         })
+}
+
+fn extract_content_text(content: &Value) -> Option<String> {
+    let texts = content
+        .as_array()?
+        .iter()
+        .filter_map(|part| string_field(part, "text").or_else(|| string_field(part, "content")))
+        .collect::<Vec<_>>();
+    if texts.is_empty() {
+        None
+    } else {
+        Some(texts.join("\n"))
+    }
 }
 
 fn extract_system_prompt_text(value: &Value) -> Option<String> {
@@ -862,6 +878,43 @@ mod tests {
     }
 
     #[test]
+    fn parses_response_item_user_message_content() {
+        let raw = [
+            session_meta("2026-06-01T00:00:00.000Z", "/repo/app"),
+            response_item(
+                "2026-06-01T00:00:01.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "# AGENTS.md instructions for /repo/app\n\n<INSTRUCTIONS>\nUse the repository instructions.\n</INSTRUCTIONS>"
+                        },
+                        {
+                            "type": "input_text",
+                            "text": "<environment_context>\n  <cwd>/repo/app</cwd>\n</environment_context>"
+                        }
+                    ]
+                }),
+            ),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+
+        assert_eq!(detail.turns.len(), 1);
+        assert_eq!(detail.turns[0].turn_id, UNGROUPED_TURN_ID);
+        assert_eq!(detail.turns[0].user_messages.len(), 1);
+        assert!(detail.turns[0].user_messages[0]
+            .text
+            .contains("AGENTS.md instructions"));
+        assert!(detail.turns[0].user_messages[0]
+            .text
+            .contains("environment_context"));
+    }
+
+    #[test]
     fn rejects_unindexed_session_path() {
         let temp_dir = tempfile_dir();
         let db = open_database(&temp_dir.join("usage.sqlite")).unwrap();
@@ -1000,6 +1053,15 @@ mod tests {
         serde_json::json!({
             "timestamp": timestamp,
             "type": "event_msg",
+            "payload": payload
+        })
+        .to_string()
+    }
+
+    fn response_item(timestamp: &str, payload: Value) -> String {
+        serde_json::json!({
+            "timestamp": timestamp,
+            "type": "response_item",
             "payload": payload
         })
         .to_string()
