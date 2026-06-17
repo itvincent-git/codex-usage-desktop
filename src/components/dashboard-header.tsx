@@ -1,6 +1,6 @@
 import { Sparkles, RefreshCcw } from "lucide-react";
 import type { OverviewResponse, UpdateCheckResponse } from "@/lib/api";
-import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
+import type { UpdateInstallStatus, UpdateProgressState } from "@/hooks/use-usage-dashboard";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/usage-dashboard";
@@ -14,6 +14,7 @@ type DashboardHeaderProps = {
   updateInfo: UpdateCheckResponse | null;
   isUpdateDismissed: boolean;
   updateInstallStatus: UpdateInstallStatus;
+  updateProgress: UpdateProgressState;
   onUpgrade: () => void;
   showLogsTab?: boolean;
   onRefresh: () => void;
@@ -30,6 +31,7 @@ export function DashboardHeader({
   updateInfo,
   isUpdateDismissed,
   updateInstallStatus,
+  updateProgress,
   onUpgrade,
   showLogsTab = false,
   onRefresh,
@@ -46,7 +48,9 @@ export function DashboardHeader({
   const headerUpgradeLabel = updateInstallStatus === "installed"
     ? t("header.restart_update")
     : isInstallingUpdate
-      ? t("header.downloading_update")
+      ? updateProgress.percent === null
+        ? t("header.downloading_update")
+        : t("header.downloading_update_progress", { percent: updateProgress.percent })
       : t("header.upgrade", { version: updateInfo?.latestVersion });
 
   const formatUpdatedTime = (timestamp: string) => {

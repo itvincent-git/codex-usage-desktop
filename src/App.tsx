@@ -52,6 +52,7 @@ export default function App() {
     isUpdateChecking,
     updateCheckError,
     updateInstallStatus,
+    updateProgress,
     updateInstallError,
     isUpdateDismissed,
     showLogsTab,
@@ -117,7 +118,9 @@ export default function App() {
   const updateButtonLabel = isUpdateInstalled
     ? t("update.restart_now")
     : isInstallingUpdate
-      ? t("update.downloading")
+      ? updateProgress.percent === null
+        ? t("update.downloading")
+        : t("update.downloading_progress", { percent: updateProgress.percent })
       : t("update.upgrade_now");
 
   return (
@@ -142,6 +145,7 @@ export default function App() {
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           updateInstallStatus={updateInstallStatus}
+          updateProgress={updateProgress}
           onUpgrade={() => void handleUpgrade()}
           showLogsTab={showLogsTab}
           onRefresh={() => void handleRefresh()}
@@ -218,6 +222,24 @@ export default function App() {
                             {t("update.view_release")}
                           </button>
                         ) : null}
+                      </div>
+                    ) : null}
+                    {isInstallingUpdate ? (
+                      <div className="pt-2">
+                        <div
+                          className="h-1.5 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-500/15"
+                          role="progressbar"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={updateProgress.percent ?? undefined}
+                        >
+                          <div
+                            className={`h-full rounded-full bg-indigo-600 transition-all duration-300 dark:bg-indigo-400 ${
+                              updateProgress.percent === null ? "w-1/2 animate-pulse" : ""
+                            }`}
+                            style={updateProgress.percent === null ? undefined : { width: `${updateProgress.percent}%` }}
+                          />
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -362,6 +384,7 @@ export default function App() {
               isUpdateChecking={isUpdateChecking}
               updateCheckError={updateCheckError}
               updateInstallStatus={updateInstallStatus}
+              updateProgress={updateProgress}
               updateInstallError={updateInstallError}
               onCheckUpdates={() => void handleManualUpdateCheck()}
               onUpgrade={() => void handleUpgrade()}

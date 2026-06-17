@@ -11,6 +11,7 @@ import tauriConfig from "../src-tauri/tauri.conf.json";
 const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 const updateTrayMock = vi.hoisted(() => vi.fn());
+const eventListeners = vi.hoisted(() => new Map<string, Array<(event: { payload: any }) => void>>());
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (command: string, ...args: any[]) => {
@@ -57,7 +58,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
+  listen: vi.fn((event: string, callback: (event: { payload: any }) => void) => {
+    const listeners = eventListeners.get(event) ?? [];
+    listeners.push(callback);
+    eventListeners.set(event, listeners);
+    return Promise.resolve(() => {
+      eventListeners.set(event, (eventListeners.get(event) ?? []).filter((listener) => listener !== callback));
+    });
+  }),
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -146,6 +154,7 @@ describe("App", () => {
     invokeMock.mockReset();
     saveMock.mockReset();
     updateTrayMock.mockReset();
+    eventListeners.clear();
     vi.unstubAllGlobals();
     vi.stubGlobal(
       "ResizeObserver",
@@ -1359,6 +1368,61 @@ describe("App", () => {
     const restartButton = await screen.findByRole("button", { name: "Restart to update" });
     await userEvent.click(restartButton);
     expect(invokeMock).toHaveBeenCalledWith("restart_app");
+  });
+
+  it("shows download progress while installing an update", async () => {
+    let finishDownload = (_value: { version: string }) => {};
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return { importedDays: 3, scannedAt: "2026-04-26T00:00:00.000Z", timezone: "UTC" };
+      }
+
+      if (command === "fetch_codex_limits") {
+        throw new Error("limits unavailable");
+      }
+
+      if (command === "fetch_overview") {
+        return overview();
+      }
+
+      if (command === "check_for_updates") {
+        return {
+          hasUpdate: true,
+          currentVersion: "0.4.0",
+          latestVersion: "0.5.0",
+          latestTag: "v0.5.0",
+          releaseName: "Big Release",
+          releaseNotes: "Feature details",
+          releaseUrl: "https://github.com/test/release",
+        };
+      }
+
+      if (command === "download_and_install_update") {
+        return new Promise((resolve) => {
+          finishDownload = resolve;
+        });
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("New update available: v0.5.0")).toBeInTheDocument());
+    await waitFor(() => expect(eventListeners.get("update-download-progress")?.length).toBeGreaterThan(0));
+
+    await userEvent.click(screen.getByRole("button", { name: "Upgrade Now" }));
+
+    eventListeners.get("update-download-progress")?.forEach((listener) => {
+      listener({ payload: { downloaded: 50, total: 100, finished: false } });
+    });
+
+    expect(await screen.findByRole("button", { name: "Downloading 50%" })).toBeDisabled();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
+
+    finishDownload({ version: "0.5.0" });
+    expect(await screen.findByRole("button", { name: "Restart to Update" })).toBeInTheDocument();
   });
 
   it("defaults to hiding the Logs tab, and shows it when toggled in Settings", async () => {

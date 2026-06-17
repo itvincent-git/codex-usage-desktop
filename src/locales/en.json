@@ -30,6 +30,7 @@
     "app_title": "Codex Usage Desktop",
     "upgrade": "Upgrade v{{version}}",
     "downloading_update": "Downloading...",
+    "downloading_update_progress": "Downloading {{percent}}%",
     "restart_update": "Restart to update",
     "upgrade_title": "Click to upgrade your application"
   },
@@ -41,6 +42,7 @@
     "view_release_notes": "View release notes",
     "upgrade_now": "Upgrade Now",
     "downloading": "Downloading...",
+    "downloading_progress": "Downloading {{percent}}%",
     "restart_now": "Restart to Update",
     "view_release": "View release",
     "dismiss_aria": "Dismiss update notification",
@@ -347,6 +349,7 @@
     "btn_upgrade": "Upgrade",
     "btn_download_update": "Download and install",
     "btn_downloading_update": "Downloading...",
+    "btn_downloading_update_progress": "Downloading {{percent}}%",
     "btn_restart_update": "Restart to update",
     "btn_view_release": "View release page",
     "up_to_date": "You are up to date!",

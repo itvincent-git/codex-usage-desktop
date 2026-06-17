@@ -156,6 +156,12 @@ export type UpdateInstallResponse = {
   version: string;
 };
 
+export type UpdateDownloadProgress = {
+  downloaded: number;
+  total: number | null;
+  finished: boolean;
+};
+
 export async function checkForUpdates(etag?: string | null): Promise<UpdateCheckResponse> {
   if (etag) {
     return invoke<UpdateCheckResponse>("check_for_updates", { etag });

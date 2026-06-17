@@ -18,6 +18,7 @@ import {
   openUrl,
   restartApp,
   type UpdateCheckResponse,
+  type UpdateDownloadProgress,
   fetchSessionDetails,
   type CodexLimitWindow,
   type SessionDetailRow,
@@ -75,6 +76,34 @@ function formatTrayLimitTitle(prefix: string, window: CodexLimitWindow | null | 
 
 export type UpdateInstallStatus = "idle" | "downloading" | "installed";
 
+export type UpdateProgressState = {
+  downloaded: number;
+  total: number | null;
+  percent: number | null;
+  finished: boolean;
+};
+
+const emptyUpdateProgress: UpdateProgressState = {
+  downloaded: 0,
+  total: null,
+  percent: null,
+  finished: false,
+};
+
+function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgressState {
+  const total = typeof progress.total === "number" && progress.total > 0 ? progress.total : null;
+  const percent = total === null
+    ? null
+    : Math.max(0, Math.min(100, Math.round((progress.downloaded / total) * 100)));
+
+  return {
+    downloaded: progress.downloaded,
+    total,
+    percent,
+    finished: progress.finished,
+  };
+}
+
 export function useUsageDashboard() {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
@@ -99,6 +128,7 @@ export function useUsageDashboard() {
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
   const [updateCheckError, setUpdateCheckError] = useState<string | null>(null);
   const [updateInstallStatus, setUpdateInstallStatus] = useState<UpdateInstallStatus>("idle");
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgressState>(emptyUpdateProgress);
   const [updateInstallError, setUpdateInstallError] = useState<string | null>(null);
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
   const [trayClockMinute, setTrayClockMinute] = useState(() => Math.floor(Date.now() / 60_000));
@@ -152,6 +182,29 @@ export function useUsageDashboard() {
 
     return () => window.clearInterval(timer);
   }, [bootstrapped]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let unlisten: (() => void) | null = null;
+
+    void listen<UpdateDownloadProgress>("update-download-progress", (event) => {
+      if (!isMounted) return;
+      setUpdateProgress(toUpdateProgressState(event.payload));
+    }).then((cleanup) => {
+      if (isMounted) {
+        unlisten = cleanup;
+      } else {
+        cleanup();
+      }
+    }).catch((err) => {
+      console.warn("Failed to listen for update download progress", err);
+    });
+
+    return () => {
+      isMounted = false;
+      unlisten?.();
+    };
+  }, []);
 
   const hasBootstrappedRef = useRef(false);
   const lastLimitsFetchTimeRef = useRef<number>(0);
@@ -746,12 +799,15 @@ export function useUsageDashboard() {
     }
 
     setUpdateInstallStatus("downloading");
+    setUpdateProgress(emptyUpdateProgress);
     setUpdateInstallError(null);
     try {
       await downloadAndInstallUpdate();
+      setUpdateProgress((progress) => ({ ...progress, percent: 100, finished: true }));
       setUpdateInstallStatus("installed");
     } catch (e) {
       setUpdateInstallStatus("idle");
+      setUpdateProgress(emptyUpdateProgress);
       setUpdateInstallError(errorMessage(e, "Failed to download and install the update."));
     }
   };
@@ -785,6 +841,7 @@ export function useUsageDashboard() {
     isUpdateChecking,
     updateCheckError,
     updateInstallStatus,
+    updateProgress,
     updateInstallError,
     isUpdateDismissed,
     showLogsTab,

@@ -10,13 +10,18 @@ mod types;
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 use std::time::{Duration, Instant};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse, UpdateInstallResponse, SessionDetailRow, SessionReplayDetail, UsageRefreshResponse,
+    UpdateCheckResponse, UpdateDownloadProgress, UpdateInstallResponse, SessionDetailRow,
+    SessionReplayDetail, UsageRefreshResponse,
 };
 
 const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -544,12 +549,35 @@ async fn download_and_install_update(
         .ok_or_else(|| "No update available.".to_string())?;
 
     let version = update.version.clone();
+    let downloaded = Arc::new(AtomicU64::new(0));
+    let finished_downloaded = Arc::clone(&downloaded);
+    let progress_app = app.clone();
     update
         .download_and_install(
             |chunk_length, content_length| {
+                let downloaded = downloaded
+                    .fetch_add(chunk_length as u64, Ordering::Relaxed)
+                    .saturating_add(chunk_length as u64);
+                let _ = progress_app.emit(
+                    "update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded,
+                        total: content_length,
+                        finished: false,
+                    },
+                );
                 log::debug!("Downloaded updater chunk: {chunk_length} bytes of {content_length:?}");
             },
             || {
+                let downloaded = finished_downloaded.load(Ordering::Relaxed);
+                let _ = app.emit(
+                    "update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded,
+                        total: Some(downloaded),
+                        finished: true,
+                    },
+                );
                 log::info!("Update download finished.");
             },
         )
@@ -727,7 +755,6 @@ pub fn run() {
 
                 match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
                     Ok(refresh_response) => {
-                        use tauri::Emitter;
                         let _ = app_handle.emit("background-refresh-completed", refresh_response);
                     }
                     Err(error) => {

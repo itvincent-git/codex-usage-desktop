@@ -2,7 +2,7 @@ import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw, Al
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UpdateCheckResponse, CodexLimitsResponse } from "@/lib/api";
-import type { UpdateInstallStatus } from "@/hooks/use-usage-dashboard";
+import type { UpdateInstallStatus, UpdateProgressState } from "@/hooks/use-usage-dashboard";
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
@@ -23,6 +23,7 @@ type SettingsPageProps = {
   isUpdateChecking: boolean;
   updateCheckError: string | null;
   updateInstallStatus: UpdateInstallStatus;
+  updateProgress: UpdateProgressState;
   updateInstallError: string | null;
   onCheckUpdates: () => void;
   onUpgrade: () => void;
@@ -51,6 +52,7 @@ export function SettingsPage({
   isUpdateChecking,
   updateCheckError,
   updateInstallStatus,
+  updateProgress,
   updateInstallError,
   onCheckUpdates,
   onUpgrade,
@@ -102,7 +104,9 @@ export function SettingsPage({
   const upgradeLabel = isUpdateInstalled
     ? t("settings.btn_restart_update")
     : isInstallingUpdate
-      ? t("settings.btn_downloading_update")
+      ? updateProgress.percent === null
+        ? t("settings.btn_downloading_update")
+        : t("settings.btn_downloading_update_progress", { percent: updateProgress.percent })
       : t("settings.btn_download_update");
 
   return (
@@ -320,6 +324,22 @@ export function SettingsPage({
                           {parsedReleaseNotes}
                         </div>
                       )
+                    ) : null}
+                    {isInstallingUpdate ? (
+                      <div
+                        className="h-1.5 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-500/15"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={updateProgress.percent ?? undefined}
+                      >
+                        <div
+                          className={`h-full rounded-full bg-indigo-600 transition-all duration-300 dark:bg-indigo-400 ${
+                            updateProgress.percent === null ? "w-1/2 animate-pulse" : ""
+                          }`}
+                          style={updateProgress.percent === null ? undefined : { width: `${updateProgress.percent}%` }}
+                        />
+                      </div>
                     ) : null}
                     {updateInstallError && updateInfo.releaseUrl ? (
                       <Button variant="ghost" size="sm" onClick={onOpenUpdateRelease}>

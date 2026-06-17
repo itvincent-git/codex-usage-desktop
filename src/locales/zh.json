@@ -30,6 +30,7 @@
     "app_title": "Codex Usage Desktop",
     "upgrade": "升级至 v{{version}}",
     "downloading_update": "正在下载...",
+    "downloading_update_progress": "正在下载 {{percent}}%",
     "restart_update": "重启完成更新",
     "upgrade_title": "点击升级您的应用"
   },
@@ -41,6 +42,7 @@
     "view_release_notes": "查看更新说明",
     "upgrade_now": "立即升级",
     "downloading": "正在下载...",
+    "downloading_progress": "正在下载 {{percent}}%",
     "restart_now": "重启完成更新",
     "view_release": "查看发布页",
     "dismiss_aria": "关闭更新提示",
@@ -347,6 +349,7 @@
     "btn_upgrade": "立即升级",
     "btn_download_update": "下载并安装",
     "btn_downloading_update": "正在下载...",
+    "btn_downloading_update_progress": "正在下载 {{percent}}%",
     "btn_restart_update": "重启完成更新",
     "btn_view_release": "查看发布页",
     "up_to_date": "您已是最新版本！",
