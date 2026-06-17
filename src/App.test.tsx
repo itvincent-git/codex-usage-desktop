@@ -155,6 +155,7 @@ describe("App", () => {
     saveMock.mockReset();
     updateTrayMock.mockReset();
     eventListeners.clear();
+    document.body.style.overflow = "";
     vi.unstubAllGlobals();
     vi.stubGlobal(
       "ResizeObserver",
@@ -790,9 +791,11 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Sessions" }));
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_session_details"));
 
+    document.body.style.overflow = "auto";
     await userEvent.click(await screen.findByText("session-replay"));
 
     expect(await screen.findByRole("dialog", { name: "session-replay" })).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByText("Session summary")).toBeInTheDocument();
     expect(screen.getByText("Turn turn-1")).toBeInTheDocument();
     expect(screen.getByText("Replay this session")).toBeInTheDocument();
@@ -803,6 +806,7 @@ describe("App", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Close session detail" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "session-replay" })).not.toBeInTheDocument());
+    expect(document.body.style.overflow).toBe("auto");
     expect(screen.getByText("session-replay")).toBeInTheDocument();
   });
 

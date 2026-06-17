@@ -71,6 +71,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     setDetail(null);
     setError(null);
@@ -115,12 +123,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   return (
     <div
-      className="fixed inset-0 z-50 flex bg-background text-foreground"
+      className="fixed inset-0 z-50 flex overscroll-contain bg-background text-foreground"
       role="dialog"
       aria-modal="true"
       aria-labelledby="session-detail-title"
     >
-      <div className="flex h-screen w-full flex-col overflow-hidden">
+      <div className="flex h-screen w-full flex-col overflow-hidden overscroll-contain">
         <header className="border-b border-border/70 bg-surface px-5 py-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-2">
@@ -180,7 +188,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
           </button>
         </nav>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 px-5 py-4">
           {error ? (
             <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
               <AlertTriangle className="h-4 w-4 shrink-0" />
