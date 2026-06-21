@@ -74,6 +74,17 @@ function formatTrayLimitTitle(prefix: string, window: CodexLimitWindow | null | 
   return resetCountdown ? `${prefix}: ${remaining}/${resetCountdown}` : `${prefix}: ${remaining}`;
 }
 
+function hasExpiredLimitWindow(window: CodexLimitWindow | null | undefined): boolean {
+  if (!window?.resetsAt) return false;
+
+  const resetTime = new Date(window.resetsAt).getTime();
+  return Number.isFinite(resetTime) && resetTime <= Date.now();
+}
+
+function hasExpiredCodexLimitWindow(limits: CodexLimitsResponse | null): boolean {
+  return hasExpiredLimitWindow(limits?.session) || hasExpiredLimitWindow(limits?.weekly);
+}
+
 export type UpdateInstallStatus = "idle" | "downloading" | "installed";
 
 export type UpdateProgressState = {
@@ -309,7 +320,7 @@ export function useUsageDashboard() {
     lastAutoScanTimeRef.current = now;
     const startedAt = performance.now();
     try {
-      await scanAndReloadOverview(startedAt);
+      await scanAndReloadOverview(startedAt, { force: hasExpiredCodexLimitWindow(codexLimits) });
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
     }
@@ -453,6 +464,32 @@ export function useUsageDashboard() {
     void runBackgroundUpdateCheck();
   });
 
+  const handleBackgroundRefreshCompleted = useEffectEvent(async (refresh: UsageRefreshResponse) => {
+    if (refresh.limits) {
+      setCodexLimits(refresh.limits);
+      setCodexLimitsError(null);
+      lastLimitsFetchTimeRef.current = Date.now();
+    } else if (refresh.limitsError) {
+      setCodexLimitsError(refresh.limitsError);
+      lastLimitsFetchTimeRef.current = Date.now();
+    } else if (refresh.limitsSkipped && hasExpiredCodexLimitWindow(codexLimits)) {
+      await loadCodexLimits({ force: true });
+    }
+
+    // Reload overview to keep UI fresh
+    const filesParsed = refresh.scan?.metrics?.filesParsed ?? 0;
+    const isForeground = document.visibilityState === "visible";
+    if (isForeground || filesParsed > 0) {
+      await loadOverview(range);
+      if (view === "monthly") {
+        await loadMonthlyUsage();
+      }
+      if (view === "sessions") {
+        await loadSessions();
+      }
+    }
+  });
+
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
@@ -511,29 +548,7 @@ export function useUsageDashboard() {
     const setupListener = async () => {
       try {
         const unsubscribe = await listen<UsageRefreshResponse>("background-refresh-completed", async (event) => {
-          const refresh = event.payload;
-
-          if (refresh.limits) {
-            setCodexLimits(refresh.limits);
-            setCodexLimitsError(null);
-            lastLimitsFetchTimeRef.current = Date.now();
-          } else if (refresh.limitsError) {
-            setCodexLimitsError(refresh.limitsError);
-            lastLimitsFetchTimeRef.current = Date.now();
-          }
-
-          // Reload overview to keep UI fresh
-          const filesParsed = refresh.scan?.metrics?.filesParsed ?? 0;
-          const isForeground = document.visibilityState === "visible";
-          if (isForeground || filesParsed > 0) {
-            await loadOverview(range);
-            if (view === "monthly") {
-              await loadMonthlyUsage();
-            }
-            if (view === "sessions") {
-              await loadSessions();
-            }
-          }
+          await handleBackgroundRefreshCompleted(event.payload);
         });
         unlistenFn = unsubscribe;
       } catch (err) {
@@ -548,7 +563,7 @@ export function useUsageDashboard() {
         unlistenFn();
       }
     };
-  }, [bootstrapped, range, view, loadOverview, loadMonthlyUsage, loadSessions]);
+  }, [bootstrapped, handleBackgroundRefreshCompleted]);
 
   // Update tray icon whenever limits, overview, translation, or tray settings change
   useEffect(() => {

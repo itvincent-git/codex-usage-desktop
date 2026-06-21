@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,13 +126,13 @@ function scan(filesParsed: number) {
   };
 }
 
-function limits(remainingPercent = 80) {
+function limits(remainingPercent = 80, resetsAt = "2026-06-11T05:00:00.000Z") {
   return {
     session: {
       usedPercent: 100 - remainingPercent,
       remainingPercent,
       windowMinutes: 300,
-      resetsAt: "2026-06-11T05:00:00.000Z",
+      resetsAt,
     },
     weekly: null,
     updatedAt: "2026-06-11T00:00:00.000Z",
@@ -224,6 +224,44 @@ describe("App", () => {
       expect(invokeMock.mock.calls.filter(([command]) => command === "scan_usage")).toHaveLength(2);
     });
     expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(1);
+  });
+
+  it("refreshes expired limits after returning from the background even when files are unchanged", async () => {
+    const initialNow = new Date("2026-06-11T00:00:00.000Z").getTime();
+    let now = initialNow;
+    let limitsFetchCount = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    setPageActive(true);
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        limitsFetchCount += 1;
+        return limits(limitsFetchCount >= 2 ? 100 : 80, new Date(initialNow + 60_000).toISOString());
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText("80%").length).toBeGreaterThan(0));
+
+    setPageActive(false);
+    window.dispatchEvent(new Event("blur"));
+    now += 5 * 60_000 + 1;
+    setPageActive(true);
+    window.dispatchEvent(new Event("focus"));
+
+    await waitFor(() => expect(screen.getAllByText("100%").length).toBeGreaterThan(0));
+    expect(invokeMock.mock.calls.filter(([command]) => command === "scan_usage")).toHaveLength(2);
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
   });
 
   it("updates overview and limits after a background resume scan finds changed files", async () => {
@@ -1023,6 +1061,61 @@ describe("App", () => {
           items: expect.arrayContaining([
             expect.objectContaining({ id: "status_5h", text: expect.stringContaining("3 hours left") }),
             expect.objectContaining({ id: "status_weekly", text: expect.stringContaining("4 days left") }),
+          ]),
+        }),
+      }));
+    });
+  });
+
+  it("refreshes expired limits for skipped native background refreshes and updates the tray", async () => {
+    const initialNow = new Date("2026-06-11T06:00:00.000Z").getTime();
+    vi.spyOn(Date, "now").mockReturnValue(initialNow);
+    localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: false, tokens: false, cost: false }));
+    localStorage.setItem("tray_menu_show", JSON.stringify({ limit5h: true, limitWeekly: false, tokens: false, cost: false }));
+
+    let limitsFetchCount = 0;
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        limitsFetchCount += 1;
+        return { ...limits(limitsFetchCount >= 2 ? 100 : 80, "2026-06-11T05:00:00.000Z"), membershipLevel: "pro" };
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(eventListeners.get("background-refresh-completed")?.length).toBeGreaterThan(0));
+    const listener = eventListeners.get("background-refresh-completed")?.[0];
+    expect(listener).toBeDefined();
+
+    await act(async () => {
+      listener?.({
+        payload: {
+          scan: scan(0),
+          limits: null,
+          limitsError: null,
+          limitsSkipped: true,
+          refreshedAt: "2026-06-11T06:00:00.000Z",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
+      expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
+        payload: expect.objectContaining({
+          title: "5h: 100%/soon",
+          items: expect.arrayContaining([
+            expect.objectContaining({ id: "status_5h", text: expect.stringContaining("100%") }),
           ]),
         }),
       }));
