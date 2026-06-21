@@ -115,7 +115,7 @@
     "login_instruction": "To view live rate limits, please authenticate Codex by running the login command in your terminal or via the browser/IDE extension:",
     "click_to_select": "Click to select",
     "login_hint": "Hint: Please run the command above in your terminal, or log in to your Codex account via the browser/IDE extension.",
-    "unavailable_reason": "Codex limits unavailable: {{error}}",
+    "unavailable_reason": "Unable to get Codex limits right now. Please check your network and Codex login status, then try again.",
     "window_5hour": "5-Hour Limit",
     "window_weekly": "Weekly Limit",
     "window_monthly": "Monthly usage limit",

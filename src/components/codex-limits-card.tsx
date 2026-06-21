@@ -77,7 +77,7 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
             </div>
           ) : (
             <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
-              {t("limits.unavailable_reason", { error })}
+              {t("limits.unavailable_reason")}
             </div>
           )
         ) : (

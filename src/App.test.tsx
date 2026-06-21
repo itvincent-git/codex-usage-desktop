@@ -1017,7 +1017,7 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
     expect(
-      screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command."),
+      screen.getByText("Unable to get Codex limits right now. Please check your network and Codex login status, then try again."),
     ).toBeInTheDocument();
     expect(screen.queryByText("Data sync failed")).not.toBeInTheDocument();
   });

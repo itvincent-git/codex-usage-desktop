@@ -115,7 +115,7 @@
     "login_instruction": "为了查看实时速率限制，请在终端运行登录命令或通过浏览器/IDE 插件登录授权 Codex：",
     "click_to_select": "点击选中",
     "login_hint": "提示：请在终端中运行上述命令，或通过浏览器/IDE 插件登录您的 Codex 账号。",
-    "unavailable_reason": "无法获取额度限制信息：{{error}}",
+    "unavailable_reason": "暂时无法获取 Codex 额度限制。请检查网络和 Codex 登录状态后重试。",
     "window_5hour": "5 小时限制",
     "window_weekly": "周度限制",
     "window_monthly": "月度限制",

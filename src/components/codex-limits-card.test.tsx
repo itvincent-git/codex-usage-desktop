@@ -109,7 +109,8 @@ describe("CodexLimitsCard component", () => {
     render(<CodexLimitsCard limits={null} error={errorMsg} />);
 
     expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
-    expect(screen.getByText("Codex limits unavailable: Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.")).toBeInTheDocument();
+    expect(screen.getByText("Unable to get Codex limits right now. Please check your network and Codex login status, then try again.")).toBeInTheDocument();
+    expect(screen.queryByText(errorMsg)).not.toBeInTheDocument();
   });
 
   it("renders a single monthly limit row when the user is not subscribed to any membership", () => {
