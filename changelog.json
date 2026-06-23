@@ -1,4 +1,8 @@
 {
+  "1.12.1": {
+    "zh": "- fix: show friendly Codex limits errors\n- fix: deduplicate session replay messages",
+    "en": "- fix: show friendly Codex limits errors\n- fix: deduplicate session replay messages"
+  },
   "1.12.0": {
     "zh": "- fix(session): parse response item messages\n- fix: refresh expired tray limits",
     "en": "- fix(session): parse response item messages\n- fix: refresh expired tray limits"
