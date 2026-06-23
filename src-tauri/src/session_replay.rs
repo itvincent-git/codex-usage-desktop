@@ -197,31 +197,40 @@ impl ReplayParseState {
             _ if is_user_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    turn.user_messages.push(SessionReplayMessage {
-                        timestamp,
-                        kind: event_type.to_string(),
-                        text,
-                    });
+                    push_unique_message(
+                        &mut turn.user_messages,
+                        SessionReplayMessage {
+                            timestamp,
+                            kind: event_type.to_string(),
+                            text,
+                        },
+                    );
                 }
             }
             _ if is_assistant_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    turn.assistant_messages.push(SessionReplayMessage {
-                        timestamp,
-                        kind: event_type.to_string(),
-                        text,
-                    });
+                    push_unique_message(
+                        &mut turn.assistant_messages,
+                        SessionReplayMessage {
+                            timestamp,
+                            kind: event_type.to_string(),
+                            text,
+                        },
+                    );
                 }
             }
             _ if is_reasoning_message(event_type) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    turn.reasoning_summaries.push(SessionReplayMessage {
-                        timestamp,
-                        kind: event_type.to_string(),
-                        text,
-                    });
+                    push_unique_message(
+                        &mut turn.reasoning_summaries,
+                        SessionReplayMessage {
+                            timestamp,
+                            kind: event_type.to_string(),
+                            text,
+                        },
+                    );
                 }
             }
             _ if is_tool_call(event_type) => {
@@ -482,6 +491,16 @@ fn empty_turn(turn_id: &str) -> SessionReplayTurn {
         token_events: Vec::new(),
         errors: Vec::new(),
     }
+}
+
+fn push_unique_message(messages: &mut Vec<SessionReplayMessage>, message: SessionReplayMessage) {
+    if messages
+        .iter()
+        .any(|existing| existing.text == message.text)
+    {
+        return;
+    }
+    messages.push(message);
 }
 
 fn build_summary(
@@ -912,6 +931,50 @@ mod tests {
         assert!(detail.turns[0].user_messages[0]
             .text
             .contains("environment_context"));
+    }
+
+    #[test]
+    fn deduplicates_messages_written_as_response_item_and_event_msg() {
+        let raw = [
+            turn_context("2026-06-01T00:00:00.000Z", "turn-1", "gpt-5", "/repo/app"),
+            response_item(
+                "2026-06-01T00:00:01.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "Create a modal" }]
+                }),
+            ),
+            event_msg(
+                "2026-06-01T00:00:01.000Z",
+                serde_json::json!({
+                    "type": "user_message",
+                    "message": "Create a modal"
+                }),
+            ),
+            event_msg(
+                "2026-06-01T00:00:02.000Z",
+                serde_json::json!({
+                    "type": "agent_message",
+                    "message": "I will inspect the code first."
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:02.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{ "type": "output_text", "text": "I will inspect the code first." }]
+                }),
+            ),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+
+        assert_eq!(detail.turns[0].user_messages.len(), 1);
+        assert_eq!(detail.turns[0].assistant_messages.len(), 1);
+        assert_eq!(detail.summary.message_count, 2);
     }
 
     #[test]
