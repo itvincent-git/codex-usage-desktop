@@ -16,7 +16,7 @@ import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import type { SessionDetailRow } from "@/lib/api";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
@@ -73,6 +73,15 @@ export default function App() {
     trayMenuShow,
     handleTrayMenuShowChange,
   } = useUsageDashboard();
+
+  useEffect(() => {
+    const preventContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    window.addEventListener("contextmenu", preventContextMenu);
+    return () => window.removeEventListener("contextmenu", preventContextMenu);
+  }, []);
 
   const isRateLimitError = !!(
     updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||

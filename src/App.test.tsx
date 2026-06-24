@@ -190,6 +190,23 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Reset cache" })).not.toBeInTheDocument();
   });
 
+  it("prevents the default page context menu", () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return new Promise(() => {});
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("rescans after returning from the background but skips limits when files are unchanged", async () => {
     let now = 10_000;
     vi.spyOn(Date, "now").mockImplementation(() => now);

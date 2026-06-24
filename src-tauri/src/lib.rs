@@ -15,8 +15,9 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant};
+use tauri::menu::{Menu, MenuItem, MenuItemKind};
+use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
@@ -676,6 +677,23 @@ fn delete_pricing_cache(path: &Path) -> Result<(), String> {
     }
 }
 
+fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
+    let menu = Menu::default(app.handle())?;
+    let reload_item = MenuItem::with_id(app, "reload_page", "Reload", true, Some("CmdOrCtrl+R"))?;
+
+    for item in menu.items()? {
+        if let MenuItemKind::Submenu(submenu) = item {
+            if submenu.text()? == "View" {
+                submenu.prepend(&reload_item)?;
+                break;
+            }
+        }
+    }
+
+    app.set_menu(menu)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -699,7 +717,16 @@ pub fn run() {
                 }
             }
         })
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "reload_page" {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.reload();
+                }
+            }
+        })
         .setup(|app| {
+            setup_app_menu(app)?;
+
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             let database_path = app_data_dir.join("codex-usage-desktop.db");
