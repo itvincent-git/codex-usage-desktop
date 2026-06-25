@@ -184,6 +184,14 @@ pub struct CodexLimitsResponse {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct CodexQuotaForecastResponse {
+    pub score: i64,
+    pub fetched_at: String,
+    pub next_refresh_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageRefreshResponse {
     pub scan: ScanResponse,
     pub limits: Option<CodexLimitsResponse>,

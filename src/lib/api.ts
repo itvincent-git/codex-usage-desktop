@@ -104,6 +104,12 @@ export type CodexLimitsResponse = {
   subscriptionWillRenew?: boolean | null;
 };
 
+export type CodexQuotaForecastResponse = {
+  score: number;
+  fetchedAt: string;
+  nextRefreshAt: string;
+};
+
 export type UsageRefreshResponse = {
   scan: ScanResponse;
   limits: CodexLimitsResponse | null;
@@ -130,6 +136,10 @@ export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
 
 export async function fetchCodexLimits(): Promise<CodexLimitsResponse> {
   return invoke<CodexLimitsResponse>("fetch_codex_limits");
+}
+
+export async function fetchCodexQuotaForecast(): Promise<CodexQuotaForecastResponse> {
+  return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast");
 }
 
 export async function resetUsageState(): Promise<void> {

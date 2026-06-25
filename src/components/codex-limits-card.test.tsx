@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { formatResetTime, CodexLimitsCard } from "./codex-limits-card";
 import dayjs from "dayjs";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 describe("formatResetTime", () => {
   beforeEach(() => {
@@ -138,5 +138,48 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByText("Monthly usage limit")).toBeInTheDocument();
     expect(screen.queryByText("5-Hour Limit")).not.toBeInTheDocument();
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
+  });
+
+  it("renders a compact quota forecast pill", () => {
+    render(
+      <CodexLimitsCard
+        limits={null}
+        error={null}
+        quotaForecast={{
+          score: 73,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveTextContent("73% · reset likely in 48h");
+  });
+
+  it("opens the quota forecast URL from the compact pill", () => {
+    const onOpenQuotaForecast = vi.fn();
+
+    render(
+      <CodexLimitsCard
+        limits={null}
+        error={null}
+        quotaForecast={{
+          score: 55,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+        onOpenQuotaForecast={onOpenQuotaForecast}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Codex quota reset forecast" }));
+
+    expect(onOpenQuotaForecast).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render the quota forecast pill without forecast data", () => {
+    render(<CodexLimitsCard limits={null} error={null} quotaForecast={null} />);
+
+    expect(screen.queryByRole("button", { name: "Open Codex quota reset forecast" })).not.toBeInTheDocument();
   });
 });

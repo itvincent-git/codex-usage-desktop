@@ -9,6 +9,7 @@ import i18n from "./i18n";
 import tauriConfig from "../src-tauri/tauri.conf.json";
 
 const invokeMock = vi.hoisted(() => vi.fn());
+const forecastInvokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 const updateTrayMock = vi.hoisted(() => vi.fn());
 const writeTextMock = vi.hoisted(() => vi.fn());
@@ -19,6 +20,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "update_tray") {
       updateTrayMock(...args);
       return Promise.resolve();
+    }
+    if (command === "fetch_codex_quota_forecast") {
+      return forecastInvokeMock();
     }
     if (command === "refresh_usage_data") {
       return invokeMock("scan_usage").then(async (scan: any) => {
@@ -153,6 +157,8 @@ describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
     invokeMock.mockReset();
+    forecastInvokeMock.mockReset();
+    forecastInvokeMock.mockRejectedValue(new Error("Forecast unavailable"));
     saveMock.mockReset();
     updateTrayMock.mockReset();
     eventListeners.clear();
@@ -344,6 +350,39 @@ describe("App", () => {
     await waitFor(() => {
       expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
     });
+  });
+
+  it("opens the external quota forecast when the compact pill is clicked", async () => {
+    forecastInvokeMock.mockResolvedValue({
+      score: 73,
+      fetchedAt: "2026-06-25T09:00:19.499Z",
+      nextRefreshAt: "2026-06-25T09:30:19.499Z",
+    });
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return limits(80);
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      if (command === "open_url") {
+        return undefined;
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Open Codex quota reset forecast" }));
+
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://www.willcodexquotareset.com/" });
   });
 
   it("loads the last 30 day overview and switches to last 1 day", async () => {

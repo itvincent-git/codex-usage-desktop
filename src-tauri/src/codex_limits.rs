@@ -1,4 +1,4 @@
-use crate::types::{CodexLimitWindow, CodexLimitsResponse};
+use crate::types::{CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse};
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -17,6 +17,7 @@ const WEEKLY_WINDOW_MINUTES: i64 = 10_080;
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
 const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
+const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -64,6 +65,19 @@ struct OAuthRateLimitWindow {
     limit_window_seconds: Option<i64>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CodexQuotaForecastApiResponse {
+    fetched_at: String,
+    next_refresh_at: String,
+    forecast: CodexQuotaForecastScore,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexQuotaForecastScore {
+    score: i64,
+}
+
 #[derive(Debug, Clone)]
 struct CodexAuth {
     access_token: String,
@@ -94,6 +108,42 @@ struct SubscriptionInfo {
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     log::info!("Starting fetch_codex_limits...");
     fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)
+}
+
+pub fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(6))
+        .build()
+        .map_err(|error| format!("Failed to build forecast HTTP client: {error}"))?;
+
+    let response = client
+        .get(CODEX_QUOTA_FORECAST_URL)
+        .header("User-Agent", "codex-usage-desktop")
+        .header("Accept", "application/json")
+        .send()
+        .map_err(|error| format!("Forecast request failed: {error}"))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Forecast endpoint returned status {status}"));
+    }
+
+    let body = response
+        .text()
+        .map_err(|error| format!("Failed to read forecast response: {error}"))?;
+
+    parse_codex_quota_forecast(&body)
+}
+
+fn parse_codex_quota_forecast(body: &str) -> Result<CodexQuotaForecastResponse, String> {
+    let response: CodexQuotaForecastApiResponse = serde_json::from_str(body)
+        .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
+
+    Ok(CodexQuotaForecastResponse {
+        score: response.forecast.score,
+        fetched_at: response.fetched_at,
+        next_refresh_at: response.next_refresh_at,
+    })
 }
 
 fn fetch_codex_limits_with(
@@ -1120,6 +1170,33 @@ mod tests {
                 expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
                 will_renew: Some(false),
                 has_active_subscription: Some(true),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_quota_forecast_from_full_response() {
+        let response = parse_codex_quota_forecast(
+            r#"{
+                "fetchedAt": "2026-06-25T09:00:19.499Z",
+                "incidents": [{"id": "incident-1"}],
+                "nextRefreshAt": "2026-06-25T09:30:19.499Z",
+                "forecast": {
+                    "breakdown": [{"label": "baseline", "points": 12}],
+                    "daysSinceReset": 7,
+                    "score": 73
+                },
+                "history": [{"toScore": 73}]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            response,
+            CodexQuotaForecastResponse {
+                score: 73,
+                fetched_at: "2026-06-25T09:00:19.499Z".to_string(),
+                next_refresh_at: "2026-06-25T09:30:19.499Z".to_string(),
             }
         );
     }

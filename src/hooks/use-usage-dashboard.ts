@@ -5,10 +5,12 @@ import { useTranslation } from "react-i18next";
 import {
   exportUsage,
   fetchCodexLimits,
+  fetchCodexQuotaForecast,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
   type CodexLimitsResponse,
+  type CodexQuotaForecastResponse,
   type ExportFormat,
   type MonthlyUsageResponse,
   type OverviewResponse,
@@ -47,6 +49,7 @@ function isNewerVersion(current: string, target: string): boolean {
 }
 
 const AUTO_RESCAN_MS = 5 * 60_000;
+const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
 
 function formatCompactResetCountdown(resetsAt: string | null): string | null {
   if (!resetsAt) return null;
@@ -123,6 +126,7 @@ export function useUsageDashboard() {
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
+  const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
   const [scanMessage, setScanMessage] = useState(() => t("hero.sync_logs_to_cache_desc", { defaultValue: "Sync local logs to cache" }));
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -255,6 +259,15 @@ export function useUsageDashboard() {
       setCodexLimitsError(null);
     } catch (limitsError) {
       setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
+    }
+  });
+
+  const loadCodexQuotaForecast = useEffectEvent(async () => {
+    try {
+      const data = await fetchCodexQuotaForecast();
+      setCodexQuotaForecast(data);
+    } catch (_) {
+      setCodexQuotaForecast(null);
     }
   });
 
@@ -447,6 +460,7 @@ export function useUsageDashboard() {
     try {
       // Do not block initial render on limits fetch
       void loadCodexLimits();
+      void loadCodexQuotaForecast();
       await loadOverview(range);
       setBootstrapped(true);
     } catch (loadError) {
@@ -709,6 +723,7 @@ export function useUsageDashboard() {
 
     try {
       await scanAndReloadOverview(startedAt, { force: true });
+      await loadCodexQuotaForecast();
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
     } finally {
@@ -837,6 +852,14 @@ export function useUsageDashboard() {
     }
   };
 
+  const handleOpenCodexQuotaForecast = async () => {
+    try {
+      await openUrl(CODEX_QUOTA_FORECAST_URL);
+    } catch (e) {
+      console.error("Failed to open Codex quota forecast URL", e);
+    }
+  };
+
   return {
     view,
     range,
@@ -844,6 +867,7 @@ export function useUsageDashboard() {
     monthlyUsage,
     codexLimits,
     codexLimitsError,
+    codexQuotaForecast,
     scanMessage,
     error,
     isLoading,
@@ -872,6 +896,7 @@ export function useUsageDashboard() {
     handleManualUpdateCheck,
     handleUpgrade,
     handleOpenUpdateRelease,
+    handleOpenCodexQuotaForecast,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,

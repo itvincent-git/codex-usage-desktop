@@ -143,7 +143,11 @@
     "window_days": "{{count}} 天",
     "window_unknown": "未知",
     "subscription_expires": "到期时间 {{date}} (还剩 {{timeLeft}})",
-    "auto_renew_off": "自动续订已关闭"
+    "auto_renew_off": "自动续订已关闭",
+    "quota_forecast_likely": "{{score}}% · 48h 内可能重置",
+    "quota_forecast_possible": "{{score}}% · 48h 内有机会",
+    "quota_forecast_low": "{{score}}% · 48h 内概率较低",
+    "quota_forecast_open": "打开 Codex 额度重置预测"
   },
   "daily": {
     "title": "按日使用明细",

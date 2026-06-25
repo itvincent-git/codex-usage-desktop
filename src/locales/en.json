@@ -143,7 +143,11 @@
     "window_days": "{{count}} days",
     "window_unknown": "Unknown",
     "subscription_expires": "Expires {{date}} ({{timeLeft}})",
-    "auto_renew_off": "Auto-renew off"
+    "auto_renew_off": "Auto-renew off",
+    "quota_forecast_likely": "{{score}}% · reset likely in 48h",
+    "quota_forecast_possible": "{{score}}% · reset possible in 48h",
+    "quota_forecast_low": "{{score}}% · low chance in 48h",
+    "quota_forecast_open": "Open Codex quota reset forecast"
   },
   "daily": {
     "title": "Daily Usage",

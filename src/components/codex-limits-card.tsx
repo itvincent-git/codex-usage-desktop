@@ -1,6 +1,6 @@
 import { Gauge, LogIn } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { CodexLimitWindow, CodexLimitsResponse } from "@/lib/api";
+import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,8 @@ import { useTranslation } from "react-i18next";
 type CodexLimitsCardProps = {
   limits: CodexLimitsResponse | null;
   error: string | null;
+  quotaForecast?: CodexQuotaForecastResponse | null;
+  onOpenQuotaForecast?: () => void;
 };
 
 type LimitRowProps = {
@@ -34,7 +36,7 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "team", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForecast }: CodexLimitsCardProps) {
   const { t } = useTranslation();
 
   return (
@@ -48,9 +50,21 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
             </CardTitle>
             <CardDescription className="text-xs">{t("limits.description")}</CardDescription>
           </div>
-          <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
-            {limits?.updatedAt ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm:ss") }) : t("limits.not_fetched")}
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+            {quotaForecast ? (
+              <button
+                type="button"
+                className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium leading-5 text-primary transition-colors hover:border-primary/35 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={onOpenQuotaForecast}
+                aria-label={t("limits.quota_forecast_open")}
+              >
+                {formatQuotaForecast(quotaForecast.score, t)}
+              </button>
+            ) : null}
+            <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
+              {limits?.updatedAt ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm:ss") }) : t("limits.not_fetched")}
+            </p>
+          </div>
         </div>
       </CardHeader>
 
@@ -98,6 +112,17 @@ export function CodexLimitsCard({ limits, error }: CodexLimitsCardProps) {
       </CardContent>
     </Card>
   );
+}
+
+function formatQuotaForecast(score: number, t: any) {
+  const roundedScore = Math.round(clampPercent(score));
+  if (roundedScore >= 70) {
+    return t("limits.quota_forecast_likely", { score: roundedScore });
+  }
+  if (roundedScore >= 40) {
+    return t("limits.quota_forecast_possible", { score: roundedScore });
+  }
+  return t("limits.quota_forecast_low", { score: roundedScore });
 }
 
 function LimitRow({ label, window }: LimitRowProps) {

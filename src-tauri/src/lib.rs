@@ -20,8 +20,8 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
-    CodexLimitsResponse, ExportResponse, MonthlyUsageResponse, OverviewResponse, ScanResponse,
-    UpdateCheckResponse, UpdateDownloadProgress, UpdateInstallResponse, SessionDetailRow,
+    CodexLimitsResponse, CodexQuotaForecastResponse, ExportResponse, MonthlyUsageResponse,
+    OverviewResponse, ScanResponse, UpdateCheckResponse, UpdateDownloadProgress, UpdateInstallResponse, SessionDetailRow,
     SessionReplayDetail, UsageRefreshResponse,
 };
 
@@ -164,6 +164,13 @@ async fn fetch_monthly_usage(
 #[tauri::command]
 async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
+    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_quota_forecast)
         .await
         .map_err(|error| error.to_string())?
 }
@@ -798,6 +805,7 @@ pub fn run() {
             fetch_overview,
             fetch_monthly_usage,
             fetch_codex_limits,
+            fetch_codex_quota_forecast,
             reset_usage_state,
             export_usage,
             check_for_updates,

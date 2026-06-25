@@ -40,6 +40,7 @@ export default function App() {
     monthlyUsage,
     codexLimits,
     codexLimitsError,
+    codexQuotaForecast,
     scanMessage,
     error,
     isLoading,
@@ -68,6 +69,7 @@ export default function App() {
     handleManualUpdateCheck,
     handleUpgrade,
     handleOpenUpdateRelease,
+    handleOpenCodexQuotaForecast,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,
@@ -314,7 +316,12 @@ export default function App() {
               />
 
               <div className="min-w-0">
-                <CodexLimitsCard limits={codexLimits} error={codexLimitsError} />
+                <CodexLimitsCard
+                  limits={codexLimits}
+                  error={codexLimitsError}
+                  quotaForecast={codexQuotaForecast}
+                  onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
+                />
               </div>
             </div>
           ) : null}
