@@ -147,6 +147,9 @@
     "quota_forecast_likely": "{{score}}% · 48h 内可能重置",
     "quota_forecast_possible": "{{score}}% · 48h 内有机会",
     "quota_forecast_low": "{{score}}% · 48h 内概率较低",
+    "quota_forecast_likely_label": "48h 内可能重置",
+    "quota_forecast_possible_label": "48h 内有机会",
+    "quota_forecast_low_label": "48h 内概率较低",
     "quota_forecast_open": "打开 Codex 额度重置预测"
   },
   "daily": {

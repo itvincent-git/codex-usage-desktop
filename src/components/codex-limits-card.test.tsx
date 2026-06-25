@@ -140,7 +140,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
-  it("renders a compact quota forecast pill", () => {
+  it("renders a prominent quota forecast badge", () => {
     render(
       <CodexLimitsCard
         limits={null}
@@ -153,10 +153,44 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveTextContent("73% · reset likely in 48h");
+    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
+
+    expect(forecastButton).toHaveTextContent("73%");
+    expect(forecastButton).toHaveTextContent("Reset likely in 48h");
+    expect(forecastButton).toHaveClass("border-success/30");
   });
 
-  it("opens the quota forecast URL from the compact pill", () => {
+  it("changes quota forecast color by probability", () => {
+    const { rerender } = render(
+      <CodexLimitsCard
+        limits={null}
+        error={null}
+        quotaForecast={{
+          score: 18,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-warning/35");
+
+    rerender(
+      <CodexLimitsCard
+        limits={null}
+        error={null}
+        quotaForecast={{
+          score: 55,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-primary/30");
+  });
+
+  it("opens the quota forecast URL from the forecast badge", () => {
     const onOpenQuotaForecast = vi.fn();
 
     render(

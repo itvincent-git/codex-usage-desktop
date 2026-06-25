@@ -352,7 +352,7 @@ describe("App", () => {
     });
   });
 
-  it("opens the external quota forecast when the compact pill is clicked", async () => {
+  it("opens the external quota forecast when the forecast badge is clicked", async () => {
     forecastInvokeMock.mockResolvedValue({
       score: 73,
       fetchedAt: "2026-06-25T09:00:19.499Z",

@@ -1,4 +1,4 @@
-import { Gauge, LogIn } from "lucide-react";
+import { ExternalLink, Gauge, LogIn } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,13 @@ type CodexLimitsCardProps = {
 type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
+};
+
+type QuotaForecastTone = {
+  label: string;
+  className: string;
+  scoreClassName: string;
+  markerClassName: string;
 };
 
 function isOAuthLoginError(err: string | null): boolean {
@@ -38,6 +45,8 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
 
 export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForecast }: CodexLimitsCardProps) {
   const { t } = useTranslation();
+  const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
+  const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
@@ -51,14 +60,26 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
             <CardDescription className="text-xs">{t("limits.description")}</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-            {quotaForecast ? (
+            {quotaForecast && quotaForecastScore !== null && quotaForecastTone ? (
               <button
                 type="button"
-                className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium leading-5 text-primary transition-colors hover:border-primary/35 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className={cn(
+                  "group flex min-w-[8.75rem] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  quotaForecastTone.className,
+                )}
                 onClick={onOpenQuotaForecast}
                 aria-label={t("limits.quota_forecast_open")}
               >
-                {formatQuotaForecast(quotaForecast.score, t)}
+                <span className={cn("h-8 w-1 rounded-full", quotaForecastTone.markerClassName)} aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className={cn("block font-mono text-base font-bold leading-none tabular-nums", quotaForecastTone.scoreClassName)}>
+                    {quotaForecastScore}%
+                  </span>
+                  <span className="mt-0.5 block text-[10px] font-semibold leading-none text-foreground/80">
+                    {quotaForecastTone.label}
+                  </span>
+                </span>
+                <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
               </button>
             ) : null}
             <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
@@ -123,6 +144,33 @@ function formatQuotaForecast(score: number, t: any) {
     return t("limits.quota_forecast_possible", { score: roundedScore });
   }
   return t("limits.quota_forecast_low", { score: roundedScore });
+}
+
+function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
+  if (score >= 70) {
+    return {
+      label: t("limits.quota_forecast_likely_label"),
+      className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
+      scoreClassName: "text-success",
+      markerClassName: "bg-success",
+    };
+  }
+
+  if (score >= 40) {
+    return {
+      label: t("limits.quota_forecast_possible_label"),
+      className: "border-primary/30 bg-primary/10 hover:border-primary/45 hover:bg-primary/15",
+      scoreClassName: "text-primary",
+      markerClassName: "bg-primary",
+    };
+  }
+
+  return {
+    label: t("limits.quota_forecast_low_label"),
+    className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
+    scoreClassName: "text-warning",
+    markerClassName: "bg-warning",
+  };
 }
 
 function LimitRow({ label, window }: LimitRowProps) {
