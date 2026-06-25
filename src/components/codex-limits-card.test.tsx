@@ -155,7 +155,8 @@ describe("CodexLimitsCard component", () => {
 
     const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
 
-    expect(forecastButton).toHaveTextContent("73%");
+    expect(screen.getByRole("img", { name: "73% reset probability" })).toBeInTheDocument();
+    expect(forecastButton).toHaveTextContent("73");
     expect(forecastButton).toHaveTextContent("Reset likely in 48h");
     expect(forecastButton).toHaveClass("border-success/30");
   });

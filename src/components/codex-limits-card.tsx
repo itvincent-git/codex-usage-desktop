@@ -21,7 +21,7 @@ type QuotaForecastTone = {
   label: string;
   className: string;
   scoreClassName: string;
-  markerClassName: string;
+  ringColor: string;
 };
 
 function isOAuthLoginError(err: string | null): boolean {
@@ -70,11 +70,8 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
                 onClick={onOpenQuotaForecast}
                 aria-label={t("limits.quota_forecast_open")}
               >
-                <span className={cn("h-8 w-1 rounded-full", quotaForecastTone.markerClassName)} aria-hidden="true" />
+                <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
                 <span className="min-w-0">
-                  <span className={cn("block font-mono text-base font-bold leading-none tabular-nums", quotaForecastTone.scoreClassName)}>
-                    {quotaForecastScore}%
-                  </span>
                   <span className="mt-0.5 block text-[10px] font-semibold leading-none text-foreground/80">
                     {quotaForecastTone.label}
                   </span>
@@ -152,7 +149,7 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
       label: t("limits.quota_forecast_likely_label"),
       className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
       scoreClassName: "text-success",
-      markerClassName: "bg-success",
+      ringColor: "rgb(var(--success))",
     };
   }
 
@@ -161,7 +158,7 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
       label: t("limits.quota_forecast_possible_label"),
       className: "border-primary/30 bg-primary/10 hover:border-primary/45 hover:bg-primary/15",
       scoreClassName: "text-primary",
-      markerClassName: "bg-primary",
+      ringColor: "rgb(var(--primary))",
     };
   }
 
@@ -169,8 +166,38 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
     label: t("limits.quota_forecast_low_label"),
     className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
     scoreClassName: "text-warning",
-    markerClassName: "bg-warning",
+    ringColor: "rgb(var(--warning))",
   };
+}
+
+function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecastTone }) {
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+
+  return (
+    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/55">
+      <svg viewBox="0 0 48 48" className="h-10 w-10" role="img" aria-label={`${score}% reset probability`}>
+        <circle cx="24" cy="24" r={radius} fill="none" stroke="rgb(var(--border) / 0.65)" strokeWidth="4" />
+        <circle
+          cx="24"
+          cy="24"
+          r={radius}
+          fill="none"
+          stroke={tone.ringColor}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          strokeWidth="4"
+          transform="rotate(-90 24 24)"
+          className="transition-all duration-500 ease-out"
+        />
+      </svg>
+      <span className={cn("absolute font-mono text-[11px] font-bold leading-none tabular-nums", tone.scoreClassName)}>
+        {score}
+      </span>
+    </span>
+  );
 }
 
 function LimitRow({ label, window }: LimitRowProps) {
