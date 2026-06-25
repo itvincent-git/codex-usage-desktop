@@ -1188,6 +1188,45 @@ describe("App", () => {
     });
   });
 
+  it("defaults the tray title to 5-hour and weekly limits", async () => {
+    const now = new Date().getTime();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const sessionReset = new Date(now + 3 * 60 * 60_000).toISOString();
+    const weeklyReset = new Date(now + 4 * 24 * 60 * 60_000).toISOString();
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return {
+          session: { usedPercent: 20, remainingPercent: 80, windowMinutes: 300, resetsAt: sessionReset },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: weeklyReset },
+          updatedAt: new Date().toISOString(),
+          source: "cli-rpc",
+          membershipLevel: "pro",
+        };
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
+        payload: expect.objectContaining({
+          title: "5h: 80%/3h | W: 55%/4d",
+        }),
+      }));
+    });
+  });
+
   it("refreshes expired limits for skipped native background refreshes and updates the tray", async () => {
     const initialNow = new Date("2026-06-11T06:00:00.000Z").getTime();
     vi.spyOn(Date, "now").mockReturnValue(initialNow);

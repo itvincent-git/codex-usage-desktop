@@ -165,7 +165,7 @@ export function useUsageDashboard() {
       const saved = localStorage.getItem("tray_title_show");
       if (saved) return JSON.parse(saved);
     } catch (_) {}
-    return { limit5h: false, limitWeekly: false, tokens: false, cost: true };
+    return { limit5h: true, limitWeekly: true, tokens: false, cost: false };
   });
 
   const [trayMenuShow, setTrayMenuShowState] = useState(() => {
