@@ -134,7 +134,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 pb-8 pt-3 sm:px-8 lg:px-10">
+      <div
+        className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 pb-8 pt-3 sm:px-8 lg:px-10"
+        aria-hidden={selectedSession ? "true" : undefined}
+        inert={selectedSession ? true : undefined}
+      >
         <div
           aria-hidden="true"
           className="pointer-events-none absolute right-10 top-3 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
@@ -425,14 +429,14 @@ export default function App() {
             />
           )}
 
-          {selectedSession && (
-            <SessionDetailModal
-              session={selectedSession}
-              onClose={() => setSelectedSession(null)}
-            />
-          )}
         </main>
       </div>
+      {selectedSession && (
+        <SessionDetailModal
+          session={selectedSession}
+          onClose={() => setSelectedSession(null)}
+        />
+      )}
     </div>
   );
 }

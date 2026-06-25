@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import tauriConfig from "../src-tauri/tauri.conf.json";
 const invokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 const updateTrayMock = vi.hoisted(() => vi.fn());
+const writeTextMock = vi.hoisted(() => vi.fn());
 const eventListeners = vi.hoisted(() => new Map<string, Array<(event: { payload: any }) => void>>());
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -165,7 +166,8 @@ describe("App", () => {
         disconnect() {}
       },
     );
-    vi.stubGlobal("navigator", { language: "en-US" });
+    writeTextMock.mockReset();
+    vi.stubGlobal("navigator", { language: "en-US", clipboard: { writeText: writeTextMock } });
     void i18n.changeLanguage("en");
   });
 
@@ -754,9 +756,10 @@ describe("App", () => {
   });
 
   it("opens a session replay modal from a session row", async () => {
+    const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
-      JSON.stringify({ timestamp: "2026-06-11T00:00:01.000Z", type: "event_msg", payload: { type: "debug_note", text: "raw-only-marker" } }),
+      `${"x".repeat(4100)}raw-only-marker`,
     ].join("\n");
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; path?: string }) => {
@@ -831,9 +834,32 @@ describe("App", () => {
               userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session" }],
               assistantMessages: [],
               reasoningSummaries: [],
-              toolCalls: [],
+              toolCalls: [
+                {
+                  callId: "call-1",
+                  name: "shell",
+                  status: "completed",
+                  arguments: null,
+                  output: longToolOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:00.500Z",
+                  completedAt: "2026-06-11T00:00:01.500Z",
+                  durationMs: 1000,
+                  isError: false,
+                },
+              ],
               patchResults: [],
-              tokenEvents: [],
+              tokenEvents: [
+                {
+                  timestamp: "2026-06-11T00:00:02.000Z",
+                  model: "gpt-5",
+                  inputTokens: 100,
+                  cachedInputTokens: 20,
+                  outputTokens: 40,
+                  reasoningOutputTokens: 0,
+                  totalTokens: 140,
+                },
+              ],
               errors: [],
             },
           ],
@@ -854,20 +880,53 @@ describe("App", () => {
 
     expect(await screen.findByRole("dialog", { name: "session-replay" })).toBeInTheDocument();
     expect(document.body.style.overflow).toBe("hidden");
+    expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
     expect(screen.getByText("Session summary")).toBeInTheDocument();
-    expect(screen.getByText("Turn turn-1")).toBeInTheDocument();
-    expect(screen.getByText("System prompt")).toBeInTheDocument();
-    expect(screen.getByText("Use the repo instructions.")).not.toBeVisible();
+    const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
+    expect(turnButton).toHaveAttribute("aria-expanded", "false");
+    expect(turnButton).toHaveTextContent("2 messages");
+    expect(turnButton).toHaveTextContent("1 tool");
+    expect(turnButton).toHaveTextContent("0 patches");
+    expect(turnButton).toHaveTextContent("0 errors");
+    expect(turnButton).toHaveTextContent("1 token event");
+    expect(screen.queryByText("System prompt")).not.toBeInTheDocument();
+    expect(screen.queryByText("Use the repo instructions.")).not.toBeInTheDocument();
     expect(screen.getByText("Replay this session")).toBeInTheDocument();
+    expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
+    await userEvent.click(turnButton);
+    expect(turnButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("System prompt")).toBeInTheDocument();
+    expect(screen.getByText("Use the repo instructions.")).toBeInTheDocument();
+    expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText("shell · completed"));
+    await userEvent.click(screen.getByRole("button", { name: "Show full text" }));
+    expect(screen.getByText(/LONG_TOOL_OUTPUT_TAIL/)).toBeInTheDocument();
+
+    await userEvent.click(turnButton);
+    expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "Raw JSONL" }));
+    expect(screen.getByText("Raw JSONL preview")).toBeInTheDocument();
+    expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(writeTextMock).toHaveBeenCalledWith(rawJsonl);
+
+    await userEvent.click(screen.getByRole("button", { name: "Show full JSONL" }));
     expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Close session detail" }));
+    screen.getByRole("button", { name: "Close session detail" }).focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(screen.getByRole("button", { name: /Copy|Copied/ })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "session-replay" })).not.toBeInTheDocument());
     expect(document.body.style.overflow).toBe("auto");
     expect(screen.getByText("session-replay")).toBeInTheDocument();
+    expect(document.activeElement?.textContent).toContain("session-replay");
   });
 
   it("bootstraps only once in strict mode", async () => {
