@@ -760,6 +760,7 @@ describe("App", () => {
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
       `${"x".repeat(4100)}raw-only-marker`,
+      JSON.stringify({ timestamp: "2026-06-11T00:00:01.000Z", type: "event_msg", payload: { type: "assistant_message", turn_id: "turn-1", text: "third-preview-line" } }),
     ].join("\n");
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; path?: string }) => {
@@ -911,11 +912,16 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "Raw JSONL" }));
     expect(screen.getByText("Raw JSONL preview")).toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
+    expect(screen.getByText(/third-preview-line/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Copy" }));
+    const showFullButton = screen.getByRole("button", { name: "Show full JSONL" });
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+    expect(showFullButton.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await userEvent.click(copyButton);
     expect(writeTextMock).toHaveBeenCalledWith(rawJsonl);
 
-    await userEvent.click(screen.getByRole("button", { name: "Show full JSONL" }));
+    await userEvent.click(showFullButton);
     expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
 
     screen.getByRole("button", { name: "Close session detail" }).focus();

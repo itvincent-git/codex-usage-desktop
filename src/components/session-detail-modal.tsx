@@ -14,7 +14,8 @@ type TabKey = "timeline" | "raw";
 
 const LONG_TEXT_THRESHOLD = 2000;
 const TEXT_PREVIEW_LENGTH = 1200;
-const RAW_PREVIEW_LENGTH = 4000;
+const RAW_PREVIEW_LINES = 12;
+const RAW_PREVIEW_LINE_LENGTH = 240;
 
 function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
@@ -40,6 +41,14 @@ function formatBytes(bytes: number) {
   const kb = bytes / 1024;
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+function buildRawPreview(rawJsonl: string) {
+  return rawJsonl
+    .split("\n")
+    .slice(0, RAW_PREVIEW_LINES)
+    .map((line) => (line.length > RAW_PREVIEW_LINE_LENGTH ? `${line.slice(0, RAW_PREVIEW_LINE_LENGTH)}...` : line))
+    .join("\n");
 }
 
 function countMessages(turn: SessionReplayDetail["turns"][number]) {
@@ -189,6 +198,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   const models = detail?.summary.models.length ? detail.summary.models : session.models;
   const projects = detail?.summary.projects.length ? detail.summary.projects : session.projects;
+  const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
 
   async function copyRawJsonl() {
     if (!detail) return;
@@ -399,19 +409,21 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     })}
                   </div>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => void copyRawJsonl()}>
-                  <Clipboard className="mr-2 h-4 w-4" />
-                  {copied ? t("sessions.detail.copied") : t("sessions.detail.copy")}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {!showFullRaw && detail.rawJsonl !== rawPreview ? (
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setShowFullRaw(true)}>
+                      {t("sessions.detail.show_full_raw")}
+                    </Button>
+                  ) : null}
+                  <Button variant="secondary" size="sm" onClick={() => void copyRawJsonl()}>
+                    <Clipboard className="mr-2 h-4 w-4" />
+                    {copied ? t("sessions.detail.copied") : t("sessions.detail.copy")}
+                  </Button>
+                </div>
               </div>
               <pre className="min-h-[60vh] overflow-auto rounded-lg border border-border/60 bg-surface p-4 font-mono text-xs leading-relaxed text-foreground">
-                {showFullRaw ? detail.rawJsonl : detail.rawJsonl.slice(0, RAW_PREVIEW_LENGTH)}
+                {showFullRaw ? detail.rawJsonl : rawPreview}
               </pre>
-              {!showFullRaw && detail.rawJsonl.length > RAW_PREVIEW_LENGTH ? (
-                <Button type="button" variant="secondary" size="sm" className="self-start" onClick={() => setShowFullRaw(true)}>
-                  {t("sessions.detail.show_full_raw")}
-                </Button>
-              ) : null}
             </div>
           )}
         </div>
