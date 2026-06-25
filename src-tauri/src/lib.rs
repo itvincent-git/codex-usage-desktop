@@ -687,10 +687,14 @@ fn delete_pricing_cache(path: &Path) -> Result<(), String> {
 fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
     let reload_item = MenuItem::with_id(app, "reload_page", "Reload", true, Some("CmdOrCtrl+R"))?;
+    #[cfg(debug_assertions)]
+    let inspect_item = MenuItem::with_id(app, "inspect_page", "Inspect", true, Some("CmdOrCtrl+Option+I"))?;
 
     for item in menu.items()? {
         if let MenuItemKind::Submenu(submenu) = item {
             if submenu.text()? == "View" {
+                #[cfg(debug_assertions)]
+                submenu.prepend(&inspect_item)?;
                 submenu.prepend(&reload_item)?;
                 break;
             }
@@ -725,10 +729,19 @@ pub fn run() {
             }
         })
         .on_menu_event(|app, event| {
-            if event.id.as_ref() == "reload_page" {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.reload();
+            match event.id.as_ref() {
+                "reload_page" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.reload();
+                    }
                 }
+                #[cfg(debug_assertions)]
+                "inspect_page" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        window.open_devtools();
+                    }
+                }
+                _ => {}
             }
         })
         .setup(|app| {
