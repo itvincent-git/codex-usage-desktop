@@ -147,26 +147,26 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
   if (score >= 70) {
     return {
       label: t("limits.quota_forecast_likely_label"),
-      className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
-      scoreClassName: "text-success",
-      ringColor: "rgb(var(--success))",
+      className: "border-error/30 bg-error/10 hover:border-error/45 hover:bg-error/15",
+      scoreClassName: "text-error",
+      ringColor: "rgb(var(--error))",
     };
   }
 
   if (score >= 40) {
     return {
       label: t("limits.quota_forecast_possible_label"),
-      className: "border-primary/30 bg-primary/10 hover:border-primary/45 hover:bg-primary/15",
-      scoreClassName: "text-primary",
-      ringColor: "rgb(var(--primary))",
+      className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
+      scoreClassName: "text-warning",
+      ringColor: "rgb(var(--warning))",
     };
   }
 
   return {
     label: t("limits.quota_forecast_low_label"),
-    className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
-    scoreClassName: "text-warning",
-    ringColor: "rgb(var(--warning))",
+    className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
+    scoreClassName: "text-success",
+    ringColor: "rgb(var(--success))",
   };
 }
 

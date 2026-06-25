@@ -158,7 +158,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByRole("img", { name: "73% reset probability" })).toBeInTheDocument();
     expect(forecastButton).toHaveTextContent("73");
     expect(forecastButton).toHaveTextContent("Reset likely in 48h");
-    expect(forecastButton).toHaveClass("border-success/30");
+    expect(forecastButton).toHaveClass("border-error/30");
   });
 
   it("changes quota forecast color by probability", () => {
@@ -174,7 +174,7 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-warning/35");
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-success/30");
 
     rerender(
       <CodexLimitsCard
@@ -188,7 +188,7 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-primary/30");
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-warning/35");
   });
 
   it("opens the quota forecast URL from the forecast badge", () => {
