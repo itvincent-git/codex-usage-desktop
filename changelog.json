@@ -1,4 +1,8 @@
 {
+  "1.13.0": {
+    "zh": "- feat: add native reload menu\n- feat: optimize session detail rendering\n- fix: improve raw jsonl preview layout",
+    "en": "- feat: add native reload menu\n- feat: optimize session detail rendering\n- fix: improve raw jsonl preview layout"
+  },
   "1.12.1": {
     "zh": "- fix: show friendly Codex limits errors\n- fix: deduplicate session replay messages",
     "en": "- fix: show friendly Codex limits errors\n- fix: deduplicate session replay messages"
