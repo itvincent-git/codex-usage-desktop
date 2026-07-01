@@ -1,4 +1,8 @@
 {
+  "1.15.0": {
+    "zh": "- feat: show weekly reset credits",
+    "en": "- feat: show weekly reset credits"
+  },
   "1.14.0": {
     "zh": "- feat: add Codex quota forecast pill\n- feat: emphasize quota forecast badge\n- feat: show quota forecast as ring\n- fix: map forecast risk colors by probability\n- feat: add development inspect menu item\n- fix: default tray title to limit windows",
     "en": "- feat: add Codex quota forecast pill\n- feat: emphasize quota forecast badge\n- feat: show quota forecast as ring\n- fix: map forecast risk colors by probability\n- feat: add development inspect menu item\n- fix: default tray title to limit windows"
