@@ -140,6 +140,35 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
+  it("renders reset credits on the weekly limit row", () => {
+    const limits = {
+      session: {
+        usedPercent: 10,
+        remainingPercent: 90,
+        windowMinutes: 300,
+        resetsAt: "2026-05-22T16:30:00.000Z",
+      },
+      weekly: {
+        usedPercent: 45,
+        remainingPercent: 55,
+        windowMinutes: 10080,
+        resetsAt: "2026-05-24T05:00:00.000Z",
+      },
+      resetCreditsAvailableCount: 2,
+      updatedAt: "2026-05-22T12:00:00.000Z",
+      source: "oauth",
+      account: "plus@example.com",
+      membershipLevel: "plus",
+    };
+
+    render(<CodexLimitsCard limits={limits} error={null} />);
+
+    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
+    expect(screen.getByText("Reset credits")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("times")).toBeInTheDocument();
+  });
+
   it("renders a prominent quota forecast badge", () => {
     render(
       <CodexLimitsCard

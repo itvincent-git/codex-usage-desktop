@@ -15,6 +15,7 @@ type CodexLimitsCardProps = {
 type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
+  resetCreditsAvailableCount?: number | null;
 };
 
 type QuotaForecastTone = {
@@ -120,7 +121,11 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
             {hasSubscription(limits) ? (
               <>
                 <LimitRow label="5 hour" window={limits?.session ?? null} />
-                <LimitRow label="Weekly" window={limits?.weekly ?? null} />
+                <LimitRow
+                  label="Weekly"
+                  window={limits?.weekly ?? null}
+                  resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
+                />
               </>
             ) : (
               <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
@@ -200,7 +205,7 @@ function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecast
   );
 }
 
-function LimitRow({ label, window }: LimitRowProps) {
+function LimitRow({ label, window, resetCreditsAvailableCount }: LimitRowProps) {
   const { t } = useTranslation();
 
   if (!window) {
@@ -234,6 +239,7 @@ function LimitRow({ label, window }: LimitRowProps) {
     : label.toLowerCase().includes("weekly")
     ? t("limits.window_weekly")
     : t("limits.window_5hour");
+  const showResetCredits = label.toLowerCase().includes("weekly") && resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
 
   return (
     <div className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm">
@@ -258,7 +264,10 @@ function LimitRow({ label, window }: LimitRowProps) {
             <p className="text-[11px] font-medium text-primary leading-normal">{resetLabel}</p>
           </div>
 
-          <div className="pt-1.5 grid grid-cols-2 gap-2 border-t border-border/50 text-[10px] text-left w-full">
+          <div className={cn(
+            "pt-1.5 grid gap-2 border-t border-border/50 text-[10px] text-left w-full",
+            showResetCredits ? "grid-cols-3" : "grid-cols-2",
+          )}>
             <div>
               <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.consumed")}</p>
               <p className="font-semibold text-foreground leading-none">
@@ -272,6 +281,15 @@ function LimitRow({ label, window }: LimitRowProps) {
               <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.window")}</p>
               <p className="font-semibold text-foreground leading-none">{formatWindowMinutes(window.windowMinutes, t)}</p>
             </div>
+            {showResetCredits ? (
+              <div>
+                <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.reset_credits")}</p>
+                <p className="font-semibold text-foreground leading-none">
+                  {resetCreditsAvailableCount}
+                  <span className="font-normal text-muted-foreground text-[8px] sm:text-[9px]"> {t("limits.times")}</span>
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

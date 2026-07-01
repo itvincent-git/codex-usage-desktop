@@ -124,6 +124,8 @@
     "remaining": "剩余",
     "consumed": "已消耗",
     "window": "窗口时长",
+    "reset_credits": "重置次数",
+    "times": "次",
     "left": "剩余",
     "status_near_limit": "接近额度上限",
     "status_moderate": "中等消耗",

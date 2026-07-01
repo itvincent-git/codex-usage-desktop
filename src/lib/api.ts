@@ -96,6 +96,7 @@ export type CodexLimitWindow = {
 export type CodexLimitsResponse = {
   session: CodexLimitWindow | null;
   weekly: CodexLimitWindow | null;
+  resetCreditsAvailableCount?: number | null;
   updatedAt: string;
   source: string;
   account?: string | null;

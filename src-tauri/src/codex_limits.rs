@@ -50,6 +50,7 @@ struct RpcRateLimitWindow {
 #[derive(Debug, Deserialize)]
 struct OAuthUsageResponse {
     rate_limit: Option<OAuthRateLimitSnapshot>,
+    rate_limit_reset_credits: Option<OAuthRateLimitResetCredits>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +64,11 @@ struct OAuthRateLimitWindow {
     used_percent: f64,
     reset_at: Option<i64>,
     limit_window_seconds: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthRateLimitResetCredits {
+    available_count: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,6 +94,7 @@ struct CodexAuth {
 struct LimitsSnapshot {
     primary: Option<RpcRateLimitWindow>,
     secondary: Option<RpcRateLimitWindow>,
+    reset_credits_available_count: Option<i64>,
     source: &'static str,
 }
 
@@ -219,6 +226,9 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
     Ok(LimitsSnapshot {
         primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
         secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
+        reset_credits_available_count: usage
+            .rate_limit_reset_credits
+            .and_then(|credits| credits.available_count),
         source: "oauth",
     })
 }
@@ -235,6 +245,7 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
     Ok(LimitsSnapshot {
         primary: limits.primary,
         secondary: limits.secondary,
+        reset_credits_available_count: None,
         source: "cli-rpc",
     })
 }
@@ -282,6 +293,7 @@ fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimit
     CodexLimitsResponse {
         session: session.map(make_window),
         weekly: weekly.map(make_window),
+        reset_credits_available_count: limits.reset_credits_available_count,
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         source: limits.source.to_string(),
         account: account.account,
@@ -1091,6 +1103,9 @@ mod tests {
                         "reset_at": 1800003600,
                         "limit_window_seconds": 604800
                     }
+                },
+                "rate_limit_reset_credits": {
+                    "available_count": 2
                 }
             }"#,
         )
@@ -1100,12 +1115,16 @@ mod tests {
             LimitsSnapshot {
                 primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
                 secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
+                reset_credits_available_count: usage
+                    .rate_limit_reset_credits
+                    .and_then(|credits| credits.available_count),
                 source: "oauth",
             },
             AccountSnapshot::default(),
         );
 
         assert_eq!(response.source, "oauth");
+        assert_eq!(response.reset_credits_available_count, Some(2));
         assert_eq!(response.session.unwrap().remaining_percent, 75.0);
         assert_eq!(
             response.weekly.unwrap().window_minutes,
@@ -1121,6 +1140,7 @@ mod tests {
                 Ok(LimitsSnapshot {
                     primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                     secondary: Some(window(40.0, Some(WEEKLY_WINDOW_MINUTES))),
+                    reset_credits_available_count: None,
                     source: "cli-rpc",
                 })
             },
@@ -1221,6 +1241,7 @@ mod tests {
             LimitsSnapshot {
                 primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                 secondary: None,
+                reset_credits_available_count: Some(2),
                 source: "oauth",
             },
             AccountSnapshot {
@@ -1239,6 +1260,7 @@ mod tests {
             Some("2026-06-12T08:22:29+00:00".to_string())
         );
         assert_eq!(response.subscription_will_renew, Some(false));
+        assert_eq!(response.reset_credits_available_count, Some(2));
     }
 
     #[test]

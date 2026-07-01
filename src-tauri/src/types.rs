@@ -174,6 +174,7 @@ pub struct CodexLimitWindow {
 pub struct CodexLimitsResponse {
     pub session: Option<CodexLimitWindow>,
     pub weekly: Option<CodexLimitWindow>,
+    pub reset_credits_available_count: Option<i64>,
     pub updated_at: String,
     pub source: String,
     pub account: Option<String>,

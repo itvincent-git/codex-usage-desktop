@@ -124,6 +124,8 @@
     "remaining": "remaining",
     "consumed": "Consumed",
     "window": "Window",
+    "reset_credits": "Reset credits",
+    "times": "times",
     "left": "Left",
     "status_near_limit": "Near Limit",
     "status_moderate": "Moderate",

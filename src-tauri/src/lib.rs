@@ -857,6 +857,7 @@ mod tests {
         CodexLimitsResponse {
             session: None,
             weekly: None,
+            reset_credits_available_count: None,
             updated_at: "2026-06-11T00:00:00.000Z".to_string(),
             source: "test".to_string(),
             account: None,
