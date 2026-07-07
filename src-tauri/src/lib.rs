@@ -745,6 +745,12 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec!["--hidden"]),
+            ))?;
+
             setup_app_menu(app)?;
 
             let app_data_dir = app.path().app_data_dir()?;
@@ -792,6 +798,12 @@ pub fn run() {
                 })
                 .build(app)
                 .map_err(|e| e.to_string())?;
+
+            if std::env::args().any(|arg| arg == "--hidden") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
 
             let database_path = database_path.clone();
             let pricing_cache_path = pricing_cache_path.clone();

@@ -1,4 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
+import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -138,6 +139,9 @@ export function useUsageDashboard() {
   const [isResetting, setIsResetting] = useState(false);
   const [isExporting, setIsExporting] = useState<ExportFormat | null>(null);
   const [lastRescanDurationMs, setLastRescanDurationMs] = useState<number | null>(null);
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
+  const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
+  const [isLaunchAtLoginUpdating, setIsLaunchAtLoginUpdating] = useState(false);
   
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResponse | null>(null);
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
@@ -218,6 +222,25 @@ export function useUsageDashboard() {
     return () => {
       isMounted = false;
       unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void isAutostartEnabled()
+      .then((enabled) => {
+        if (!isMounted) return;
+        setLaunchAtLogin(enabled);
+        setLaunchAtLoginError(null);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setLaunchAtLoginError(errorMessage(err, "Failed to read login item setting."));
+      });
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -782,6 +805,26 @@ export function useUsageDashboard() {
     }
   }
 
+  async function handleLaunchAtLoginChange(enabled: boolean) {
+    const previous = launchAtLogin;
+    setLaunchAtLogin(enabled);
+    setLaunchAtLoginError(null);
+    setIsLaunchAtLoginUpdating(true);
+
+    try {
+      if (enabled) {
+        await enableAutostart();
+      } else {
+        await disableAutostart();
+      }
+    } catch (autostartError) {
+      setLaunchAtLogin(previous);
+      setLaunchAtLoginError(errorMessage(autostartError, "Failed to update login item setting."));
+    } finally {
+      setIsLaunchAtLoginUpdating(false);
+    }
+  }
+
   const handleDismissUpdate = () => {
     if (updateInfo) {
       localStorage.setItem("dismissed_update_tag", updateInfo.latestTag);
@@ -883,6 +926,9 @@ export function useUsageDashboard() {
     updateProgress,
     updateInstallError,
     isUpdateDismissed,
+    launchAtLogin,
+    launchAtLoginError,
+    isLaunchAtLoginUpdating,
     showLogsTab,
     setShowLogsTab,
     sessions,
@@ -897,6 +943,7 @@ export function useUsageDashboard() {
     handleUpgrade,
     handleOpenUpdateRelease,
     handleOpenCodexQuotaForecast,
+    handleLaunchAtLoginChange,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,

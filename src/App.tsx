@@ -56,6 +56,9 @@ export default function App() {
     updateProgress,
     updateInstallError,
     isUpdateDismissed,
+    launchAtLogin,
+    launchAtLoginError,
+    isLaunchAtLoginUpdating,
     showLogsTab,
     setShowLogsTab,
     sessions,
@@ -70,6 +73,7 @@ export default function App() {
     handleUpgrade,
     handleOpenUpdateRelease,
     handleOpenCodexQuotaForecast,
+    handleLaunchAtLoginChange,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,
@@ -409,6 +413,10 @@ export default function App() {
               onCheckUpdates={() => void handleManualUpdateCheck()}
               onUpgrade={() => void handleUpgrade()}
               onOpenUpdateRelease={() => void handleOpenUpdateRelease()}
+              launchAtLogin={launchAtLogin}
+              launchAtLoginError={launchAtLoginError}
+              isLaunchAtLoginUpdating={isLaunchAtLoginUpdating}
+              onLaunchAtLoginChange={(enabled) => void handleLaunchAtLoginChange(enabled)}
               showLogsTab={showLogsTab}
               onShowLogsTabChange={setShowLogsTab}
               trayTitleShow={trayTitleShow}

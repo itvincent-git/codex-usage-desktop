@@ -28,6 +28,10 @@ type SettingsPageProps = {
   onCheckUpdates: () => void;
   onUpgrade: () => void;
   onOpenUpdateRelease: () => void;
+  launchAtLogin: boolean;
+  launchAtLoginError: string | null;
+  isLaunchAtLoginUpdating: boolean;
+  onLaunchAtLoginChange: (enabled: boolean) => void;
   showLogsTab: boolean;
   onShowLogsTabChange: (show: boolean) => void;
   trayTitleShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
@@ -57,6 +61,10 @@ export function SettingsPage({
   onCheckUpdates,
   onUpgrade,
   onOpenUpdateRelease,
+  launchAtLogin,
+  launchAtLoginError,
+  isLaunchAtLoginUpdating,
+  onLaunchAtLoginChange,
   showLogsTab,
   onShowLogsTabChange,
   trayTitleShow,
@@ -159,6 +167,46 @@ export function SettingsPage({
                 aria-hidden="true"
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                   showLogsTab ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.system_title")}</CardTitle>
+          <CardDescription>{t("settings.system_desc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-foreground">{t("settings.launch_at_login_title")}</h4>
+              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+                {t("settings.launch_at_login_desc")}
+              </p>
+              {launchAtLoginError ? (
+                <p className="max-w-lg text-sm leading-6 text-error dark:text-red-400">
+                  {launchAtLoginError}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              id="toggle-launch-at-login"
+              aria-label={t("settings.toggle_launch_at_login_aria")}
+              aria-pressed={launchAtLogin}
+              onClick={() => onLaunchAtLoginChange(!launchAtLogin)}
+              disabled={isDisabled || isLaunchAtLoginUpdating}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                launchAtLogin ? "bg-indigo-600" : "bg-neutral-700"
+              } ${isDisabled || isLaunchAtLoginUpdating ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  launchAtLogin ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>

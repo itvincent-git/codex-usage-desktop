@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Default desktop capability set",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-save", "log:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-save",
+    "log:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
 }

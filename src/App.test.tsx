@@ -11,6 +11,9 @@ import tauriConfig from "../src-tauri/tauri.conf.json";
 const invokeMock = vi.hoisted(() => vi.fn());
 const forecastInvokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
+const autostartEnableMock = vi.hoisted(() => vi.fn());
+const autostartDisableMock = vi.hoisted(() => vi.fn());
+const autostartIsEnabledMock = vi.hoisted(() => vi.fn());
 const updateTrayMock = vi.hoisted(() => vi.fn());
 const writeTextMock = vi.hoisted(() => vi.fn());
 const eventListeners = vi.hoisted(() => new Map<string, Array<(event: { payload: any }) => void>>());
@@ -75,6 +78,12 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: saveMock,
+}));
+
+vi.mock("@tauri-apps/plugin-autostart", () => ({
+  enable: autostartEnableMock,
+  disable: autostartDisableMock,
+  isEnabled: autostartIsEnabledMock,
 }));
 
 vi.mock("@tauri-apps/plugin-log", () => ({
@@ -153,6 +162,24 @@ function setPageActive(active: boolean) {
   vi.spyOn(document, "hasFocus").mockReturnValue(active);
 }
 
+function mockLoadedDashboard() {
+  invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+    if (command === "fetch_codex_limits") {
+      return limits(80);
+    }
+    if (command === "scan_usage") {
+      return scan(0);
+    }
+    if (command === "fetch_overview" && args?.range === "30d") {
+      return overview();
+    }
+    if (command === "check_for_updates") {
+      return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+    }
+    throw new Error(`Unexpected invoke: ${command}`);
+  });
+}
+
 describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -160,6 +187,12 @@ describe("App", () => {
     forecastInvokeMock.mockReset();
     forecastInvokeMock.mockRejectedValue(new Error("Forecast unavailable"));
     saveMock.mockReset();
+    autostartEnableMock.mockReset();
+    autostartEnableMock.mockResolvedValue(undefined);
+    autostartDisableMock.mockReset();
+    autostartDisableMock.mockResolvedValue(undefined);
+    autostartIsEnabledMock.mockReset();
+    autostartIsEnabledMock.mockResolvedValue(false);
     updateTrayMock.mockReset();
     eventListeners.clear();
     document.body.style.overflow = "";
@@ -1773,6 +1806,83 @@ describe("App", () => {
     expect(screen.queryByRole("tab", { name: "Logs" })).not.toBeInTheDocument();
     expect(localStorage.getItem("show_logs_tab")).toBe("false");
     expect(screen.getByRole("tab", { name: "Settings" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("shows launch at login as disabled when autostart is not enabled", async () => {
+    mockLoadedDashboard();
+    autostartIsEnabledMock.mockResolvedValue(false);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+
+    const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
+    await waitFor(() => expect(autostartIsEnabledMock).toHaveBeenCalled());
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("enables launch at login from Settings", async () => {
+    mockLoadedDashboard();
+    autostartIsEnabledMock.mockResolvedValue(false);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
+
+    await userEvent.click(toggle);
+
+    await waitFor(() => expect(autostartEnableMock).toHaveBeenCalledTimes(1));
+    expect(autostartDisableMock).not.toHaveBeenCalled();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("disables launch at login from Settings", async () => {
+    mockLoadedDashboard();
+    autostartIsEnabledMock.mockResolvedValue(true);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-pressed", "true"));
+
+    await userEvent.click(toggle);
+
+    await waitFor(() => expect(autostartDisableMock).toHaveBeenCalledTimes(1));
+    expect(autostartEnableMock).not.toHaveBeenCalled();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("rolls back launch at login when enabling fails", async () => {
+    mockLoadedDashboard();
+    autostartIsEnabledMock.mockResolvedValue(false);
+    autostartEnableMock.mockRejectedValue(new Error("Autostart unavailable"));
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
+    await userEvent.click(toggle);
+
+    expect(await screen.findByText("Autostart unavailable")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("rolls back launch at login when disabling fails", async () => {
+    mockLoadedDashboard();
+    autostartIsEnabledMock.mockResolvedValue(true);
+    autostartDisableMock.mockRejectedValue(new Error("Cannot disable autostart"));
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-pressed", "true"));
+    await userEvent.click(toggle);
+
+    expect(await screen.findByText("Cannot disable autostart")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 
   it("does not show update banner when cached latest version matches or is older than the current running version", async () => {
