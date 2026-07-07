@@ -1,4 +1,8 @@
 {
+  "1.16.0": {
+    "zh": "- feat: add launch at login setting",
+    "en": "- feat: add launch at login setting"
+  },
   "1.15.0": {
     "zh": "- feat: show weekly reset credits",
     "en": "- feat: show weekly reset credits"
