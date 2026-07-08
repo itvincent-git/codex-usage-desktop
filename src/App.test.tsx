@@ -1384,11 +1384,13 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
 
     expect(screen.getByText("Manage local app state and recovery actions.")).toBeInTheDocument();
-    expect(screen.getByRole("tabpanel", { name: "Menu Bar" })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Display Settings")).toBeInTheDocument();
     expect(screen.getByText("Menu Bar Settings")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Maintenance" }));
-    expect(screen.getByRole("tabpanel", { name: "Maintenance" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Maintenance" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Menu Bar Settings")).toBeInTheDocument();
     expect(screen.getByText("Local cache")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
@@ -1787,8 +1789,7 @@ describe("App", () => {
     await userEvent.click(settingsTab);
 
     expect(screen.getByText("Menu Bar Settings")).toBeInTheDocument();
-    expect(screen.queryByText("Display Settings")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "General" }));
+    expect(screen.getByText("Display Settings")).toBeInTheDocument();
 
     // Verify Display Settings card is rendered with "Show Logs Tab" toggle switch
     expect(screen.getByText("Language Settings")).toBeInTheDocument();

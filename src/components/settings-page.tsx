@@ -78,7 +78,7 @@ export function SettingsPage({
   codexLimits,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
-  const [activeSection, setActiveSection] = useState<SettingsSection>("menuBar");
+  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const isRateLimitError = !!(
     updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||
     updateInfo?.releaseNotes?.includes("GitHub API 访问受限")
@@ -125,6 +125,7 @@ export function SettingsPage({
   const renderSectionTab = (section: SettingsSection) => {
     const selected = activeSection === section;
     const label = t(`settings.nav_${section === "menuBar" ? "menu_bar" : section}`);
+    const sectionId = `settings-section-${section}`;
 
     return (
       <button
@@ -133,8 +134,11 @@ export function SettingsPage({
         role="tab"
         id={`settings-tab-${section}`}
         aria-selected={selected}
-        aria-controls={`settings-panel-${section}`}
-        onClick={() => setActiveSection(section)}
+        aria-controls={sectionId}
+        onClick={() => {
+          setActiveSection(section);
+          document.getElementById(sectionId)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+        }}
         className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background ${
           selected
             ? "bg-indigo-600 text-white shadow-sm"
@@ -437,13 +441,6 @@ export function SettingsPage({
     </>
   );
 
-  const activeContent =
-    activeSection === "general"
-      ? generalContent
-      : activeSection === "menuBar"
-        ? menuBarContent
-        : maintenanceContent;
-
   return (
     <div className="max-w-5xl space-y-4">
       <div className="space-y-1">
@@ -462,11 +459,31 @@ export function SettingsPage({
 
         <div
           role="tabpanel"
-          id={`settings-panel-${activeSection}`}
-          aria-label={t(`settings.nav_${activeSection === "menuBar" ? "menu_bar" : activeSection}`)}
+          id="settings-panel"
+          aria-label={t("settings.title")}
           className="space-y-4"
         >
-          {activeContent}
+          <section
+            id="settings-section-general"
+            aria-labelledby="settings-tab-general"
+            className="scroll-mt-4 space-y-4"
+          >
+            {generalContent}
+          </section>
+          <section
+            id="settings-section-menuBar"
+            aria-labelledby="settings-tab-menuBar"
+            className="scroll-mt-4"
+          >
+            {menuBarContent}
+          </section>
+          <section
+            id="settings-section-maintenance"
+            aria-labelledby="settings-tab-maintenance"
+            className="scroll-mt-4 space-y-4"
+          >
+            {maintenanceContent}
+          </section>
         </div>
       </div>
     </div>
