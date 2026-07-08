@@ -355,6 +355,10 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Manage local app state and recovery actions.",
+    "nav_aria": "Settings sections",
+    "nav_general": "General",
+    "nav_menu_bar": "Menu Bar",
+    "nav_maintenance": "Maintenance",
     "cache_title": "Local cache",
     "cache_desc": "Clear cached usage, incremental scan data, and pricing data, then rebuild from local Codex logs.",
     "btn_resetting": "Resetting",

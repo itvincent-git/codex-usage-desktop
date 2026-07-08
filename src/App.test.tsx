@@ -1384,8 +1384,12 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
 
     expect(screen.getByText("Manage local app state and recovery actions.")).toBeInTheDocument();
-    expect(screen.getByText("Local cache")).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: "Menu Bar" })).toBeInTheDocument();
+    expect(screen.getByText("Menu Bar Settings")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Maintenance" }));
+    expect(screen.getByRole("tabpanel", { name: "Maintenance" })).toBeInTheDocument();
+    expect(screen.getByText("Local cache")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled();
     await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
 
@@ -1441,6 +1445,7 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument());
     await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Maintenance" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Reset cache" })).toBeEnabled());
     await userEvent.click(screen.getByRole("button", { name: "Reset cache" }));
 
@@ -1781,8 +1786,14 @@ describe("App", () => {
     const settingsTab = screen.getByRole("tab", { name: "Settings" });
     await userEvent.click(settingsTab);
 
+    expect(screen.getByText("Menu Bar Settings")).toBeInTheDocument();
+    expect(screen.queryByText("Display Settings")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
+
     // Verify Display Settings card is rendered with "Show Logs Tab" toggle switch
+    expect(screen.getByText("Language Settings")).toBeInTheDocument();
     expect(screen.getByText("Display Settings")).toBeInTheDocument();
+    expect(screen.getByText("Launch at Login")).toBeInTheDocument();
     const toggleSwitch = screen.getByRole("button", { name: "Toggle Logs Tab" });
     expect(toggleSwitch).toBeInTheDocument();
 
@@ -1800,6 +1811,7 @@ describe("App", () => {
 
     // Go back to Settings and toggle it off
     await userEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
     await userEvent.click(screen.getByRole("button", { name: "Toggle Logs Tab" }));
 
     // Logs tab should be hidden and settings should remain selected
@@ -1815,6 +1827,7 @@ describe("App", () => {
     render(<App />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
 
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
     await waitFor(() => expect(autostartIsEnabledMock).toHaveBeenCalled());
@@ -1828,6 +1841,7 @@ describe("App", () => {
     render(<App />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
 
     await userEvent.click(toggle);
@@ -1844,6 +1858,7 @@ describe("App", () => {
     render(<App />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
     await waitFor(() => expect(toggle).toHaveAttribute("aria-pressed", "true"));
 
@@ -1862,6 +1877,7 @@ describe("App", () => {
     render(<App />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
     await userEvent.click(toggle);
 
@@ -1877,6 +1893,7 @@ describe("App", () => {
     render(<App />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
     await waitFor(() => expect(toggle).toHaveAttribute("aria-pressed", "true"));
     await userEvent.click(toggle);

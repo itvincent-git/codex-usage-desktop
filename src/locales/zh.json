@@ -358,8 +358,12 @@
     }
   },
   "settings": {
-    "title": "系统设置",
+    "title": "设置",
     "subtitle": "管理本地应用缓存数据和恢复操作。",
+    "nav_aria": "设置分类",
+    "nav_general": "通用",
+    "nav_menu_bar": "菜单栏",
+    "nav_maintenance": "维护",
     "cache_title": "本地缓存管理",
     "cache_desc": "清理本地缓存的使用数据、增量扫描数据和价格配置，并从本地 Codex 日志中重新构建。",
     "btn_resetting": "正在重置",

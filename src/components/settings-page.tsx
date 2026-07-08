@@ -6,7 +6,7 @@ import type { UpdateInstallStatus, UpdateProgressState } from "@/hooks/use-usage
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -48,6 +48,10 @@ const TRAY_OPTION_KEYS = {
   cost: "cost",
 } as const;
 
+type SettingsSection = "general" | "menuBar" | "maintenance";
+
+const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance"];
+
 export function SettingsPage({
   isResetting,
   isDisabled,
@@ -74,6 +78,7 @@ export function SettingsPage({
   codexLimits,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
+  const [activeSection, setActiveSection] = useState<SettingsSection>("menuBar");
   const isRateLimitError = !!(
     updateInfo?.releaseNotes?.includes("GitHub API rate limit exceeded") ||
     updateInfo?.releaseNotes?.includes("GitHub API 访问受限")
@@ -117,25 +122,57 @@ export function SettingsPage({
         : t("settings.btn_downloading_update_progress", { percent: updateProgress.percent })
       : t("settings.btn_download_update");
 
-  return (
-    <div className="max-w-3xl space-y-4">
+  const renderSectionTab = (section: SettingsSection) => {
+    const selected = activeSection === section;
+    const label = t(`settings.nav_${section === "menuBar" ? "menu_bar" : section}`);
+
+    return (
+      <button
+        key={section}
+        type="button"
+        role="tab"
+        id={`settings-tab-${section}`}
+        aria-selected={selected}
+        aria-controls={`settings-panel-${section}`}
+        onClick={() => setActiveSection(section)}
+        className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background ${
+          selected
+            ? "bg-indigo-600 text-white shadow-sm"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  const generalContent = (
+    <>
       <Card>
         <CardHeader>
-          <CardTitle>{t("settings.title")}</CardTitle>
-          <CardDescription>{t("settings.subtitle")}</CardDescription>
+          <CardTitle>{t("settings.language_title")}</CardTitle>
+          <CardDescription>{t("settings.language_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h4 className="text-sm font-medium text-foreground">{t("settings.cache_title")}</h4>
-              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
-                {t("settings.cache_desc")}
-              </p>
+              <h4 className="text-sm font-medium text-foreground">{t("settings.language_label")}</h4>
             </div>
-            <Button variant="secondary" size="lg" onClick={onReset} disabled={isDisabled}>
-              <RotateCcw className={`h-4 w-4 ${isResetting ? "animate-spin" : ""}`} />
-              {isResetting ? t("settings.btn_resetting") : t("settings.btn_reset")}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select
+                value={currentLanguage}
+                onValueChange={handleLanguageChange}
+                disabled={isDisabled}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder={t("settings.language_label")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">{t("settings.lang_en")}</SelectItem>
+                  <SelectItem value="zh">{t("settings.lang_zh")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -176,16 +213,12 @@ export function SettingsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("settings.system_title")}</CardTitle>
-          <CardDescription>{t("settings.system_desc")}</CardDescription>
+          <CardTitle>{t("settings.launch_at_login_title")}</CardTitle>
+          <CardDescription>{t("settings.launch_at_login_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h4 className="text-sm font-medium text-foreground">{t("settings.launch_at_login_title")}</h4>
-              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
-                {t("settings.launch_at_login_desc")}
-              </p>
               {launchAtLoginError ? (
                 <p className="max-w-lg text-sm leading-6 text-error dark:text-red-400">
                   {launchAtLoginError}
@@ -213,84 +246,76 @@ export function SettingsPage({
           </div>
         </CardContent>
       </Card>
+    </>
+  );
 
+  const menuBarContent = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("settings.menu_bar_title")}</CardTitle>
+        <CardDescription>{t("settings.menu_bar_desc")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="border-t border-border pt-5 space-y-4">
+          <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_title")}</h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {optionKeys.map((key) => (
+              <label key={`title-${key}`} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={trayTitleShow[key]}
+                  onChange={(e) => onTrayTitleShowChange(key, e.target.checked)}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
+                />
+                <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  {key === "limitWeekly" && !hasSub
+                    ? t("settings.menu_bar_opt_monthly")
+                    : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-5 space-y-4">
+          <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_menu")}</h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {optionKeys.map((key) => (
+              <label key={`menu-${key}`} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={trayMenuShow[key]}
+                  onChange={(e) => onTrayMenuShowChange(key, e.target.checked)}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
+                />
+                <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  {key === "limitWeekly" && !hasSub
+                    ? t("settings.menu_bar_opt_monthly")
+                    : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const maintenanceContent = (
+    <>
       <Card>
         <CardHeader>
-          <CardTitle>{t("settings.menu_bar_title")}</CardTitle>
-          <CardDescription>{t("settings.menu_bar_desc")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="border-t border-border pt-5 space-y-4">
-            <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_title")}</h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {optionKeys.map((key) => (
-                <label key={`title-${key}`} className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={trayTitleShow[key]}
-                    onChange={(e) => onTrayTitleShowChange(key, e.target.checked)}
-                    disabled={isDisabled}
-                    className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
-                  />
-                  <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {key === "limitWeekly" && !hasSub
-                      ? t("settings.menu_bar_opt_monthly")
-                      : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t border-border pt-5 space-y-4">
-            <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_show_menu")}</h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {optionKeys.map((key) => (
-                <label key={`menu-${key}`} className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={trayMenuShow[key]}
-                    onChange={(e) => onTrayMenuShowChange(key, e.target.checked)}
-                    disabled={isDisabled}
-                    className="h-4 w-4 rounded border-border bg-neutral-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-background disabled:opacity-50"
-                  />
-                  <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {key === "limitWeekly" && !hasSub
-                      ? t("settings.menu_bar_opt_monthly")
-                      : t(`settings.menu_bar_opt_${TRAY_OPTION_KEYS[key]}`)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.language_title")}</CardTitle>
-          <CardDescription>{t("settings.language_desc")}</CardDescription>
+          <CardTitle>{t("settings.cache_title")}</CardTitle>
+          <CardDescription>{t("settings.cache_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h4 className="text-sm font-medium text-foreground">{t("settings.language_label")}</h4>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select
-                value={currentLanguage}
-                onValueChange={handleLanguageChange}
-                disabled={isDisabled}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder={t("settings.language_label")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en">{t("settings.lang_en")}</SelectItem>
-                  <SelectItem value="zh">{t("settings.lang_zh")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex justify-start border-t border-border pt-5 sm:justify-end">
+            <Button variant="secondary" size="lg" onClick={onReset} disabled={isDisabled}>
+              <RotateCcw className={`h-4 w-4 ${isResetting ? "animate-spin" : ""}`} />
+              {isResetting ? t("settings.btn_resetting") : t("settings.btn_reset")}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -409,6 +434,41 @@ export function SettingsPage({
           </div>
         </CardContent>
       </Card>
+    </>
+  );
+
+  const activeContent =
+    activeSection === "general"
+      ? generalContent
+      : activeSection === "menuBar"
+        ? menuBarContent
+        : maintenanceContent;
+
+  return (
+    <div className="max-w-5xl space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">{t("settings.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("settings.subtitle")}</p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <div
+          role="tablist"
+          aria-label={t("settings.nav_aria")}
+          className="flex gap-2 overflow-x-auto rounded-lg border border-border bg-card p-2 lg:sticky lg:top-4 lg:flex-col lg:self-start lg:overflow-visible"
+        >
+          {SETTINGS_SECTIONS.map(renderSectionTab)}
+        </div>
+
+        <div
+          role="tabpanel"
+          id={`settings-panel-${activeSection}`}
+          aria-label={t(`settings.nav_${activeSection === "menuBar" ? "menu_bar" : activeSection}`)}
+          className="space-y-4"
+        >
+          {activeContent}
+        </div>
+      </div>
     </div>
   );
 }
