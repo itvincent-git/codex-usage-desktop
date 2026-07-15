@@ -1,4 +1,8 @@
 {
+  "1.17.1": {
+    "zh": "- fix(scripts): avoid git lock races during releases",
+    "en": "- fix(scripts): avoid git lock races during releases"
+  },
   "1.17.0": {
     "zh": "- feat: organize settings into sections\n- fix: keep all settings visible",
     "en": "- feat: organize settings into sections\n- fix: keep all settings visible"
