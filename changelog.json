@@ -1,4 +1,8 @@
 {
+  "1.17.0": {
+    "zh": "- feat: organize settings into sections\n- fix: keep all settings visible",
+    "en": "- feat: organize settings into sections\n- fix: keep all settings visible"
+  },
   "1.16.0": {
     "zh": "- feat: add launch at login setting",
     "en": "- feat: add launch at login setting"
