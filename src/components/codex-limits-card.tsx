@@ -1,6 +1,6 @@
 import { ExternalLink, Gauge, LogIn } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse } from "@/lib/api";
+import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,7 @@ type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
   resetCreditsAvailableCount?: number | null;
+  resetCredits?: CodexResetCredit[] | null;
 };
 
 type QuotaForecastTone = {
@@ -125,6 +126,7 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
                   label="Weekly"
                   window={limits?.weekly ?? null}
                   resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
+                  resetCredits={limits?.resetCredits}
                 />
               </>
             ) : (
@@ -205,7 +207,7 @@ function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecast
   );
 }
 
-function LimitRow({ label, window, resetCreditsAvailableCount }: LimitRowProps) {
+function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits }: LimitRowProps) {
   const { t } = useTranslation();
 
   if (!window) {
@@ -264,10 +266,7 @@ function LimitRow({ label, window, resetCreditsAvailableCount }: LimitRowProps) 
             <p className="text-[11px] font-medium text-primary leading-normal">{resetLabel}</p>
           </div>
 
-          <div className={cn(
-            "pt-1.5 grid gap-2 border-t border-border/50 text-[10px] text-left w-full",
-            showResetCredits ? "grid-cols-3" : "grid-cols-2",
-          )}>
+          <div className="grid w-full grid-cols-2 gap-2 border-t border-border/50 pt-1.5 text-left text-[10px]">
             <div>
               <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.consumed")}</p>
               <p className="font-semibold text-foreground leading-none">
@@ -281,20 +280,81 @@ function LimitRow({ label, window, resetCreditsAvailableCount }: LimitRowProps) 
               <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.window")}</p>
               <p className="font-semibold text-foreground leading-none">{formatWindowMinutes(window.windowMinutes, t)}</p>
             </div>
-            {showResetCredits ? (
-              <div>
-                <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.reset_credits")}</p>
-                <p className="font-semibold text-foreground leading-none">
-                  {resetCreditsAvailableCount}
-                  <span className="font-normal text-muted-foreground text-[8px] sm:text-[9px]"> {t("limits.times")}</span>
-                </p>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
+      {showResetCredits ? (
+        <ResetCreditsPanel
+          availableCount={resetCreditsAvailableCount}
+          credits={resetCredits}
+        />
+      ) : null}
     </div>
   );
+}
+
+function ResetCreditsPanel({ availableCount, credits }: { availableCount: number; credits?: CodexResetCredit[] | null }) {
+  const { t } = useTranslation();
+  const count = Math.max(0, Math.trunc(availableCount));
+  const sortedCredits = [...(credits ?? [])]
+    .sort((left, right) => {
+      if (left.expiresAt === null) return right.expiresAt === null ? 0 : 1;
+      if (right.expiresAt === null) return -1;
+      return new Date(left.expiresAt).getTime() - new Date(right.expiresAt).getTime();
+    })
+    .slice(0, count);
+
+  return (
+    <div className="mt-3 grid gap-2 rounded-lg border border-primary/15 bg-primary/5 p-2.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:gap-4">
+      <div className="min-w-[5.5rem]">
+        <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{t("limits.reset_credits")}</p>
+        <p className="mt-0.5 leading-none">
+          <span data-testid="reset-credit-count" className="font-mono text-3xl font-bold tabular-nums text-primary">{count}</span>
+          <span className="ml-1 text-[10px] font-medium text-muted-foreground">{t("limits.times")}</span>
+        </p>
+      </div>
+      <div className="min-w-0 space-y-1 text-[10px] leading-normal text-foreground/85 sm:pt-0.5">
+        {count === 0 ? (
+          <p className="text-muted-foreground">{t("limits.reset_credits_none")}</p>
+        ) : sortedCredits.length === 0 ? (
+          <p className="text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
+        ) : (
+          <>
+            {sortedCredits.map((credit, index) => (
+              <p key={credit.id} className="break-words">
+                {credit.expiresAt
+                  ? t("limits.reset_credit_expires", {
+                      index: index + 1,
+                      date: dayjs(credit.expiresAt).format("YYYY-MM-DD HH:mm"),
+                      timeLeft: formatResetCreditTimeLeft(credit.expiresAt, t),
+                    })
+                  : t("limits.reset_credit_no_expiry", { index: index + 1 })}
+              </p>
+            ))}
+            {sortedCredits.length < count ? (
+              <p className="text-muted-foreground">
+                {t("limits.reset_credits_details_partial", { count: count - sortedCredits.length })}
+              </p>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatResetCreditTimeLeft(expiresAt: string, t: any): string {
+  const diffMs = dayjs(expiresAt).diff(dayjs());
+  if (diffMs <= 0) return t("limits.resetting_soon");
+
+  const minutes = Math.ceil(diffMs / 60_000);
+  if (minutes < 60) return t(minutes === 1 ? "limits.mins_left_one" : "limits.mins_left_other", { count: minutes });
+
+  const hours = Math.ceil(diffMs / 3_600_000);
+  if (hours < 24) return t(hours === 1 ? "limits.hours_left_one" : "limits.hours_left_other", { count: hours });
+
+  const days = Math.ceil(diffMs / 86_400_000);
+  return t(days === 1 ? "limits.days_left_one" : "limits.days_left_other", { count: days });
 }
 
 function LimitGauge({ remainingPercent, tone }: { remainingPercent: number; tone: "success" | "warning" | "error" }) {

@@ -140,7 +140,9 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
-  it("renders reset credits on the weekly limit row", () => {
+  it("emphasizes reset credits and sorts each expiration with non-expiring credits last", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T00:00:00+08:00"));
     const limits = {
       session: {
         usedPercent: 10,
@@ -154,7 +156,12 @@ describe("CodexLimitsCard component", () => {
         windowMinutes: 10080,
         resetsAt: "2026-05-24T05:00:00.000Z",
       },
-      resetCreditsAvailableCount: 2,
+      resetCreditsAvailableCount: 3,
+      resetCredits: [
+        { id: "later", expiresAt: "2026-08-03T18:00:00+08:00" },
+        { id: "never", expiresAt: null },
+        { id: "earlier", expiresAt: "2026-08-01T18:00:00+08:00" },
+      ],
       updatedAt: "2026-05-22T12:00:00.000Z",
       source: "oauth",
       account: "plus@example.com",
@@ -165,8 +172,74 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getByText("Reset credits")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3");
+    expect(screen.getByTestId("reset-credit-count")).toHaveClass("text-3xl", "font-bold", "text-primary", "tabular-nums");
     expect(screen.getByText("times")).toBeInTheDocument();
+    const detailLines = screen.getAllByText(/^Credit \d/);
+    expect(detailLines).toHaveLength(3);
+    expect(detailLines[0]).toHaveTextContent(`Credit 1 · Expires ${dayjs("2026-08-01T18:00:00+08:00").format("YYYY-MM-DD")}`);
+    expect(detailLines[1]).toHaveTextContent(`Credit 2 · Expires ${dayjs("2026-08-03T18:00:00+08:00").format("YYYY-MM-DD")}`);
+    expect(detailLines[2]).toHaveTextContent("Credit 3 · Does not expire");
+    vi.useRealTimers();
+  });
+
+  it("reports reset credits whose expiration details are missing", () => {
+    render(
+      <CodexLimitsCard
+        limits={{
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
+          resetCreditsAvailableCount: 3,
+          resetCredits: [{ id: "known", expiresAt: "2026-08-01T18:00:00.000Z" }],
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+      />,
+    );
+
+    expect(screen.getByText("Expiration details were not returned for 2 more credits")).toBeInTheDocument();
+  });
+
+  it("keeps the reset count when all expiration details are unavailable", () => {
+    render(
+      <CodexLimitsCard
+        limits={{
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
+          resetCreditsAvailableCount: 3,
+          resetCredits: null,
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+      />,
+    );
+
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3");
+    expect(screen.getByText("Expiration details are temporarily unavailable")).toBeInTheDocument();
+  });
+
+  it("shows the empty reset-credit state when no credits are available", () => {
+    render(
+      <CodexLimitsCard
+        limits={{
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
+          resetCreditsAvailableCount: 0,
+          resetCredits: [],
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+      />,
+    );
+
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("0");
+    expect(screen.getByText("No reset credits available")).toBeInTheDocument();
   });
 
   it("renders a prominent quota forecast badge", () => {

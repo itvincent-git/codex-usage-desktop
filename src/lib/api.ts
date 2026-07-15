@@ -93,10 +93,16 @@ export type CodexLimitWindow = {
   resetsAt: string | null;
 };
 
+export type CodexResetCredit = {
+  id: string;
+  expiresAt: string | null;
+};
+
 export type CodexLimitsResponse = {
   session: CodexLimitWindow | null;
   weekly: CodexLimitWindow | null;
   resetCreditsAvailableCount?: number | null;
+  resetCredits?: CodexResetCredit[] | null;
   updatedAt: string;
   source: string;
   account?: string | null;

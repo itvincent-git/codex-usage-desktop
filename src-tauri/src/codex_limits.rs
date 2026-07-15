@@ -1,4 +1,6 @@
-use crate::types::{CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse};
+use crate::types::{
+    CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit,
+};
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -15,6 +17,8 @@ use std::{
 const SESSION_WINDOW_MINUTES: i64 = 300;
 const WEEKLY_WINDOW_MINUTES: i64 = 10_080;
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
+const CODEX_RESET_CREDITS_URL: &str =
+    "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
 const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
 const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
@@ -37,6 +41,23 @@ struct RpcRateLimitsResponse {
 struct RpcRateLimitSnapshot {
     primary: Option<RpcRateLimitWindow>,
     secondary: Option<RpcRateLimitWindow>,
+    rate_limit_reset_credits: Option<RpcRateLimitResetCredits>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RpcRateLimitResetCredits {
+    available_count: Option<i64>,
+    #[serde(default)]
+    credits: Vec<RpcResetCredit>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RpcResetCredit {
+    id: String,
+    status: String,
+    expires_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -72,6 +93,19 @@ struct OAuthRateLimitResetCredits {
 }
 
 #[derive(Debug, Deserialize)]
+struct OAuthResetCreditsResponse {
+    #[serde(default)]
+    credits: Vec<OAuthResetCredit>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthResetCredit {
+    id: String,
+    status: String,
+    expires_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexQuotaForecastApiResponse {
     fetched_at: String,
@@ -95,6 +129,7 @@ struct LimitsSnapshot {
     primary: Option<RpcRateLimitWindow>,
     secondary: Option<RpcRateLimitWindow>,
     reset_credits_available_count: Option<i64>,
+    reset_credits: Option<Vec<CodexResetCredit>>,
     source: &'static str,
 }
 
@@ -193,13 +228,13 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
 
     let mut request = client
         .get(CODEX_USAGE_URL)
-        .bearer_auth(auth.access_token)
+        .bearer_auth(&auth.access_token)
         .header("Accept", "application/json")
         .header("Origin", "https://chatgpt.com")
         .header("Referer", "https://chatgpt.com/")
         .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
-    if let Some(account_id) = auth.account_id {
+    if let Some(account_id) = &auth.account_id {
         request = request.header("ChatGPT-Account-Id", account_id);
     }
 
@@ -219,16 +254,70 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
 
     let usage = serde_json::from_str::<OAuthUsageResponse>(&body)
         .map_err(|error| format!("Failed to parse Codex usage API response: {error}"))?;
+    let reset_credits = fetch_oauth_reset_credits(&client, &auth);
+
+    make_oauth_snapshot(usage, reset_credits)
+}
+
+fn fetch_oauth_reset_credits(
+    client: &reqwest::blocking::Client,
+    auth: &CodexAuth,
+) -> Result<Vec<CodexResetCredit>, String> {
+    let mut request = client
+        .get(CODEX_RESET_CREDITS_URL)
+        .timeout(Duration::from_secs(5))
+        .bearer_auth(&auth.access_token)
+        .header("Accept", "application/json")
+        .header("Origin", "https://chatgpt.com")
+        .header("Referer", "https://chatgpt.com/")
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+    if let Some(account_id) = &auth.account_id {
+        request = request.header("ChatGPT-Account-Id", account_id);
+    }
+
+    let response = request
+        .send()
+        .map_err(|error| format!("Failed to fetch Codex reset credit details: {error}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .map_err(|error| format!("Failed to read Codex reset credit details: {error}"))?;
+
+    if !status.is_success() {
+        return Err(format!(
+            "Codex reset credit details API returned {status}: {body}"
+        ));
+    }
+
+    let details = serde_json::from_str::<OAuthResetCreditsResponse>(&body)
+        .map_err(|error| format!("Failed to parse Codex reset credit details: {error}"))?;
+    Ok(normalize_oauth_reset_credits(details.credits))
+}
+
+fn make_oauth_snapshot(
+    usage: OAuthUsageResponse,
+    reset_credits: Result<Vec<CodexResetCredit>, String>,
+) -> Result<LimitsSnapshot, String> {
     let rate_limit = usage
         .rate_limit
         .ok_or_else(|| "Codex usage API response was missing rate_limit.".to_string())?;
+    let reset_credits_available_count = usage
+        .rate_limit_reset_credits
+        .and_then(|credits| credits.available_count);
+    let reset_credits = match reset_credits {
+        Ok(credits) => Some(credits),
+        Err(error) => {
+            log::warn!("Codex reset credit details unavailable: {error}");
+            None
+        }
+    };
 
     Ok(LimitsSnapshot {
         primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
         secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
-        reset_credits_available_count: usage
-            .rate_limit_reset_credits
-            .and_then(|credits| credits.available_count),
+        reset_credits_available_count,
+        reset_credits,
         source: "oauth",
     })
 }
@@ -245,7 +334,13 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
     Ok(LimitsSnapshot {
         primary: limits.primary,
         secondary: limits.secondary,
-        reset_credits_available_count: None,
+        reset_credits_available_count: limits
+            .rate_limit_reset_credits
+            .as_ref()
+            .and_then(|credits| credits.available_count),
+        reset_credits: limits
+            .rate_limit_reset_credits
+            .map(|credits| normalize_rpc_reset_credits(credits.credits)),
         source: "cli-rpc",
     })
 }
@@ -294,6 +389,7 @@ fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimit
         session: session.map(make_window),
         weekly: weekly.map(make_window),
         reset_credits_available_count: limits.reset_credits_available_count,
+        reset_credits: limits.reset_credits,
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         source: limits.source.to_string(),
         account: account.account,
@@ -536,6 +632,52 @@ fn string_field(value: &Value, key: &str) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
+}
+
+fn normalize_oauth_reset_credits(credits: Vec<OAuthResetCredit>) -> Vec<CodexResetCredit> {
+    sort_reset_credits(
+        credits
+            .into_iter()
+            .filter(|credit| credit.status.eq_ignore_ascii_case("available"))
+            .map(|credit| CodexResetCredit {
+                id: credit.id,
+                expires_at: credit.expires_at.and_then(|expires_at| {
+                    chrono::DateTime::parse_from_rfc3339(&expires_at)
+                        .ok()
+                        .map(|date| {
+                            date.with_timezone(&Utc)
+                                .to_rfc3339_opts(SecondsFormat::Millis, true)
+                        })
+                }),
+            })
+            .collect(),
+    )
+}
+
+fn normalize_rpc_reset_credits(credits: Vec<RpcResetCredit>) -> Vec<CodexResetCredit> {
+    sort_reset_credits(
+        credits
+            .into_iter()
+            .filter(|credit| credit.status.eq_ignore_ascii_case("available"))
+            .map(|credit| CodexResetCredit {
+                id: credit.id,
+                expires_at: credit
+                    .expires_at
+                    .and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single())
+                    .map(|date| date.to_rfc3339_opts(SecondsFormat::Millis, true)),
+            })
+            .collect(),
+    )
+}
+
+fn sort_reset_credits(mut credits: Vec<CodexResetCredit>) -> Vec<CodexResetCredit> {
+    credits.sort_by_key(|credit| {
+        (
+            credit.expires_at.is_none(),
+            credit.expires_at.clone().unwrap_or_default(),
+        )
+    });
+    credits
 }
 
 fn make_window(window: RpcRateLimitWindow) -> CodexLimitWindow {
@@ -1089,7 +1231,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_oauth_usage_windows() {
+    fn oauth_detail_failure_preserves_usage_count_and_windows() {
         let usage = serde_json::from_str::<OAuthUsageResponse>(
             r#"{
                 "rate_limit": {
@@ -1110,26 +1252,98 @@ mod tests {
             }"#,
         )
         .unwrap();
-        let rate_limit = usage.rate_limit.unwrap();
         let response = make_response(
-            LimitsSnapshot {
-                primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
-                secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
-                reset_credits_available_count: usage
-                    .rate_limit_reset_credits
-                    .and_then(|credits| credits.available_count),
-                source: "oauth",
-            },
+            make_oauth_snapshot(usage, Err("details unavailable".to_string())).unwrap(),
             AccountSnapshot::default(),
         );
 
         assert_eq!(response.source, "oauth");
         assert_eq!(response.reset_credits_available_count, Some(2));
+        assert_eq!(response.reset_credits, None);
         assert_eq!(response.session.unwrap().remaining_percent, 75.0);
         assert_eq!(
             response.weekly.unwrap().window_minutes,
             Some(WEEKLY_WINDOW_MINUTES)
         );
+    }
+
+    #[test]
+    fn parses_filters_and_sorts_oauth_reset_credit_details() {
+        let details = serde_json::from_str::<OAuthResetCreditsResponse>(
+            r#"{
+                "available_count": 3,
+                "credits": [
+                    {"id": "never", "status": "available", "expires_at": null},
+                    {"id": "used", "status": "redeemed", "expires_at": "2026-08-01T00:00:00Z"},
+                    {"id": "later", "status": "available", "expires_at": "2026-08-03T02:00:00+02:00"},
+                    {"id": "earlier", "status": "available", "expires_at": "2026-08-01T00:00:00Z"}
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            normalize_oauth_reset_credits(details.credits),
+            vec![
+                CodexResetCredit {
+                    id: "earlier".to_string(),
+                    expires_at: Some("2026-08-01T00:00:00.000Z".to_string()),
+                },
+                CodexResetCredit {
+                    id: "later".to_string(),
+                    expires_at: Some("2026-08-03T00:00:00.000Z".to_string()),
+                },
+                CodexResetCredit {
+                    id: "never".to_string(),
+                    expires_at: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_cli_reset_credits_and_converts_unix_expirations() {
+        let response = serde_json::from_value::<RpcRateLimitsResponse>(json!({
+            "rateLimits": {
+                "primary": null,
+                "secondary": null,
+                "rateLimitResetCredits": {
+                    "availableCount": 2,
+                    "credits": [
+                        {"id": "never", "status": "available", "expiresAt": null},
+                        {"id": "used", "status": "redeemed", "expiresAt": 1785542400},
+                        {"id": "expires", "status": "available", "expiresAt": 1785542400}
+                    ]
+                }
+            }
+        }))
+        .unwrap();
+        let credits = response.rate_limits.rate_limit_reset_credits.unwrap();
+
+        assert_eq!(credits.available_count, Some(2));
+        assert_eq!(
+            normalize_rpc_reset_credits(credits.credits),
+            vec![
+                CodexResetCredit {
+                    id: "expires".to_string(),
+                    expires_at: Some("2026-08-01T00:00:00.000Z".to_string()),
+                },
+                CodexResetCredit {
+                    id: "never".to_string(),
+                    expires_at: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_legacy_cli_rate_limits_without_reset_credits() {
+        let response = serde_json::from_value::<RpcRateLimitsResponse>(json!({
+            "rateLimits": {"primary": null, "secondary": null}
+        }))
+        .unwrap();
+
+        assert!(response.rate_limits.rate_limit_reset_credits.is_none());
     }
 
     #[test]
@@ -1141,6 +1355,7 @@ mod tests {
                     primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                     secondary: Some(window(40.0, Some(WEEKLY_WINDOW_MINUTES))),
                     reset_credits_available_count: None,
+                    reset_credits: None,
                     source: "cli-rpc",
                 })
             },
@@ -1242,6 +1457,7 @@ mod tests {
                 primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                 secondary: None,
                 reset_credits_available_count: Some(2),
+                reset_credits: None,
                 source: "oauth",
             },
             AccountSnapshot {

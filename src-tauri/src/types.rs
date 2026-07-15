@@ -171,10 +171,18 @@ pub struct CodexLimitWindow {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct CodexResetCredit {
+    pub id: String,
+    pub expires_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CodexLimitsResponse {
     pub session: Option<CodexLimitWindow>,
     pub weekly: Option<CodexLimitWindow>,
     pub reset_credits_available_count: Option<i64>,
+    pub reset_credits: Option<Vec<CodexResetCredit>>,
     pub updated_at: String,
     pub source: String,
     pub account: Option<String>,
