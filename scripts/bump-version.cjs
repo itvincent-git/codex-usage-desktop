@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const { git, printGitFailure } = require('./git-utils.cjs');
 
 // Get version from command line argument
 let version = process.argv[2];
@@ -8,26 +9,21 @@ let version = process.argv[2];
 const pkgPath = path.join(__dirname, '../package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 
-if (!version) {
-  // If no argument, read from package.json (e.g. when run as npm 'version' hook)
-  version = pkg.version;
-} else {
-  // Validate version format (semver)
-  if (!/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(version)) {
-    console.error(`Error: Invalid version format "${version}". Expected SemVer (e.g., 1.2.0).`);
-    process.exit(1);
-  }
-  // If argument provided, update package.json version first
-  pkg.version = version;
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-  console.log(`Updated package.json version to ${version}`);
+if (!version || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(version)) {
+  console.error(`Error: Invalid version format "${version || ''}". Expected a stable version (e.g., 1.2.0).`);
+  process.exit(1);
 }
+
+pkg.version = version;
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+console.log(`Updated package.json version to ${version}`);
 
 // 1.5. Update changelog.json based on git log since last tag
 try {
   updateChangelog(version);
 } catch (e) {
-  console.warn('Warning: Failed to update changelog.json automatically:', e.message);
+  console.error('Error: Failed to update changelog.json automatically:', e.message);
+  process.exit(1);
 }
 
 console.log(`Syncing version ${version} to Tauri configuration...`);
@@ -53,11 +49,15 @@ if (fs.existsSync(cargoPath)) {
   // Update src-tauri/Cargo.lock if it exists
   const cargoLockPath = path.join(__dirname, '../src-tauri/Cargo.lock');
   if (fs.existsSync(cargoLockPath)) {
+    console.log('Updating src-tauri/Cargo.lock...');
     try {
-      console.log('Updating src-tauri/Cargo.lock...');
-      execSync('cargo update -p codex-usage-desktop --manifest-path src-tauri/Cargo.toml');
+      execFileSync('cargo', ['update', '-p', 'codex-usage-desktop', '--manifest-path', 'src-tauri/Cargo.toml'], {
+        cwd: path.join(__dirname, '..'),
+        stdio: 'inherit'
+      });
     } catch (e) {
-      console.warn('Warning: Failed to update Cargo.lock using cargo. Please check if Cargo is installed.');
+      console.error('Error: Failed to update Cargo.lock using cargo. Please check the Cargo output above.');
+      process.exit(1);
     }
   }
 }
@@ -69,10 +69,11 @@ try {
   if (fs.existsSync(cargoLockPath)) {
     filesToStage.push('src-tauri/Cargo.lock');
   }
-  execSync(`git add ${filesToStage.join(' ')}`);
+  git(['add', '--', ...filesToStage], { cwd: path.join(__dirname, '..'), retryIndexLock: true });
   console.log('Successfully staged version files in git.');
 } catch (e) {
-  // Silent fail if not in a git repo
+  printGitFailure(e);
+  process.exit(1);
 }
 
 function updateChangelog(version) {
@@ -89,7 +90,9 @@ function updateChangelog(version) {
   // Get the last release tag of format app-v*
   let previousTag = '';
   try {
-    previousTag = execSync("git describe --tags --match 'app-v*' --abbrev=0 2>/dev/null", { encoding: 'utf8' }).trim();
+    previousTag = git(['describe', '--tags', '--match', 'app-v*', '--abbrev=0'], {
+      cwd: path.join(__dirname, '..')
+    }).trim();
   } catch (e) {
     // No previous tag found
   }
@@ -101,8 +104,9 @@ function updateChangelog(version) {
 
   let commits = [];
   try {
-    const gitLogCmd = range ? `git log --format=%s --reverse ${range}` : 'git log --format=%s --reverse';
-    const logOutput = execSync(gitLogCmd, { encoding: 'utf8' });
+    const gitLogArgs = ['log', '--format=%s', '--reverse'];
+    if (range) gitLogArgs.push(range);
+    const logOutput = git(gitLogArgs, { cwd: path.join(__dirname, '..') });
     commits = logOutput.split('\n').map(s => s.trim()).filter(Boolean);
   } catch (e) {
     console.warn('Warning: Failed to get git log.');
