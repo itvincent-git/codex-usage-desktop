@@ -81,7 +81,7 @@ pub fn scan_codex_usage(
     })
 }
 
-fn default_codex_home() -> PathBuf {
+pub(crate) fn default_codex_home() -> PathBuf {
     std::env::var("CODEX_HOME")
         .ok()
         .filter(|value| !value.trim().is_empty())

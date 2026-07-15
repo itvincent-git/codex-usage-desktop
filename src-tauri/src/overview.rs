@@ -35,7 +35,7 @@ pub fn get_overview(
     pricing_source: &PricingSource,
 ) -> Result<OverviewResponse, String> {
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
-    
+
     let (start_date, end_date, days) = if range.starts_with("custom:") {
         let parts: Vec<&str> = range["custom:".len()..].split('_').collect();
         if parts.len() != 2 {

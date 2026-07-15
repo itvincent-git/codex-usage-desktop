@@ -242,6 +242,7 @@ pub struct UpdateDownloadProgress {
 pub struct SessionDetailRow {
     pub path: String,
     pub session_id: String,
+    pub thread_name: Option<String>,
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub input_tokens: i64,
@@ -348,6 +349,7 @@ pub struct SessionReplayTurn {
 pub struct SessionReplayDetail {
     pub path: String,
     pub session_id: String,
+    pub thread_name: Option<String>,
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub raw_jsonl: String,

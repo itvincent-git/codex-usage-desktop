@@ -853,6 +853,7 @@ describe("App", () => {
           {
             path: "/tmp/session-replay.jsonl",
             sessionId: "session-replay.jsonl",
+            threadName: "Replay summary",
             modifiedAtMs: new Date("2026-06-11T00:00:02.000Z").getTime(),
             sizeBytes: rawJsonl.length,
             inputTokens: 100,
@@ -870,6 +871,7 @@ describe("App", () => {
         return {
           path: "/tmp/session-replay.jsonl",
           sessionId: "session-replay.jsonl",
+          threadName: "Updated replay summary",
           modifiedAtMs: new Date("2026-06-11T00:00:02.000Z").getTime(),
           sizeBytes: rawJsonl.length,
           rawJsonl,
@@ -949,9 +951,12 @@ describe("App", () => {
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_session_details"));
 
     document.body.style.overflow = "auto";
-    await userEvent.click(await screen.findByText("session-replay"));
+    expect(await screen.findByText("Replay summary")).toBeInTheDocument();
+    expect(screen.getByText("session-replay")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Replay summary"));
 
-    expect(await screen.findByRole("dialog", { name: "session-replay" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Updated replay summary" })).toBeInTheDocument();
+    expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
     expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
     expect(screen.getByText("Session summary")).toBeInTheDocument();
@@ -1001,10 +1006,10 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /Copy|Copied/ })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "session-replay" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Updated replay summary" })).not.toBeInTheDocument());
     expect(document.body.style.overflow).toBe("auto");
-    expect(screen.getByText("session-replay")).toBeInTheDocument();
-    expect(document.activeElement?.textContent).toContain("session-replay");
+    expect(screen.getByText("Replay summary")).toBeInTheDocument();
+    expect(document.activeElement?.textContent).toContain("Replay summary");
   });
 
   it("bootstraps only once in strict mode", async () => {

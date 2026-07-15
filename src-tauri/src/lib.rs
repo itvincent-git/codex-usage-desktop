@@ -5,6 +5,7 @@ mod exporter;
 mod overview;
 mod pricing;
 mod scanner;
+mod session_index;
 mod session_replay;
 mod types;
 
@@ -21,8 +22,8 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
     CodexLimitsResponse, CodexQuotaForecastResponse, ExportResponse, MonthlyUsageResponse,
-    OverviewResponse, ScanResponse, UpdateCheckResponse, UpdateDownloadProgress, UpdateInstallResponse, SessionDetailRow,
-    SessionReplayDetail, UsageRefreshResponse,
+    OverviewResponse, ScanResponse, SessionDetailRow, SessionReplayDetail, UpdateCheckResponse,
+    UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
 };
 
 const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -183,7 +184,12 @@ async fn fetch_session_details(
 
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
-        db::query_session_details(&db)
+        let mut sessions = db::query_session_details(&db)?;
+        let names = session_index::load_thread_names();
+        for session in &mut sessions {
+            session.thread_name = session_index::thread_name_for_path(&session.path, &names);
+        }
+        Ok(sessions)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -198,7 +204,10 @@ async fn fetch_session_detail(
 
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
-        session_replay::fetch_session_detail(&db, &path)
+        let mut detail = session_replay::fetch_session_detail(&db, &path)?;
+        let names = session_index::load_thread_names();
+        detail.thread_name = session_index::thread_name_for_path(&detail.path, &names);
+        Ok(detail)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -244,7 +253,10 @@ fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
     if parts.len() >= 3 {
         let major = parts[0].parse::<u32>().ok()?;
         let minor = parts[1].parse::<u32>().ok()?;
-        let patch_clean: String = parts[2].chars().take_while(|c| c.is_ascii_digit()).collect();
+        let patch_clean: String = parts[2]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
         let patch = patch_clean.parse::<u32>().ok()?;
         Some((major, minor, patch))
     } else {
@@ -279,7 +291,7 @@ async fn check_for_updates(
             current_version,
             etag
         );
-        
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(8))
             .build()
@@ -288,7 +300,7 @@ async fn check_for_updates(
                 log::error!("{}", err_msg);
                 err_msg
             })?;
-            
+
         // Struct to parse version from tauri.conf.json
         #[derive(serde::Deserialize)]
         struct TauriConfDto {
@@ -338,7 +350,7 @@ async fn check_for_updates(
         // If CDN or Raw GitHub successfully returned version info
         if let Some(version) = latest_version_from_static {
             let has_update = is_newer(&current_version, &version);
-            
+
             if !has_update {
                 log::info!("CDN/Raw check: Version {} is not newer than current {}. No update needed.", version, current_version);
                 return Ok(UpdateCheckResponse {
@@ -353,14 +365,14 @@ async fn check_for_updates(
                     not_modified: Some(false),
                 });
             }
-            
+
             // If there IS a new version, try to get release details from GitHub API
             log::info!("CDN/Raw check: New version {} detected! Querying GitHub API for release notes.", version);
             let mut api_request = client
                 .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
                 .header("User-Agent", "codex-usage-desktop")
                 .header("Accept", "application/json");
-                
+
             if let Some(ref e) = etag {
                 api_request = api_request.header("If-None-Match", e);
             }
@@ -382,12 +394,12 @@ async fn check_for_updates(
                             not_modified: Some(true),
                         });
                     }
-                    
+
                     if status.is_success() {
                         let response_etag = response.headers().get("etag")
                             .and_then(|v| v.to_str().ok())
                             .map(|s| s.to_string());
-                        
+
                         #[derive(serde::Deserialize)]
                         struct GithubReleaseDto {
                             tag_name: String,
@@ -395,7 +407,7 @@ async fn check_for_updates(
                             html_url: String,
                             body: Option<String>,
                         }
-                        
+
                         if let Ok(release) = response.json::<GithubReleaseDto>() {
                             log::info!("Successfully retrieved release notes from GitHub API for v{}.", version);
                             return Ok(UpdateCheckResponse {
@@ -422,7 +434,7 @@ async fn check_for_updates(
             // Try to retrieve release notes from CDN changelog.json as a fallback
             let mut notes = "GitHub API rate limit exceeded or network timeout. Please check the release page to view update logs and download the latest version.\n\nGitHub API 访问受限或超时，请直接前往发布页面查看更新日志并下载最新版本。".to_string();
             let cdn_changelog_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/changelog.json";
-            
+
             match client
                 .get(cdn_changelog_url)
                 .header("User-Agent", "codex-usage-desktop")
@@ -464,7 +476,7 @@ async fn check_for_updates(
             .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
             .header("User-Agent", "codex-usage-desktop")
             .header("Accept", "application/json");
-            
+
         if let Some(ref e) = etag {
             api_request = api_request.header("If-None-Match", e);
         }
@@ -476,7 +488,7 @@ async fn check_for_updates(
         })?;
 
         let status = response.status();
-        
+
         if status == reqwest::StatusCode::NOT_MODIFIED {
             log::info!("Update check: 304 Not Modified. ETag matched.");
             return Ok(UpdateCheckResponse {
@@ -491,18 +503,18 @@ async fn check_for_updates(
                 not_modified: Some(true),
             });
         }
-            
+
         if !status.is_success() {
             let body = response.text().unwrap_or_else(|_| "Unavailable".to_string());
             let err_msg = format!("GitHub API returned error status: {status}. Response: {body}");
             log::error!("{}", err_msg);
             return Err(err_msg);
         }
-        
+
         let response_etag = response.headers().get("etag")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
-        
+
         #[derive(serde::Deserialize)]
         struct GithubReleaseDto {
             tag_name: String,
@@ -510,7 +522,7 @@ async fn check_for_updates(
             html_url: String,
             body: Option<String>,
         }
-        
+
         let release: GithubReleaseDto = response
             .json()
             .map_err(|e| {
@@ -518,9 +530,9 @@ async fn check_for_updates(
                 log::error!("{}", err_msg);
                 err_msg
             })?;
-            
+
         let has_update = is_newer(&current_version, &release.tag_name);
-        
+
         log::info!(
             "Update check completed via primary GitHub API. Latest version: {} (Tag: {}), has_update: {}, ETag: {:?}",
             release.tag_name.trim_start_matches("app-v").trim_start_matches('v'),
@@ -528,7 +540,7 @@ async fn check_for_updates(
             has_update,
             response_etag
         );
-        
+
         Ok(UpdateCheckResponse {
             has_update,
             current_version,
@@ -647,9 +659,9 @@ struct TrayMenuUpdate {
 fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_title(Some(payload.title));
-        
+
         let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
-        
+
         for item in payload.items {
             if item.id == "separator" {
                 menu_builder = menu_builder.separator();
@@ -661,15 +673,27 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
                 menu_builder = menu_builder.item(&menu_item);
             }
         }
-        
-        let show_main_label = payload.show_main_text.unwrap_or_else(|| "显示主窗口 / Show Main Window".to_string());
-        let quit_label = payload.quit_text.unwrap_or_else(|| "退出 / Quit".to_string());
+
+        let show_main_label = payload
+            .show_main_text
+            .unwrap_or_else(|| "显示主窗口 / Show Main Window".to_string());
+        let quit_label = payload
+            .quit_text
+            .unwrap_or_else(|| "退出 / Quit".to_string());
 
         menu_builder = menu_builder
             .separator()
-            .item(&tauri::menu::MenuItemBuilder::with_id("show_main", &show_main_label).build(&app).map_err(|e| e.to_string())?)
-            .item(&tauri::menu::MenuItemBuilder::with_id("quit", &quit_label).build(&app).map_err(|e| e.to_string())?);
-            
+            .item(
+                &tauri::menu::MenuItemBuilder::with_id("show_main", &show_main_label)
+                    .build(&app)
+                    .map_err(|e| e.to_string())?,
+            )
+            .item(
+                &tauri::menu::MenuItemBuilder::with_id("quit", &quit_label)
+                    .build(&app)
+                    .map_err(|e| e.to_string())?,
+            );
+
         let menu = menu_builder.build().map_err(|e| e.to_string())?;
         let _ = tray.set_menu(Some(menu));
     }
@@ -688,7 +712,13 @@ fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
     let reload_item = MenuItem::with_id(app, "reload_page", "Reload", true, Some("CmdOrCtrl+R"))?;
     #[cfg(debug_assertions)]
-    let inspect_item = MenuItem::with_id(app, "inspect_page", "Inspect", true, Some("CmdOrCtrl+Option+I"))?;
+    let inspect_item = MenuItem::with_id(
+        app,
+        "inspect_page",
+        "Inspect",
+        true,
+        Some("CmdOrCtrl+Option+I"),
+    )?;
 
     for item in menu.items()? {
         if let MenuItemKind::Submenu(submenu) = item {
@@ -712,7 +742,9 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir { file_name: None }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: None,
+                    }),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
                 ])
                 .level(log::LevelFilter::Info)
@@ -728,21 +760,19 @@ pub fn run() {
                 }
             }
         })
-        .on_menu_event(|app, event| {
-            match event.id.as_ref() {
-                "reload_page" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.reload();
-                    }
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "reload_page" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.reload();
                 }
-                #[cfg(debug_assertions)]
-                "inspect_page" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        window.open_devtools();
-                    }
-                }
-                _ => {}
             }
+            #[cfg(debug_assertions)]
+            "inspect_page" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.open_devtools();
+                }
+            }
+            _ => {}
         })
         .setup(|app| {
             #[cfg(desktop)]
@@ -764,31 +794,31 @@ pub fn run() {
 
             // Set up system tray icon
             let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate@2x.png");
-            let tray_icon_image = tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
+            let tray_icon_image =
+                tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
 
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(tray_icon_image)
                 .icon_as_template(true)
                 .tooltip("Codex Usage")
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "show_main" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show_main" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         ..
-                    } = event {
+                    } = event
+                    {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();

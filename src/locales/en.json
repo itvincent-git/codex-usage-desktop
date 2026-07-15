@@ -235,10 +235,10 @@
     "active_files": "active files",
     "showing_filtered": "Showing {{filtered}} matching sessions",
     "subtitle_desc": "Individual sessions writing to this directory",
-    "search_placeholder": "Search session ID or model...",
+    "search_placeholder": "Search title, session ID, or model...",
     "no_matching_sessions": "No sessions match your search query",
     "clear_search_hint": "Try clearing your search query or searching for another term.",
-    "session_id_file": "Session ID / File",
+    "session_id_file": "Session Title / ID",
     "no_models": "No models",
     "view_in_sessions_tab": "View in Sessions Tab"
   },

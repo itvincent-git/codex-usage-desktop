@@ -198,6 +198,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   const models = detail?.summary.models.length ? detail.summary.models : session.models;
   const projects = detail?.summary.projects.length ? detail.summary.projects : session.projects;
+  const threadName = detail ? detail.threadName : session.threadName;
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
 
   async function copyRawJsonl() {
@@ -234,9 +235,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <div className="flex items-center gap-2">
                 <FileJson className="h-4 w-4 text-primary" />
                 <h2 id="session-detail-title" className="truncate text-lg font-bold tracking-tight">
-                  {cleanSessionId(session.sessionId)}
+                  {threadName || cleanSessionId(session.sessionId)}
                 </h2>
               </div>
+              {threadName ? (
+                <p className="truncate font-mono text-xs text-muted-foreground" title={session.sessionId}>
+                  {cleanSessionId(session.sessionId)}
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-1.5">
                 {projects.map((project) => (
                   <span key={project} className="max-w-[360px] truncate rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground" title={project}>

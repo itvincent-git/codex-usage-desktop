@@ -347,10 +347,15 @@ export function SessionUsageTable({
                                   <div className="flex items-center gap-2 font-semibold text-foreground leading-none">
                                     <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                                     <span className="truncate max-w-[180px] text-xs" title={session.path}>
-                                      {cleanSessionId(session.sessionId)}
+                                      {session.threadName || cleanSessionId(session.sessionId)}
                                     </span>
                                   </div>
                                   <div className="text-[10px] text-muted-foreground tabular-nums flex flex-col gap-0.5">
+                                    {session.threadName ? (
+                                      <span className="truncate max-w-[180px] font-mono" title={session.sessionId}>
+                                        {cleanSessionId(session.sessionId)}
+                                      </span>
+                                    ) : null}
                                     <span>{t("sessions.time_label", { time: formattedTime, defaultValue: `Time: ${formattedTime}` })}</span>
                                     <span className="opacity-80">{t("sessions.size_label", { size: formatBytes(session.sizeBytes), defaultValue: `Size: ${formatBytes(session.sizeBytes)}` })}</span>
                                   </div>

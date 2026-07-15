@@ -235,10 +235,10 @@
     "active_files": "个活动文件",
     "showing_filtered": "当前显示 {{filtered}} 个匹配会话",
     "subtitle_desc": "写入该目录的各个独立会话记录",
-    "search_placeholder": "搜索会话 ID 或模型...",
+    "search_placeholder": "搜索概要名、会话 ID 或模型...",
     "no_matching_sessions": "没有找到符合搜索条件的会话",
     "clear_search_hint": "尝试清空搜索框或搜索其他关键词。",
-    "session_id_file": "会话 ID / 文件",
+    "session_id_file": "概要名 / 会话 ID",
     "no_models": "无模型",
     "view_in_sessions_tab": "在会话页签中查看"
   },

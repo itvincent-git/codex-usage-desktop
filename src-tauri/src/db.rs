@@ -450,6 +450,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             Ok(SessionDetailRow {
                 path,
                 session_id,
+                thread_name: None,
                 modified_at_ms,
                 size_bytes,
                 input_tokens,

@@ -95,9 +95,10 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
     if (!query) return sessions;
     return sessions.filter((s) => {
       const cleanId = cleanSessionId(s.sessionId).toLowerCase();
+      const matchesThreadName = s.threadName?.toLowerCase().includes(query) ?? false;
       const matchesSession = cleanId.includes(query);
       const matchesModel = s.models && s.models.some((m) => m.toLowerCase().includes(query));
-      return matchesSession || matchesModel;
+      return matchesThreadName || matchesSession || matchesModel;
     });
   }, [sessions, searchQuery]);
 
@@ -204,7 +205,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder={t("project_modal.search_placeholder", { defaultValue: "Search session ID or model..." })}
+                      placeholder={t("project_modal.search_placeholder", { defaultValue: "Search title, session ID, or model..." })}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full rounded-lg border border-border bg-surface pl-9 pr-4 py-2 text-xs font-medium text-foreground placeholder:text-muted-foreground outline-none focus:border-indigo-500/80 focus:ring-4 focus:ring-indigo-500/10 transition"
@@ -224,7 +225,7 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                       <table className="min-w-full border-separate border-spacing-0 text-sm">
                         <thead className="sticky top-0 bg-surface z-10">
                           <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground border-b border-border bg-muted/20">
-                            <th className="border-b border-border/60 px-4 py-3 font-semibold">{t("project_modal.session_id_file", { defaultValue: "Session ID / File" })}</th>
+                            <th className="border-b border-border/60 px-4 py-3 font-semibold">{t("project_modal.session_id_file", { defaultValue: "Session Title / ID" })}</th>
                             <th className="border-b border-border/60 px-4 py-3 font-semibold">{t("common.model")}</th>
                             <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("common.tokens")}</th>
                             <th className="border-b border-border/60 px-4 py-3 font-semibold text-right">{t("project_modal.input")}</th>
@@ -247,10 +248,15 @@ export function ProjectSessionsModal({ project, onClose, onGoToSessions }: Proje
                                     <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs leading-none">
                                       <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                                       <span className="truncate max-w-[140px]" title={session.path}>
-                                        {cleanSessionId(session.sessionId)}
+                                        {session.threadName || cleanSessionId(session.sessionId)}
                                       </span>
                                     </div>
                                     <div className="text-[9px] text-muted-foreground flex flex-col gap-0.5 font-mono">
+                                      {session.threadName ? (
+                                        <span className="truncate max-w-[140px]" title={session.sessionId}>
+                                          {cleanSessionId(session.sessionId)}
+                                        </span>
+                                      ) : null}
                                       <span>{formattedTime}</span>
                                       <span>Size: {formatBytes(session.sizeBytes)}</span>
                                     </div>

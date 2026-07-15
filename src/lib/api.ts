@@ -201,6 +201,7 @@ export async function openUrl(url: string): Promise<void> {
 export type SessionDetailRow = {
   path: string;
   sessionId: string;
+  threadName: string | null;
   modifiedAtMs: number;
   sizeBytes: number;
   inputTokens: number;
@@ -220,6 +221,7 @@ export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {
 export type SessionReplayDetail = {
   path: string;
   sessionId: string;
+  threadName: string | null;
   modifiedAtMs: number;
   sizeBytes: number;
   rawJsonl: string;

@@ -109,6 +109,7 @@ fn parse_session_detail(record: SessionRollupRecord, raw_jsonl: String) -> Sessi
     SessionReplayDetail {
         path: record.path,
         session_id,
+        thread_name: None,
         modified_at_ms: record.modified_at_ms,
         size_bytes: record.size_bytes,
         raw_jsonl,
