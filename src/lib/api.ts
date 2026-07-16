@@ -198,6 +198,18 @@ export async function openUrl(url: string): Promise<void> {
   return invoke<void>("open_url", { url });
 }
 
+export type SessionDailyUsageRow = {
+  date: string;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  totalTokens: number;
+  costUSD: number;
+  models: string[];
+  projects: string[];
+};
+
 export type SessionDetailRow = {
   path: string;
   sessionId: string;
@@ -212,6 +224,7 @@ export type SessionDetailRow = {
   costUSD: number;
   models: string[];
   projects: string[];
+  dailyUsage: SessionDailyUsageRow[];
 };
 
 export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {

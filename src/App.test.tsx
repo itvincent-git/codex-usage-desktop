@@ -864,6 +864,19 @@ describe("App", () => {
             costUSD: 0.001,
             models: ["gpt-5"],
             projects: ["/repo/app"],
+            dailyUsage: [
+              {
+                date: "2026-06-11",
+                inputTokens: 100,
+                cachedInputTokens: 20,
+                outputTokens: 40,
+                reasoningOutputTokens: 0,
+                totalTokens: 140,
+                costUSD: 0.001,
+                models: ["gpt-5"],
+                projects: ["/repo/app"],
+              },
+            ],
           },
         ];
       }

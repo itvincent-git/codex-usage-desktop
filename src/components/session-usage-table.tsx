@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
+type SessionDisplayRow = SessionDetailRow & {
+  usageDate: string;
+  originalSession: SessionDetailRow;
+};
+
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
   initialExpandedDate?: string | null;
@@ -63,16 +68,31 @@ export function SessionUsageTable({
     }
   }, [initialExpandedDate]);
 
-  // Group and sort sessions
+  const displaySessions = useMemo<SessionDisplayRow[]>(() => sessions.flatMap((session) => {
+    if (session.totalTokens === 0 || session.dailyUsage.length === 0) {
+      return [{
+        ...session,
+        usageDate: dayjs(session.modifiedAtMs).format("YYYY-MM-DD"),
+        originalSession: session,
+      }];
+    }
+
+    return session.dailyUsage.map((usage) => ({
+      ...session,
+      ...usage,
+      usageDate: usage.date,
+      originalSession: session,
+    }));
+  }), [sessions]);
+
+  // Group and sort session-day rows using the scanner's application-timezone dates.
   const groups = useMemo(() => {
-    const map: Record<string, SessionDetailRow[]> = {};
-    for (const session of sessions) {
-      // If a project filter is active, skip sessions that don't belong to the project
-      if (selectedProject && (!session.projects || !session.projects.includes(selectedProject))) {
+    const map: Record<string, SessionDisplayRow[]> = {};
+    for (const session of displaySessions) {
+      if (selectedProject && !session.projects.includes(selectedProject)) {
         continue;
       }
-      // Extract date part (local time based on timestamp) using dayjs with YYYY-MM-DD format
-      const dateStr = dayjs(session.modifiedAtMs).format("YYYY-MM-DD");
+      const dateStr = session.usageDate;
       if (!map[dateStr]) {
         map[dateStr] = [];
       }
@@ -105,12 +125,12 @@ export function SessionUsageTable({
           projects,
         };
       });
-  }, [sessions, selectedProject]);
+  }, [displaySessions, selectedProject]);
 
   const filteredCount = useMemo(() => {
-    if (!selectedProject) return sessions.length;
-    return sessions.filter((s) => s.projects && s.projects.includes(selectedProject)).length;
-  }, [sessions, selectedProject]);
+    if (!selectedProject) return displaySessions.length;
+    return displaySessions.filter((session) => session.projects.includes(selectedProject)).length;
+  }, [displaySessions, selectedProject]);
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
@@ -157,7 +177,7 @@ export function SessionUsageTable({
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
             {t("sessions.title")}
             <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400 border border-indigo-500/20">
-              {selectedProject ? t("sessions.showing_info_filtered", { filtered: filteredCount, total: sessions.length }) : t("sessions.showing_info", { count: sessions.length })}
+              {selectedProject ? t("sessions.showing_info_filtered", { filtered: filteredCount, total: displaySessions.length }) : t("sessions.showing_info", { count: displaySessions.length })}
             </span>
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -331,12 +351,12 @@ export function SessionUsageTable({
                               key={session.path}
                               tabIndex={onSessionClick ? 0 : undefined}
                               role={onSessionClick ? "button" : undefined}
-                              onClick={() => onSessionClick?.(session)}
+                              onClick={() => onSessionClick?.(session.originalSession)}
                               onKeyDown={(event) => {
                                 if (!onSessionClick) return;
                                 if (event.key === "Enter" || event.key === " ") {
                                   event.preventDefault();
-                                  onSessionClick(session);
+                                  onSessionClick(session.originalSession);
                                 }
                               }}
                               className="align-top hover:bg-white/[0.01] transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"

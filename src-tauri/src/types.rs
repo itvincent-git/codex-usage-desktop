@@ -239,6 +239,21 @@ pub struct UpdateDownloadProgress {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SessionDailyUsageRow {
+    pub date: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+    #[serde(rename = "costUSD")]
+    pub cost_usd: f64,
+    pub models: Vec<String>,
+    pub projects: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionDetailRow {
     pub path: String,
     pub session_id: String,
@@ -254,6 +269,7 @@ pub struct SessionDetailRow {
     pub cost_usd: f64,
     pub models: Vec<String>,
     pub projects: Vec<String>,
+    pub daily_usage: Vec<SessionDailyUsageRow>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

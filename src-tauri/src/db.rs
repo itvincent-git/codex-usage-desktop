@@ -1,4 +1,6 @@
-use crate::types::{DailyUsageRow, ModelUsage, ProjectUsage, SessionDetailRow};
+use crate::types::{
+    DailyUsageRow, ModelUsage, ProjectUsage, SessionDailyUsageRow, SessionDetailRow,
+};
 use rusqlite::{params, Connection};
 use std::{collections::BTreeMap, path::Path};
 
@@ -447,6 +449,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let mut cost_usd = 0.0;
             let mut models = std::collections::BTreeSet::new();
             let mut projects = std::collections::BTreeSet::new();
+            let mut daily_usage = Vec::with_capacity(daily_rows.len());
 
             for r in daily_rows {
                 input_tokens += r.input_tokens;
@@ -461,6 +464,17 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 for project in r.projects.keys() {
                     projects.insert(project.clone());
                 }
+                daily_usage.push(SessionDailyUsageRow {
+                    date: r.date,
+                    input_tokens: r.input_tokens,
+                    cached_input_tokens: r.cached_input_tokens,
+                    output_tokens: r.output_tokens,
+                    reasoning_output_tokens: r.reasoning_output_tokens,
+                    total_tokens: r.total_tokens,
+                    cost_usd: r.cost_usd,
+                    models: r.models.into_keys().collect(),
+                    projects: r.projects.into_keys().collect(),
+                });
             }
 
             let session_id = Path::new(&path)
@@ -483,6 +497,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 cost_usd,
                 models: models.into_iter().collect(),
                 projects: projects.into_iter().collect(),
+                daily_usage,
             })
         })
         .map_err(|error| error.to_string())?;
@@ -592,6 +607,66 @@ mod tests {
             Some("First real request")
         );
         assert_eq!(sessions[1].thread_name, None);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn session_details_preserve_daily_usage_for_resumed_sessions() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-usage-db-session-daily-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let mut db = open_database(&path).unwrap();
+        let model_usage = ModelUsage {
+            input_tokens: 100,
+            output_tokens: 40,
+            total_tokens: 140,
+            ..Default::default()
+        };
+        let project_usage = ProjectUsage {
+            input_tokens: 100,
+            output_tokens: 40,
+            total_tokens: 140,
+            models: BTreeMap::from([("gpt-5".to_string(), model_usage.clone())]),
+            ..Default::default()
+        };
+        let daily_row = |date: &str, multiplier: i64| DailyUsageRow {
+            date: date.to_string(),
+            input_tokens: 100 * multiplier,
+            cached_input_tokens: 20 * multiplier,
+            output_tokens: 40 * multiplier,
+            reasoning_output_tokens: 10 * multiplier,
+            total_tokens: 150 * multiplier,
+            cost_usd: 0.01 * multiplier as f64,
+            models: BTreeMap::from([("gpt-5".to_string(), model_usage.clone())]),
+            projects: BTreeMap::from([("/repo/app".to_string(), project_usage.clone())]),
+            updated_at: "2026-07-02T00:00:00.000Z".to_string(),
+        };
+        upsert_session_file_rollups(
+            &mut db,
+            &[SessionFileRollup {
+                path: "/tmp/resumed.jsonl".to_string(),
+                modified_at_ms: 2,
+                size_bytes: 200,
+                rows: vec![daily_row("2026-07-01", 1), daily_row("2026-07-02", 2)],
+                prompt_title: None,
+            }],
+            "2026-07-02T00:00:00.000Z",
+        )
+        .unwrap();
+
+        let sessions = query_session_details(&db).unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].total_tokens, 450);
+        assert!((sessions[0].cost_usd - 0.03).abs() < f64::EPSILON);
+        assert_eq!(sessions[0].daily_usage.len(), 2);
+        assert_eq!(sessions[0].daily_usage[0].date, "2026-07-01");
+        assert_eq!(sessions[0].daily_usage[0].total_tokens, 150);
+        assert_eq!(sessions[0].daily_usage[1].date, "2026-07-02");
+        assert_eq!(sessions[0].daily_usage[1].total_tokens, 300);
+        assert_eq!(sessions[0].daily_usage[1].models, ["gpt-5"]);
+        assert_eq!(sessions[0].daily_usage[1].projects, ["/repo/app"]);
         let _ = std::fs::remove_file(path);
     }
 
