@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { formatResetTime, CodexLimitsCard } from "./codex-limits-card";
 import dayjs from "dayjs";
 import { fireEvent, render, screen } from "@testing-library/react";
+import i18n from "../i18n";
 
 describe("formatResetTime", () => {
   beforeEach(() => {
@@ -140,7 +141,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
-  it("emphasizes reset credits and sorts each expiration with non-expiring credits last", () => {
+  it("shows reset credits as a neutral sorted detail list with non-expiring credits last", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-15T00:00:00+08:00"));
     const limits = {
@@ -172,15 +173,47 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getByText("Reset credits")).toBeInTheDocument();
-    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3");
-    expect(screen.getByTestId("reset-credit-count")).toHaveClass("text-3xl", "font-bold", "text-primary", "tabular-nums");
-    expect(screen.getByText("times")).toBeInTheDocument();
-    const detailLines = screen.getAllByText(/^Credit \d/);
-    expect(detailLines).toHaveLength(3);
-    expect(detailLines[0]).toHaveTextContent(`Credit 1 · Expires ${dayjs("2026-08-01T18:00:00+08:00").format("YYYY-MM-DD")}`);
-    expect(detailLines[1]).toHaveTextContent(`Credit 2 · Expires ${dayjs("2026-08-03T18:00:00+08:00").format("YYYY-MM-DD")}`);
-    expect(detailLines[2]).toHaveTextContent("Credit 3 · Does not expire");
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3 available");
+    expect(screen.getByTestId("reset-credit-count")).toHaveClass("bg-muted", "text-muted-foreground", "tabular-nums");
+    expect(screen.getByText("Credit 1")).toBeInTheDocument();
+    expect(screen.getByText(`Expires ${dayjs("2026-08-01T18:00:00+08:00").format("YYYY-MM-DD HH:mm")}`)).toBeInTheDocument();
+    expect(screen.getByText("18 days left")).toBeInTheDocument();
+    expect(screen.getByText("Credit 2")).toBeInTheDocument();
+    expect(screen.getByText(`Expires ${dayjs("2026-08-03T18:00:00+08:00").format("YYYY-MM-DD HH:mm")}`)).toBeInTheDocument();
+    expect(screen.getByText("20 days left")).toBeInTheDocument();
+    expect(screen.getByText("Credit 3")).toBeInTheDocument();
+    expect(screen.getByText("Does not expire")).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it("renders structured reset-credit fields in Chinese", async () => {
+    await i18n.changeLanguage("zh");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T00:00:00+08:00"));
+
+    render(
+      <CodexLimitsCard
+        limits={{
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
+          resetCreditsAvailableCount: 1,
+          resetCredits: [{ id: "known", expiresAt: "2026-08-01T18:00:00+08:00" }],
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+      />,
+    );
+
+    expect(screen.getByText("重置次数")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("1 次可用");
+    expect(screen.getByText("第 1 次")).toBeInTheDocument();
+    expect(screen.getByText(`${dayjs("2026-08-01T18:00:00+08:00").format("YYYY-MM-DD HH:mm")} 到期`)).toBeInTheDocument();
+    expect(screen.getByText("剩 18 天")).toBeInTheDocument();
+
+    vi.useRealTimers();
+    await i18n.changeLanguage("en");
   });
 
   it("reports reset credits whose expiration details are missing", () => {
@@ -218,7 +251,7 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3");
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3 available");
     expect(screen.getByText("Expiration details are temporarily unavailable")).toBeInTheDocument();
   });
 
@@ -238,7 +271,7 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("0");
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("0 available");
     expect(screen.getByText("No reset credits available")).toBeInTheDocument();
   });
 

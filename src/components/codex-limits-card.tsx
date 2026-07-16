@@ -1,4 +1,4 @@
-import { ExternalLink, Gauge, LogIn } from "lucide-react";
+import { ExternalLink, Gauge, LogIn, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -305,34 +305,48 @@ function ResetCreditsPanel({ availableCount, credits }: { availableCount: number
     .slice(0, count);
 
   return (
-    <div className="mt-3 grid gap-2 rounded-lg border border-primary/15 bg-primary/5 p-2.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:gap-4">
-      <div className="min-w-[5.5rem]">
-        <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{t("limits.reset_credits")}</p>
-        <p className="mt-0.5 leading-none">
-          <span data-testid="reset-credit-count" className="font-mono text-3xl font-bold tabular-nums text-primary">{count}</span>
-          <span className="ml-1 text-[10px] font-medium text-muted-foreground">{t("limits.times")}</span>
-        </p>
+    <div className="mt-3 border-t border-border/60 pt-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+          <p className="text-[10px] font-semibold">{t("limits.reset_credits")}</p>
+        </div>
+        <span
+          data-testid="reset-credit-count"
+          className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground"
+        >
+          {t("limits.reset_credits_available", { count })}
+        </span>
       </div>
-      <div className="min-w-0 space-y-1 text-[10px] leading-normal text-foreground/85 sm:pt-0.5">
+      <div className="mt-2 border-t border-border/40 text-[10px] leading-normal text-foreground/85">
         {count === 0 ? (
-          <p className="text-muted-foreground">{t("limits.reset_credits_none")}</p>
+          <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>
         ) : sortedCredits.length === 0 ? (
-          <p className="text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
+          <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
         ) : (
           <>
             {sortedCredits.map((credit, index) => (
-              <p key={credit.id} className="break-words">
-                {credit.expiresAt
-                  ? t("limits.reset_credit_expires", {
-                      index: index + 1,
-                      date: dayjs(credit.expiresAt).format("YYYY-MM-DD HH:mm"),
-                      timeLeft: formatResetCreditTimeLeft(credit.expiresAt, t),
-                    })
-                  : t("limits.reset_credit_no_expiry", { index: index + 1 })}
-              </p>
+              <div
+                key={credit.id}
+                className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-border/40 py-2 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+              >
+                <span className="font-medium text-foreground">{t("limits.reset_credit_number", { index: index + 1 })}</span>
+                {credit.expiresAt ? (
+                  <>
+                    <span className="min-w-0 tabular-nums text-muted-foreground">
+                      {t("limits.reset_credit_expires_at", { date: dayjs(credit.expiresAt).format("YYYY-MM-DD HH:mm") })}
+                    </span>
+                    <span className="col-start-2 tabular-nums text-muted-foreground sm:col-start-3 sm:row-start-1 sm:text-right">
+                      {t("limits.reset_credit_time_left", { timeLeft: formatResetCreditTimeLeft(credit.expiresAt, t) })}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">{t("limits.reset_credit_no_expiry")}</span>
+                )}
+              </div>
             ))}
             {sortedCredits.length < count ? (
-              <p className="text-muted-foreground">
+              <p className="border-t border-border/40 pt-2 text-muted-foreground">
                 {t("limits.reset_credits_details_partial", { count: count - sortedCredits.length })}
               </p>
             ) : null}
