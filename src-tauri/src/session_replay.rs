@@ -109,7 +109,7 @@ fn parse_session_detail(record: SessionRollupRecord, raw_jsonl: String) -> Sessi
     SessionReplayDetail {
         path: record.path,
         session_id,
-        thread_name: None,
+        thread_name: record.prompt_title.filter(|title| !title.is_empty()),
         modified_at_ms: record.modified_at_ms,
         size_bytes: record.size_bytes,
         raw_jsonl,
@@ -987,6 +987,16 @@ mod tests {
     }
 
     #[test]
+    fn uses_cached_prompt_title_in_session_detail() {
+        let mut record = record("/tmp/session.jsonl");
+        record.prompt_title = Some("First real request".to_string());
+
+        let detail = parse_session_detail(record, String::new());
+
+        assert_eq!(detail.thread_name.as_deref(), Some("First real request"));
+    }
+
+    #[test]
     fn calculates_token_deltas_from_running_totals() {
         let raw = [
             turn_context("2026-06-01T00:00:01.000Z", "turn-1", "gpt-5", "/repo/app"),
@@ -1052,6 +1062,7 @@ mod tests {
                 modified_at_ms: 123,
                 size_bytes: raw.len() as i64,
                 rows: vec![],
+                prompt_title: Some("Replay this session".to_string()),
             }],
             "2026-06-01T00:00:00.000Z",
         )
@@ -1079,6 +1090,7 @@ mod tests {
             modified_at_ms: 100,
             size_bytes: 200,
             rows: vec![],
+            prompt_title: None,
         }
     }
 

@@ -13,6 +13,7 @@ use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     time::{Instant, SystemTime},
 };
@@ -146,16 +147,19 @@ fn load_daily_rows(
 
     for file in files {
         active_paths.push(file.cache_key.clone());
-        if let Some(rows) =
+        if let Some(mut rollup) =
             query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
         {
             metrics.files_reused += 1;
-            all_rows.extend(rows);
+            if rollup.prompt_title.is_none() && backfill_prompt_title(&file.path, &mut rollup) {
+                changed_rollups.push(rollup.clone());
+            }
+            all_rows.extend(rollup.rows);
             continue;
         }
 
         let mut events = Vec::new();
-        load_session_file(&file.path, &mut events)?;
+        let prompt_title = load_session_file(&file.path, &mut events)?;
         let rows = build_daily_rows(&events, timezone, updated_at, pricing_source);
         metrics.files_parsed += 1;
         metrics.bytes_read += file.size_bytes as u64;
@@ -164,6 +168,7 @@ fn load_daily_rows(
             modified_at_ms: file.modified_at_ms,
             size_bytes: file.size_bytes,
             rows: rows.clone(),
+            prompt_title: Some(prompt_title),
         });
         all_rows.extend(rows);
     }
@@ -223,12 +228,13 @@ fn modified_at_ms(metadata: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), String> {
+fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<String, String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
     let mut previous_totals: Option<RawUsage> = None;
     let mut current_model: Option<String> = None;
     let mut current_model_is_fallback = false;
     let mut current_project_path: Option<String> = None;
+    let mut prompt_title = None;
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -239,6 +245,10 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), St
         let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
             continue;
         };
+
+        if prompt_title.is_none() {
+            prompt_title = prompt_title_from_entry(&entry);
+        }
 
         let entry_type = entry.get("type").and_then(Value::as_str);
         if entry_type == Some("session_meta") {
@@ -334,7 +344,74 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<(), St
         });
     }
 
-    Ok(())
+    Ok(prompt_title.unwrap_or_default())
+}
+
+fn backfill_prompt_title(path: &Path, rollup: &mut SessionFileRollup) -> bool {
+    match load_prompt_title(path) {
+        Ok(title) => {
+            rollup.prompt_title = Some(title);
+            true
+        }
+        Err(error) => {
+            log::warn!(
+                "Failed to backfill session title from {}: {error}",
+                path.display()
+            );
+            false
+        }
+    }
+}
+
+fn load_prompt_title(path: &Path) -> Result<String, String> {
+    let file = fs::File::open(path).map_err(|error| error.to_string())?;
+    for line in BufReader::new(file).lines() {
+        let line = line.map_err(|error| error.to_string())?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
+            continue;
+        };
+        if let Some(title) = prompt_title_from_entry(&entry) {
+            return Ok(title);
+        }
+    }
+    Ok(String::new())
+}
+
+fn prompt_title_from_entry(entry: &Value) -> Option<String> {
+    if entry.get("type").and_then(Value::as_str) != Some("event_msg") {
+        return None;
+    }
+    let payload = entry.get("payload")?;
+    if payload.get("type").and_then(Value::as_str) != Some("user_message") {
+        return None;
+    }
+
+    ["message", "text"].into_iter().find_map(|field| {
+        payload
+            .get(field)
+            .and_then(Value::as_str)
+            .and_then(normalize_prompt_title)
+    })
+}
+
+fn normalize_prompt_title(message: &str) -> Option<String> {
+    const MAX_CHARS: usize = 80;
+
+    let normalized = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return None;
+    }
+    if normalized.chars().count() <= MAX_CHARS {
+        return Some(normalized);
+    }
+
+    let mut title = normalized.chars().take(MAX_CHARS - 1).collect::<String>();
+    title.push('…');
+    Some(title)
 }
 
 fn merge_payload_info(payload: &Value, info: &Value) -> Value {
@@ -769,6 +846,247 @@ mod tests {
     }
 
     #[test]
+    fn extracts_first_real_user_message_for_prompt_title() {
+        let temp_dir = tempfile_dir();
+        let path = temp_dir.join("session.jsonl");
+        let raw = [
+            serde_json::json!({
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "AGENTS and environment injection" }]
+                }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "event_msg",
+                "payload": { "type": "user_message", "message": " \n\t " }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "event_msg",
+                "payload": { "type": "user_message", "message": "  Build\n\t the dashboard  🙂 " }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "event_msg",
+                "payload": { "type": "user_message", "message": "Later request" }
+            })
+            .to_string(),
+        ]
+        .join("\n");
+        fs::write(&path, raw).unwrap();
+
+        let title = load_session_file(&path, &mut Vec::new()).unwrap();
+        let legacy_text_entry = serde_json::json!({
+            "type": "event_msg",
+            "payload": { "type": "user_message", "text": "Legacy text field" }
+        });
+
+        assert_eq!(title, "Build the dashboard 🙂");
+        assert_eq!(
+            prompt_title_from_entry(&legacy_text_entry).as_deref(),
+            Some("Legacy text field")
+        );
+    }
+
+    #[test]
+    fn normalizes_truncates_and_marks_missing_prompt_titles() {
+        assert_eq!(
+            normalize_prompt_title("  first\n\tsecond   third  ").as_deref(),
+            Some("first second third")
+        );
+
+        let long = format!("{}🙂🙂🙂", "中".repeat(78));
+        let truncated = normalize_prompt_title(&long).unwrap();
+        assert_eq!(truncated.chars().count(), 80);
+        assert_eq!(truncated, format!("{}🙂…", "中".repeat(78)));
+
+        let temp_dir = tempfile_dir();
+        let path = temp_dir.join("session.jsonl");
+        fs::write(
+            &path,
+            serde_json::json!({
+                "type": "response_item",
+                "payload": { "type": "message", "role": "user", "content": [] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert_eq!(load_prompt_title(&path).unwrap(), "");
+    }
+
+    #[test]
+    fn backfills_legacy_prompt_title_without_reparsing_usage() {
+        let temp_dir = tempfile_dir();
+        let db_path = temp_dir.join("usage.sqlite");
+        let mut db = crate::db::open_database(&db_path).unwrap();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions").join("project-alpha");
+        fs::create_dir_all(&sessions).unwrap();
+        let session_path = sessions.join("session.jsonl");
+        let initial_raw = format!(
+            "{}\n{}\n{}",
+            serde_json::json!({
+                "type": "event_msg",
+                "payload": { "type": "user_message", "message": "Initial request" }
+            }),
+            token_context("2026-05-08T09:00:00.000Z", "gpt-5"),
+            token_event(
+                "2026-05-08T09:00:00.000Z",
+                "gpt-5",
+                1000,
+                200,
+                300,
+                1300,
+                1000,
+                200,
+                300,
+                1300
+            )
+        );
+        fs::write(&session_path, &initial_raw).unwrap();
+
+        let pricing_source = PricingSource::embedded();
+        scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home.clone()),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        db.execute(
+            "UPDATE session_file_rollups SET prompt_title = NULL, updated_at = 'legacy'",
+            [],
+        )
+        .unwrap();
+
+        let migrated = scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home.clone()),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let record = crate::db::query_session_rollup_record(&db, &session_path.to_string_lossy())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(migrated.metrics.files_parsed, 0);
+        assert_eq!(migrated.metrics.files_reused, 1);
+        assert_eq!(record.prompt_title.as_deref(), Some("Initial request"));
+        assert_eq!(record.rows[0].total_tokens, 1300);
+
+        let unchanged = load_daily_rows(
+            &db,
+            Some(codex_home.clone()),
+            "UTC",
+            "2026-05-08T00:00:00.000Z",
+            &pricing_source,
+        )
+        .unwrap();
+        assert!(unchanged.changed_rollups.is_empty());
+
+        let changed_raw = initial_raw.replace("Initial request", "Changed request with more text");
+        fs::write(&session_path, changed_raw).unwrap();
+        let changed = scan_codex_usage(
+            &mut db,
+            &pricing_source,
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let record = crate::db::query_session_rollup_record(&db, &session_path.to_string_lossy())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(changed.metrics.files_parsed, 1);
+        assert_eq!(
+            record.prompt_title.as_deref(),
+            Some("Changed request with more text")
+        );
+    }
+
+    #[test]
+    fn failed_title_backfill_preserves_usage_and_does_not_prevent_other_sessions() {
+        let temp_dir = tempfile_dir();
+        let db_path = temp_dir.join("usage.sqlite");
+        let mut db = crate::db::open_database(&db_path).unwrap();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        let failed_path = sessions.join("failed.jsonl");
+        let valid_path = sessions.join("valid.jsonl");
+        fs::write(&failed_path, [0xff]).unwrap();
+        fs::write(
+            &valid_path,
+            serde_json::json!({
+                "type": "event_msg",
+                "payload": { "type": "user_message", "message": "Valid request" }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let failed_metadata = fs::metadata(&failed_path).unwrap();
+        let valid_metadata = fs::metadata(&valid_path).unwrap();
+        let cached_row = DailyUsageRow {
+            date: "2026-07-16".to_string(),
+            input_tokens: 1,
+            cached_input_tokens: 0,
+            output_tokens: 2,
+            reasoning_output_tokens: 0,
+            total_tokens: 3,
+            cost_usd: 0.0,
+            models: BTreeMap::new(),
+            projects: BTreeMap::new(),
+            updated_at: "legacy".to_string(),
+        };
+        crate::db::upsert_session_file_rollups(
+            &mut db,
+            &[
+                SessionFileRollup {
+                    path: failed_path.to_string_lossy().to_string(),
+                    modified_at_ms: modified_at_ms(&failed_metadata),
+                    size_bytes: failed_metadata.len() as i64,
+                    rows: vec![cached_row],
+                    prompt_title: None,
+                },
+                SessionFileRollup {
+                    path: valid_path.to_string_lossy().to_string(),
+                    modified_at_ms: modified_at_ms(&valid_metadata),
+                    size_bytes: valid_metadata.len() as i64,
+                    rows: vec![],
+                    prompt_title: None,
+                },
+            ],
+            "legacy",
+        )
+        .unwrap();
+
+        let scan = scan_codex_usage(
+            &mut db,
+            &PricingSource::embedded(),
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let failed = crate::db::query_session_rollup_record(&db, &failed_path.to_string_lossy())
+            .unwrap()
+            .unwrap();
+        let valid = crate::db::query_session_rollup_record(&db, &valid_path.to_string_lossy())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(scan.metrics.files_parsed, 0);
+        assert_eq!(scan.metrics.files_reused, 2);
+        assert_eq!(scan.imported_days, 1);
+        assert_eq!(failed.rows[0].total_tokens, 3);
+        assert_eq!(failed.prompt_title, None);
+        assert_eq!(valid.prompt_title.as_deref(), Some("Valid request"));
+    }
+
+    #[test]
     fn reuses_unchanged_session_file_rollups() {
         let temp_dir = tempfile_dir();
         let db_path = temp_dir.join("usage.sqlite");
@@ -815,6 +1133,17 @@ mod tests {
 
         assert_eq!(first.metrics.files_parsed, 1);
         assert_eq!(first.metrics.files_reused, 0);
+        assert_eq!(
+            crate::db::query_session_rollup_record(
+                &db,
+                &sessions.join("session.jsonl").to_string_lossy(),
+            )
+            .unwrap()
+            .unwrap()
+            .prompt_title
+            .as_deref(),
+            Some("")
+        );
         assert_eq!(second.metrics.files_parsed, 0);
         assert_eq!(second.metrics.files_reused, 1);
         assert_eq!(second.imported_days, 1);

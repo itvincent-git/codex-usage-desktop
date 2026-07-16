@@ -187,7 +187,11 @@ async fn fetch_session_details(
         let mut sessions = db::query_session_details(&db)?;
         let names = session_index::load_thread_names();
         for session in &mut sessions {
-            session.thread_name = session_index::thread_name_for_path(&session.path, &names);
+            session.thread_name = session_index::resolve_thread_name(
+                &session.path,
+                session.thread_name.take(),
+                &names,
+            );
         }
         Ok(sessions)
     })
@@ -206,7 +210,8 @@ async fn fetch_session_detail(
         let db = db::open_database(&database_path)?;
         let mut detail = session_replay::fetch_session_detail(&db, &path)?;
         let names = session_index::load_thread_names();
-        detail.thread_name = session_index::thread_name_for_path(&detail.path, &names);
+        detail.thread_name =
+            session_index::resolve_thread_name(&detail.path, detail.thread_name.take(), &names);
         Ok(detail)
     })
     .await

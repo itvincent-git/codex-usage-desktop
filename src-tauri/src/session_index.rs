@@ -55,6 +55,14 @@ pub fn thread_name_for_path(path: &str, names: &HashMap<String, String>) -> Opti
     rollout_thread_id(Path::new(path)).and_then(|id| names.get(id).cloned())
 }
 
+pub fn resolve_thread_name(
+    path: &str,
+    fallback: Option<String>,
+    names: &HashMap<String, String>,
+) -> Option<String> {
+    thread_name_for_path(path, names).or(fallback)
+}
+
 fn rollout_thread_id(path: &Path) -> Option<&str> {
     let stem = path.file_stem()?.to_str()?;
     let id = stem.get(stem.len().checked_sub(THREAD_ID_LENGTH)?..)?;
@@ -107,6 +115,26 @@ mod tests {
             Some("Session title")
         );
         assert_eq!(thread_name_for_path("/tmp/session.jsonl", &names), None);
+    }
+
+    #[test]
+    fn official_name_overrides_fallback_and_missing_name_preserves_it() {
+        let names = HashMap::from([(THREAD_ID.to_string(), "Official title".to_string())]);
+        let path = format!("/tmp/rollout-2026-06-11T00-00-00-{THREAD_ID}.jsonl");
+
+        assert_eq!(
+            resolve_thread_name(&path, Some("Prompt title".to_string()), &names).as_deref(),
+            Some("Official title")
+        );
+        assert_eq!(
+            resolve_thread_name(
+                "/tmp/session.jsonl",
+                Some("Prompt title".to_string()),
+                &names,
+            )
+            .as_deref(),
+            Some("Prompt title")
+        );
     }
 
     #[test]

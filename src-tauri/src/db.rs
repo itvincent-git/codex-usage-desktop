@@ -35,6 +35,7 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           modified_at_ms INTEGER NOT NULL,
           size_bytes INTEGER NOT NULL,
           rows_json TEXT NOT NULL,
+          prompt_title TEXT,
           updated_at TEXT NOT NULL
         );
         "#,
@@ -46,6 +47,12 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "projects_json",
         "ALTER TABLE daily_usage_rollups ADD COLUMN projects_json TEXT NOT NULL DEFAULT '{}'",
     )?;
+    ensure_column(
+        &db,
+        "session_file_rollups",
+        "prompt_title",
+        "ALTER TABLE session_file_rollups ADD COLUMN prompt_title TEXT",
+    )?;
     Ok(db)
 }
 
@@ -55,6 +62,7 @@ pub struct SessionFileRollup {
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub rows: Vec<DailyUsageRow>,
+    pub prompt_title: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +71,7 @@ pub struct SessionRollupRecord {
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub rows: Vec<DailyUsageRow>,
+    pub prompt_title: Option<String>,
 }
 
 fn ensure_column(
@@ -203,21 +212,28 @@ pub fn query_session_file_rollup(
     path: &str,
     modified_at_ms: i64,
     size_bytes: i64,
-) -> Result<Option<Vec<DailyUsageRow>>, String> {
+) -> Result<Option<SessionFileRollup>, String> {
     let result = db.query_row(
         r#"
-        SELECT rows_json
+        SELECT rows_json, prompt_title
         FROM session_file_rollups
         WHERE path = ? AND modified_at_ms = ? AND size_bytes = ?
         "#,
         params![path, modified_at_ms, size_bytes],
-        |row| row.get::<_, String>(0),
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
     );
 
     match result {
-        Ok(rows_json) => serde_json::from_str(&rows_json)
-            .map(Some)
-            .map_err(|error| error.to_string()),
+        Ok((rows_json, prompt_title)) => {
+            let rows = serde_json::from_str(&rows_json).map_err(|error| error.to_string())?;
+            Ok(Some(SessionFileRollup {
+                path: path.to_string(),
+                modified_at_ms,
+                size_bytes,
+                rows,
+                prompt_title,
+            }))
+        }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(error) => Err(error.to_string()),
     }
@@ -229,7 +245,7 @@ pub fn query_session_rollup_record(
 ) -> Result<Option<SessionRollupRecord>, String> {
     let result = db.query_row(
         r#"
-        SELECT path, modified_at_ms, size_bytes, rows_json
+        SELECT path, modified_at_ms, size_bytes, rows_json, prompt_title
         FROM session_file_rollups
         WHERE path = ?
         "#,
@@ -243,6 +259,7 @@ pub fn query_session_rollup_record(
                 modified_at_ms: row.get(1)?,
                 size_bytes: row.get(2)?,
                 rows,
+                prompt_title: row.get(4)?,
             })
         },
     );
@@ -269,12 +286,14 @@ pub fn upsert_session_file_rollups(
                   modified_at_ms,
                   size_bytes,
                   rows_json,
+                  prompt_title,
                   updated_at
-                ) VALUES (?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                   modified_at_ms = excluded.modified_at_ms,
                   size_bytes = excluded.size_bytes,
                   rows_json = excluded.rows_json,
+                  prompt_title = excluded.prompt_title,
                   updated_at = excluded.updated_at
                 "#,
             )
@@ -289,6 +308,7 @@ pub fn upsert_session_file_rollups(
                     rollup.modified_at_ms,
                     rollup.size_bytes,
                     rows_json,
+                    rollup.prompt_title,
                     updated_at
                 ])
                 .map_err(|error| error.to_string())?;
@@ -400,7 +420,8 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
               path,
               modified_at_ms,
               size_bytes,
-              rows_json
+              rows_json,
+              prompt_title
             FROM session_file_rollups
             ORDER BY modified_at_ms DESC
             "#,
@@ -413,6 +434,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let modified_at_ms: i64 = row.get(1)?;
             let size_bytes: i64 = row.get(2)?;
             let rows_json: String = row.get(3)?;
+            let prompt_title: Option<String> = row.get(4)?;
 
             let daily_rows =
                 serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
@@ -450,7 +472,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             Ok(SessionDetailRow {
                 path,
                 session_id,
-                thread_name: None,
+                thread_name: prompt_title.filter(|title| !title.is_empty()),
                 modified_at_ms,
                 size_bytes,
                 input_tokens,
@@ -475,7 +497,7 @@ mod tests {
     use chrono::Utc;
 
     #[test]
-    fn open_database_adds_projects_json_to_existing_rollups() {
+    fn open_database_adds_missing_rollup_columns() {
         let path = std::env::temp_dir().join(format!(
             "codex-usage-db-migration-{}.sqlite",
             Utc::now().timestamp_nanos_opt().unwrap_or_default()
@@ -495,6 +517,14 @@ mod tests {
                   models_json TEXT NOT NULL,
                   updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE session_file_rollups (
+                  path TEXT PRIMARY KEY,
+                  modified_at_ms INTEGER NOT NULL,
+                  size_bytes INTEGER NOT NULL,
+                  rows_json TEXT NOT NULL,
+                  updated_at TEXT NOT NULL
+                );
                 "#,
             )
             .unwrap();
@@ -512,6 +542,56 @@ mod tests {
             .any(|column| column == "projects_json");
 
         assert!(has_projects_json);
+        let has_prompt_title = db
+            .prepare("PRAGMA table_info(session_file_rollups)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .iter()
+            .any(|column| column == "prompt_title");
+
+        assert!(has_prompt_title);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn session_details_use_cached_prompt_title() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-usage-db-session-title-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let mut db = open_database(&path).unwrap();
+        upsert_session_file_rollups(
+            &mut db,
+            &[
+                SessionFileRollup {
+                    path: "/tmp/titled.jsonl".to_string(),
+                    modified_at_ms: 2,
+                    size_bytes: 2,
+                    rows: vec![],
+                    prompt_title: Some("First real request".to_string()),
+                },
+                SessionFileRollup {
+                    path: "/tmp/untitled.jsonl".to_string(),
+                    modified_at_ms: 1,
+                    size_bytes: 1,
+                    rows: vec![],
+                    prompt_title: Some(String::new()),
+                },
+            ],
+            "2026-07-16T00:00:00.000Z",
+        )
+        .unwrap();
+
+        let sessions = query_session_details(&db).unwrap();
+
+        assert_eq!(
+            sessions[0].thread_name.as_deref(),
+            Some("First real request")
+        );
+        assert_eq!(sessions[1].thread_name, None);
         let _ = std::fs::remove_file(path);
     }
 
