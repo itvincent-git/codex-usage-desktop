@@ -1,8 +1,9 @@
-import { ExternalLink, Gauge, LogIn, RotateCcw } from "lucide-react";
+import { ChevronDown, ExternalLink, Gauge, LogIn, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type CodexLimitsCardProps = {
@@ -295,6 +296,7 @@ function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits }: L
 
 function ResetCreditsPanel({ availableCount, credits }: { availableCount: number; credits?: CodexResetCredit[] | null }) {
   const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
   const count = Math.max(0, Math.trunc(availableCount));
   const sortedCredits = [...(credits ?? [])]
     .sort((left, right) => {
@@ -303,21 +305,33 @@ function ResetCreditsPanel({ availableCount, credits }: { availableCount: number
       return new Date(left.expiresAt).getTime() - new Date(right.expiresAt).getTime();
     })
     .slice(0, count);
+  const visibleCredits = isExpanded ? sortedCredits : sortedCredits.slice(0, 1);
 
   return (
     <div className="mt-3 border-t border-border/60 pt-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-muted-foreground">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((expanded) => !expanded)}
+      >
+        <span className="flex items-center gap-1.5 text-muted-foreground">
           <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-          <p className="text-[10px] font-semibold">{t("limits.reset_credits")}</p>
-        </div>
-        <span
-          data-testid="reset-credit-count"
-          className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground"
-        >
-          {t("limits.reset_credits_available", { count })}
+          <span className="text-[10px] font-semibold">{t("limits.reset_credits")}</span>
         </span>
-      </div>
+        <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+          <span
+            data-testid="reset-credit-count"
+            className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground"
+          >
+            {t("limits.reset_credits_available", { count })}
+          </span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
+            aria-hidden="true"
+          />
+        </span>
+      </button>
       <div className="mt-2 border-t border-border/40 text-[10px] leading-normal text-foreground/85">
         {count === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>
@@ -325,7 +339,7 @@ function ResetCreditsPanel({ availableCount, credits }: { availableCount: number
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
         ) : (
           <>
-            {sortedCredits.map((credit, index) => (
+            {visibleCredits.map((credit, index) => (
               <div
                 key={credit.id}
                 className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-border/40 py-2 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
@@ -345,7 +359,7 @@ function ResetCreditsPanel({ availableCount, credits }: { availableCount: number
                 )}
               </div>
             ))}
-            {sortedCredits.length < count ? (
+            {isExpanded && sortedCredits.length < count ? (
               <p className="border-t border-border/40 pt-2 text-muted-foreground">
                 {t("limits.reset_credits_details_partial", { count: count - sortedCredits.length })}
               </p>
