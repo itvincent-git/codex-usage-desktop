@@ -19,23 +19,23 @@ Codex Usage Desktop 将 Mac 上已有的 Codex CLI 日志整理成清晰的使�
 
 ## 你可以看到什么
 
-| | 能力 |
-| --- | --- |
-| **快速掌握用量** | 查看 Token 总量、预估成本、缓存命中率、日均数据，以及预设或自定义时间范围内的趋势。 |
-| **找到成本来源** | 按项目、模型、日期、月份和单个 Codex 会话拆分用量。 |
-| **提前关注额度** | 查看实时 5 小时、周度或月度额度、重置时间、可用重置次数，以及可用时的额度重置预测。 |
-| **深入会话活动** | 搜索会话标题、项目和模型，并打开会话查看具体用量与活动明细。 |
-| **常驻且省心** | 可选菜单栏指标、开机启动、中英文界面和应用内更新检查。 |
+|            | 能力                                               |
+| ---------- | ------------------------------------------------ |
+| **快速掌握用量** | 查看 Token 总量、预估成本、缓存命中率、日均数据，以及预设或自定义时间范围内的趋势。    |
+| **找到成本来源** | 按项目、模型、日期、月份和单个 Codex 会话拆分用量。                    |
+| **提前关注额度** | 查看实时 5 小时、周度或月度额度、重置时间、可用重置次数，以及可用时的额度重置预测。      |
+| **深入会话活动** | 搜索会话标题、项目和模型，并打开会话查看具体用量与活动明细。                   |
+| **常驻且省心**  | 可选菜单栏指标、开机启动、中英文界面和应用内更新检查。                      |
 | **随时导出数据** | 将当前看板时间范围导出为 Excel (`.xlsx`) 或 Markdown (`.md`)。 |
 
 ## 在 macOS 上安装
 
 根据你的 Mac 选择对应版本：
 
-| Mac | 下载 |
-| --- | --- |
+| Mac                         | 下载                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Apple 芯片（M1、M2、M3、M4 及更新型号） | [下载最新版 ARM64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg) |
-| Intel | [下载最新版 x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg) |
+| Intel                       | [下载最新版 x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)     |
 
 打开 DMG，并将 **Codex Usage Desktop** 移入“应用程序”目录。你也可以查看[最新版本与更新说明](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)。
 

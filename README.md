@@ -19,23 +19,23 @@ Codex Usage Desktop turns the Codex CLI logs already on your Mac into a clear us
 
 ## What you can see
 
-| | Capability |
-| --- | --- |
-| **Usage at a glance** | Token totals, estimated cost, cache hit rate, daily averages, and trends across preset or custom date ranges. |
-| **Know what drives cost** | Breakdowns by project, model, day, month, and individual Codex session. |
-| **Stay ahead of limits** | Live 5-hour, weekly, or monthly limits, reset times, available reset credits, and quota-reset forecasting when available. |
-| **Inspect session activity** | Search session titles, projects, and models, then open a session for its usage and activity details. |
-| **Keep it close** | Optional menu bar metrics, launch at login, English and Chinese UI, and in-app update checks. |
-| **Take your data with you** | Export the selected dashboard range to Excel (`.xlsx`) or Markdown (`.md`). |
+|                              | Capability                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Usage at a glance**        | Token totals, estimated cost, cache hit rate, daily averages, and trends across preset or custom date ranges.             |
+| **Know what drives cost**    | Breakdowns by project, model, day, month, and individual Codex session.                                                   |
+| **Stay ahead of limits**     | Live 5-hour, weekly, or monthly limits, reset times, available reset credits, and quota-reset forecasting when available. |
+| **Inspect session activity** | Search session titles, projects, and models, then open a session for its usage and activity details.                      |
+| **Keep it close**            | Optional menu bar metrics, launch at login, English and Chinese UI, and in-app update checks.                             |
+| **Take your data with you**  | Export the selected dashboard range to Excel (`.xlsx`) or Markdown (`.md`).                                               |
 
 ## Install on macOS
 
 Choose the build for your Mac:
 
-| Mac | Download |
-| --- | --- |
+| Mac                                       | Download                                                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Apple Silicon (M1, M2, M3, M4, and newer) | [Download the latest ARM64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg) |
-| Intel | [Download the latest x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg) |
+| Intel                                     | [Download the latest x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)     |
 
 Open the DMG and move **Codex Usage Desktop** to Applications. You can also browse the [latest release and release notes](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
 
