@@ -1,109 +1,99 @@
 # Codex Usage Desktop
 
-![ScreenShot](docs/screen_shot.jpg)
+> See where your Codex tokens, limits, and dollars go — without sending your session logs anywhere.
+
 [![Release](https://img.shields.io/github/v/release/itvincent-git/codex-usage-desktop?label=release)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](#install-on-macos)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
-[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-24c8db.svg)](https://tauri.app/)
-[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#privacy)
+[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#privacy-and-network-access)
 
-> See where your Codex tokens and dollars go — locally.
+**[Download for Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Download for Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md)
 
-A local-first macOS dashboard for OpenAI Codex CLI usage.
-No cloud account. No API key. No log upload. Reads your local ~/.codex logs.
+![Codex Usage Desktop dashboard showing token costs, trends, and account limits](docs/screen_shot.jpg)
 
-[Download the latest release](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) · [中文 README](README_zh.md)
+Codex Usage Desktop turns the Codex CLI logs already on your Mac into a clear usage dashboard. Check token and cost trends, see which projects and models consume the most, inspect individual sessions, and keep an eye on live account limits — all from one native desktop app.
 
-## Why this exists
+- **Local by default:** session logs are read on your Mac and never uploaded by the app.
+- **No API key setup:** install, open, and scan the Codex data you already have.
+- **Free and open source:** no separate app account, subscription, or hosted analytics service required.
 
-Codex usage can grow quickly, but tracking it shouldn't cost you your privacy or credentials security. 
+## What you can see
 
-Unlike traditional analytics platforms that require cloud logins and API key uploads, **Codex Usage Desktop** is built with a local-first philosophy.
+| | Capability |
+| --- | --- |
+| **Usage at a glance** | Token totals, estimated cost, cache hit rate, daily averages, and trends across preset or custom date ranges. |
+| **Know what drives cost** | Breakdowns by project, model, day, month, and individual Codex session. |
+| **Stay ahead of limits** | Live 5-hour, weekly, or monthly limits, reset times, available reset credits, and quota-reset forecasting when available. |
+| **Inspect session activity** | Search session titles, projects, and models, then open a session for its usage and activity details. |
+| **Keep it close** | Optional menu bar metrics, launch at login, English and Chinese UI, and in-app update checks. |
+| **Take your data with you** | Export the selected dashboard range to Excel (`.xlsx`) or Markdown (`.md`). |
 
-### 📊 Local-First vs. Cloud SaaS Analytics
+## Install on macOS
 
-| Feature                  | Codex Usage Desktop (Local-First)                         | Traditional Cloud SaaS                             |
-|:------------------------ |:--------------------------------------------------------- |:-------------------------------------------------- |
-| **Data Privacy**         | 🟢 **100% Local**. Your logs never leave your machine.    | 🔴 Uploads logs to third-party cloud servers.      |
-| **Credentials Security** | 🟢 **Zero API Keys required**. No keys are stored.        | 🔴 Requires uploading master API keys/tokens.      |
-| **Costs**                | 🟢 **Free & Open Source**. No subscription.               | 🔴 Pay-per-seat subscription models.               |
-| **Performance**          | 🟢 **Blazing fast SQLite**. Local TUI/JSONL log indexing. | 🔴 Subject to network latency and API rate limits. |
+Choose the build for your Mac:
 
----
+| Mac | Download |
+| --- | --- |
+| Apple Silicon (M1, M2, M3, M4, and newer) | [Download the latest ARM64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg) |
+| Intel | [Download the latest x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg) |
 
-## Features
+Open the DMG and move **Codex Usage Desktop** to Applications. You can also browse the [latest release and release notes](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
 
-* 🔍 **Local-First Log Scanner**: Automatically parses Codex CLI session logs (`~/.codex/sessions`) on your machine in real-time. No cloud API keys or accounts required.
-* 📊 **Interactive Dashboard**:
-  * **Multiple Windows**: Filter metrics over different timeframes (1d, 7d, 14d, 30d, 60d, 90d).
-  * **Aggregated Trends**: Real-time charts for input/output tokens, cached tokens, and daily cost estimates.
-* 💼 **Granular Breakdown**:
-  * **Project Analysis**: Track which project directories or repositories are consuming the most tokens.
-  * **Model Cost Estimates**: Segment usage by models (e.g., `gpt-5.5`, `gpt-5.4`) to see where your budget goes.
-* 🗓️ **Natural Month Overview**: Track aggregate monthly spending and token budgets for long-term project planning.
-* 💾 **Flexible Data Export**: One-click export of current dashboard datasets to Excel (`.xlsx`) or Markdown (`.md`) reports.
-* ⚙️ **Cache Management**: Instantly rebuild or purge the local SQLite usage index directly from settings to refresh data.
+> [!NOTE]
+> The app does not bypass macOS Gatekeeper. If macOS blocks the first launch, open **System Settings → Privacy & Security** and allow the app.
 
-## Download And Install
+### Install from Terminal
 
-### Install Script
+The installer detects Apple Silicon or Intel, downloads the matching DMG, and copies the app to `/Applications`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/scripts/install.sh | sh
 ```
 
-The script downloads the latest macOS DMG for your architecture and installs `Codex Usage Desktop.app` to `/Applications`. It does not bypass macOS Gatekeeper. If macOS blocks the first launch, open System Settings > Privacy & Security and allow the app.
+The script does not disable or bypass Gatekeeper.
 
-### Manual Download
+## Quick start
 
-You can also download the latest macOS build from [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest).
+1. Use Codex CLI normally so session logs exist under `~/.codex`.
+2. Open Codex Usage Desktop. It scans the local logs and builds a local SQLite index.
+3. Choose a time range or open the Model, Project, Daily, Monthly, or Sessions views to explore your usage.
 
-Current release builds:
+Live account limits require an authenticated local Codex CLI session. If needed, run `codex auth login`, then refresh the dashboard.
 
-- macOS Apple Silicon
-- macOS Intel
+## Privacy and network access
 
-Windows and Linux builds are planned, but the current release workflow only publishes macOS desktop packages.
+Your Codex session content is sensitive. The app is designed to keep it on your device:
 
-## Privacy & Security
+- Source files under `~/.codex` are read locally and are never uploaded, shared, or modified by the app.
+- No OpenAI or LiteLLM API key needs to be entered into or stored by the app.
+- Aggregated usage data is stored in a SQLite cache in the macOS app data directory.
+- Live limits are requested directly from ChatGPT using your existing local Codex authentication; the app does not send session logs with those requests.
+- Network access is also used for public font files, model pricing, quota forecasts, and update checks. Pricing is cached locally, and these requests do not include your session logs or usage analytics.
 
-> [!IMPORTANT]
-> **Zero Cloud Telemetry & Credentials Security Guarantee**
-> 
-> * **No API Keys Stored**: The app **does not require or store** your OpenAI/LiteLLM API keys. It parses local logs that already contain token counts.
-> * **Logs Stay Local**: Source session files in `~/.codex` are read strictly on your device and are never uploaded, shared, or modified.
-> * **Local-first SQLite Cache**: Summarized metrics are stored in a local SQLite cache in your system's app data directory.
-> * **Minimal Network Activity**: Pricing data is cached locally. If missing, the app fetches public pricing lists from LiteLLM over HTTPS, without sending any user credentials or usage metrics.
+## Compatibility and current limits
 
-## Advanced Options
+- Release packages currently support macOS on Apple Silicon and Intel. Windows and Linux packages are planned.
+- Usage and cost values are calculated from local Codex logs; cost figures are estimates based on the available model pricing.
+- Unknown models default to zero estimated cost.
+- Session details depend on the information present in each local Codex log.
+
+## Advanced options
 
 - `CODEX_HOME`: Codex home directory, default `~/.codex`
-- `CODEX_USAGE_TIMEZONE`: timezone for day bucketing, default system timezone with UTC fallback
-
-## Current Limits
-
-- The app shows daily and monthly aggregate usage, not session-level detail.
-- Unknown models default to zero cost.
-- Release packages are currently macOS-only.
-
-## Roadmap
-
-- Windows and Linux release packages.
-- More detailed usage drilldowns.
-- More export and reporting options.
+- `CODEX_USAGE_TIMEZONE`: timezone used for daily buckets, default system timezone with UTC fallback
 
 ## Development
 
-The app is built with React 19, Vite, Tauri v2, and a native Rust usage pipeline.
+Codex Usage Desktop is built with React 19, Vite, Tauri v2, and a native Rust usage pipeline.
 
-Install Node.js `>= 24`, `pnpm`, Rust, and Tauri v2 system dependencies, then run:
+Install Node.js `>= 24`, `pnpm`, Rust, and the Tauri v2 system dependencies, then start the real desktop app:
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
 
-Useful checks:
+Run the checks:
 
 ```bash
 pnpm test
@@ -111,8 +101,4 @@ pnpm typecheck
 cd src-tauri && cargo test
 ```
 
-Packaged builds use:
-
-```bash
-pnpm tauri build
-```
+Packaged builds use `pnpm tauri build`.

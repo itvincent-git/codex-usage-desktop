@@ -1,107 +1,99 @@
 # Codex Usage Desktop
 
+> 看清 Codex 的 Token、额度和费用去向，不需要把会话日志发送到任何地方。
+
 [![Release](https://img.shields.io/github/v/release/itvincent-git/codex-usage-desktop?label=release)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](#在-macos-上安装)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
-[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-24c8db.svg)](https://tauri.app/)
-[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#隐私和数据)
+[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#隐私与网络访问)
 
-一个本地优先的 macOS Codex CLI 用量统计桌面看板，用来从本机 `~/.codex` 日志查看 token 使用量、成本预估、模型用量和项目用量。
+**[下载 Apple 芯片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[下载 Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md)
 
-[下载最新版本](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) · [English README](README.md)
+![Codex Usage Desktop 仪表盘，展示 Token 成本、趋势与账户额度](docs/screen_shot.jpg)
 
-如果你在本机使用 Codex CLI，并希望不用上传本地日志就能查看近期 token、成本趋势、缓存命中率、模型用量和项目用量，可以使用 Codex Usage Desktop。
+Codex Usage Desktop 将 Mac 上已有的 Codex CLI 日志整理成清晰的使用看板。你可以查看 Token 和成本趋势，找出消耗最多的项目与模型，深入检查单个会话，并随时关注账户实时额度——全部在一个原生桌面应用中完成。
 
-## 为什么使用
+- **默认本地运行：** 会话日志只在 Mac 上读取，应用不会上传日志。
+- **无需配置 API Key：** 安装并打开，即可扫描已有的 Codex 数据。
+- **免费开源：** 无需为本应用注册账号、购买订阅或接入托管分析服务。
 
-Codex 的使用量增长极快，但监控它不应以牺牲你的隐私或凭证安全为代价。
+## 你可以看到什么
 
-不同于传统的需要云端登录和上传 API 密钥的分析平台，**Codex Usage Desktop** 秉承完全的“本地优先（Local-First）”哲学。
+| | 能力 |
+| --- | --- |
+| **快速掌握用量** | 查看 Token 总量、预估成本、缓存命中率、日均数据，以及预设或自定义时间范围内的趋势。 |
+| **找到成本来源** | 按项目、模型、日期、月份和单个 Codex 会话拆分用量。 |
+| **提前关注额度** | 查看实时 5 小时、周度或月度额度、重置时间、可用重置次数，以及可用时的额度重置预测。 |
+| **深入会话活动** | 搜索会话标题、项目和模型，并打开会话查看具体用量与活动明细。 |
+| **常驻且省心** | 可选菜单栏指标、开机启动、中英文界面和应用内更新检查。 |
+| **随时导出数据** | 将当前看板时间范围导出为 Excel (`.xlsx`) 或 Markdown (`.md`)。 |
 
-### 📊 本地优先 vs. 传统云端 SaaS 分析
+## 在 macOS 上安装
 
-| 特性       | Codex Usage Desktop (本地优先)       | 传统云端 SaaS 工具                |
-|:-------- |:-------------------------------- |:--------------------------- |
-| **数据隐私** | 🟢 **100% 本地**。您的日志绝不离开您的设备。     | 🔴 需将原始日志上传至第三方云端服务器。       |
-| **凭证安全** | 🟢 **零 API 密钥需求**。不存储任何 API 密钥。  | 🔴 必须上传主 API 密钥/Token 才能运行。 |
-| **成本费用** | 🟢 **完全免费且开源**。无任何订阅费用。          | 🔴 按席位或数据量收费的订阅制。           |
-| **性能体验** | 🟢 **极速 SQLite 本地索引**。毫秒级读取本机日志。 | 🔴 受限于网络延迟、上传带宽和 API 限制。    |
+根据你的 Mac 选择对应版本：
 
----
+| Mac | 下载 |
+| --- | --- |
+| Apple 芯片（M1、M2、M3、M4 及更新型号） | [下载最新版 ARM64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg) |
+| Intel | [下载最新版 x64 DMG](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg) |
 
-## 功能亮点
+打开 DMG，并将 **Codex Usage Desktop** 移入“应用程序”目录。你也可以查看[最新版本与更新说明](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)。
 
-* 🔍 **本地日志扫描器 (Local-First Scanner)**：实时、零配置地解析本机 `~/.codex/sessions` 目录下的 Codex CLI 会话日志，完全基于本地运行。
-* 📊 **多维交互仪表盘 (Interactive Dashboard)**：
-  * **多时间窗口切换**：支持 1d、7d、14d、30d、60d、90d 等时间跨度切换。
-  * **直观趋势图表**：使用动态 Recharts 展示输入/输出 token、缓存命中量以及每日费用趋势。
-* 💼 **细粒度多维度拆分**：
-  * **项目用量分析**：精准统计各个本地项目目录（CWD）所消耗的 Token 和预算。
-  * **模型用量与成本**：按模型细化分类（如 `gpt-5.5`, `gpt-5.4` 等），费用分布一目了然。
-* 🗓️ **自然月长期概览 (Monthly View)**：以自然月为单位聚合用量和成本，方便进行中长期的用量规划与预算复盘。
-* 💾 **多样化数据导出**：支持一键将当前时间窗口下的看板用量数据导出为 Excel (`.xlsx`) 或 Markdown (`.md`) 报告。
-* ⚙️ **便捷缓存管理**：可在设置中一键重建或清空本地 SQLite 用量数据库，随时从原始日志重新同步数据。
+> [!NOTE]
+> 应用不会绕过 macOS Gatekeeper。如果首次启动被系统拦截，请打开 **系统设置 → 隐私与安全性** 并允许打开。
 
-## 下载和安装
+### 通过终端安装
 
-### 一键安装脚本
+安装脚本会自动识别 Apple 芯片或 Intel，下载对应 DMG，并将应用复制到 `/Applications`：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/scripts/install.sh | sh
 ```
 
-脚本会按当前 Mac 架构下载最新 DMG，并将 `Codex Usage Desktop.app` 安装到 `/Applications`。脚本不会绕过 macOS Gatekeeper。如果首次启动被系统拦截，请在“系统设置 > 隐私与安全性”中允许打开。
+脚本不会关闭或绕过 Gatekeeper。
 
-### 手动下载
+## 快速开始
 
-也可以从 [GitHub Releases](https://github.com/itvincent-git/codex-usage-desktop/releases/latest) 下载最新 macOS 版本。
+1. 正常使用 Codex CLI，确保 `~/.codex` 下已有会话日志。
+2. 打开 Codex Usage Desktop，应用会扫描本地日志并建立本地 SQLite 索引。
+3. 选择时间范围，或打开模型、项目、按日、按月、会话页面探索用量。
 
-当前 release 构建：
+查看实时账户额度需要本机 Codex CLI 已完成登录。如有需要，请先运行 `codex auth login`，然后刷新看板。
 
-- macOS Apple Silicon
-- macOS Intel
+## 隐私与网络访问
 
-Windows 和 Linux 构建在计划中；当前 release workflow 只发布 macOS 桌面安装包。
+Codex 会话内容可能包含敏感信息，因此应用被设计为将日志留在你的设备上：
 
-## 隐私与安全
+- `~/.codex` 下的源文件只在本地读取，应用不会上传、分享或修改它们。
+- 无需在应用中输入或保存 OpenAI、LiteLLM API Key。
+- 聚合后的用量数据存储在 macOS 应用数据目录中的 SQLite 缓存里。
+- 实时额度会使用本机已有的 Codex 登录状态直接向 ChatGPT 查询，应用不会随请求发送会话日志。
+- 网络还用于加载公共字体、模型定价、额度预测和更新检查；定价会缓存在本地，这些请求不包含会话日志或用量分析数据。
 
-> [!IMPORTANT]
-> **零云端遥测与凭证安全保障声明**
-> 
-> * **不存储 API 密钥**：本应用**不需要也不存储**您的 OpenAI/LiteLLM API 密钥。它完全基于本地日志中已记录的 token 计数进行分析。
-> * **日志保留在本地**：本应用以只读方式读取本机 `~/.codex` 中的原始会话文件，绝对不会上传、分享或修改它们。
-> * **本地 SQLite 缓存**：计算汇总后的数据保存在您本地系统应用数据目录下的 SQLite 缓存中。
-> * **极简网络交互**：价格数据缓存在本地。如果本地不存在价格缓存，应用会通过 HTTPS 从 LiteLLM 获取公开的定价列表，绝不发送任何用户凭证或使用指标。
+## 兼容性与当前边界
+
+- 当前安装包支持 Apple 芯片和 Intel Mac，Windows 与 Linux 版本仍在计划中。
+- 用量与成本根据本地 Codex 日志计算；成本数据是基于可用模型定价的估算值。
+- 未知模型的预估成本默认为零。
+- 会话明细取决于每份本地 Codex 日志中实际包含的信息。
 
 ## 高级选项
 
-- `CODEX_HOME`: Codex home 目录，默认 `~/.codex`
-- `CODEX_USAGE_TIMEZONE`: 日期分桶使用的时区，默认系统时区，失败时回退 UTC
-
-## 当前边界
-
-- 当前展示的是按天和按月聚合后的 usage，不是会话级明细。
-- 未知模型按零成本处理。
-- 当前 release 安装包只支持 macOS。
-
-## 路线图
-
-- Windows 和 Linux 安装包。
-- 更细粒度的用量明细。
-- 更多导出和报告能力。
+- `CODEX_HOME`：Codex home 目录，默认 `~/.codex`
+- `CODEX_USAGE_TIMEZONE`：按日统计使用的时区，默认系统时区，失败时回退 UTC
 
 ## 开发者说明
 
-应用使用 React 19、Vite、Tauri v2 和 Rust 原生 usage pipeline 构建。
+Codex Usage Desktop 使用 React 19、Vite、Tauri v2 和 Rust 原生 usage pipeline 构建。
 
-本地开发需要 Node.js `>= 24`、`pnpm`、Rust 和 Tauri v2 系统依赖，然后运行：
+安装 Node.js `>= 24`、`pnpm`、Rust 和 Tauri v2 系统依赖，然后通过真实桌面应用启动：
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
 
-常用检查命令：
+运行检查：
 
 ```bash
 pnpm test
@@ -109,8 +101,4 @@ pnpm typecheck
 cd src-tauri && cargo test
 ```
 
-打包命令：
-
-```bash
-pnpm tauri build
-```
+使用 `pnpm tauri build` 构建安装包。
