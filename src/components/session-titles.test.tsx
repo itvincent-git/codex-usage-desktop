@@ -98,10 +98,15 @@ describe("session daily usage", () => {
     expect(secondDay).toHaveTextContent("gpt-5-mini");
     expect(secondDay).not.toHaveTextContent("420");
 
-    const sessionRow = within(secondDay!).getByText("fallback-session").closest("tr");
-    expect(sessionRow).not.toBeNull();
-    await userEvent.click(sessionRow!);
+    const sessionCard = within(secondDay!).getByText("fallback-session").closest("article");
+    expect(sessionCard).not.toBeNull();
+    await userEvent.click(sessionCard!);
     expect(onSessionClick).toHaveBeenCalledWith(resumed);
+
+    sessionCard!.focus();
+    await userEvent.keyboard("{Enter}");
+    await userEvent.keyboard(" ");
+    expect(onSessionClick).toHaveBeenCalledTimes(3);
 
     rerender(
       <SessionUsageTable
@@ -139,19 +144,116 @@ describe("session daily usage", () => {
 });
 
 describe("session titles", () => {
-  it("shows the summary name with the session ID and falls back to the ID", () => {
+  it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {
     render(
       <SessionUsageTable
         sessions={[
-          session({ path: "/tmp/titled.jsonl", sessionId: "titled-session.jsonl", threadName: "Fix login flow" }),
-          session({ path: "/tmp/fallback.jsonl", sessionId: "fallback-session.jsonl" }),
+          session({ path: "/tmp/titled.jsonl", sessionId: "titled-session.jsonl", threadName: "Fix login flow", sizeBytes: 2048 }),
+          session({ path: "/tmp/fallback.jsonl", sessionId: "fallback-session.jsonl", sizeBytes: 3072 }),
         ]}
       />,
     );
 
-    expect(screen.getByText("Fix login flow")).toBeInTheDocument();
-    expect(screen.getByText("titled-session")).toBeInTheDocument();
-    expect(screen.getByText("fallback-session")).toBeInTheDocument();
+    const titledCard = screen.getByText("Fix login flow").closest("article")!;
+    const fallbackCard = screen.getByText("fallback-session").closest("article")!;
+    expect(within(titledCard).getByText("titled-session")).toBeInTheDocument();
+    expect(within(titledCard).getByText("2 KB")).toHaveAttribute("title", "/tmp/titled.jsonl");
+    expect(within(fallbackCard).getAllByText("fallback-session")).toHaveLength(1);
+    expect(within(fallbackCard).getByText("3 KB")).toHaveAttribute("title", "/tmp/fallback.jsonl");
+  });
+
+  it("shows the modified time to the minute and keeps the complete time in a tooltip", () => {
+    const modifiedAtMs = new Date("2026-07-15T08:23:47Z").getTime();
+    render(<SessionUsageTable sessions={[session({ modifiedAtMs })]} />);
+
+    const expectedTime = new Date(modifiedAtMs).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const time = screen.getByText(expectedTime);
+    expect(time.parentElement).toHaveAttribute("title", new Date(modifiedAtMs).toLocaleString());
+    expect(time).not.toHaveTextContent("47");
+  });
+
+  it("limits project and model badges and exposes complete lists in tooltips", () => {
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Badge limits",
+      projects: ["/repo/one", "/repo/two", "/repo/three"],
+      models: ["model-one", "model-two", "model-three", "model-four"],
+      dailyUsage: [],
+    })]} />);
+
+    const card = screen.getByText("Badge limits").closest("article")!;
+    expect(within(card).getByText("one")).toBeInTheDocument();
+    expect(within(card).getByText("two")).toBeInTheDocument();
+    expect(within(card).queryByText("three")).not.toBeInTheDocument();
+    expect(within(card).getByText("+1", { selector: "span[title='/repo/one\\A /repo/two\\A /repo/three']" })).toBeInTheDocument();
+    expect(within(card).getByText("model-one")).toBeInTheDocument();
+    expect(within(card).getByText("model-three")).toBeInTheDocument();
+    expect(within(card).queryByText("model-four")).not.toBeInTheDocument();
+    expect(within(card).getByText("+1", { selector: "span[title='model-one, model-two, model-three, model-four']" })).toBeInTheDocument();
+  });
+
+  it("uses non-cached input, cached input, and output as non-overlapping token segments", () => {
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Token segments",
+      inputTokens: 100,
+      cachedInputTokens: 20,
+      outputTokens: 40,
+      totalTokens: 140,
+      dailyUsage: [],
+    })]} />);
+
+    const card = screen.getByText("Token segments").closest("article")!;
+    const input = card.querySelector<HTMLElement>("[data-token-segment='input']")!;
+    const cached = card.querySelector<HTMLElement>("[data-token-segment='cached']")!;
+    const output = card.querySelector<HTMLElement>("[data-token-segment='output']")!;
+    expect(input.style.width).toBe(`${(80 / 140) * 100}%`);
+    expect(cached.style.width).toBe(`${(20 / 140) * 100}%`);
+    expect(output.style.width).toBe(`${(40 / 140) * 100}%`);
+    expect(within(card).getByRole("img", { name: /80 non-cached input, 20 cached input, 40 output, 140 total/ })).toBeInTheDocument();
+  });
+
+  it("renders an empty neutral token bar and neutral cost for an inactive session", () => {
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Inactive session",
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      costUSD: 0,
+      dailyUsage: [],
+    })]} />);
+
+    const card = screen.getByText("Inactive session").closest("article")!;
+    expect(within(card).getByRole("img", { name: "No token activity" })).toBeEmptyDOMElement();
+    expect(card.querySelector("[data-cost-tone='zero']")).toHaveTextContent("$0.00");
+    expect(within(card).getByText("No activity")).toBeInTheDocument();
+  });
+
+  it("keeps model colors stable and applies relative zero, low, medium, and high cost tones", () => {
+    const costSession = (threadName: string, path: string, costUSD: number, model: string) => session({
+      threadName,
+      path,
+      sessionId: `${threadName}.jsonl`,
+      costUSD,
+      models: [model],
+      dailyUsage: [],
+    });
+    render(<SessionUsageTable sessions={[
+      costSession("Zero", "/tmp/zero.jsonl", 0, "shared-model"),
+      costSession("Low", "/tmp/low.jsonl", 0.001, "shared-model"),
+      costSession("Medium", "/tmp/medium.jsonl", 0.002, "other-model"),
+      costSession("High", "/tmp/high.jsonl", 0.003, "third-model"),
+    ]} />);
+
+    const card = (name: string) => screen.getByText(name, { selector: "h3" }).closest("article")!;
+    expect(card("Zero").querySelector("[data-cost-tone='zero']")).toBeInTheDocument();
+    expect(card("Low").querySelector("[data-cost-tone='low']")).toBeInTheDocument();
+    expect(card("Medium").querySelector("[data-cost-tone='medium']")).toBeInTheDocument();
+    expect(card("High").querySelector("[data-cost-tone='high']")).toBeInTheDocument();
+    const sharedTones = screen.getAllByText("shared-model", { selector: "article span" }).map((badge) => badge.getAttribute("data-model-tone"));
+    expect(sharedTones).toEqual([sharedTones[0], sharedTones[0]]);
   });
 
   it("filters project sessions by summary name", async () => {

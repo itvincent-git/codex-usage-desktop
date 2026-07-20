@@ -54,6 +54,31 @@
 }
 
 @layer utilities {
+  .session-usage-card {
+    display: grid;
+    grid-template-columns: 84px minmax(180px, 1fr) minmax(250px, 0.9fr) 104px;
+    gap: 12px;
+    min-height: 96px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 96px;
+    align-items: center;
+  }
+
+  @media (max-width: 900px) {
+    .session-usage-card {
+      grid-template-columns: 72px minmax(0, 1fr) 104px;
+      min-height: 112px;
+    }
+
+    .session-card-tokens {
+      grid-column: 2 / 4;
+    }
+
+    .session-card-time {
+      grid-row: 1 / 3;
+    }
+  }
+
   @keyframes loading-scan {
     0% {
       transform: translateX(-4px);

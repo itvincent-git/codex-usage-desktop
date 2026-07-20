@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Sparkles, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
+import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -38,6 +38,38 @@ function formatDateHeader(dateStr: string) {
   } catch (e) {
     return dateStr;
   }
+}
+
+const MODEL_TONES = [
+  "border-sky-500/20 bg-sky-500/10 text-sky-500",
+  "border-violet-500/20 bg-violet-500/10 text-violet-500",
+  "border-cyan-500/20 bg-cyan-500/10 text-cyan-500",
+  "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-500",
+  "border-orange-500/20 bg-orange-500/10 text-orange-500",
+  "border-teal-500/20 bg-teal-500/10 text-teal-500",
+] as const;
+
+function modelTone(model: string) {
+  let hash = 0;
+  for (const character of model) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return { className: MODEL_TONES[hash % MODEL_TONES.length], index: hash % MODEL_TONES.length };
+}
+
+function costTone(cost: number, maxCost: number, isInactive: boolean) {
+  if (isInactive || cost <= 0 || maxCost <= 0) {
+    return { name: "zero", className: "border-border/60 bg-muted/60 text-muted-foreground" };
+  }
+
+  const relativeCost = cost / maxCost;
+  if (relativeCost <= 1 / 3) {
+    return { name: "low", className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+  }
+  if (relativeCost <= 2 / 3) {
+    return { name: "medium", className: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+  }
+  return { name: "high", className: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400" };
 }
 
 export function SessionUsageTable({
@@ -134,6 +166,16 @@ export function SessionUsageTable({
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
+  const maxSessionCost = useMemo(
+    () => groups.reduce(
+      (maxCost, group) => group.sessions.reduce(
+        (groupMaxCost, session) => Math.max(groupMaxCost, session.costUSD),
+        maxCost,
+      ),
+      0,
+    ),
+    [groups],
+  );
 
   const toggleDate = (date: string) => {
     setCollapsedDates((prev) => ({
@@ -225,7 +267,7 @@ export function SessionUsageTable({
             </CardContent>
           </Card>
         ) : (
-          groups.map((group, index) => {
+          groups.map((group) => {
           const collapsed = isCollapsed(group.date);
           const formattedDate = formatDateHeader(group.date);
           
@@ -318,174 +360,121 @@ export function SessionUsageTable({
                 </div>
               </button>
 
-              {/* Accordion Content: Session Table for this Date */}
+              {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
-                <div className="border-t border-border/40 bg-black/[0.04] dark:bg-black/[0.08] px-5 pb-5 pt-3">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-0 text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                          <th className="border-b border-border/60 pb-3 font-medium">{t("project_modal.session_id_file")}</th>
-                          <th className="border-b border-border/60 px-4 pb-3 font-medium">{t("sessions.projects_models", { defaultValue: "Projects & Models" })}</th>
-                          <th className="border-b border-border/60 px-4 pb-3 font-medium">{t("common.tokens")}</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("project_modal.input")}</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("common.cache")}</th>
-                          <th className="border-b border-border/60 px-4 pb-3 text-right font-medium">{t("project_modal.output")}</th>
-                          <th className="border-b border-border/60 pb-3 text-right font-medium">{t("common.cost")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.sessions.map((session) => {
-                          const isInactive = session.totalTokens === 0;
-                          const tokenBarWidth = `${Math.max((session.totalTokens / group.totalTokens) * 100, 6)}%`;
-                          const cacheHitRate = session.inputTokens > 0 ? session.cachedInputTokens / session.inputTokens : 0;
-                          
-                          const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          });
+                <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
+                  {group.sessions.map((session) => {
+                    const isInactive = session.totalTokens === 0;
+                    const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
+                    const tokenDenominator = session.totalTokens > 0 ? session.totalTokens : 1;
+                    const fullTime = new Date(session.modifiedAtMs).toLocaleString();
+                    const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    const title = session.threadName || cleanSessionId(session.sessionId);
+                    const shownProjects = session.projects.slice(0, 2);
+                    const shownModels = session.models.slice(0, 3);
+                    const projectOverflow = session.projects.length - shownProjects.length;
+                    const modelOverflow = session.models.length - shownModels.length;
+                    const cost = costTone(session.costUSD, maxSessionCost, isInactive);
+                    const tokenLabel = isInactive
+                      ? t("sessions.token_bar_empty")
+                      : t("sessions.token_bar_label", {
+                          input: formatNumber(nonCachedInputTokens),
+                          cached: formatNumber(session.cachedInputTokens),
+                          output: formatNumber(session.outputTokens),
+                          total: formatNumber(session.totalTokens),
+                        });
 
-                          return (
-                            <tr
-                              key={session.path}
-                              tabIndex={onSessionClick ? 0 : undefined}
-                              role={onSessionClick ? "button" : undefined}
-                              onClick={() => onSessionClick?.(session.originalSession)}
-                              onKeyDown={(event) => {
-                                if (!onSessionClick) return;
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  onSessionClick(session.originalSession);
-                                }
-                              }}
-                              className="align-top hover:bg-white/[0.01] transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                            >
-                              {/* Session Name & Time */}
-                              <td className="border-b border-border/30 py-4">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2 font-semibold text-foreground leading-none">
-                                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                    <span className="truncate max-w-[180px] text-xs" title={session.path}>
-                                      {session.threadName || cleanSessionId(session.sessionId)}
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-muted-foreground tabular-nums flex flex-col gap-0.5">
-                                    {session.threadName ? (
-                                      <span className="truncate max-w-[180px] font-mono" title={session.sessionId}>
-                                        {cleanSessionId(session.sessionId)}
-                                      </span>
-                                    ) : null}
-                                    <span>{t("sessions.time_label", { time: formattedTime, defaultValue: `Time: ${formattedTime}` })}</span>
-                                    <span className="opacity-80">{t("sessions.size_label", { size: formatBytes(session.sizeBytes), defaultValue: `Size: ${formatBytes(session.sizeBytes)}` })}</span>
-                                  </div>
-                                </div>
-                              </td>
+                    return (
+                      <article
+                        key={session.path}
+                        tabIndex={onSessionClick ? 0 : undefined}
+                        role={onSessionClick ? "button" : undefined}
+                        aria-label={onSessionClick ? t("sessions.open_session", { title }) : undefined}
+                        data-testid="session-card"
+                        onClick={() => onSessionClick?.(session.originalSession)}
+                        onKeyDown={(event) => {
+                          if (!onSessionClick) return;
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onSessionClick(session.originalSession);
+                          }
+                        }}
+                        className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
+                      >
+                        <div className="session-card-time border-r border-border/40 pr-3" title={fullTime}>
+                          <div className="text-base font-bold tabular-nums tracking-tight text-foreground">{formattedTime}</div>
+                          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            {t("sessions.recorded_time")}
+                          </div>
+                        </div>
 
-                              {/* Projects & Models */}
-                              <td className="border-b border-border/30 px-4 py-4">
-                                <div className="space-y-2 max-w-[280px]">
-                                  {/* Projects */}
-                                  {session.projects && session.projects.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {session.projects.map((proj) => {
-                                        const name = proj.split("/").pop() || proj;
-                                        return (
-                                          <span
-                                            key={proj}
-                                            className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground border border-border/10 transition-all"
-                                            title={proj}
-                                          >
-                                            <Folder className="h-2.5 w-2.5 opacity-60" />
-                                            {name}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground/60 italic">{t("sessions.no_workspace", { defaultValue: "No workspace" })}</span>
-                                  )}
+                        <div className="session-card-summary min-w-0 space-y-1.5">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <FileText className="h-3.5 w-3.5 flex-none text-muted-foreground" />
+                            <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
+                          </div>
+                          <div className="flex min-w-0 flex-wrap items-center gap-1" title={session.projects.join("\n")}>
+                            {shownProjects.length > 0 ? shownProjects.map((project) => (
+                              <span key={project} className="inline-flex max-w-[120px] items-center gap-0.5 rounded border border-border/40 bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground" title={project}>
+                                <Folder className="h-2.5 w-2.5 flex-none opacity-60" />
+                                <span className="truncate">{project.split("/").pop() || project}</span>
+                              </span>
+                            )) : (
+                              <span className="text-[9px] italic text-muted-foreground/70">{t("sessions.no_workspace")}</span>
+                            )}
+                            {projectOverflow > 0 ? <span className="text-[9px] font-semibold text-muted-foreground" title={session.projects.join("\n")}>+{projectOverflow}</span> : null}
+                          </div>
+                          <div className="flex min-w-0 items-center gap-1 text-[9px] text-muted-foreground/70" title={session.path}>
+                            {session.threadName ? <span className="max-w-[160px] truncate font-mono">{cleanSessionId(session.sessionId)}</span> : null}
+                            {session.threadName ? <span aria-hidden="true">·</span> : null}
+                            <span className="whitespace-nowrap" title={session.path}>{formatBytes(session.sizeBytes)}</span>
+                          </div>
+                        </div>
 
-                                  {/* Models */}
-                                  {session.models && session.models.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {session.models.map((model) => (
-                                        <span
-                                          key={model}
-                                          className="inline-flex items-center rounded-full bg-indigo-500/10 px-1.5 py-0.2 text-[9px] font-semibold text-indigo-400 border border-indigo-500/10"
-                                        >
-                                          {model}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground/60 italic">{t("project_modal.no_models")}</span>
-                                  )}
-                                </div>
-                              </td>
+                        <div className="session-card-tokens min-w-0 space-y-1.5">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("sessions.total_tokens")}</span>
+                            <span className="text-sm font-bold tabular-nums text-foreground">{formatNumber(session.totalTokens)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[9px] tabular-nums text-muted-foreground">
+                            <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatNumber(session.inputTokens)}</strong></span>
+                            <span>{t("sessions.cached")} <strong className="font-semibold text-foreground">{formatNumber(session.cachedInputTokens)}</strong></span>
+                            <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatNumber(session.outputTokens)}</strong></span>
+                          </div>
+                          <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
+                            {isInactive ? null : (
+                              <>
+                                <span data-token-segment="input" className="h-full bg-sky-500" style={{ width: `${(nonCachedInputTokens / tokenDenominator) * 100}%` }} />
+                                <span data-token-segment="cached" className="h-full bg-emerald-500" style={{ width: `${(session.cachedInputTokens / tokenDenominator) * 100}%` }} />
+                                <span data-token-segment="output" className="h-full bg-violet-500" style={{ width: `${(session.outputTokens / tokenDenominator) * 100}%` }} />
+                              </>
+                            )}
+                          </div>
+                          {isInactive ? <div className="text-[9px] italic text-muted-foreground">{t("daily.no_activity")}</div> : null}
+                        </div>
 
-                              {/* Total Tokens (relative to group total) */}
-                              <td className="border-b border-border/30 px-4 py-4">
-                                {isInactive ? (
-                                  <span className="inline-flex rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                    {t("daily.no_activity")}
-                                  </span>
-                                ) : (
-                                  <div className="space-y-1.5 min-w-[90px]">
-                                    <div className="font-semibold text-foreground text-xs">
-                                      {formatNumber(session.totalTokens)}
-                                    </div>
-                                    <div className="h-1 overflow-hidden rounded-full bg-muted/65 w-full">
-                                      <div
-                                        aria-hidden="true"
-                                        className="h-full rounded-full bg-primary/70"
-                                        style={{ width: tokenBarWidth }}
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Input Tokens */}
-                              <td className="border-b border-border/30 px-4 py-4 text-right tabular-nums text-foreground text-xs">
-                                {isInactive ? <span className="text-muted-foreground/60">--</span> : formatNumber(session.inputTokens)}
-                              </td>
-
-                              {/* Cached Input Tokens */}
-                              <td className="border-b border-border/30 px-4 py-4 text-right">
-                                {isInactive ? (
-                                  <span className="text-muted-foreground/60">--</span>
-                                ) : (
-                                  <div className="flex flex-col items-end gap-0.5">
-                                    <span className="tabular-nums font-medium text-foreground text-xs">{formatNumber(session.cachedInputTokens)}</span>
-                                    <span className="rounded-full bg-secondary/10 px-1 py-0.2 text-[8px] font-bold text-secondary">
-                                      {formatPercent(cacheHitRate)}
-                                    </span>
-                                  </div>
-                                )}
-                              </td>
-
-                              {/* Output Tokens */}
-                              <td className="border-b border-border/30 px-4 py-4 text-right tabular-nums text-foreground text-xs">
-                                {isInactive ? <span className="text-muted-foreground/60">--</span> : formatNumber(session.outputTokens)}
-                              </td>
-
-                              {/* Cost */}
-                              <td className="border-b border-border/30 py-4 text-right tabular-nums">
-                                {isInactive ? (
-                                  <span className="text-muted-foreground/60">--</span>
-                                ) : (
-                                  <span className="font-semibold text-foreground text-xs">
-                                    {formatCurrency(session.costUSD)}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                        <div className="session-card-cost flex min-w-0 flex-col items-end justify-center gap-2">
+                          <span data-cost-tone={cost.name} className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}>
+                            {formatCurrency(session.costUSD)}
+                          </span>
+                          <div className="flex w-full min-w-0 flex-nowrap justify-end gap-0.5 overflow-hidden" title={session.models.join(", ")}>
+                            {shownModels.length > 0 ? shownModels.map((model) => {
+                              const tone = modelTone(model);
+                              return (
+                                <span key={model} data-model={model} data-model-tone={tone.index} className={`inline-flex min-w-0 max-w-[42px] truncate rounded-full border px-1 py-0.5 text-[8px] font-semibold ${tone.className}`} title={model}>
+                                  {model}
+                                </span>
+                              );
+                            }) : <span className="text-[9px] italic text-muted-foreground/70">{t("project_modal.no_models")}</span>}
+                            {modelOverflow > 0 ? <span className="text-[9px] font-semibold text-muted-foreground" title={session.models.join(", ")}>+{modelOverflow}</span> : null}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>
