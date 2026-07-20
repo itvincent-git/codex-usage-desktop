@@ -100,6 +100,14 @@ describe("session daily usage", () => {
 
     const sessionCard = within(secondDay!).getByText("fallback-session").closest("article");
     expect(sessionCard).not.toBeNull();
+    expect(sessionCard!.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe(`${(160 / 280) * 100}%`);
+    expect(within(sessionCard!).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
+
+    await userEvent.click(within(firstDay!).getByRole("button"));
+    const firstDayCard = within(firstDay!).getByText("fallback-session").closest("article")!;
+    expect(firstDayCard.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe(`${(80 / 280) * 100}%`);
+    expect(within(firstDayCard).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "50%" });
+
     await userEvent.click(sessionCard!);
     expect(onSessionClick).toHaveBeenCalledWith(resumed);
 
@@ -215,6 +223,185 @@ describe("session titles", () => {
     expect(within(card).getByText("(20.0%)", { selector: "span" })).toBeInTheDocument();
   });
 
+  it("scales token segments and cost bars against independent session maxima", () => {
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/smaller.jsonl",
+        sessionId: "smaller.jsonl",
+        threadName: "Smaller session",
+        inputTokens: 60,
+        cachedInputTokens: 20,
+        outputTokens: 40,
+        totalTokens: 100,
+        costUSD: 0.001,
+        dailyUsage: [],
+      }),
+      session({
+        path: "/tmp/larger.jsonl",
+        sessionId: "larger.jsonl",
+        threadName: "Larger session",
+        inputTokens: 120,
+        cachedInputTokens: 20,
+        outputTokens: 80,
+        totalTokens: 200,
+        costUSD: 0.004,
+        dailyUsage: [],
+      }),
+    ]} />);
+
+    const smaller = screen.getByText("Smaller session").closest("article")!;
+    const larger = screen.getByText("Larger session").closest("article")!;
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("20%");
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='cached']")!.style.width).toBe("10%");
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='output']")!.style.width).toBe("20%");
+    expect(larger.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("50%");
+    expect(larger.querySelector<HTMLElement>("[data-token-segment='cached']")!.style.width).toBe("10%");
+    expect(larger.querySelector<HTMLElement>("[data-token-segment='output']")!.style.width).toBe("40%");
+    expect(within(smaller).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "25%" });
+    expect(within(larger).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(smaller).getByRole("img", { name: /50\.0% of the highest visible session/ })).toBeInTheDocument();
+    expect(within(smaller).getByRole("img", { name: /25\.0% of the highest visible session/ })).toBeInTheDocument();
+  });
+
+  it("keeps collapsed dates in the shared scale", () => {
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/newer.jsonl",
+        sessionId: "newer.jsonl",
+        threadName: "Visible newer session",
+        modifiedAtMs: new Date("2026-07-15T08:00:00Z").getTime(),
+        inputTokens: 50,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 50,
+        costUSD: 0.001,
+        dailyUsage: [{
+          date: "2026-07-15",
+          inputTokens: 50,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          totalTokens: 50,
+          costUSD: 0.001,
+          models: ["gpt-5"],
+          projects: ["/repo/app"],
+        }],
+      }),
+      session({
+        path: "/tmp/older.jsonl",
+        sessionId: "older.jsonl",
+        threadName: "Collapsed older maximum",
+        modifiedAtMs: new Date("2026-07-14T08:00:00Z").getTime(),
+        inputTokens: 100,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 100,
+        costUSD: 0.002,
+        dailyUsage: [{
+          date: "2026-07-14",
+          inputTokens: 100,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          reasoningOutputTokens: 0,
+          totalTokens: 100,
+          costUSD: 0.002,
+          models: ["gpt-5"],
+          projects: ["/repo/app"],
+        }],
+      }),
+    ]} />);
+
+    expect(screen.queryByText("Collapsed older maximum")).not.toBeInTheDocument();
+    const visible = screen.getByText("Visible newer session").closest("article")!;
+    expect(visible.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("50%");
+    expect(within(visible).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "50%" });
+  });
+
+  it("recalculates maxima after applying the project filter", () => {
+    render(<SessionUsageTable
+      selectedProject="/repo/selected"
+      sessions={[
+        session({
+          path: "/tmp/selected.jsonl",
+          sessionId: "selected.jsonl",
+          threadName: "Selected project session",
+          inputTokens: 50,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 50,
+          costUSD: 0.001,
+          projects: ["/repo/selected"],
+          dailyUsage: [],
+        }),
+        session({
+          path: "/tmp/other.jsonl",
+          sessionId: "other.jsonl",
+          threadName: "Other project maximum",
+          inputTokens: 100,
+          cachedInputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 100,
+          costUSD: 0.002,
+          projects: ["/repo/other"],
+          dailyUsage: [],
+        }),
+      ]}
+    />);
+
+    const selected = screen.getByText("Selected project session").closest("article")!;
+    expect(screen.queryByText("Other project maximum")).not.toBeInTheDocument();
+    expect(selected.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("100%");
+    expect(within(selected).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
+  });
+
+  it("keeps zero bars empty and makes tiny non-zero values visible", () => {
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/zero.jsonl",
+        sessionId: "zero.jsonl",
+        threadName: "Zero comparison session",
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUSD: 0,
+        dailyUsage: [],
+      }),
+      session({
+        path: "/tmp/tiny.jsonl",
+        sessionId: "tiny.jsonl",
+        threadName: "Tiny comparison session",
+        inputTokens: 1,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 1,
+        costUSD: 0.000001,
+        dailyUsage: [],
+      }),
+      session({
+        path: "/tmp/maximum.jsonl",
+        sessionId: "maximum.jsonl",
+        threadName: "Maximum comparison session",
+        inputTokens: 10_000,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 10_000,
+        costUSD: 1,
+        dailyUsage: [],
+      }),
+    ]} />);
+
+    const zero = screen.getByText("Zero comparison session").closest("article")!;
+    const tiny = screen.getByText("Tiny comparison session").closest("article")!;
+    expect(within(zero).getByTestId("token-bar")).toBeEmptyDOMElement();
+    expect(within(zero).getByTestId("cost-bar")).toBeEmptyDOMElement();
+    expect(zero.innerHTML).not.toContain("NaN");
+    expect(tiny.querySelector<HTMLElement>("[data-token-segment='input']")).toHaveStyle({ width: "0.01%", minWidth: "2px" });
+    const tinyCostBar = within(tiny).getByTestId("cost-bar").firstElementChild as HTMLElement;
+    expect(parseFloat(tinyCostBar.style.width)).toBeCloseTo(0.0001);
+    expect(tinyCostBar).toHaveStyle({ minWidth: "2px" });
+  });
+
   it("shows the complete model name in a session card", () => {
     render(<SessionUsageTable sessions={[session({
       threadName: "Long model name",
@@ -240,7 +427,7 @@ describe("session titles", () => {
     })]} />);
 
     const card = screen.getByText("Inactive session").closest("article")!;
-    expect(within(card).getByRole("img", { name: "No token activity" })).toBeEmptyDOMElement();
+    expect(within(card).getByRole("img", { name: /No token activity; 0\.0% of the highest visible session/ })).toBeEmptyDOMElement();
     expect(card.querySelector("[data-cost-tone='zero']")).toHaveTextContent("$0.00");
     expect(within(card).getByText("No activity")).toBeInTheDocument();
   });

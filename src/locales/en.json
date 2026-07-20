@@ -305,8 +305,9 @@
     "input_including_cache": "Input (incl. cache)",
     "cached": "Cached",
     "output": "Output",
-    "token_bar_label": "Token breakdown: {{input}} non-cached input, {{cached}} cached input, {{output}} output, {{total}} total",
-    "token_bar_empty": "No token activity",
+    "token_bar_label": "Token breakdown: {{input}} non-cached input, {{cached}} cached input, {{output}} output, {{total}} total; {{percent}} of the highest visible session",
+    "token_bar_empty": "No token activity; {{percent}} of the highest visible session",
+    "cost_bar_label": "Cost {{cost}}; {{percent}} of the highest visible session",
     "open_session": "Open session {{title}}",
     "detail": {
       "modal_title": "Session Details",

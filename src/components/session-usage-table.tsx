@@ -59,17 +59,33 @@ function modelTone(model: string) {
 
 function costTone(cost: number, maxCost: number, isInactive: boolean) {
   if (isInactive || cost <= 0 || maxCost <= 0) {
-    return { name: "zero", className: "border-border/60 bg-muted/60 text-muted-foreground" };
+    return {
+      name: "zero",
+      className: "border-border/60 bg-muted/60 text-muted-foreground",
+      barClassName: "bg-muted-foreground/40",
+    };
   }
 
   const relativeCost = cost / maxCost;
   if (relativeCost <= 1 / 3) {
-    return { name: "low", className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    return {
+      name: "low",
+      className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      barClassName: "bg-emerald-500",
+    };
   }
   if (relativeCost <= 2 / 3) {
-    return { name: "medium", className: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    return {
+      name: "medium",
+      className: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      barClassName: "bg-amber-500",
+    };
   }
-  return { name: "high", className: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400" };
+  return {
+    name: "high",
+    className: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    barClassName: "bg-rose-500",
+  };
 }
 
 export function SessionUsageTable({
@@ -166,13 +182,16 @@ export function SessionUsageTable({
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
-  const maxSessionCost = useMemo(
+  const sessionScale = useMemo(
     () => groups.reduce(
-      (maxCost, group) => group.sessions.reduce(
-        (groupMaxCost, session) => Math.max(groupMaxCost, session.costUSD),
-        maxCost,
+      (maxima, group) => group.sessions.reduce(
+        (groupMaxima, session) => ({
+          tokens: Math.max(groupMaxima.tokens, session.totalTokens),
+          cost: Math.max(groupMaxima.cost, session.costUSD),
+        }),
+        maxima,
       ),
-      0,
+      { tokens: 0, cost: 0 },
     ),
     [groups],
   );
@@ -367,7 +386,6 @@ export function SessionUsageTable({
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
                     const cacheHitRate = session.inputTokens > 0 ? session.cachedInputTokens / session.inputTokens : 0;
-                    const tokenDenominator = session.totalTokens > 0 ? session.totalTokens : 1;
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
                     const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
                       hour: "2-digit",
@@ -378,15 +396,22 @@ export function SessionUsageTable({
                     const shownModels = session.models.slice(0, 3);
                     const projectOverflow = session.projects.length - shownProjects.length;
                     const modelOverflow = session.models.length - shownModels.length;
-                    const cost = costTone(session.costUSD, maxSessionCost, isInactive);
+                    const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
+                    const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
+                    const cost = costTone(session.costUSD, sessionScale.cost, isInactive);
                     const tokenLabel = isInactive
-                      ? t("sessions.token_bar_empty")
+                      ? t("sessions.token_bar_empty", { percent: formatPercent(tokenRatio) })
                       : t("sessions.token_bar_label", {
                           input: formatNumber(nonCachedInputTokens),
                           cached: formatNumber(session.cachedInputTokens),
                           output: formatNumber(session.outputTokens),
                           total: formatNumber(session.totalTokens),
+                          percent: formatPercent(tokenRatio),
                         });
+                    const costLabel = t("sessions.cost_bar_label", {
+                      cost: formatCurrency(session.costUSD),
+                      percent: formatPercent(costRatio),
+                    });
 
                     return (
                       <article
@@ -451,9 +476,9 @@ export function SessionUsageTable({
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (
                               <>
-                                <span data-token-segment="input" className="h-full bg-sky-500" style={{ width: `${(nonCachedInputTokens / tokenDenominator) * 100}%` }} />
-                                <span data-token-segment="cached" className="h-full bg-emerald-500" style={{ width: `${(session.cachedInputTokens / tokenDenominator) * 100}%` }} />
-                                <span data-token-segment="output" className="h-full bg-violet-500" style={{ width: `${(session.outputTokens / tokenDenominator) * 100}%` }} />
+                                <span data-token-segment="input" className="h-full flex-none bg-sky-500" style={{ width: `${(nonCachedInputTokens / sessionScale.tokens) * 100}%`, minWidth: nonCachedInputTokens > 0 ? 2 : undefined }} />
+                                <span data-token-segment="cached" className="h-full flex-none bg-emerald-500" style={{ width: `${(session.cachedInputTokens / sessionScale.tokens) * 100}%`, minWidth: session.cachedInputTokens > 0 ? 2 : undefined }} />
+                                <span data-token-segment="output" className="h-full flex-none bg-violet-500" style={{ width: `${(session.outputTokens / sessionScale.tokens) * 100}%`, minWidth: session.outputTokens > 0 ? 2 : undefined }} />
                               </>
                             )}
                           </div>
@@ -464,6 +489,14 @@ export function SessionUsageTable({
                           <span data-cost-tone={cost.name} className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}>
                             {formatCurrency(session.costUSD)}
                           </span>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={costLabel} data-testid="cost-bar">
+                            {session.costUSD > 0 && sessionScale.cost > 0 ? (
+                              <span
+                                className={`block h-full rounded-full ${cost.barClassName}`}
+                                style={{ width: `${costRatio * 100}%`, minWidth: 2 }}
+                              />
+                            ) : null}
+                          </div>
                           <div className="flex w-full min-w-0 flex-wrap justify-end gap-0.5" title={session.models.join(", ")}>
                             {shownModels.length > 0 ? shownModels.map((model) => {
                               const tone = modelTone(model);
