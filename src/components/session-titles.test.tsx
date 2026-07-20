@@ -212,6 +212,20 @@ describe("session titles", () => {
     expect(cached.style.width).toBe(`${(20 / 140) * 100}%`);
     expect(output.style.width).toBe(`${(40 / 140) * 100}%`);
     expect(within(card).getByRole("img", { name: /80 non-cached input, 20 cached input, 40 output, 140 total/ })).toBeInTheDocument();
+    expect(within(card).getByText("(20.0%)", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it("shows the complete model name in a session card", () => {
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Long model name",
+      models: ["gpt-5.6-sol"],
+      dailyUsage: [],
+    })]} />);
+
+    const card = screen.getByText("Long model name").closest("article")!;
+    const model = within(card).getByText("gpt-5.6-sol", { selector: "span" });
+    expect(model).not.toHaveClass("truncate");
+    expect(model.className).not.toContain("max-w-");
   });
 
   it("renders an empty neutral token bar and neutral cost for an inactive session", () => {

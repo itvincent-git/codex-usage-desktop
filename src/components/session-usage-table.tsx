@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
-import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
@@ -366,6 +366,7 @@ export function SessionUsageTable({
                   {group.sessions.map((session) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
+                    const cacheHitRate = session.inputTokens > 0 ? session.cachedInputTokens / session.inputTokens : 0;
                     const tokenDenominator = session.totalTokens > 0 ? session.totalTokens : 1;
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
                     const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
@@ -441,7 +442,10 @@ export function SessionUsageTable({
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-[9px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatNumber(session.inputTokens)}</strong></span>
-                            <span>{t("sessions.cached")} <strong className="font-semibold text-foreground">{formatNumber(session.cachedInputTokens)}</strong></span>
+                            <span>
+                              {t("sessions.cached")} <strong className="font-semibold text-foreground">{formatNumber(session.cachedInputTokens)}</strong>{" "}
+                              <span className="whitespace-nowrap text-muted-foreground">({formatPercent(cacheHitRate)})</span>
+                            </span>
                             <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatNumber(session.outputTokens)}</strong></span>
                           </div>
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
@@ -460,11 +464,11 @@ export function SessionUsageTable({
                           <span data-cost-tone={cost.name} className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}>
                             {formatCurrency(session.costUSD)}
                           </span>
-                          <div className="flex w-full min-w-0 flex-nowrap justify-end gap-0.5 overflow-hidden" title={session.models.join(", ")}>
+                          <div className="flex w-full min-w-0 flex-wrap justify-end gap-0.5" title={session.models.join(", ")}>
                             {shownModels.length > 0 ? shownModels.map((model) => {
                               const tone = modelTone(model);
                               return (
-                                <span key={model} data-model={model} data-model-tone={tone.index} className={`inline-flex min-w-0 max-w-[42px] truncate rounded-full border px-1 py-0.5 text-[8px] font-semibold ${tone.className}`} title={model}>
+                                <span key={model} data-model={model} data-model-tone={tone.index} className={`inline-flex whitespace-nowrap rounded-full border px-1 py-0.5 text-[8px] font-semibold ${tone.className}`} title={model}>
                                   {model}
                                 </span>
                               );
