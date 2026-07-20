@@ -125,6 +125,8 @@
     "consumed": "Consumed",
     "window": "Window",
     "reset_credits": "Reset credits",
+    "reset_credits_open": "Open reset credits in ChatGPT Usage",
+    "reset_credits_toggle": "Show or hide reset credit expiration details",
     "reset_credits_available": "{{count}} available",
     "reset_credit_number": "Credit {{index}}",
     "reset_credit_expires_at": "Expires {{date}}",

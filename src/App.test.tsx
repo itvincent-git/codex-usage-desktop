@@ -418,6 +418,44 @@ describe("App", () => {
     expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://www.willcodexquotareset.com/" });
   });
 
+  it("opens ChatGPT Usage when reset credits are clicked", async () => {
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return {
+          ...limits(80),
+          weekly: {
+            usedPercent: 45,
+            remainingPercent: 55,
+            windowMinutes: 10080,
+            resetsAt: "2026-06-18T00:00:00.000Z",
+          },
+          resetCreditsAvailableCount: 0,
+          resetCredits: [],
+          membershipLevel: "plus",
+        };
+      }
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      if (command === "open_url") {
+        return undefined;
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Open reset credits in ChatGPT Usage" }));
+
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://chatgpt.com/#settings/Usage" });
+  });
+
   it("loads the last 30 day overview and switches to last 1 day", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "scan_usage") {

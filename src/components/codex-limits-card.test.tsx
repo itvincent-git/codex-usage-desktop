@@ -98,7 +98,7 @@ describe("formatResetTime", () => {
 describe("CodexLimitsCard component", () => {
   it("renders friendly tip for OAuth login / no credentials error", () => {
     const errorMsg = "OAuth unavailable: Failed to read Codex auth at /Users/vincent/.codex/auth.json: No such file or directory (os error 2); CLI RPC unavailable: Codex CLI not found.";
-    render(<CodexLimitsCard limits={null} error={errorMsg} />);
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={errorMsg} />);
 
     expect(screen.getByText("Not Logged In / 尚未登录")).toBeInTheDocument();
     expect(screen.getByText("codex auth login")).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe("CodexLimitsCard component", () => {
 
   it("renders default error message for other errors", () => {
     const errorMsg = "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.";
-    render(<CodexLimitsCard limits={null} error={errorMsg} />);
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={errorMsg} />);
 
     expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
     expect(screen.getByText("Unable to get Codex limits right now. Please check your network and Codex login status, then try again.")).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe("CodexLimitsCard component", () => {
       membershipLevel: "free",
     };
 
-    render(<CodexLimitsCard limits={freeLimits} error={null} />);
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={freeLimits} error={null} />);
 
     expect(screen.getByText("Monthly usage limit")).toBeInTheDocument();
     expect(screen.queryByText("5-Hour Limit")).not.toBeInTheDocument();
@@ -169,7 +169,8 @@ describe("CodexLimitsCard component", () => {
       membershipLevel: "plus",
     };
 
-    render(<CodexLimitsCard limits={limits} error={null} />);
+    const onOpenResetCredits = vi.fn();
+    render(<CodexLimitsCard onOpenResetCredits={onOpenResetCredits} limits={limits} error={null} />);
 
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getByText("Reset credits")).toBeInTheDocument();
@@ -181,10 +182,11 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Credit 2")).not.toBeInTheDocument();
     expect(screen.queryByText("Does not expire")).not.toBeInTheDocument();
 
-    const toggle = screen.getByRole("button", { name: /Reset credits/ });
+    const toggle = screen.getByRole("button", { name: "Show or hide reset credit expiration details" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
 
+    expect(onOpenResetCredits).not.toHaveBeenCalled();
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Credit 2")).toBeInTheDocument();
     expect(screen.getByText(`Expires ${dayjs("2026-08-03T18:00:00+08:00").format("YYYY-MM-DD HH:mm")}`)).toBeInTheDocument();
@@ -200,13 +202,37 @@ describe("CodexLimitsCard component", () => {
     vi.useRealTimers();
   });
 
+  it("opens ChatGPT Usage from the reset-credit label and available-count badge", () => {
+    const onOpenResetCredits = vi.fn();
+    render(
+      <CodexLimitsCard
+        onOpenResetCredits={onOpenResetCredits}
+        limits={{
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: null },
+          resetCreditsAvailableCount: 1,
+          resetCredits: [],
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Reset credits"));
+    fireEvent.click(screen.getByTestId("reset-credit-count"));
+
+    expect(onOpenResetCredits).toHaveBeenCalledTimes(2);
+  });
+
   it("renders structured reset-credit fields in Chinese", async () => {
     await i18n.changeLanguage("zh");
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-15T00:00:00+08:00"));
 
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={{
           session: null,
           weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
@@ -232,7 +258,7 @@ describe("CodexLimitsCard component", () => {
 
   it("reports partial expiration details only when expanded", () => {
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={{
           session: null,
           weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
@@ -248,14 +274,14 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.queryByText("Expiration details were not returned for 2 more credits")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Reset credits/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Show or hide reset credit expiration details" }));
 
     expect(screen.getByText("Expiration details were not returned for 2 more credits")).toBeInTheDocument();
   });
 
   it("keeps the reset count when all expiration details are unavailable", () => {
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={{
           session: null,
           weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
@@ -274,8 +300,9 @@ describe("CodexLimitsCard component", () => {
   });
 
   it("shows the empty reset-credit state when no credits are available", () => {
+    const onOpenResetCredits = vi.fn();
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={onOpenResetCredits}
         limits={{
           session: null,
           weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: "2026-08-04T05:00:00.000Z" },
@@ -291,11 +318,14 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("0 available");
     expect(screen.getByText("No reset credits available")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("reset-credit-count"));
+    expect(onOpenResetCredits).toHaveBeenCalledTimes(1);
   });
 
   it("renders a prominent quota forecast badge", () => {
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
         error={null}
         quotaForecast={{
@@ -316,7 +346,7 @@ describe("CodexLimitsCard component", () => {
 
   it("changes quota forecast color by probability", () => {
     const { rerender } = render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
         error={null}
         quotaForecast={{
@@ -330,7 +360,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-success/30");
 
     rerender(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
         error={null}
         quotaForecast={{
@@ -348,7 +378,7 @@ describe("CodexLimitsCard component", () => {
     const onOpenQuotaForecast = vi.fn();
 
     render(
-      <CodexLimitsCard
+      <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
         error={null}
         quotaForecast={{
@@ -366,7 +396,7 @@ describe("CodexLimitsCard component", () => {
   });
 
   it("does not render the quota forecast pill without forecast data", () => {
-    render(<CodexLimitsCard limits={null} error={null} quotaForecast={null} />);
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={null} quotaForecast={null} />);
 
     expect(screen.queryByRole("button", { name: "Open Codex quota reset forecast" })).not.toBeInTheDocument();
   });

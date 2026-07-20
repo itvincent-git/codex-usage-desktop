@@ -73,6 +73,7 @@ export default function App() {
     handleUpgrade,
     handleOpenUpdateRelease,
     handleOpenCodexQuotaForecast,
+    handleOpenResetCredits,
     handleLaunchAtLoginChange,
     trayTitleShow,
     handleTrayTitleShowChange,
@@ -325,6 +326,7 @@ export default function App() {
                   error={codexLimitsError}
                   quotaForecast={codexQuotaForecast}
                   onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
+                  onOpenResetCredits={() => void handleOpenResetCredits()}
                 />
               </div>
             </div>

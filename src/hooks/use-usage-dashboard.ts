@@ -51,6 +51,7 @@ function isNewerVersion(current: string, target: string): boolean {
 
 const AUTO_RESCAN_MS = 5 * 60_000;
 const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
+const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
 
 function formatCompactResetCountdown(resetsAt: string | null): string | null {
   if (!resetsAt) return null;
@@ -903,6 +904,14 @@ export function useUsageDashboard() {
     }
   };
 
+  const handleOpenResetCredits = async () => {
+    try {
+      await openUrl(CHATGPT_USAGE_URL);
+    } catch (e) {
+      console.error("Failed to open ChatGPT Usage URL", e);
+    }
+  };
+
   return {
     view,
     range,
@@ -943,6 +952,7 @@ export function useUsageDashboard() {
     handleUpgrade,
     handleOpenUpdateRelease,
     handleOpenCodexQuotaForecast,
+    handleOpenResetCredits,
     handleLaunchAtLoginChange,
     trayTitleShow,
     handleTrayTitleShowChange,

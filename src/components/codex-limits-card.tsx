@@ -11,6 +11,7 @@ type CodexLimitsCardProps = {
   error: string | null;
   quotaForecast?: CodexQuotaForecastResponse | null;
   onOpenQuotaForecast?: () => void;
+  onOpenResetCredits: () => void;
 };
 
 type LimitRowProps = {
@@ -18,6 +19,7 @@ type LimitRowProps = {
   window: CodexLimitWindow | null;
   resetCreditsAvailableCount?: number | null;
   resetCredits?: CodexResetCredit[] | null;
+  onOpenResetCredits: () => void;
 };
 
 type QuotaForecastTone = {
@@ -46,7 +48,7 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "team", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForecast }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForecast, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
   const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
   const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
@@ -122,16 +124,17 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
           )}>
             {hasSubscription(limits) ? (
               <>
-                <LimitRow label="5 hour" window={limits?.session ?? null} />
+                <LimitRow label="5 hour" window={limits?.session ?? null} onOpenResetCredits={onOpenResetCredits} />
                 <LimitRow
                   label="Weekly"
                   window={limits?.weekly ?? null}
                   resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
                   resetCredits={limits?.resetCredits}
+                  onOpenResetCredits={onOpenResetCredits}
                 />
               </>
             ) : (
-              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
+              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} onOpenResetCredits={onOpenResetCredits} />
             )}
           </div>
         )}
@@ -208,7 +211,7 @@ function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecast
   );
 }
 
-function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits }: LimitRowProps) {
+function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits, onOpenResetCredits }: LimitRowProps) {
   const { t } = useTranslation();
 
   if (!window) {
@@ -288,13 +291,14 @@ function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits }: L
         <ResetCreditsPanel
           availableCount={resetCreditsAvailableCount}
           credits={resetCredits}
+          onOpen={onOpenResetCredits}
         />
       ) : null}
     </div>
   );
 }
 
-function ResetCreditsPanel({ availableCount, credits }: { availableCount: number; credits?: CodexResetCredit[] | null }) {
+function ResetCreditsPanel({ availableCount, credits, onOpen }: { availableCount: number; credits?: CodexResetCredit[] | null; onOpen: () => void }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const count = Math.max(0, Math.trunc(availableCount));
@@ -309,29 +313,38 @@ function ResetCreditsPanel({ availableCount, credits }: { availableCount: number
 
   return (
     <div className="mt-3 border-t border-border/60 pt-2.5">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-expanded={isExpanded}
-        onClick={() => setIsExpanded((expanded) => !expanded)}
-      >
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="text-[10px] font-semibold">{t("limits.reset_credits")}</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+      <div className="flex w-full items-center gap-1">
+        <button
+          type="button"
+          className="group flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={t("limits.reset_credits_open")}
+          onClick={onOpen}
+        >
+          <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover:text-foreground">
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="text-[10px] font-semibold">{t("limits.reset_credits")}</span>
+            <ExternalLink className="h-3 w-3 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
+          </span>
           <span
             data-testid="reset-credit-count"
-            className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground"
+            className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground transition-colors group-hover:text-foreground"
           >
             {t("limits.reset_credits_available", { count })}
           </span>
+        </button>
+        <button
+          type="button"
+          className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={t("limits.reset_credits_toggle")}
+          aria-expanded={isExpanded}
+          onClick={() => setIsExpanded((expanded) => !expanded)}
+        >
           <ChevronDown
             className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
             aria-hidden="true"
           />
-        </span>
-      </button>
+        </button>
+      </div>
       <div className="mt-2 border-t border-border/40 text-[10px] leading-normal text-foreground/85">
         {count === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>
