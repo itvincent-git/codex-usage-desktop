@@ -1,4 +1,8 @@
 {
+  "1.19.0": {
+    "zh": "- docs(readme): improve installation-focused presentation\n- doc: update README\n- feat: link reset credits to ChatGPT usage settings",
+    "en": "- docs(readme): improve installation-focused presentation\n- doc: update README\n- feat: link reset credits to ChatGPT usage settings"
+  },
   "1.18.0": {
     "zh": "- fix(scripts): avoid git lock races during releases\n- feat: show reset credit expirations\n- feat: display Codex session titles\n- style: refine reset credits layout\n- feat: collapse reset credit details by default\n- feat(session): add fallback titles for CLI sessions\n- fix(sessions): split resumed session usage by day",
     "en": "- fix(scripts): avoid git lock races during releases\n- feat: show reset credit expirations\n- feat: display Codex session titles\n- style: refine reset credits layout\n- feat: collapse reset credit details by default\n- feat(session): add fallback titles for CLI sessions\n- fix(sessions): split resumed session usage by day"
