@@ -1,4 +1,8 @@
 {
+  "1.20.0": {
+    "zh": "- feat(sessions): redesign session items as compact cards\n- fix(ui): show session cache rate and full model names\n- feat(sessions): compare token and cost usage bars\n- fix(sessions): clarify token and cost comparisons",
+    "en": "- feat(sessions): redesign session items as compact cards\n- fix(ui): show session cache rate and full model names\n- feat(sessions): compare token and cost usage bars\n- fix(sessions): clarify token and cost comparisons"
+  },
   "1.19.0": {
     "zh": "- docs(readme): improve installation-focused presentation\n- doc: update README\n- feat: link reset credits to ChatGPT usage settings",
     "en": "- docs(readme): improve installation-focused presentation\n- doc: update README\n- feat: link reset credits to ChatGPT usage settings"
