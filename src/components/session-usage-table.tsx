@@ -62,7 +62,7 @@ function costTone(cost: number, maxCost: number, isInactive: boolean) {
     return {
       name: "zero",
       className: "border-border/60 bg-muted/60 text-muted-foreground",
-      barClassName: "bg-muted-foreground/40",
+      fillClassName: "bg-muted-foreground/15",
     };
   }
 
@@ -71,20 +71,20 @@ function costTone(cost: number, maxCost: number, isInactive: boolean) {
     return {
       name: "low",
       className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-      barClassName: "bg-emerald-500",
+      fillClassName: "bg-emerald-500/20",
     };
   }
   if (relativeCost <= 2 / 3) {
     return {
       name: "medium",
       className: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-      barClassName: "bg-amber-500",
+      fillClassName: "bg-amber-500/20",
     };
   }
   return {
     name: "high",
     className: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400",
-    barClassName: "bg-rose-500",
+    fillClassName: "bg-rose-500/20",
   };
 }
 
@@ -400,15 +400,18 @@ export function SessionUsageTable({
                     const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
                     const cost = costTone(session.costUSD, sessionScale.cost, isInactive);
                     const tokenLabel = isInactive
-                      ? t("sessions.token_bar_empty", { percent: formatPercent(tokenRatio) })
+                      ? t("sessions.token_bar_empty")
                       : t("sessions.token_bar_label", {
                           input: formatNumber(nonCachedInputTokens),
                           cached: formatNumber(session.cachedInputTokens),
                           output: formatNumber(session.outputTokens),
                           total: formatNumber(session.totalTokens),
-                          percent: formatPercent(tokenRatio),
                         });
-                    const costLabel = t("sessions.cost_bar_label", {
+                    const tokenTotalLabel = t("sessions.token_total_label", {
+                      total: formatNumber(session.totalTokens),
+                      percent: formatPercent(tokenRatio),
+                    });
+                    const costLabel = t("sessions.cost_pill_label", {
                       cost: formatCurrency(session.costUSD),
                       percent: formatPercent(costRatio),
                     });
@@ -463,7 +466,21 @@ export function SessionUsageTable({
                         <div className="session-card-tokens min-w-0 space-y-1.5">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("sessions.total_tokens")}</span>
-                            <span className="text-sm font-bold tabular-nums text-foreground">{formatNumber(session.totalTokens)}</span>
+                            <span
+                              className="relative isolate inline-flex w-24 flex-none overflow-hidden rounded-full border border-primary/15 bg-primary/5 px-2.5 py-0.5 text-right text-sm font-bold tabular-nums text-foreground"
+                              role="img"
+                              aria-label={tokenTotalLabel}
+                              data-testid="token-total-pill"
+                            >
+                              {session.totalTokens > 0 && sessionScale.tokens > 0 ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-0 left-0 -z-10 bg-primary/15"
+                                  style={{ width: `${tokenRatio * 100}%`, minWidth: 2 }}
+                                />
+                              ) : null}
+                              <span className="relative ml-auto">{formatNumber(session.totalTokens)}</span>
+                            </span>
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-[9px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatNumber(session.inputTokens)}</strong></span>
@@ -476,9 +493,9 @@ export function SessionUsageTable({
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (
                               <>
-                                <span data-token-segment="input" className="h-full flex-none bg-sky-500" style={{ width: `${(nonCachedInputTokens / sessionScale.tokens) * 100}%`, minWidth: nonCachedInputTokens > 0 ? 2 : undefined }} />
-                                <span data-token-segment="cached" className="h-full flex-none bg-emerald-500" style={{ width: `${(session.cachedInputTokens / sessionScale.tokens) * 100}%`, minWidth: session.cachedInputTokens > 0 ? 2 : undefined }} />
-                                <span data-token-segment="output" className="h-full flex-none bg-violet-500" style={{ width: `${(session.outputTokens / sessionScale.tokens) * 100}%`, minWidth: session.outputTokens > 0 ? 2 : undefined }} />
+                                <span data-token-segment="input" className="h-full flex-none bg-sky-500" style={{ width: `${(nonCachedInputTokens / session.totalTokens) * 100}%`, minWidth: nonCachedInputTokens > 0 ? 2 : undefined }} />
+                                <span data-token-segment="cached" className="h-full flex-none bg-emerald-500" style={{ width: `${(session.cachedInputTokens / session.totalTokens) * 100}%`, minWidth: session.cachedInputTokens > 0 ? 2 : undefined }} />
+                                <span data-token-segment="output" className="h-full flex-none bg-violet-500" style={{ width: `${(session.outputTokens / session.totalTokens) * 100}%`, minWidth: session.outputTokens > 0 ? 2 : undefined }} />
                               </>
                             )}
                           </div>
@@ -486,17 +503,22 @@ export function SessionUsageTable({
                         </div>
 
                         <div className="session-card-cost flex min-w-0 flex-col items-end justify-center gap-2">
-                          <span data-cost-tone={cost.name} className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}>
-                            {formatCurrency(session.costUSD)}
-                          </span>
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={costLabel} data-testid="cost-bar">
-                            {session.costUSD > 0 && sessionScale.cost > 0 ? (
+                          <span
+                            data-cost-tone={cost.name}
+                            className={`relative isolate inline-flex w-full max-w-full overflow-hidden rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}
+                            role="img"
+                            aria-label={costLabel}
+                            data-testid="cost-pill"
+                          >
+                            {!isInactive && session.costUSD > 0 && sessionScale.cost > 0 ? (
                               <span
-                                className={`block h-full rounded-full ${cost.barClassName}`}
+                                aria-hidden="true"
+                                className={`absolute inset-y-0 left-0 -z-10 ${cost.fillClassName}`}
                                 style={{ width: `${costRatio * 100}%`, minWidth: 2 }}
                               />
                             ) : null}
-                          </div>
+                            <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
+                          </span>
                           <div className="flex w-full min-w-0 flex-wrap justify-end gap-0.5" title={session.models.join(", ")}>
                             {shownModels.length > 0 ? shownModels.map((model) => {
                               const tone = modelTone(model);

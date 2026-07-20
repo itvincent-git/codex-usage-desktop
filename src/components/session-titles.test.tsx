@@ -101,12 +101,13 @@ describe("session daily usage", () => {
     const sessionCard = within(secondDay!).getByText("fallback-session").closest("article");
     expect(sessionCard).not.toBeNull();
     expect(sessionCard!.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe(`${(160 / 280) * 100}%`);
-    expect(within(sessionCard!).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(sessionCard!).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "100%" });
 
     await userEvent.click(within(firstDay!).getByRole("button"));
     const firstDayCard = within(firstDay!).getByText("fallback-session").closest("article")!;
-    expect(firstDayCard.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe(`${(80 / 280) * 100}%`);
-    expect(within(firstDayCard).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "50%" });
+    expect(firstDayCard.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe(`${(80 / 140) * 100}%`);
+    expect(within(firstDayCard).getByTestId("token-total-pill").firstElementChild).toHaveStyle({ width: "50%" });
+    expect(within(firstDayCard).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "50%" });
 
     await userEvent.click(sessionCard!);
     expect(onSessionClick).toHaveBeenCalledWith(resumed);
@@ -223,7 +224,23 @@ describe("session titles", () => {
     expect(within(card).getByText("(20.0%)", { selector: "span" })).toBeInTheDocument();
   });
 
-  it("scales token segments and cost bars against independent session maxima", () => {
+  it("keeps tiny non-zero token composition segments visible", () => {
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Tiny cached segment",
+      inputTokens: 999,
+      cachedInputTokens: 1,
+      outputTokens: 1_000,
+      totalTokens: 1_999,
+      dailyUsage: [],
+    })]} />);
+
+    const card = screen.getByText("Tiny cached segment").closest("article")!;
+    const cached = card.querySelector<HTMLElement>("[data-token-segment='cached']")!;
+    expect(parseFloat(cached.style.width)).toBeCloseTo((1 / 1_999) * 100);
+    expect(cached).toHaveStyle({ minWidth: "2px" });
+  });
+
+  it("normalizes token composition while scaling total-token and cost pills independently", () => {
     render(<SessionUsageTable sessions={[
       session({
         path: "/tmp/smaller.jsonl",
@@ -251,16 +268,19 @@ describe("session titles", () => {
 
     const smaller = screen.getByText("Smaller session").closest("article")!;
     const larger = screen.getByText("Larger session").closest("article")!;
-    expect(smaller.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("20%");
-    expect(smaller.querySelector<HTMLElement>("[data-token-segment='cached']")!.style.width).toBe("10%");
-    expect(smaller.querySelector<HTMLElement>("[data-token-segment='output']")!.style.width).toBe("20%");
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("40%");
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='cached']")!.style.width).toBe("20%");
+    expect(smaller.querySelector<HTMLElement>("[data-token-segment='output']")!.style.width).toBe("40%");
     expect(larger.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("50%");
     expect(larger.querySelector<HTMLElement>("[data-token-segment='cached']")!.style.width).toBe("10%");
     expect(larger.querySelector<HTMLElement>("[data-token-segment='output']")!.style.width).toBe("40%");
-    expect(within(smaller).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "25%" });
-    expect(within(larger).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
-    expect(within(smaller).getByRole("img", { name: /50\.0% of the highest visible session/ })).toBeInTheDocument();
-    expect(within(smaller).getByRole("img", { name: /25\.0% of the highest visible session/ })).toBeInTheDocument();
+    expect(within(smaller).getByTestId("token-total-pill").firstElementChild).toHaveStyle({ width: "50%" });
+    expect(within(larger).getByTestId("token-total-pill").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(smaller).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "25%" });
+    expect(within(larger).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(smaller).getByRole("img", { name: /Total tokens 100; 50\.0% of the highest visible session/ })).toBeInTheDocument();
+    expect(within(smaller).getByRole("img", { name: /Cost \$0\.001; 25\.0% of the highest visible session/ })).toBeInTheDocument();
+    expect(within(smaller).getByRole("img", { name: /Token breakdown: 40 non-cached input, 20 cached input, 40 output, 100 total$/ })).toBeInTheDocument();
   });
 
   it("keeps collapsed dates in the shared scale", () => {
@@ -313,8 +333,9 @@ describe("session titles", () => {
 
     expect(screen.queryByText("Collapsed older maximum")).not.toBeInTheDocument();
     const visible = screen.getByText("Visible newer session").closest("article")!;
-    expect(visible.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("50%");
-    expect(within(visible).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "50%" });
+    expect(visible.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("100%");
+    expect(within(visible).getByTestId("token-total-pill").firstElementChild).toHaveStyle({ width: "50%" });
+    expect(within(visible).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "50%" });
   });
 
   it("recalculates maxima after applying the project filter", () => {
@@ -351,7 +372,8 @@ describe("session titles", () => {
     const selected = screen.getByText("Selected project session").closest("article")!;
     expect(screen.queryByText("Other project maximum")).not.toBeInTheDocument();
     expect(selected.querySelector<HTMLElement>("[data-token-segment='input']")!.style.width).toBe("100%");
-    expect(within(selected).getByTestId("cost-bar").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(selected).getByTestId("token-total-pill").firstElementChild).toHaveStyle({ width: "100%" });
+    expect(within(selected).getByTestId("cost-pill").firstElementChild).toHaveStyle({ width: "100%" });
   });
 
   it("keeps zero bars empty and makes tiny non-zero values visible", () => {
@@ -394,12 +416,16 @@ describe("session titles", () => {
     const zero = screen.getByText("Zero comparison session").closest("article")!;
     const tiny = screen.getByText("Tiny comparison session").closest("article")!;
     expect(within(zero).getByTestId("token-bar")).toBeEmptyDOMElement();
-    expect(within(zero).getByTestId("cost-bar")).toBeEmptyDOMElement();
+    expect(within(zero).getByTestId("token-total-pill").children).toHaveLength(1);
+    expect(within(zero).getByTestId("cost-pill").children).toHaveLength(1);
     expect(zero.innerHTML).not.toContain("NaN");
-    expect(tiny.querySelector<HTMLElement>("[data-token-segment='input']")).toHaveStyle({ width: "0.01%", minWidth: "2px" });
-    const tinyCostBar = within(tiny).getByTestId("cost-bar").firstElementChild as HTMLElement;
-    expect(parseFloat(tinyCostBar.style.width)).toBeCloseTo(0.0001);
-    expect(tinyCostBar).toHaveStyle({ minWidth: "2px" });
+    expect(tiny.querySelector<HTMLElement>("[data-token-segment='input']")).toHaveStyle({ width: "100%", minWidth: "2px" });
+    const tinyTokenFill = within(tiny).getByTestId("token-total-pill").firstElementChild as HTMLElement;
+    expect(parseFloat(tinyTokenFill.style.width)).toBeCloseTo(0.01);
+    expect(tinyTokenFill).toHaveStyle({ minWidth: "2px" });
+    const tinyCostFill = within(tiny).getByTestId("cost-pill").firstElementChild as HTMLElement;
+    expect(parseFloat(tinyCostFill.style.width)).toBeCloseTo(0.0001);
+    expect(tinyCostFill).toHaveStyle({ minWidth: "2px" });
   });
 
   it("shows the complete model name in a session card", () => {
@@ -427,7 +453,8 @@ describe("session titles", () => {
     })]} />);
 
     const card = screen.getByText("Inactive session").closest("article")!;
-    expect(within(card).getByRole("img", { name: /No token activity; 0\.0% of the highest visible session/ })).toBeEmptyDOMElement();
+    expect(within(card).getByRole("img", { name: "No token activity" })).toBeEmptyDOMElement();
+    expect(within(card).getByRole("img", { name: /Total tokens 0; 0\.0% of the highest visible session/ })).toBeInTheDocument();
     expect(card.querySelector("[data-cost-tone='zero']")).toHaveTextContent("$0.00");
     expect(within(card).getByText("No activity")).toBeInTheDocument();
   });

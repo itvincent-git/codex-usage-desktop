@@ -305,9 +305,10 @@
     "input_including_cache": "输入（含缓存）",
     "cached": "缓存",
     "output": "输出",
-    "token_bar_label": "Token 构成：非缓存输入 {{input}}，缓存输入 {{cached}}，输出 {{output}}，总计 {{total}}；相当于当前可见会话最高值的 {{percent}}",
-    "token_bar_empty": "无 Token 活动；相当于当前可见会话最高值的 {{percent}}",
-    "cost_bar_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
+    "token_bar_label": "Token 构成：非缓存输入 {{input}}，缓存输入 {{cached}}，输出 {{output}}，总计 {{total}}",
+    "token_bar_empty": "无 Token 活动",
+    "token_total_label": "Token 总数 {{total}}；相当于当前可见会话最高值的 {{percent}}",
+    "cost_pill_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
     "open_session": "打开会话 {{title}}",
     "detail": {
       "modal_title": "会话详情",
