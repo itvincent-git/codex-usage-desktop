@@ -1,4 +1,8 @@
 {
+  "1.21.0": {
+    "zh": "- fix: reorder sessions navigation tab\n- feat(model): new model card",
+    "en": "- fix: reorder sessions navigation tab\n- feat(model): new model card"
+  },
   "1.20.0": {
     "zh": "- feat(sessions): redesign session items as compact cards\n- fix(ui): show session cache rate and full model names\n- feat(sessions): compare token and cost usage bars\n- fix(sessions): clarify token and cost comparisons",
     "en": "- feat(sessions): redesign session items as compact cards\n- fix(ui): show session cache rate and full model names\n- feat(sessions): compare token and cost usage bars\n- fix(sessions): clarify token and cost comparisons"
