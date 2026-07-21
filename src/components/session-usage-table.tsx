@@ -6,6 +6,7 @@ import { Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { modelTone } from "@/lib/model-tone";
 
 type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
@@ -38,23 +39,6 @@ function formatDateHeader(dateStr: string) {
   } catch (e) {
     return dateStr;
   }
-}
-
-const MODEL_TONES = [
-  "border-sky-500/20 bg-sky-500/10 text-sky-500",
-  "border-violet-500/20 bg-violet-500/10 text-violet-500",
-  "border-cyan-500/20 bg-cyan-500/10 text-cyan-500",
-  "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-500",
-  "border-orange-500/20 bg-orange-500/10 text-orange-500",
-  "border-teal-500/20 bg-teal-500/10 text-teal-500",
-] as const;
-
-function modelTone(model: string) {
-  let hash = 0;
-  for (const character of model) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-  return { className: MODEL_TONES[hash % MODEL_TONES.length], index: hash % MODEL_TONES.length };
 }
 
 function costTone(cost: number, maxCost: number, isInactive: boolean) {

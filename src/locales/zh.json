@@ -199,16 +199,49 @@
   "models": {
     "title": "模型使用详情",
     "subtitle": "分析不同 AI 模型下的 Token 消耗与成本分布。",
-    "card_title": "模型使用",
-    "card_subtitle": "在所选时间范围内按模型分组的 Token 与成本总计。",
-    "cols": {
-      "model": "模型",
-      "tokens": "Tokens 消耗",
-      "cost": "成本",
-      "cache": "缓存命中率",
-      "percent": "占总比"
+    "no_data": "在所选时间范围内没有模型活动。",
+    "other": "其他",
+    "pricing_unavailable": "暂无定价",
+    "of_usage": "用量占比",
+    "of_cost": "成本占比",
+    "summary": {
+      "active_models": "活跃模型",
+      "total_tokens": "总 Token",
+      "estimated_cost": "预估成本",
+      "cache_hit": "缓存命中率",
+      "effective_price": "整体有效单价 / 百万 Token"
     },
-    "no_data": "在所选时间范围内没有模型活动。"
+    "composition": {
+      "title": "Token 构成",
+      "subtitle": "输入总量包含缓存输入；构成条由未缓存输入、缓存输入和输出相加。",
+      "total": "Token 总量",
+      "input_total": "输入（含缓存）",
+      "uncached": "未缓存输入",
+      "cached": "缓存输入",
+      "output": "输出",
+      "bar_label": "Token 构成：未缓存输入 {{input}}，缓存输入 {{cached}}，输出 {{output}}，总计 {{total}}"
+    },
+    "distribution": {
+      "title": "模型 Token 用量占比",
+      "subtitle": "按总 Token 展示前 6 个模型，其余合并为“其他”。"
+    },
+    "comparison": {
+      "title": "模型比较",
+      "subtitle": "比较用量结构、标准单价、有效单价与成本影响；单价均按每百万 Token 计算。"
+    },
+    "sort": { "label": "降序排序", "tokens": "总 Token", "cost": "预估成本", "effective": "有效单价" },
+    "groups": { "model": "模型与用量占比", "tokens": "Token 构成", "prices": "每百万 Token 单价", "cost": "成本影响" },
+    "prices": {
+      "input": "输入",
+      "cached": "缓存输入",
+      "output": "输出",
+      "effective": "有效单价",
+      "input_tooltip": "每百万未缓存输入 Token 的标准单价",
+      "cached_tooltip": "每百万缓存输入 Token 的标准单价",
+      "output_tooltip": "每百万输出 Token 的标准单价",
+      "effective_tooltip": "按当前用量结构以预估成本除以总 Token 计算"
+    },
+    "price_legend": { "label": "相对价格热度图例", "low": "低价", "medium": "中价", "high": "高价", "equal": "同价" }
   },
   "projects": {
     "title": "项目使用详情",

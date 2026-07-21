@@ -77,6 +77,19 @@ pub struct OverviewModelRow {
     pub total_tokens: i64,
     #[serde(rename = "costUSD")]
     pub cost_usd: f64,
+    pub pricing_status: PricingStatus,
+    pub input_cost_per_million_tokens: Option<f64>,
+    pub cached_input_cost_per_million_tokens: Option<f64>,
+    pub output_cost_per_million_tokens: Option<f64>,
+    pub effective_cost_per_million_tokens: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PricingStatus {
+    Priced,
+    Free,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, Serialize)]

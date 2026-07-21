@@ -538,6 +538,11 @@ describe("App", () => {
               outputTokens: 800,
               totalTokens: 3400,
               costUSD: 0.0088685,
+              pricingStatus: "priced",
+              inputCostPerMillionTokens: 1.25,
+              cachedInputCostPerMillionTokens: 0.125,
+              outputCostPerMillionTokens: 10,
+              effectiveCostPerMillionTokens: 2.6083,
             },
           ],
           projects: [
@@ -639,8 +644,8 @@ describe("App", () => {
     await userEvent.click(modelUsageTab);
 
     expect(screen.getByRole("heading", { name: "Model Usage Details" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Total Token" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "gpt-5" })).toBeInTheDocument();
+    expect(screen.getByText("Model comparison")).toBeInTheDocument();
+    expect(screen.getByText("gpt-5")).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: /codex-usage-desktop/ })).not.toBeInTheDocument();
 
     const projectUsageTab = screen.getByRole("tab", { name: "Project" });

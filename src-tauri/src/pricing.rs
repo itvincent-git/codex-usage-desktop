@@ -1,4 +1,4 @@
-use crate::types::ModelUsage;
+use crate::types::{ModelUsage, PricingStatus};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -29,6 +29,12 @@ pub struct Pricing {
 #[derive(Debug, Clone)]
 pub struct PricingSource {
     pricing: BTreeMap<String, LiteLlmModelPricing>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResolvedPricing {
+    pub status: PricingStatus,
+    pub pricing: Pricing,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -145,8 +151,15 @@ impl PricingSource {
     }
 
     pub fn pricing_for_model(&self, model: &str) -> Pricing {
+        self.resolve_pricing_for_model(model).pricing
+    }
+
+    pub fn resolve_pricing_for_model(&self, model: &str) -> ResolvedPricing {
         if is_openrouter_free_model(model) {
-            return Pricing::free();
+            return ResolvedPricing {
+                status: PricingStatus::Free,
+                pricing: Pricing::free(),
+            };
         }
 
         let mut pricing = self.lookup_model_pricing(model);
@@ -167,9 +180,23 @@ impl PricingSource {
             }
         }
 
-        pricing
-            .map(Pricing::from_litellm)
-            .unwrap_or_else(Pricing::free)
+        match pricing {
+            Some(pricing) => {
+                let pricing = Pricing::from_litellm(pricing);
+                ResolvedPricing {
+                    status: if pricing == Pricing::free() {
+                        PricingStatus::Free
+                    } else {
+                        PricingStatus::Priced
+                    },
+                    pricing,
+                }
+            }
+            None => ResolvedPricing {
+                status: PricingStatus::Unavailable,
+                pricing: Pricing::free(),
+            },
+        }
     }
 
     fn lookup_model_pricing(&self, model: &str) -> Option<&LiteLlmModelPricing> {
@@ -407,10 +434,16 @@ mod tests {
     }
 
     #[test]
-    fn unknown_models_are_free() {
+    fn unknown_models_have_unavailable_pricing() {
         let source = PricingSource::from_pricing(BTreeMap::new());
 
-        assert_eq!(source.pricing_for_model("unknown-model"), Pricing::free());
+        assert_eq!(
+            source.resolve_pricing_for_model("unknown-model"),
+            ResolvedPricing {
+                status: PricingStatus::Unavailable,
+                pricing: Pricing::free(),
+            }
+        );
     }
 
     #[test]
@@ -470,8 +503,11 @@ mod tests {
         let source = PricingSource::from_pricing(embedded_pricing());
 
         assert_eq!(
-            source.pricing_for_model("openrouter/openai/gpt-5.5:free"),
-            Pricing::free()
+            source.resolve_pricing_for_model("openrouter/openai/gpt-5.5:free"),
+            ResolvedPricing {
+                status: PricingStatus::Free,
+                pricing: Pricing::free(),
+            }
         );
     }
 }

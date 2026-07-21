@@ -342,6 +342,11 @@ mod tests {
                 output_tokens: 400,
                 total_tokens: 1600,
                 cost_usd: 0.005275,
+                pricing_status: crate::types::PricingStatus::Priced,
+                input_cost_per_million_tokens: Some(1.25),
+                cached_input_cost_per_million_tokens: Some(0.125),
+                output_cost_per_million_tokens: Some(10.0),
+                effective_cost_per_million_tokens: Some(3.296875),
             }],
             projects: vec![OverviewProjectRow {
                 project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop".to_string(),

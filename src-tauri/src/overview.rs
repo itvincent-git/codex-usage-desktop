@@ -116,14 +116,7 @@ pub fn get_overview(
     }
     let mut models = models_by_name
         .into_iter()
-        .map(|(model, usage)| OverviewModelRow {
-            cost_usd: calculate_cost_usd(&usage, pricing_source.pricing_for_model(&model)),
-            model,
-            input_tokens: usage.input_tokens,
-            cached_input_tokens: usage.cached_input_tokens,
-            output_tokens: usage.output_tokens,
-            total_tokens: usage.total_tokens,
-        })
+        .map(|(model, usage)| overview_model_row(model, usage, pricing_source))
         .collect::<Vec<_>>();
     models.sort_by(|a, b| {
         b.total_tokens
@@ -184,6 +177,36 @@ pub fn get_overview(
         models,
         projects,
     })
+}
+
+fn overview_model_row(
+    model: String,
+    usage: ModelUsage,
+    pricing_source: &PricingSource,
+) -> OverviewModelRow {
+    let resolved = pricing_source.resolve_pricing_for_model(&model);
+    let cost_usd = calculate_cost_usd(&usage, resolved.pricing);
+    let prices = (resolved.status != crate::types::PricingStatus::Unavailable)
+        .then_some(resolved.pricing);
+    OverviewModelRow {
+        model,
+        input_tokens: usage.input_tokens,
+        cached_input_tokens: usage.cached_input_tokens,
+        output_tokens: usage.output_tokens,
+        total_tokens: usage.total_tokens,
+        cost_usd,
+        pricing_status: resolved.status,
+        input_cost_per_million_tokens: prices.map(|price| price.input_cost_per_m_token),
+        cached_input_cost_per_million_tokens: prices.map(|price| price.cached_input_cost_per_m_token),
+        output_cost_per_million_tokens: prices.map(|price| price.output_cost_per_m_token),
+        effective_cost_per_million_tokens: if usage.total_tokens > 0
+            && resolved.status != crate::types::PricingStatus::Unavailable
+        {
+            Some(cost_usd / usage.total_tokens as f64 * 1_000_000.0)
+        } else {
+            None
+        },
+    }
 }
 
 pub fn get_monthly_usage(
@@ -295,8 +318,39 @@ mod tests {
     use super::*;
     use crate::{
         db::{open_database, upsert_daily_rows},
-        types::DailyUsageRow,
+        types::{DailyUsageRow, PricingStatus},
     };
+
+    #[test]
+    fn model_rows_expose_pricing_and_effective_cost_without_treating_unknown_as_free() {
+        let source = PricingSource::embedded();
+        let usage = ModelUsage {
+            input_tokens: 1_000_000,
+            cached_input_tokens: 200_000,
+            output_tokens: 500_000,
+            reasoning_output_tokens: 0,
+            total_tokens: 1_500_000,
+            is_fallback: None,
+        };
+
+        let priced = overview_model_row("gpt-5".to_string(), usage.clone(), &source);
+        assert_eq!(priced.pricing_status, PricingStatus::Priced);
+        assert_eq!(priced.input_cost_per_million_tokens, Some(1.25));
+        assert_eq!(priced.cached_input_cost_per_million_tokens, Some(0.125));
+        assert_eq!(priced.output_cost_per_million_tokens, Some(10.0));
+        assert!((priced.cost_usd - 6.025).abs() < f64::EPSILON);
+        assert!((priced.effective_cost_per_million_tokens.unwrap() - 4.016666666666667).abs() < 1e-12);
+
+        let free = overview_model_row("openrouter/free".to_string(), usage.clone(), &source);
+        assert_eq!(free.pricing_status, PricingStatus::Free);
+        assert_eq!(free.input_cost_per_million_tokens, Some(0.0));
+        assert_eq!(free.effective_cost_per_million_tokens, Some(0.0));
+
+        let unknown = overview_model_row("unknown-model".to_string(), usage, &source);
+        assert_eq!(unknown.pricing_status, PricingStatus::Unavailable);
+        assert_eq!(unknown.input_cost_per_million_tokens, None);
+        assert_eq!(unknown.effective_cost_per_million_tokens, None);
+    }
 
     #[test]
     fn aggregates_usage_by_natural_month() {

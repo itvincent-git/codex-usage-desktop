@@ -199,16 +199,49 @@
   "models": {
     "title": "Model Usage Details",
     "subtitle": "Analyze your token and cost distribution by model.",
-    "card_title": "Model Usage",
-    "card_subtitle": "Token and cost totals grouped by model for the selected window.",
-    "cols": {
-      "model": "Model",
-      "tokens": "Total Token",
-      "cost": "Cost",
-      "cache": "Cache Hit",
-      "percent": "% of Total"
+    "no_data": "No model activity in this window.",
+    "other": "Other",
+    "pricing_unavailable": "Pricing unavailable",
+    "of_usage": "of usage",
+    "of_cost": "of cost",
+    "summary": {
+      "active_models": "Active models",
+      "total_tokens": "Total tokens",
+      "estimated_cost": "Estimated cost",
+      "cache_hit": "Cache hit rate",
+      "effective_price": "Overall effective price / 1M"
     },
-    "no_data": "No model activity in this window."
+    "composition": {
+      "title": "Token composition",
+      "subtitle": "Input includes cached input; the bar uses non-cached input + cached input + output.",
+      "total": "Total tokens",
+      "input_total": "Input (incl. cache)",
+      "uncached": "Non-cached input",
+      "cached": "Cached input",
+      "output": "Output",
+      "bar_label": "Token composition: {{input}} non-cached input, {{cached}} cached input, {{output}} output, {{total}} total"
+    },
+    "distribution": {
+      "title": "Token share by model",
+      "subtitle": "Top six models by total tokens; remaining models are grouped as Other."
+    },
+    "comparison": {
+      "title": "Model comparison",
+      "subtitle": "Compare usage mix, standard prices, effective price, and cost impact. All prices are per 1M tokens."
+    },
+    "sort": { "label": "Sort descending", "tokens": "Total tokens", "cost": "Estimated cost", "effective": "Effective price" },
+    "groups": { "model": "Model & usage share", "tokens": "Token mix", "prices": "Prices / 1M tokens", "cost": "Cost impact" },
+    "prices": {
+      "input": "Input",
+      "cached": "Cached",
+      "output": "Output",
+      "effective": "Effective",
+      "input_tooltip": "Standard price for one million non-cached input tokens",
+      "cached_tooltip": "Standard price for one million cached input tokens",
+      "output_tooltip": "Standard price for one million output tokens",
+      "effective_tooltip": "Estimated cost divided by total tokens for this usage mix"
+    },
+    "price_legend": { "label": "Relative price heat legend", "low": "Low price", "medium": "Mid price", "high": "High price", "equal": "Same price" }
   },
   "projects": {
     "title": "Project Usage Details",

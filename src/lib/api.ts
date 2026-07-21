@@ -36,6 +36,11 @@ export type OverviewResponse = {
     outputTokens: number;
     totalTokens: number;
     costUSD: number;
+    pricingStatus: "priced" | "free" | "unavailable";
+    inputCostPerMillionTokens: number | null;
+    cachedInputCostPerMillionTokens: number | null;
+    outputCostPerMillionTokens: number | null;
+    effectiveCostPerMillionTokens: number | null;
   }>;
   projects: Array<{
     project: string;
