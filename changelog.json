@@ -1,4 +1,8 @@
 {
+  "1.22.0": {
+    "zh": "- fix(models): improve model colors and sort selector\n- feat: redesign daily usage comparison",
+    "en": "- fix(models): improve model colors and sort selector\n- feat: redesign daily usage comparison"
+  },
   "1.21.1": {
     "zh": "- test(app): allow duplicate model labels",
     "en": "- test(app): allow duplicate model labels"
