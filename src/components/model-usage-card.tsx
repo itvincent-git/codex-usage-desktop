@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { OverviewResponse } from "@/lib/api";
 import {
   buildDonutData,
-  modelTone,
+  modelPageColors,
   priceTones,
   sortModels,
   tokenBreakdown,
@@ -57,7 +58,8 @@ export function ModelUsageCard({ models }: ModelUsageCardProps) {
     costUSD: result.costUSD + model.costUSD,
   }), { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, totalTokens: 0, costUSD: 0 }), [models]);
   const sortedModels = useMemo(() => sortModels(models, sort), [models, sort]);
-  const donutData = useMemo(() => buildDonutData(models, t("models.other")), [models, t]);
+  const modelColors = useMemo(() => modelPageColors(models), [models]);
+  const donutData = useMemo(() => buildDonutData(models, t("models.other"), modelColors), [modelColors, models, t]);
   const tones = useMemo(() => ({
     input: priceTones(models, "inputCostPerMillionTokens"),
     cached: priceTones(models, "cachedInputCostPerMillionTokens"),
@@ -119,7 +121,7 @@ export function ModelUsageCard({ models }: ModelUsageCardProps) {
               </ResponsiveContainer>
             </div>
             <div className="grid w-full gap-2 text-xs sm:w-1/2">
-              {donutData.map((entry) => <div key={entry.name} className="flex items-center justify-between gap-3"><span className="min-w-0 truncate"><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />{entry.name}</span><span className="tabular-nums text-muted-foreground">{formatPercent(entry.value / Math.max(totals.totalTokens, 1))}</span></div>)}
+              {donutData.map((entry) => <div key={entry.name} data-model-legend={entry.name} data-model-color={entry.color} className="flex items-center justify-between gap-3"><span className="min-w-0 truncate"><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />{entry.name}</span><span className="tabular-nums text-muted-foreground">{formatPercent(entry.value / Math.max(totals.totalTokens, 1))}</span></div>)}
             </div>
           </CardContent>
         </Card>
@@ -128,7 +130,19 @@ export function ModelUsageCard({ models }: ModelUsageCardProps) {
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div><CardTitle>{t("models.comparison.title")}</CardTitle><CardDescription>{t("models.comparison.subtitle")}</CardDescription></div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">{t("models.sort.label")}<select aria-label={t("models.sort.label")} value={sort} onChange={(event) => setSort(event.target.value as ModelSort)} className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground"><option value="tokens">{t("models.sort.tokens")}</option><option value="cost">{t("models.sort.cost")}</option><option value="effective">{t("models.sort.effective")}</option></select></label>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{t("models.sort.label")}</span>
+            <Select value={sort} onValueChange={(value) => setSort(value as ModelSort)}>
+              <SelectTrigger aria-label={t("models.sort.label")} className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tokens">{t("models.sort.tokens")}</SelectItem>
+                <SelectItem value="cost">{t("models.sort.cost")}</SelectItem>
+                <SelectItem value="effective">{t("models.sort.effective")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex flex-wrap gap-3 text-[11px] text-muted-foreground" aria-label={t("models.price_legend.label")}>
@@ -138,12 +152,12 @@ export function ModelUsageCard({ models }: ModelUsageCardProps) {
             <table className="min-w-[1120px] w-full border-separate border-spacing-0 text-sm">
               <thead><tr className="text-left text-[10px] uppercase tracking-[0.12em] text-muted-foreground"><th className="border-b border-border pb-2">{t("models.groups.model")}</th><th className="border-b border-border px-4 pb-2">{t("models.groups.tokens")}</th><th className="border-b border-border px-4 pb-2">{t("models.groups.prices")}</th><th className="border-b border-border pb-2">{t("models.groups.cost")}</th></tr></thead>
               <tbody>{sortedModels.map((model) => {
-                const identity = modelTone(model.model);
+                const modelColor = modelColors.get(model.model)!;
                 const parts = tokenBreakdown(model);
                 const usageShare = model.totalTokens / Math.max(totals.totalTokens, 1);
                 const costShare = totals.costUSD > 0 ? model.costUSD / totals.costUSD : 0;
-                return <tr key={model.model} data-model-row={model.model} className="align-top">
-                  <td className="border-b border-border/70 py-4 pr-4"><div className="flex items-center gap-2"><span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: identity.color }} /><span className={cn("rounded-full border px-2 py-0.5 font-semibold", identity.className)}>{model.model}</span></div><p className="mt-2 text-xs tabular-nums text-muted-foreground">{formatPercent(usageShare)} {t("models.of_usage")}</p></td>
+                return <tr key={model.model} data-model-row={model.model} data-model-color={modelColor} className="align-top">
+                  <td className="border-b border-border/70 py-4 pr-4"><div className="flex items-center gap-2"><span data-model-swatch className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: modelColor }} /><span data-model-badge className="rounded-full border px-2 py-0.5 font-semibold text-foreground" style={{ borderColor: `${modelColor}66`, backgroundColor: `${modelColor}1a` }}>{model.model}</span></div><p className="mt-2 text-xs tabular-nums text-muted-foreground">{formatPercent(usageShare)} {t("models.of_usage")}</p></td>
                   <td className="border-b border-border/70 px-4 py-4"><div className="mb-2 flex justify-between gap-4"><strong className="tabular-nums">{formatNumber(model.totalTokens)}</strong><span className="text-xs text-muted-foreground">{t("models.composition.input_total")} {formatNumber(model.inputTokens)} · {t("models.composition.cached")} {formatNumber(model.cachedInputTokens)} · {t("models.composition.output")} {formatNumber(model.outputTokens)}</span></div><TokenBar row={model} label={t("models.composition.bar_label", { input: formatNumber(parts.nonCachedInput), cached: formatNumber(parts.cachedInput), output: formatNumber(parts.output), total: formatNumber(model.totalTokens) })} /></td>
                   <td className="border-b border-border/70 px-4 py-4"><div className="grid grid-cols-4 gap-3 text-xs"><div title={t("models.prices.input_tooltip")}><p className="mb-1 text-muted-foreground">{t("models.prices.input")}</p><Price value={model.inputCostPerMillionTokens} tone={tones.input.get(model.model)!} unavailable={unavailable} /></div><div title={t("models.prices.cached_tooltip")}><p className="mb-1 text-muted-foreground">{t("models.prices.cached")}</p><Price value={model.cachedInputCostPerMillionTokens} tone={tones.cached.get(model.model)!} unavailable={unavailable} /></div><div title={t("models.prices.output_tooltip")}><p className="mb-1 text-muted-foreground">{t("models.prices.output")}</p><Price value={model.outputCostPerMillionTokens} tone={tones.output.get(model.model)!} unavailable={unavailable} /></div><div title={t("models.prices.effective_tooltip")}><p className="mb-1 text-muted-foreground">{t("models.prices.effective")}</p><Price value={model.effectiveCostPerMillionTokens} tone={tones.effective.get(model.model)!} unavailable={unavailable} /></div></div></td>
                   <td className="border-b border-border/70 py-4 text-right"><p data-effective-tone={tones.effective.get(model.model)} className={cn("font-bold tabular-nums", priceToneClasses[tones.effective.get(model.model)!])}>{formatCurrency(model.costUSD)}</p><p className="mt-1 text-xs tabular-nums text-muted-foreground">{formatPercent(costShare)} {t("models.of_cost")}</p></td>

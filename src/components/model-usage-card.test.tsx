@@ -2,10 +2,10 @@
 
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ModelUsageCard } from "@/components/model-usage-card";
 import type { OverviewResponse } from "@/lib/api";
-import { buildDonutData, priceTones, sortModels, tokenBreakdown } from "@/lib/model-analytics";
+import { buildDonutData, modelPageColors, OTHER_MODEL_COLOR, priceTones, sortModels, tokenBreakdown } from "@/lib/model-analytics";
 import i18n from "@/i18n";
 
 type Model = OverviewResponse["models"][number];
@@ -24,6 +24,10 @@ const model = (name: string, totalTokens: number, overrides: Partial<Model> = {}
   ...overrides,
 });
 
+beforeAll(() => {
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+
 describe("model analytics", () => {
   it("does not double count cached input in token composition", () => {
     const parts = tokenBreakdown(model("one", 1_200, { inputTokens: 1_000, cachedInputTokens: 400, outputTokens: 200 }));
@@ -35,7 +39,26 @@ describe("model analytics", () => {
     const data = buildDonutData(Array.from({ length: 8 }, (_, index) => model(`m${index + 1}`, 800 - index * 100)), "Other");
     expect(data).toHaveLength(7);
     expect(data.slice(0, 6).map((item) => item.value)).toEqual([800, 700, 600, 500, 400, 300]);
-    expect(data[6]).toMatchObject({ name: "Other", value: 300 });
+    expect(data[6]).toMatchObject({ name: "Other", value: 300, color: OTHER_MODEL_COLOR });
+  });
+
+  it("assigns the first six models unique colors in deterministic token order", () => {
+    const rows = [
+      model("zeta", 100),
+      model("beta", 300),
+      model("alpha", 300),
+      model("gamma", 200),
+      model("delta", 150),
+      model("epsilon", 125),
+    ];
+    const colors = modelPageColors(rows);
+    const rankedNames = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"];
+
+    expect([...colors.keys()]).toEqual(rankedNames);
+    expect(new Set(rankedNames.map((name) => colors.get(name))).size).toBe(6);
+    expect(buildDonutData(rows, "Other", colors).map((entry) => entry.color)).toEqual(
+      rankedNames.map((name) => colors.get(name)),
+    );
   });
 
   it("sorts descending by tokens, cost, and effective price with unknown prices last", () => {
@@ -64,8 +87,29 @@ describe("model analytics", () => {
     expect(within(row).getAllByText("Pricing unavailable")).toHaveLength(4);
     expect(screen.getByText("Token composition")).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort descending" }), "effective");
-    expect(screen.getByRole("combobox")).toHaveValue("effective");
+    const user = userEvent.setup();
+    screen.getByRole("combobox", { name: "Sort descending" }).focus();
+    await user.keyboard("[Enter][End][Enter]");
+    expect(screen.getByRole("combobox", { name: "Sort descending" })).toHaveTextContent("Effective price");
+  });
+
+  it("uses one model color mapping across the chart and table while sorting", async () => {
+    const rows = [model("alpha", 100, { costUSD: 9 }), model("beta", 300, { costUSD: 1 })];
+    const colors = modelPageColors(rows);
+    render(<ModelUsageCard models={rows} />);
+
+    for (const row of rows) {
+      const tableRow = document.querySelector(`[data-model-row='${row.model}']`) as HTMLElement;
+      expect(tableRow).toHaveAttribute("data-model-color", colors.get(row.model));
+      expect(document.querySelector(`[data-model-legend='${row.model}']`)).toHaveAttribute("data-model-color", colors.get(row.model));
+      expect(tableRow.querySelector("[data-model-badge]")).toHaveClass("text-foreground");
+    }
+
+    const user = userEvent.setup();
+    screen.getByRole("combobox", { name: "Sort descending" }).focus();
+    await user.keyboard("[Enter][ArrowDown][Enter]");
+    expect(document.querySelector("tbody tr")?.getAttribute("data-model-row")).toBe("alpha");
+    expect(document.querySelector("[data-model-row='beta']")).toHaveAttribute("data-model-color", colors.get("beta"));
   });
 
   it("renders the model page labels in Chinese", async () => {

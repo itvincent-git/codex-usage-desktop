@@ -5,6 +5,8 @@ export type ModelSort = "tokens" | "cost" | "effective";
 export type PriceTone = "low" | "medium" | "high" | "equal" | "unavailable";
 
 const MODEL_COLORS = ["#0ea5e9", "#8b5cf6", "#06b6d4", "#d946ef", "#f97316", "#14b8a6"] as const;
+const MODEL_PAGE_COLORS = ["#2563eb", "#d97706", "#16a34a", "#c026d3", "#dc2626", "#0891b2"] as const;
+export const OTHER_MODEL_COLOR = "#94a3b8";
 const MODEL_TONE_CLASSES = [
   "border-sky-500/20 bg-sky-500/10 text-sky-500",
   "border-violet-500/20 bg-violet-500/10 text-violet-500",
@@ -19,6 +21,13 @@ export function modelTone(model: string) {
   for (const character of model) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   const index = hash % MODEL_COLORS.length;
   return { index, color: MODEL_COLORS[index], className: MODEL_TONE_CLASSES[index] };
+}
+
+export function modelPageColors(models: ModelRow[]) {
+  return new Map(sortModels(models, "tokens").map((model, index) => [
+    model.model,
+    MODEL_PAGE_COLORS[index % MODEL_PAGE_COLORS.length],
+  ]));
 }
 
 export function tokenBreakdown(row: Pick<ModelRow, "inputTokens" | "cachedInputTokens" | "outputTokens">) {
@@ -46,15 +55,15 @@ export function sortModels(models: ModelRow[], sort: ModelSort) {
   });
 }
 
-export function buildDonutData(models: ModelRow[], otherLabel: string) {
+export function buildDonutData(models: ModelRow[], otherLabel: string, colors = modelPageColors(models)) {
   const sorted = sortModels(models, "tokens");
   const visible: Array<{ name: string; value: number; color: string }> = sorted.slice(0, 6).map((model) => ({
     name: model.model,
     value: model.totalTokens,
-    color: modelTone(model.model).color,
+    color: colors.get(model.model)!,
   }));
   const other = sorted.slice(6).reduce((sum, model) => sum + model.totalTokens, 0);
-  if (other > 0) visible.push({ name: otherLabel, value: other, color: "#94a3b8" });
+  if (other > 0) visible.push({ name: otherLabel, value: other, color: OTHER_MODEL_COLOR });
   return visible;
 }
 
