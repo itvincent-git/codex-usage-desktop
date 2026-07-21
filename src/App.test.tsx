@@ -659,10 +659,17 @@ describe("App", () => {
     const dailyTab = screen.getByRole("tab", { name: "Daily" });
     await userEvent.click(dailyTab);
 
-    const latestDailyCell = screen.getByRole("cell", { name: "2026-04-26" });
+    expect(screen.getAllByRole("heading", { name: "Daily Usage" })).toHaveLength(1);
+    expect(screen.getAllByText("Compare daily token composition, scale, and cost, with sorting by field.")).toHaveLength(1);
+    const latestDailyCell = screen.getByRole("cell", { name: /2026-04-26/ });
     const inactiveDailyCell = screen.getByRole("cell", { name: "2026-04-24 to 2026-04-25" });
     expect(latestDailyCell.compareDocumentPosition(inactiveDailyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("No activity (2 days)")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("row", { name: "View sessions for 2026-04-26" }));
+    expect(screen.getByRole("tab", { name: "Sessions" })).toHaveAttribute("aria-selected", "true");
+
+    await userEvent.click(dailyTab);
 
     // Switch back to Dashboard tab to perform range selection
     const dashboardTab = screen.getByRole("tab", { name: "Dashboard" });

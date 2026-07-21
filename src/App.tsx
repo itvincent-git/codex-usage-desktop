@@ -111,10 +111,6 @@ export default function App() {
 
   const metrics = overview ? buildMetricCards(overview, range, t) : [];
   const projects = overview?.projects ?? [];
-  const sortedDailyUsage = useMemo(
-    () => (overview ? [...overview.daily].sort((left, right) => right.date.localeCompare(left.date)) : []),
-    [overview],
-  );
   const sortedMonthlyUsage = useMemo(
     () =>
       monthlyUsage
@@ -378,7 +374,7 @@ export default function App() {
               </div>
               <DailyUsageTable
                 range={range}
-                daily={sortedDailyUsage}
+                daily={overview.daily}
                 onRowClick={(date) => {
                   setSelectedSessionDate(date);
                   void handleViewChange("sessions");

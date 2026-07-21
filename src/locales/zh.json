@@ -165,7 +165,7 @@
   },
   "daily": {
     "title": "按日使用明细",
-    "subtitle": "按日期排列的 Token 消耗和成本明细列表。",
+    "subtitle": "比较每日 Token 构成、规模与成本，支持按字段排序。",
     "cols": {
       "date": "日期",
       "tokens": "Tokens 消耗",
@@ -180,7 +180,32 @@
     "pagination_info": "显示第 {{start}} 到 {{end}} 条，共 {{total}} 天数据",
     "date_range": "{{start}} 至 {{end}}",
     "no_activity": "无数据",
-    "no_activity_days": "无数据 ({{count}} 天)"
+    "no_activity_days": "无数据 ({{count}} 天)",
+    "comparison_range": "比较范围：{{range}}",
+    "token_legend_label": "Token 颜色图例",
+    "cost_legend_label": "成本色阶：不超过区间峰值三分之一为绿色，不超过三分之二为橙色，超过三分之二为红色",
+    "cost_scale": "成本相对峰值",
+    "uncached_input": "非缓存输入",
+    "cached_input": "缓存输入",
+    "input_including_cache": "输入（含缓存）",
+    "cached_with_rate": "缓存（{{rate}}）",
+    "output": "输出",
+    "peak": "最高",
+    "open_sessions": "查看 {{date}} 的会话",
+    "token_bar_label": "Token 构成：非缓存输入 {{input}}，缓存输入 {{cached}}，输出 {{output}}，总计 {{total}}",
+    "total_bar_label": "总 Token {{total}}，为区间峰值的 {{percent}}",
+    "cost_bar_label": "成本 {{cost}}，为区间峰值的 {{percent}}",
+    "sort": {
+      "label": "排序字段",
+      "date": "日期",
+      "totalTokens": "总 Token",
+      "inputTokens": "输入",
+      "cachedInputTokens": "缓存 Token",
+      "outputTokens": "输出",
+      "costUSD": "成本",
+      "asc": "升序",
+      "desc": "降序"
+    }
   },
   "monthly": {
     "title": "月度使用明细",

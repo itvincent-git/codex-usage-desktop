@@ -54,6 +54,11 @@
 }
 
 @layer utilities {
+  .daily-usage-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 112px;
+  }
+
   .session-usage-card {
     display: grid;
     grid-template-columns: 84px minmax(180px, 1fr) minmax(250px, 0.9fr) 104px;

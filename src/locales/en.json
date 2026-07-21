@@ -165,7 +165,7 @@
   },
   "daily": {
     "title": "Daily Usage",
-    "subtitle": "A chronological list of daily usage and cost.",
+    "subtitle": "Compare daily token composition, scale, and cost, with sorting by field.",
     "cols": {
       "date": "Date",
       "tokens": "Total Tokens",
@@ -180,7 +180,32 @@
     "pagination_info": "Showing {{start}} to {{end}} of {{total}} days",
     "date_range": "{{start}} to {{end}}",
     "no_activity": "No activity",
-    "no_activity_days": "No activity ({{count}} days)"
+    "no_activity_days": "No activity ({{count}} days)",
+    "comparison_range": "Comparing {{range}}",
+    "token_legend_label": "Token color legend",
+    "cost_legend_label": "Cost scale: green up to one third, orange up to two thirds, red above two thirds of the range peak",
+    "cost_scale": "Cost vs. peak",
+    "uncached_input": "Non-cached input",
+    "cached_input": "Cached input",
+    "input_including_cache": "Input (incl. cache)",
+    "cached_with_rate": "Cached ({{rate}})",
+    "output": "Output",
+    "peak": "Highest",
+    "open_sessions": "View sessions for {{date}}",
+    "token_bar_label": "Token composition: {{input}} non-cached input, {{cached}} cached input, {{output}} output, {{total}} total",
+    "total_bar_label": "{{total}} total tokens; {{percent}} of the range peak",
+    "cost_bar_label": "Cost {{cost}}; {{percent}} of the range peak",
+    "sort": {
+      "label": "Sort by",
+      "date": "Date",
+      "totalTokens": "Total tokens",
+      "inputTokens": "Input",
+      "cachedInputTokens": "Cached tokens",
+      "outputTokens": "Output",
+      "costUSD": "Cost",
+      "asc": "Ascending",
+      "desc": "Descending"
+    }
   },
   "monthly": {
     "title": "Monthly Usage",
