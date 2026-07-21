@@ -1,4 +1,8 @@
 {
+  "1.21.1": {
+    "zh": "- test(app): allow duplicate model labels",
+    "en": "- test(app): allow duplicate model labels"
+  },
   "1.21.0": {
     "zh": "- fix: reorder sessions navigation tab\n- feat(model): new model card",
     "en": "- fix: reorder sessions navigation tab\n- feat(model): new model card"
