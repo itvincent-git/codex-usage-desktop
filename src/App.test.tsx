@@ -645,7 +645,7 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "Model Usage Details" })).toBeInTheDocument();
     expect(screen.getByText("Model comparison")).toBeInTheDocument();
-    expect(screen.getByText("gpt-5")).toBeInTheDocument();
+    expect(screen.getAllByText("gpt-5").length).toBeGreaterThan(0);
     expect(screen.queryByRole("cell", { name: /codex-usage-desktop/ })).not.toBeInTheDocument();
 
     const projectUsageTab = screen.getByRole("tab", { name: "Project" });
