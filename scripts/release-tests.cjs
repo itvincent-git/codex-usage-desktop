@@ -190,10 +190,12 @@ test('gives up on a persistent index lock without deleting it', () => {
 test('blocks pnpm version before package.json changes', () => {
   const root = createRepository();
   const before = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
+  const hookResult = command(process.execPath, ['scripts/preversion.cjs'], root);
   const result = command('pnpm', ['version', 'minor'], root);
 
+  assert.notEqual(hookResult.status, 0);
+  assert.match(hookResult.output, /pnpm version is disabled/i);
   assert.notEqual(result.status, 0);
-  assert.match(result.output, /pnpm version is disabled/i);
   assert.equal(fs.readFileSync(path.join(root, 'package.json'), 'utf8'), before);
   assert.equal(git(root, 'status', '--porcelain'), '');
 });
