@@ -1007,14 +1007,14 @@ fn resolve_native_codex_binary() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         for directory in [
-            env::var_os("PNPM_HOME"),
+            env::var_os("PNPM_HOME").map(PathBuf::from),
             env::var_os("APPDATA").map(|path| PathBuf::from(path).join("npm")),
         ]
         .into_iter()
         .flatten()
         {
-            candidates.push(PathBuf::from(&directory).join("codex.exe"));
-            candidates.push(PathBuf::from(directory).join("codex.cmd"));
+            candidates.push(directory.join("codex.exe"));
+            candidates.push(directory.join("codex.cmd"));
         }
     }
     if !cfg!(target_os = "windows") {
