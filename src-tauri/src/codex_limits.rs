@@ -1054,8 +1054,8 @@ fn parse_command_v_output(output: &str) -> Option<PathBuf> {
         .lines()
         .rev()
         .map(str::trim)
-        .filter(|line| line.starts_with('/'))
         .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
         .find(|path| is_executable(path))
 }
 
@@ -1658,13 +1658,11 @@ mod tests {
 
     #[test]
     fn effective_path_prepends_resolved_codex_directory() {
-        let path = effective_path_with_codex(Path::new(
-            "/Users/test/.nvm/versions/node/v24.11.0/bin/codex",
-        ));
+        let codex = std::env::temp_dir().join("codex-test-bin").join("codex");
+        let path = effective_path_with_codex(&codex);
+        let first = std::env::split_paths(&path).next();
 
-        assert!(path
-            .to_string_lossy()
-            .starts_with("/Users/test/.nvm/versions/node/v24.11.0/bin:"));
+        assert_eq!(first.as_deref(), codex.parent());
     }
 
     #[test]
