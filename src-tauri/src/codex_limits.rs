@@ -1,11 +1,14 @@
-use crate::types::{
-    CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit,
+use crate::{
+    codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
+    types::{CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit},
 };
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
-    env, fs,
+    env,
+    ffi::{OsStr, OsString},
+    fs,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -323,7 +326,7 @@ fn make_oauth_snapshot(
 }
 
 fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
-    let codex = resolve_codex_binary().ok_or_else(|| {
+    let codex = resolve_codex_command(selected_codex_environment()).ok_or_else(|| {
         "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
     })?;
     let mut rpc = CodexRpcProcess::start(codex)?;
@@ -589,14 +592,7 @@ fn load_codex_auth() -> Result<CodexAuth, String> {
 }
 
 fn codex_auth_path() -> Option<PathBuf> {
-    if let Ok(path) = env::var("CODEX_HOME") {
-        let trimmed = path.trim();
-        if !trimmed.is_empty() {
-            return Some(PathBuf::from(trimmed).join("auth.json"));
-        }
-    }
-
-    dirs::home_dir().map(|home| home.join(".codex/auth.json"))
+    Some(selected_codex_environment().home.join("auth.json"))
 }
 
 fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
@@ -747,22 +743,24 @@ struct CodexRpcProcess {
     next_id: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CodexCommand {
+    Native(PathBuf),
+    WindowsCmd(PathBuf),
+    Wsl { distribution: String, path: String },
+}
+
 impl CodexRpcProcess {
-    fn start(codex: PathBuf) -> Result<Self, String> {
-        let path = effective_path_with_codex(&codex);
-        let mut child = Command::new("/usr/bin/env")
-            .arg(&codex)
-            .args(codex_app_server_args())
-            .env("PATH", path)
+    fn start(codex: CodexCommand) -> Result<Self, String> {
+        let display = codex_command_display(&codex);
+        let mut command = codex_process_command(&codex);
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|error| {
-                format!(
-                    "Failed to start Codex CLI app-server at {}: {error}",
-                    codex.display()
-                )
+                format!("Failed to start Codex CLI app-server at {display}: {error}")
             })?;
 
         let stdin = child
@@ -954,33 +952,75 @@ fn codex_app_server_args() -> [&'static str; 7] {
     ]
 }
 
-fn resolve_codex_binary() -> Option<PathBuf> {
+fn resolve_codex_command(environment: &CodexEnvironment) -> Option<CodexCommand> {
+    match &environment.runtime {
+        CodexRuntime::Native => resolve_native_codex_binary()
+            .map(|path| classify_native_command(path, cfg!(target_os = "windows"))),
+        CodexRuntime::Wsl { distribution } => {
+            let path = command_v_wsl_codex(distribution)?;
+            Some(CodexCommand::Wsl {
+                distribution: distribution.clone(),
+                path,
+            })
+        }
+    }
+}
+
+fn resolve_native_codex_binary() -> Option<PathBuf> {
     if let Ok(path) = env::var("CODEX_CLI_PATH") {
-        let path = PathBuf::from(path);
+        let path = PathBuf::from(path.trim());
         if is_executable(&path) {
             return Some(path);
         }
     }
 
-    if let Ok(path) = env::var("PATH") {
-        if let Some(bin) = find_in_path("codex", &path) {
+    if let Some(path) = env::var_os("PATH") {
+        let names: &[&str] = if cfg!(target_os = "windows") {
+            &["codex.exe", "codex.cmd", "codex.bat", "codex"]
+        } else {
+            &["codex"]
+        };
+        if let Some(bin) = find_in_system_path(names, &path) {
             return Some(bin);
         }
     }
 
-    if let Some(path) = command_v_codex() {
-        return Some(path);
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(path) = command_v_codex() {
+            return Some(path);
+        }
     }
 
     let mut candidates = Vec::new();
     if let Some(home) = dirs::home_dir() {
-        candidates.push(home.join(".local/bin/codex"));
-        candidates.push(home.join(".bun/bin/codex"));
-        candidates.push(home.join(".npm-global/bin/codex"));
-        candidates.extend(nvm_codex_candidates(&home));
+        if cfg!(target_os = "windows") {
+            candidates.push(home.join(".codex/bin/codex.exe"));
+            candidates.push(home.join(".codex/bin/codex.cmd"));
+        } else {
+            candidates.push(home.join(".local/bin/codex"));
+            candidates.push(home.join(".bun/bin/codex"));
+            candidates.push(home.join(".npm-global/bin/codex"));
+            candidates.extend(nvm_codex_candidates(&home));
+        }
     }
-    candidates.push(PathBuf::from("/opt/homebrew/bin/codex"));
-    candidates.push(PathBuf::from("/usr/local/bin/codex"));
+    #[cfg(target_os = "windows")]
+    {
+        for directory in [
+            env::var_os("PNPM_HOME"),
+            env::var_os("APPDATA").map(|path| PathBuf::from(path).join("npm")),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            candidates.push(PathBuf::from(&directory).join("codex.exe"));
+            candidates.push(PathBuf::from(directory).join("codex.cmd"));
+        }
+    }
+    if !cfg!(target_os = "windows") {
+        candidates.push(PathBuf::from("/opt/homebrew/bin/codex"));
+        candidates.push(PathBuf::from("/usr/local/bin/codex"));
+    }
 
     candidates.into_iter().find(|path| is_executable(&path))
 }
@@ -1019,51 +1059,188 @@ fn parse_command_v_output(output: &str) -> Option<PathBuf> {
         .find(|path| is_executable(path))
 }
 
-fn effective_path_with_codex(codex: &Path) -> String {
-    let mut parts = Vec::new();
-    if let Some(parent) = codex.parent() {
-        parts.push(parent.to_string_lossy().to_string());
+fn command_v_wsl_codex(distribution: &str) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut child = Command::new("wsl.exe")
+            .args([
+                "-d",
+                distribution,
+                "--",
+                "sh",
+                "-lc",
+                "exec \"$SHELL\" -lic 'command -v codex'",
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()?;
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if child.try_wait().ok().flatten().is_some() {
+                let output = child.wait_with_output().ok()?;
+                return parse_wsl_command_v_output(&String::from_utf8(output.stdout).ok()?);
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                log::warn!(
+                    "Timed out while locating Codex CLI in WSL distribution {distribution}."
+                );
+                return None;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
     }
-    parts.extend(path_parts(&effective_path()));
-    dedupe_path(parts).join(":")
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = distribution;
+        None
+    }
 }
 
-fn effective_path() -> String {
-    let mut parts = env::var("PATH")
-        .ok()
-        .map(|path| path_parts(&path))
+#[cfg(any(target_os = "windows", test))]
+fn parse_wsl_command_v_output(output: &str) -> Option<String> {
+    output
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| line.starts_with('/'))
+        .map(str::to_string)
+}
+
+fn classify_native_command(path: PathBuf, windows: bool) -> CodexCommand {
+    if windows
+        && matches!(
+            path.extension().and_then(|extension| extension.to_str()),
+            Some(extension) if extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+        )
+    {
+        CodexCommand::WindowsCmd(path)
+    } else {
+        CodexCommand::Native(path)
+    }
+}
+
+fn codex_process_command(codex: &CodexCommand) -> Command {
+    match codex {
+        CodexCommand::Native(path) => {
+            #[cfg(target_os = "windows")]
+            let mut command = Command::new(path);
+            #[cfg(not(target_os = "windows"))]
+            let mut command = {
+                let mut command = Command::new("/usr/bin/env");
+                command.arg(path);
+                command
+            };
+            command
+                .args(codex_app_server_args())
+                .env("PATH", effective_path_with_codex(path));
+            command
+        }
+        CodexCommand::WindowsCmd(path) => {
+            let args = codex_app_server_args().join(" ");
+            let mut command = Command::new("cmd.exe");
+            command
+                .args(["/D", "/S", "/C"])
+                .arg(format!("\"{}\" {args}", path.display()))
+                .env("PATH", effective_path_with_codex(path));
+            command
+        }
+        CodexCommand::Wsl { distribution, path } => {
+            let inner_command = std::iter::once(path.as_str())
+                .chain(codex_app_server_args())
+                .map(shell_quote)
+                .collect::<Vec<_>>()
+                .join(" ");
+            let login_command = format!("exec \"$SHELL\" -lic {}", shell_quote(&inner_command));
+            let mut command = Command::new("wsl.exe");
+            command
+                .args(["-d", distribution, "--", "sh", "-lc"])
+                .arg(login_command);
+            command
+        }
+    }
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn codex_command_display(codex: &CodexCommand) -> String {
+    match codex {
+        CodexCommand::Native(path) | CodexCommand::WindowsCmd(path) => path.display().to_string(),
+        CodexCommand::Wsl { distribution, path } => format!("WSL {distribution}:{path}"),
+    }
+}
+
+fn effective_path_with_codex(codex: &Path) -> OsString {
+    let mut parts = Vec::<PathBuf>::new();
+    if let Some(parent) = codex.parent() {
+        parts.push(parent.to_path_buf());
+    }
+    parts.extend(effective_path_parts());
+    env::join_paths(dedupe_paths(parts)).unwrap_or_default()
+}
+
+fn effective_path_parts() -> Vec<PathBuf> {
+    let mut parts: Vec<PathBuf> = env::var_os("PATH")
+        .map(|path| env::split_paths(&path).collect())
         .unwrap_or_default();
-    parts.extend([
-        "/opt/homebrew/bin".to_string(),
-        "/usr/local/bin".to_string(),
-        "/usr/bin".to_string(),
-        "/bin".to_string(),
-        "/usr/sbin".to_string(),
-        "/sbin".to_string(),
-    ]);
-
-    dedupe_path(parts).join(":")
+    if !cfg!(target_os = "windows") {
+        parts.extend([
+            PathBuf::from("/opt/homebrew/bin"),
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/bin"),
+            PathBuf::from("/usr/sbin"),
+            PathBuf::from("/sbin"),
+        ]);
+    }
+    dedupe_paths(parts)
 }
 
-fn path_parts(path: &str) -> Vec<String> {
-    path.split(':').map(str::to_string).collect()
+#[cfg(test)]
+fn path_parts(path: &str, separator: char) -> Vec<String> {
+    path.split(separator).map(str::to_string).collect()
 }
 
-fn dedupe_path(parts: Vec<String>) -> Vec<String> {
-    let mut seen = Vec::<String>::new();
+#[cfg(test)]
+fn join_path_parts(parts: Vec<String>, separator: char) -> String {
+    parts.join(&separator.to_string())
+}
+
+fn dedupe_paths(parts: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = Vec::<PathBuf>::new();
     for part in parts {
-        if !part.is_empty() && !seen.contains(&part) {
+        if !part.as_os_str().is_empty() && !seen.contains(&part) {
             seen.push(part);
         }
     }
     seen
 }
 
-fn find_in_path(binary: &str, path: &str) -> Option<PathBuf> {
-    path.split(':')
+fn find_in_system_path(binaries: &[&str], path: &OsStr) -> Option<PathBuf> {
+    env::split_paths(path)
+        .flat_map(|part| binaries.iter().map(move |binary| part.join(binary)))
+        .find(is_executable)
+}
+
+#[cfg(test)]
+fn find_in_path_candidates_for_separator(
+    binaries: &[&str],
+    path: &str,
+    separator: char,
+) -> Option<PathBuf> {
+    path.split(separator)
         .filter(|part| !part.is_empty())
-        .map(|part| PathBuf::from(part).join(binary))
-        .find(|path| is_executable(path))
+        .flat_map(|part| {
+            binaries
+                .iter()
+                .map(move |binary| PathBuf::from(part).join(binary))
+        })
+        .find(is_executable)
 }
 
 fn nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
@@ -1485,7 +1662,89 @@ mod tests {
             "/Users/test/.nvm/versions/node/v24.11.0/bin/codex",
         ));
 
-        assert!(path.starts_with("/Users/test/.nvm/versions/node/v24.11.0/bin:"));
+        assert!(path
+            .to_string_lossy()
+            .starts_with("/Users/test/.nvm/versions/node/v24.11.0/bin:"));
+    }
+
+    #[test]
+    fn windows_path_lists_use_semicolon_separator() {
+        assert_eq!(
+            path_parts(r"C:\\Tools;D:\\npm;;", ';'),
+            vec![r"C:\\Tools", r"D:\\npm", "", ""]
+        );
+        assert_eq!(
+            join_path_parts(vec![r"C:\\Tools".to_string(), r"D:\\npm".to_string()], ';'),
+            r"C:\\Tools;D:\\npm"
+        );
+    }
+
+    #[test]
+    fn windows_path_lookup_prefers_exe_before_cmd() {
+        let root = command_v_fixture("windows-path");
+        fs::create_dir_all(&root).unwrap();
+        let exe = root.join("codex.exe");
+        let cmd = root.join("codex.cmd");
+        fs::write(&exe, "exe").unwrap();
+        fs::write(&cmd, "cmd").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&exe, fs::Permissions::from_mode(0o755)).unwrap();
+            fs::set_permissions(&cmd, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        assert_eq!(
+            find_in_path_candidates_for_separator(
+                &["codex.exe", "codex.cmd"],
+                &root.to_string_lossy(),
+                ';'
+            ),
+            Some(exe)
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn windows_cmd_wrapper_uses_cmd_exe_launcher() {
+        let codex = classify_native_command(PathBuf::from(r"C:\\Users\\test\\codex.cmd"), true);
+        let command = codex_process_command(&codex);
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command.get_program(), "cmd.exe");
+        assert_eq!(&args[..3], &["/D", "/S", "/C"]);
+        assert!(args[3].contains("codex.cmd"));
+        assert!(args[3].contains("app-server"));
+    }
+
+    #[test]
+    fn parses_wsl_codex_path_after_shell_noise() {
+        assert_eq!(
+            parse_wsl_command_v_output("startup warning\n/home/test/.npm/bin/codex\n"),
+            Some("/home/test/.npm/bin/codex".to_string())
+        );
+    }
+
+    #[test]
+    fn wsl_cli_runs_through_the_selected_distributions_login_shell() {
+        let command = codex_process_command(&CodexCommand::Wsl {
+            distribution: "Ubuntu".to_string(),
+            path: "/home/test/.nvm/bin/codex".to_string(),
+        });
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command.get_program(), "wsl.exe");
+        assert_eq!(&args[..5], &["-d", "Ubuntu", "--", "sh", "-lc"]);
+        assert!(args[5].contains("$SHELL"));
+        assert!(args[5].contains("/home/test/.nvm/bin/codex"));
+        assert!(args[5].contains("app-server"));
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use crate::{
+    codex_environment::selected_codex_environment,
     date::{date_key_in_timezone, resolve_app_timezone},
     db::{
         delete_missing_daily_rows, delete_missing_session_file_rollups, query_session_file_rollup,
@@ -83,12 +84,7 @@ pub fn scan_codex_usage(
 }
 
 pub(crate) fn default_codex_home() -> PathBuf {
-    std::env::var("CODEX_HOME")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
-        .unwrap_or_else(|| PathBuf::from(".codex"))
+    selected_codex_environment().home.clone()
 }
 
 #[cfg(test)]

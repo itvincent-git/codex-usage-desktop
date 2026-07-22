@@ -1,4 +1,4 @@
-use crate::scanner::default_codex_home;
+use crate::codex_environment::selected_codex_environment;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -17,7 +17,7 @@ struct SessionIndexEntry {
 }
 
 pub fn load_thread_names() -> HashMap<String, String> {
-    match read_thread_names(&default_codex_home()) {
+    match read_thread_names(&selected_codex_environment().home) {
         Ok(names) => names,
         Err(error) => {
             log::warn!("Failed to read Codex session index: {error}");

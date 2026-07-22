@@ -20,19 +20,29 @@ env:
 jobs:
   release:
     name: Build ${{ matrix.label }}
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - label: macOS Intel
+            os: macos-latest
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
             stableAsset: codex-usage-desktop-macos-x64.dmg
+            updaterAsset: codex-usage-desktop-macos-x64.app.tar.gz
           - label: macOS Apple Silicon
+            os: macos-latest
             target: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
             stableAsset: codex-usage-desktop-macos-arm64.dmg
+            updaterAsset: codex-usage-desktop-macos-arm64.app.tar.gz
+          - label: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc
+            stableAsset: codex-usage-desktop-windows-x64-setup.exe
+            updaterAsset: codex-usage-desktop-windows-x64.nsis.zip
 
     steps:
       - name: Checkout
@@ -82,6 +92,9 @@ jobs:
 
       - name: Typecheck frontend
         run: pnpm typecheck
+
+      - name: Test Rust backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Generate release notes
         id: release_notes
@@ -145,6 +158,7 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Prepare stable DMG asset
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
@@ -165,16 +179,119 @@ jobs:
           fi
 
           dmg="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.dmg' | head -n 1)"
-          if [[ -z "${dmg}" ]]; then
-            echo "No DMG bundle was found."
+          updater="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -type f -name '*.app.tar.gz' | head -n 1)"
+          signature="$(find "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -type f -name '*.app.tar.gz.sig' | head -n 1)"
+          if [[ -z "${dmg}" || -z "${updater}" || -z "${signature}" ]]; then
+            echo "The DMG, updater archive, or updater signature is missing."
             exit 1
           fi
 
           mkdir -p release-assets
           cp "${dmg}" "release-assets/${{ matrix.stableAsset }}"
+          cp "${updater}" "release-assets/${{ matrix.updaterAsset }}"
+          cp "${signature}" "release-assets/${{ matrix.updaterAsset }}.sig"
 
       - name: Upload stable DMG asset
+        if: runner.os == 'macOS'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          files: release-assets/${{ matrix.stableAsset }}
+          files: release-assets/*
+
+      - name: Prepare and validate Windows assets
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          search_dirs=()
+          for dir in \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/nsis" \
+            "src-tauri/target/release/bundle/nsis"
+          do
+            if [[ -d "${dir}" ]]; then
+              search_dirs+=("${dir}")
+            fi
+          done
+
+          if [[ "${#search_dirs[@]}" -eq 0 ]]; then
+            echo "No Tauri NSIS bundle directories were found."
+            exit 1
+          fi
+
+          setup="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*-setup.exe' | head -n 1)"
+          updater="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.nsis.zip' | head -n 1)"
+          signature="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.nsis.zip.sig' | head -n 1)"
+          if [[ -z "${setup}" || -z "${updater}" || -z "${signature}" ]]; then
+            echo "The setup executable, updater archive, or updater signature is missing."
+            exit 1
+          fi
+
+          mkdir -p release-assets
+          cp "${setup}" "release-assets/${{ matrix.stableAsset }}"
+          cp "${updater}" "release-assets/${{ matrix.updaterAsset }}"
+          cp "${signature}" "release-assets/${{ matrix.updaterAsset }}.sig"
+
+      - name: Upload Windows assets
+        if: runner.os == 'Windows'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: release-assets/*
+
+  updater-manifest:
+    name: Publish updater manifest
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download stable updater assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir updater-assets
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir updater-assets \
+            --pattern 'codex-usage-desktop-macos-*.app.tar.gz' \
+            --pattern 'codex-usage-desktop-macos-*.app.tar.gz.sig' \
+            --pattern 'codex-usage-desktop-windows-x64.nsis.zip' \
+            --pattern 'codex-usage-desktop-windows-x64.nsis.zip.sig'
+
+      - name: Generate complete updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#app-v}"
+          base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
+          published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          mac_x64_sig="$(cat updater-assets/codex-usage-desktop-macos-x64.app.tar.gz.sig)"
+          mac_arm64_sig="$(cat updater-assets/codex-usage-desktop-macos-arm64.app.tar.gz.sig)"
+          windows_x64_sig="$(cat updater-assets/codex-usage-desktop-windows-x64.nsis.zip.sig)"
+
+          jq -n \
+            --arg version "${version}" \
+            --arg notes "See the GitHub release for changes in ${RELEASE_TAG}." \
+            --arg pub_date "${published_at}" \
+            --arg mac_x64_sig "${mac_x64_sig}" \
+            --arg mac_arm64_sig "${mac_arm64_sig}" \
+            --arg windows_x64_sig "${windows_x64_sig}" \
+            --arg mac_x64_url "${base_url}/codex-usage-desktop-macos-x64.app.tar.gz" \
+            --arg mac_arm64_url "${base_url}/codex-usage-desktop-macos-arm64.app.tar.gz" \
+            --arg windows_x64_url "${base_url}/codex-usage-desktop-windows-x64.nsis.zip" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-x86_64": {signature: $mac_x64_sig, url: $mac_x64_url},
+                "darwin-aarch64": {signature: $mac_arm64_sig, url: $mac_arm64_url},
+                "windows-x86_64": {signature: $windows_x64_sig, url: $windows_x64_url}
+              }
+            }' > latest.json
+
+      - name: Upload complete updater manifest
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: latest.json

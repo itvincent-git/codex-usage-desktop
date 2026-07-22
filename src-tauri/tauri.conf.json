@@ -29,15 +29,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
-    "macOS": {
-      "signingIdentity": "-"
-    },
     "icon": [
-      "icons/icon.icns",
       "icons/icon.png"
     ]
   },

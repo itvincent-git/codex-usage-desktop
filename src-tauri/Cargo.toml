@@ -1,12 +1,12 @@
 [package]
 name = "codex-usage-desktop"
 version = "1.22.0"
-description = "Local-first macOS dashboard for Codex CLI token usage and cost estimates."
+description = "Local-first desktop dashboard for Codex CLI token usage and cost estimates."
 authors = ["vincent"]
 license = "MIT"
 repository = "https://github.com/itvincent-git/codex-usage-desktop"
 homepage = "https://github.com/itvincent-git/codex-usage-desktop"
-keywords = ["codex-cli", "openai-codex", "token-usage", "tauri", "macos"]
+keywords = ["codex-cli", "openai-codex", "token-usage", "tauri", "desktop"]
 edition = "2021"
 
 [lib]

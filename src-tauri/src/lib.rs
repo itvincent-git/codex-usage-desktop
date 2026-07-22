@@ -1,3 +1,4 @@
+mod codex_environment;
 mod codex_limits;
 mod date;
 mod db;
@@ -663,7 +664,14 @@ struct TrayMenuUpdate {
 #[tauri::command]
 fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_title(Some(payload.title));
+        #[cfg(target_os = "macos")]
+        let _ = tray.set_title(Some(&payload.title));
+        #[cfg(not(target_os = "macos"))]
+        let _ = tray.set_tooltip(Some(if payload.title.is_empty() {
+            "Codex Usage".to_string()
+        } else {
+            payload.title.clone()
+        }));
 
         let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
 
@@ -722,7 +730,11 @@ fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
         "inspect_page",
         "Inspect",
         true,
-        Some("CmdOrCtrl+Option+I"),
+        Some(if cfg!(target_os = "macos") {
+            "CmdOrCtrl+Option+I"
+        } else {
+            "Ctrl+Shift+I"
+        }),
     )?;
 
     for item in menu.items()? {
@@ -798,13 +810,15 @@ pub fn run() {
             });
 
             // Set up system tray icon
+            #[cfg(target_os = "macos")]
             let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate@2x.png");
+            #[cfg(not(target_os = "macos"))]
+            let tray_icon_bytes = include_bytes!("../icons/tray_icon.png");
             let tray_icon_image =
                 tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
 
-            let _tray = TrayIconBuilder::with_id("main")
+            let tray_builder = TrayIconBuilder::with_id("main")
                 .icon(tray_icon_image)
-                .icon_as_template(true)
                 .tooltip("Codex Usage")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show_main" => {
@@ -830,9 +844,13 @@ pub fn run() {
                             let _ = window.set_focus();
                         }
                     }
-                })
-                .build(app)
-                .map_err(|e| e.to_string())?;
+                });
+            #[cfg(target_os = "macos")]
+            let tray_builder = tray_builder.icon_as_template(true);
+            #[cfg(target_os = "windows")]
+            let tray_builder = tray_builder.show_menu_on_left_click(false);
+
+            let _tray = tray_builder.build(app).map_err(|e| e.to_string())?;
 
             if std::env::args().any(|arg| arg == "--hidden") {
                 if let Some(window) = app.get_webview_window("main") {
