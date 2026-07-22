@@ -85,6 +85,16 @@ function runRelease(root, version) {
   return command(process.execPath, ['scripts/release.cjs', version], root);
 }
 
+function runPnpm(root, ...args) {
+  const pnpmCli = process.env.npm_execpath;
+  if (pnpmCli && /^pnpm(?:\.[cm]?js)?$/i.test(path.basename(pnpmCli))) {
+    return command(process.execPath, [pnpmCli, ...args], root);
+  }
+  return command(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', args, root, {
+    shell: process.platform === 'win32'
+  });
+}
+
 function assertRelease(root, version) {
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version, version);
   assert.ok(JSON.parse(fs.readFileSync(path.join(root, 'changelog.json')))[version]);
@@ -102,7 +112,7 @@ function assertRelease(root, version) {
 
 test('releases a minor version with one commit and annotated tag', () => {
   const root = createRepository();
-  const result = command('pnpm', ['release', 'minor'], root);
+  const result = runPnpm(root, 'release', 'minor');
   assert.equal(result.status, 0, result.output);
   assertRelease(root, '1.1.0');
 });
@@ -191,7 +201,7 @@ test('blocks pnpm version before package.json changes', () => {
   const root = createRepository();
   const before = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
   const hookResult = command(process.execPath, ['scripts/preversion.cjs'], root);
-  const result = command('pnpm', ['version', 'minor'], root);
+  const result = runPnpm(root, 'version', 'minor');
 
   assert.notEqual(hookResult.status, 0);
   assert.match(hookResult.output, /pnpm version is disabled/i);
