@@ -1,4 +1,8 @@
 {
+  "1.23.0": {
+    "zh": "- feat(windows): add Windows packaging support\n- ci: add Windows package validation workflow\n- fix(tests): handle pnpm output on Windows\n- fix(tests): invoke pnpm portably\n- fix(windows): align npm candidate path types\n- fix(windows): make codex path tests portable\n- ci: upgrade upload artifact action",
+    "en": "- feat(windows): add Windows packaging support\n- ci: add Windows package validation workflow\n- fix(tests): handle pnpm output on Windows\n- fix(tests): invoke pnpm portably\n- fix(windows): align npm candidate path types\n- fix(windows): make codex path tests portable\n- ci: upgrade upload artifact action"
+  },
   "1.22.0": {
     "zh": "- fix(models): improve model colors and sort selector\n- feat: redesign daily usage comparison",
     "en": "- fix(models): improve model colors and sort selector\n- feat: redesign daily usage comparison"
