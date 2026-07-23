@@ -42,7 +42,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             args: --target x86_64-pc-windows-msvc
             stableAsset: codex-usage-desktop-windows-x64-setup.exe
-            updaterAsset: codex-usage-desktop-windows-x64.nsis.zip
 
     steps:
       - name: Checkout
@@ -220,17 +219,20 @@ jobs:
           fi
 
           setup="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*-setup.exe' | head -n 1)"
-          updater="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.nsis.zip' | head -n 1)"
-          signature="$(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.nsis.zip.sig' | head -n 1)"
-          if [[ -z "${setup}" || -z "${updater}" || -z "${signature}" ]]; then
-            echo "The setup executable, updater archive, or updater signature is missing."
+          if [[ -z "${setup}" ]]; then
+            echo "The setup executable is missing."
+            exit 1
+          fi
+
+          signature="${setup}.sig"
+          if [[ ! -f "${signature}" ]]; then
+            echo "The setup executable signature is missing: ${signature}"
             exit 1
           fi
 
           mkdir -p release-assets
           cp "${setup}" "release-assets/${{ matrix.stableAsset }}"
-          cp "${updater}" "release-assets/${{ matrix.updaterAsset }}"
-          cp "${signature}" "release-assets/${{ matrix.updaterAsset }}.sig"
+          cp "${signature}" "release-assets/${{ matrix.stableAsset }}.sig"
 
       - name: Upload Windows assets
         if: runner.os == 'Windows'
@@ -255,8 +257,8 @@ jobs:
             --dir updater-assets \
             --pattern 'codex-usage-desktop-macos-*.app.tar.gz' \
             --pattern 'codex-usage-desktop-macos-*.app.tar.gz.sig' \
-            --pattern 'codex-usage-desktop-windows-x64.nsis.zip' \
-            --pattern 'codex-usage-desktop-windows-x64.nsis.zip.sig'
+            --pattern 'codex-usage-desktop-windows-x64-setup.exe' \
+            --pattern 'codex-usage-desktop-windows-x64-setup.exe.sig'
 
       - name: Generate complete updater manifest
         shell: bash
@@ -267,7 +269,7 @@ jobs:
           published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           mac_x64_sig="$(cat updater-assets/codex-usage-desktop-macos-x64.app.tar.gz.sig)"
           mac_arm64_sig="$(cat updater-assets/codex-usage-desktop-macos-arm64.app.tar.gz.sig)"
-          windows_x64_sig="$(cat updater-assets/codex-usage-desktop-windows-x64.nsis.zip.sig)"
+          windows_x64_sig="$(cat updater-assets/codex-usage-desktop-windows-x64-setup.exe.sig)"
 
           jq -n \
             --arg version "${version}" \
@@ -278,7 +280,7 @@ jobs:
             --arg windows_x64_sig "${windows_x64_sig}" \
             --arg mac_x64_url "${base_url}/codex-usage-desktop-macos-x64.app.tar.gz" \
             --arg mac_arm64_url "${base_url}/codex-usage-desktop-macos-arm64.app.tar.gz" \
-            --arg windows_x64_url "${base_url}/codex-usage-desktop-windows-x64.nsis.zip" \
+            --arg windows_x64_url "${base_url}/codex-usage-desktop-windows-x64-setup.exe" \
             '{
               version: $version,
               notes: $notes,
