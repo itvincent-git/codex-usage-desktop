@@ -1,4 +1,8 @@
 {
+  "1.23.2": {
+    "zh": "- fix(macos): reopen main window from dock",
+    "en": "- fix(macos): reopen main window from dock"
+  },
   "1.23.1": {
     "zh": "- fix(ci): use Tauri 2 Windows updater artifacts",
     "en": "- fix(ci): use Tauri 2 Windows updater artifacts"
