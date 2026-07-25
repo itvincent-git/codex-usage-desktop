@@ -13,6 +13,9 @@ edition = "2021"
 name = "codex_usage_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[profile.dev]
+debug = 1
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
