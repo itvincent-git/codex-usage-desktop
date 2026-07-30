@@ -17,9 +17,6 @@ type CodexLimitsCardProps = {
 type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
-  resetCreditsAvailableCount?: number | null;
-  resetCredits?: CodexResetCredit[] | null;
-  onOpenResetCredits: () => void;
 };
 
 type QuotaForecastTone = {
@@ -55,7 +52,7 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
-      <CardHeader className="border-b border-border p-3 sm:px-4 sm:py-3 shrink-0">
+      <CardHeader data-testid="limits-header" className="border-b border-border p-3 sm:px-4 sm:py-3 shrink-0">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-0.5">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
@@ -64,30 +61,9 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
             </CardTitle>
             <CardDescription className="text-xs">{t("limits.description")}</CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-            {quotaForecast && quotaForecastScore !== null && quotaForecastTone ? (
-              <button
-                type="button"
-                className={cn(
-                  "group flex min-w-[8.75rem] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  quotaForecastTone.className,
-                )}
-                onClick={onOpenQuotaForecast}
-                aria-label={t("limits.quota_forecast_open")}
-              >
-                <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
-                <span className="min-w-0">
-                  <span className="mt-0.5 block text-[10px] font-semibold leading-none text-foreground/80">
-                    {quotaForecastTone.label}
-                  </span>
-                </span>
-                <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
-              </button>
-            ) : null}
-            <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
-              {limits?.updatedAt ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm:ss") }) : t("limits.not_fetched")}
-            </p>
-          </div>
+          <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
+            {limits?.updatedAt ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm:ss") }) : t("limits.not_fetched")}
+          </p>
         </div>
       </CardHeader>
 
@@ -120,22 +96,25 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
         ) : (
           <div className={cn(
             "grid gap-3 flex-1 justify-center",
-            hasSubscription(limits) ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+            hasSubscription(limits) ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
           )}>
             {hasSubscription(limits) ? (
               <>
-                <LimitRow label="5 hour" window={limits?.session ?? null} onOpenResetCredits={onOpenResetCredits} />
-                <LimitRow
-                  label="Weekly"
-                  window={limits?.weekly ?? null}
-                  resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
-                  resetCredits={limits?.resetCredits}
-                  onOpenResetCredits={onOpenResetCredits}
-                />
+                <LimitRow label="5 hour" window={limits?.session ?? null} />
+                <LimitRow label="Weekly" window={limits?.weekly ?? null} />
               </>
             ) : (
-              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} onOpenResetCredits={onOpenResetCredits} />
+              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
             )}
+            <ResetArea
+              quotaForecast={quotaForecast}
+              quotaForecastScore={quotaForecastScore}
+              quotaForecastTone={quotaForecastTone}
+              resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
+              resetCredits={limits?.resetCredits}
+              onOpenQuotaForecast={onOpenQuotaForecast}
+              onOpenResetCredits={onOpenResetCredits}
+            />
           </div>
         )}
       </CardContent>
@@ -211,7 +190,64 @@ function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecast
   );
 }
 
-function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits, onOpenResetCredits }: LimitRowProps) {
+function ResetArea({
+  quotaForecast,
+  quotaForecastScore,
+  quotaForecastTone,
+  resetCreditsAvailableCount,
+  resetCredits,
+  onOpenQuotaForecast,
+  onOpenResetCredits,
+}: {
+  quotaForecast?: CodexQuotaForecastResponse | null;
+  quotaForecastScore: number | null;
+  quotaForecastTone: QuotaForecastTone | null;
+  resetCreditsAvailableCount?: number | null;
+  resetCredits?: CodexResetCredit[] | null;
+  onOpenQuotaForecast?: () => void;
+  onOpenResetCredits: () => void;
+}) {
+  const { t } = useTranslation();
+  const showQuotaForecast = quotaForecast && quotaForecastScore !== null && quotaForecastTone;
+  const showResetCredits = resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
+
+  return (
+    <div
+      data-testid="reset-area"
+      className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
+    >
+      {showQuotaForecast ? (
+        <button
+          type="button"
+          className={cn(
+            "group flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            quotaForecastTone.className,
+          )}
+          onClick={onOpenQuotaForecast}
+          aria-label={t("limits.quota_forecast_open")}
+        >
+          <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
+          <span className="min-w-0">
+            <span className="mt-0.5 block text-[10px] font-semibold leading-none text-foreground/80">
+              {quotaForecastTone.label}
+            </span>
+          </span>
+          <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
+        </button>
+      ) : null}
+      {showResetCredits ? (
+        <ResetCreditsPanel
+          availableCount={resetCreditsAvailableCount}
+          credits={resetCredits}
+          onOpen={onOpenResetCredits}
+          separated={Boolean(showQuotaForecast)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function LimitRow({ label, window }: LimitRowProps) {
   const { t } = useTranslation();
 
   if (!window) {
@@ -245,10 +281,11 @@ function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits, onO
     : label.toLowerCase().includes("weekly")
     ? t("limits.window_weekly")
     : t("limits.window_5hour");
-  const showResetCredits = label.toLowerCase().includes("weekly") && resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
-
   return (
-    <div className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm">
+    <div
+      data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`}
+      className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
+    >
       <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] items-center gap-3 sm:gap-4">
         <div className="flex justify-center">
           <LimitGauge remainingPercent={remainingPercent} tone={status.tone} />
@@ -287,18 +324,21 @@ function LimitRow({ label, window, resetCreditsAvailableCount, resetCredits, onO
           </div>
         </div>
       </div>
-      {showResetCredits ? (
-        <ResetCreditsPanel
-          availableCount={resetCreditsAvailableCount}
-          credits={resetCredits}
-          onOpen={onOpenResetCredits}
-        />
-      ) : null}
     </div>
   );
 }
 
-function ResetCreditsPanel({ availableCount, credits, onOpen }: { availableCount: number; credits?: CodexResetCredit[] | null; onOpen: () => void }) {
+function ResetCreditsPanel({
+  availableCount,
+  credits,
+  onOpen,
+  separated,
+}: {
+  availableCount: number;
+  credits?: CodexResetCredit[] | null;
+  onOpen: () => void;
+  separated: boolean;
+}) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const count = Math.max(0, Math.trunc(availableCount));
@@ -312,7 +352,7 @@ function ResetCreditsPanel({ availableCount, credits, onOpen }: { availableCount
   const visibleCredits = isExpanded ? sortedCredits : sortedCredits.slice(0, 1);
 
   return (
-    <div className="mt-3 border-t border-border/60 pt-2.5">
+    <div className={cn(separated && "mt-3 border-t border-border/60 pt-2.5")}>
       <div className="flex w-full items-center gap-1">
         <button
           type="button"

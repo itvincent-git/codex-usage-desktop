@@ -137,8 +137,89 @@ describe("CodexLimitsCard component", () => {
     render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={freeLimits} error={null} />);
 
     expect(screen.getByText("Monthly usage limit")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-area")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-area").parentElement).toHaveClass("grid-cols-1", "md:grid-cols-2");
     expect(screen.queryByText("5-Hour Limit")).not.toBeInTheDocument();
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
+  });
+
+  it("groups quota forecast and reset credits outside the header and weekly limit", () => {
+    render(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        limits={{
+          session: { usedPercent: 10, remainingPercent: 90, windowMinutes: 300, resetsAt: null },
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: null },
+          resetCreditsAvailableCount: 1,
+          resetCredits: [],
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+        quotaForecast={{
+          score: 73,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    const resetArea = screen.getByTestId("reset-area");
+    const header = screen.getByTestId("limits-header");
+    const weeklyLimit = screen.getByTestId("limit-row-weekly");
+    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
+    const creditCount = screen.getByTestId("reset-credit-count");
+
+    expect(resetArea).toContainElement(forecastButton);
+    expect(resetArea).toContainElement(creditCount);
+    expect(resetArea.parentElement).toHaveClass("grid-cols-1", "md:grid-cols-3");
+    expect(header).not.toContainElement(forecastButton);
+    expect(weeklyLimit).not.toContainElement(creditCount);
+  });
+
+  it("renders whichever reset data is available", () => {
+    const { rerender } = render(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        limits={{
+          session: null,
+          weekly: null,
+          resetCreditsAvailableCount: 2,
+          resetCredits: null,
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+        quotaForecast={null}
+      />,
+    );
+
+    expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("2 available");
+    expect(screen.queryByRole("button", { name: "Open Codex quota reset forecast" })).not.toBeInTheDocument();
+
+    rerender(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        limits={{
+          session: null,
+          weekly: null,
+          updatedAt: "2026-07-15T00:00:00.000Z",
+          source: "oauth",
+          membershipLevel: "plus",
+        }}
+        error={null}
+        quotaForecast={{
+          score: 55,
+          fetchedAt: "2026-06-25T09:00:19.499Z",
+          nextRefreshAt: "2026-06-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toBeInTheDocument();
+    expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
   });
 
   it("collapses reset credits to the earliest expiry and expands the sorted detail list", () => {
