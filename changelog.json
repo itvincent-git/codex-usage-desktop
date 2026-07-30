@@ -1,4 +1,8 @@
 {
+  "1.24.0": {
+    "zh": "- feat: debug = 1\n- feat: reorganize limits into reset column\n- fix: stabilize reset credit details",
+    "en": "- feat: debug = 1\n- feat: reorganize limits into reset column\n- fix: stabilize reset credit details"
+  },
   "1.23.2": {
     "zh": "- fix(macos): reopen main window from dock",
     "en": "- fix(macos): reopen main window from dock"
