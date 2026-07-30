@@ -1,5 +1,5 @@
-import { ChevronDown, ExternalLink, Gauge, LogIn, RotateCcw } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronDown, ExternalLink, LogIn, RotateCcw } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
@@ -52,21 +52,6 @@ export function CodexLimitsCard({ limits, error, quotaForecast, onOpenQuotaForec
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
-      <CardHeader data-testid="limits-header" className="border-b border-border p-3 sm:px-4 sm:py-3 shrink-0">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-0.5">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Gauge className="h-4.5 w-4.5 text-primary" />
-              {t("limits.title")}
-            </CardTitle>
-            <CardDescription className="text-xs">{t("limits.description")}</CardDescription>
-          </div>
-          <p className="text-[10px] leading-5 text-muted-foreground sm:text-right">
-            {limits?.updatedAt ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm:ss") }) : t("limits.not_fetched")}
-          </p>
-        </div>
-      </CardHeader>
-
       <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center">
         {error ? (
           isOAuthLoginError(error) ? (

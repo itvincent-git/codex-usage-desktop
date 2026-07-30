@@ -143,7 +143,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
-  it("groups quota forecast and reset credits outside the header and weekly limit", () => {
+  it("renders all limit sections without the outer title, description, or update time", () => {
     render(
       <CodexLimitsCard
         onOpenResetCredits={() => {}}
@@ -166,16 +166,19 @@ describe("CodexLimitsCard component", () => {
     );
 
     const resetArea = screen.getByTestId("reset-area");
-    const header = screen.getByTestId("limits-header");
     const weeklyLimit = screen.getByTestId("limit-row-weekly");
     const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
     const creditCount = screen.getByTestId("reset-credit-count");
 
+    expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
+    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(resetArea).toContainElement(forecastButton);
     expect(resetArea).toContainElement(creditCount);
     expect(resetArea.parentElement).toHaveClass("grid-cols-1", "md:grid-cols-3");
-    expect(header).not.toContainElement(forecastButton);
     expect(weeklyLimit).not.toContainElement(creditCount);
+    expect(screen.queryByText("Codex Limits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live limits from your Codex account")).not.toBeInTheDocument();
+    expect(screen.queryByText("Updated 08:00:00")).not.toBeInTheDocument();
   });
 
   it("renders whichever reset data is available", () => {

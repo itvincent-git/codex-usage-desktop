@@ -6,13 +6,14 @@ use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     env,
     ffi::{OsStr, OsString},
     fs,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Condvar, Mutex, OnceLock},
     thread,
     time::{Duration, Instant},
 };
@@ -25,6 +26,7 @@ const CODEX_RESET_CREDITS_URL: &str =
 const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
 const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
+const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -95,18 +97,47 @@ struct OAuthRateLimitResetCredits {
     available_count: Option<i64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 struct OAuthResetCreditsResponse {
+    available_count: Option<i64>,
     #[serde(default)]
     credits: Vec<OAuthResetCredit>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 struct OAuthResetCredit {
     id: String,
     status: String,
     expires_at: Option<String>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+struct OAuthResetCreditsSnapshot {
+    available_count: Option<i64>,
+    credits: Vec<CodexResetCredit>,
+}
+
+#[derive(Debug)]
+struct CachedResetCredits {
+    snapshot: OAuthResetCreditsSnapshot,
+    fetched_at: Instant,
+}
+
+#[derive(Debug, Default)]
+struct ResetCreditsCacheEntry {
+    cached: Option<CachedResetCredits>,
+    in_flight: bool,
+    generation: u64,
+    last_error: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct ResetCreditsCache {
+    entries: Mutex<HashMap<String, ResetCreditsCacheEntry>>,
+    ready: Condvar,
+}
+
+static RESET_CREDITS_CACHE: OnceLock<ResetCreditsCache> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -265,7 +296,23 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
 fn fetch_oauth_reset_credits(
     client: &reqwest::blocking::Client,
     auth: &CodexAuth,
-) -> Result<Vec<CodexResetCredit>, String> {
+) -> Result<OAuthResetCreditsSnapshot, String> {
+    let account_key = auth
+        .account_id
+        .as_deref()
+        .unwrap_or(&auth.access_token)
+        .to_string();
+    RESET_CREDITS_CACHE
+        .get_or_init(ResetCreditsCache::default)
+        .fetch(account_key, RESET_CREDITS_CACHE_TTL, || {
+            fetch_oauth_reset_credits_uncached(client, auth)
+        })
+}
+
+fn fetch_oauth_reset_credits_uncached(
+    client: &reqwest::blocking::Client,
+    auth: &CodexAuth,
+) -> Result<OAuthResetCreditsSnapshot, String> {
     let mut request = client
         .get(CODEX_RESET_CREDITS_URL)
         .timeout(Duration::from_secs(5))
@@ -295,24 +342,33 @@ fn fetch_oauth_reset_credits(
 
     let details = serde_json::from_str::<OAuthResetCreditsResponse>(&body)
         .map_err(|error| format!("Failed to parse Codex reset credit details: {error}"))?;
-    Ok(normalize_oauth_reset_credits(details.credits))
+    Ok(OAuthResetCreditsSnapshot {
+        available_count: details.available_count,
+        credits: normalize_oauth_reset_credits(details.credits),
+    })
 }
 
 fn make_oauth_snapshot(
     usage: OAuthUsageResponse,
-    reset_credits: Result<Vec<CodexResetCredit>, String>,
+    reset_credits: Result<OAuthResetCreditsSnapshot, String>,
 ) -> Result<LimitsSnapshot, String> {
     let rate_limit = usage
         .rate_limit
         .ok_or_else(|| "Codex usage API response was missing rate_limit.".to_string())?;
-    let reset_credits_available_count = usage
+    let usage_available_count = usage
         .rate_limit_reset_credits
         .and_then(|credits| credits.available_count);
-    let reset_credits = match reset_credits {
-        Ok(credits) => Some(credits),
+    let (reset_credits_available_count, reset_credits) = match reset_credits {
+        Ok(details) => (
+            details
+                .available_count
+                .or(usage_available_count)
+                .or_else(|| Some(details.credits.len() as i64)),
+            Some(details.credits),
+        ),
         Err(error) => {
             log::warn!("Codex reset credit details unavailable: {error}");
-            None
+            (usage_available_count, None)
         }
     };
 
@@ -323,6 +379,86 @@ fn make_oauth_snapshot(
         reset_credits,
         source: "oauth",
     })
+}
+
+impl ResetCreditsCache {
+    fn fetch(
+        &self,
+        account_key: String,
+        max_age: Duration,
+        fetch: impl FnOnce() -> Result<OAuthResetCreditsSnapshot, String>,
+    ) -> Result<OAuthResetCreditsSnapshot, String> {
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| "Codex reset credit cache lock was poisoned.".to_string())?;
+
+        loop {
+            let entry = entries.entry(account_key.clone()).or_default();
+            if let Some(cached) = &entry.cached {
+                if cached.fetched_at.elapsed() < max_age {
+                    return Ok(cached.snapshot.clone());
+                }
+            }
+
+            if !entry.in_flight {
+                entry.in_flight = true;
+                break;
+            }
+
+            let generation = entry.generation;
+            while entries
+                .get(&account_key)
+                .is_some_and(|entry| entry.in_flight && entry.generation == generation)
+            {
+                entries = self
+                    .ready
+                    .wait(entries)
+                    .map_err(|_| "Codex reset credit cache lock was poisoned.".to_string())?;
+            }
+
+            let entry = entries.entry(account_key.clone()).or_default();
+            if entry.generation > generation {
+                if let Some(cached) = &entry.cached {
+                    return Ok(cached.snapshot.clone());
+                }
+                if let Some(error) = &entry.last_error {
+                    return Err(error.clone());
+                }
+            }
+        }
+
+        drop(entries);
+        let result = fetch();
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| "Codex reset credit cache lock was poisoned.".to_string())?;
+        let entry = entries.entry(account_key).or_default();
+        entry.in_flight = false;
+        entry.generation += 1;
+
+        let result = match result {
+            Ok(snapshot) => {
+                entry.cached = Some(CachedResetCredits {
+                    snapshot: snapshot.clone(),
+                    fetched_at: Instant::now(),
+                });
+                entry.last_error = None;
+                Ok(snapshot)
+            }
+            Err(error) => {
+                entry.last_error = Some(error.clone());
+                entry
+                    .cached
+                    .as_ref()
+                    .map(|cached| cached.snapshot.clone())
+                    .ok_or(error)
+            }
+        };
+        self.ready.notify_all();
+        result
+    }
 }
 
 fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
@@ -1459,6 +1595,7 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(details.available_count, Some(3));
         assert_eq!(
             normalize_oauth_reset_credits(details.credits),
             vec![
@@ -1476,6 +1613,176 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn oauth_reset_credit_count_prefers_details_then_usage_then_valid_details() {
+        let usage = || {
+            serde_json::from_str::<OAuthUsageResponse>(
+                r#"{
+                    "rate_limit": {
+                        "primary_window": null,
+                        "secondary_window": null
+                    },
+                    "rate_limit_reset_credits": {
+                        "available_count": 2
+                    }
+                }"#,
+            )
+            .unwrap()
+        };
+        let credits = vec![CodexResetCredit {
+            id: "credit".to_string(),
+            expires_at: None,
+        }];
+
+        let from_details = make_oauth_snapshot(
+            usage(),
+            Ok(OAuthResetCreditsSnapshot {
+                available_count: Some(3),
+                credits: credits.clone(),
+            }),
+        )
+        .unwrap();
+        let from_usage = make_oauth_snapshot(
+            usage(),
+            Ok(OAuthResetCreditsSnapshot {
+                available_count: None,
+                credits: credits.clone(),
+            }),
+        )
+        .unwrap();
+        let from_valid_details = make_oauth_snapshot(
+            serde_json::from_str::<OAuthUsageResponse>(
+                r#"{
+                    "rate_limit": {
+                        "primary_window": null,
+                        "secondary_window": null
+                    }
+                }"#,
+            )
+            .unwrap(),
+            Ok(OAuthResetCreditsSnapshot {
+                available_count: None,
+                credits,
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(from_details.reset_credits_available_count, Some(3));
+        assert_eq!(from_usage.reset_credits_available_count, Some(2));
+        assert_eq!(from_valid_details.reset_credits_available_count, Some(1));
+    }
+
+    #[test]
+    fn reset_credit_cache_reuses_success_for_the_same_account() {
+        let cache = ResetCreditsCache::default();
+        let expected = OAuthResetCreditsSnapshot {
+            available_count: Some(2),
+            credits: Vec::new(),
+        };
+        let mut calls = 0;
+
+        let first = cache
+            .fetch("account-a".to_string(), RESET_CREDITS_CACHE_TTL, || {
+                calls += 1;
+                Ok(expected.clone())
+            })
+            .unwrap();
+        let second = cache
+            .fetch("account-a".to_string(), RESET_CREDITS_CACHE_TTL, || {
+                calls += 1;
+                Err("should not fetch".to_string())
+            })
+            .unwrap();
+
+        assert_eq!(calls, 1);
+        assert_eq!(first, expected);
+        assert_eq!(second, expected);
+    }
+
+    #[test]
+    fn reset_credit_cache_merges_concurrent_requests_for_the_same_account() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Barrier,
+        };
+
+        let cache = Arc::new(ResetCreditsCache::default());
+        let barrier = Arc::new(Barrier::new(3));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut requests = Vec::new();
+
+        for _ in 0..2 {
+            let cache = Arc::clone(&cache);
+            let barrier = Arc::clone(&barrier);
+            let calls = Arc::clone(&calls);
+            requests.push(thread::spawn(move || {
+                barrier.wait();
+                cache
+                    .fetch("account-a".to_string(), RESET_CREDITS_CACHE_TTL, || {
+                        calls.fetch_add(1, Ordering::SeqCst);
+                        thread::sleep(Duration::from_millis(50));
+                        Ok(OAuthResetCreditsSnapshot {
+                            available_count: Some(2),
+                            credits: Vec::new(),
+                        })
+                    })
+                    .unwrap()
+            }));
+        }
+
+        barrier.wait();
+        for request in requests {
+            assert_eq!(request.join().unwrap().available_count, Some(2));
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn reset_credit_cache_uses_last_success_after_429() {
+        let cache = ResetCreditsCache::default();
+        let expected = OAuthResetCreditsSnapshot {
+            available_count: Some(2),
+            credits: vec![CodexResetCredit {
+                id: "cached".to_string(),
+                expires_at: Some("2026-08-01T00:00:00.000Z".to_string()),
+            }],
+        };
+        cache
+            .fetch("account-a".to_string(), Duration::ZERO, || {
+                Ok(expected.clone())
+            })
+            .unwrap();
+
+        let fallback = cache
+            .fetch("account-a".to_string(), Duration::ZERO, || {
+                Err("Codex reset credit details API returned 429".to_string())
+            })
+            .unwrap();
+
+        assert_eq!(fallback, expected);
+    }
+
+    #[test]
+    fn reset_credit_cache_does_not_cross_accounts() {
+        let cache = ResetCreditsCache::default();
+        cache
+            .fetch("account-a".to_string(), RESET_CREDITS_CACHE_TTL, || {
+                Ok(OAuthResetCreditsSnapshot {
+                    available_count: Some(2),
+                    credits: Vec::new(),
+                })
+            })
+            .unwrap();
+
+        let error = cache
+            .fetch("account-b".to_string(), RESET_CREDITS_CACHE_TTL, || {
+                Err("account-b returned 429".to_string())
+            })
+            .unwrap_err();
+
+        assert_eq!(error, "account-b returned 429");
     }
 
     #[test]

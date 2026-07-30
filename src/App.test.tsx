@@ -618,7 +618,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
-    expect(screen.getByText("Codex Limits")).toBeInTheDocument();
+    expect(screen.queryByText("Codex Limits")).not.toBeInTheDocument();
     expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
