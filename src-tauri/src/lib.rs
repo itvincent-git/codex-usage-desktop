@@ -22,9 +22,9 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
-    CodexLimitsResponse, CodexQuotaForecastResponse, ExportResponse, MonthlyUsageResponse,
-    OverviewResponse, ScanResponse, SessionDetailRow, SessionReplayDetail, UpdateCheckResponse,
-    UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
+    CodexLimitsResponse, CodexQuotaForecastResponse, ExportResponse, ModelPricingCatalogResponse,
+    MonthlyUsageResponse, OverviewResponse, ScanResponse, SessionDetailRow, SessionReplayDetail,
+    UpdateCheckResponse, UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
 };
 
 const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -144,6 +144,18 @@ async fn fetch_overview(
         let db = db::open_database(&database_path)?;
         let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
         overview::get_overview(&db, &range, None, &pricing_source)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_model_pricing_catalog(
+    state: tauri::State<'_, AppState>,
+) -> Result<ModelPricingCatalogResponse, String> {
+    let pricing_cache_path = state.pricing_cache_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(pricing::PricingSource::load(Some(pricing_cache_path)).catalog())
     })
     .await
     .map_err(|error| error.to_string())?
@@ -881,6 +893,7 @@ pub fn run() {
             scan_usage,
             refresh_usage_data,
             fetch_overview,
+            fetch_model_pricing_catalog,
             fetch_monthly_usage,
             fetch_codex_limits,
             fetch_codex_quota_forecast,

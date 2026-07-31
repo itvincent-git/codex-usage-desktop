@@ -4,7 +4,7 @@ import { DashboardHeroCard } from "@/components/dashboard-hero-card";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LoadingState } from "@/components/loading-state";
 import { LogPanel } from "@/components/log-panel";
-import { ModelUsageCard } from "@/components/model-usage-card";
+import { ModelsPage } from "@/components/models-page";
 import { MonthlyUsageTable } from "@/components/monthly-usage-table";
 import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
@@ -329,18 +329,7 @@ export default function App() {
           ) : null}
 
           {!isLoading && view === "models" && overview ? (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">{t("models.title")}</h2>
-                  <p className="text-sm text-muted-foreground">{t("models.subtitle")}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <RangeSwitcher value={range} onChange={handleRangeChange} />
-                </div>
-              </div>
-              <ModelUsageCard models={overview.models} />
-            </div>
+            <ModelsPage models={overview.models} range={range} onRangeChange={handleRangeChange} />
           ) : null}
 
           {!isLoading && view === "projects" && overview ? (

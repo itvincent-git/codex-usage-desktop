@@ -53,6 +53,18 @@ export type OverviewResponse = {
   }>;
 };
 
+export type ModelPricingCatalogResponse = {
+  isLimited: boolean;
+  models: Array<{
+    model: string;
+    provider: string;
+    pricingStatus: "priced" | "free" | "unavailable";
+    inputCostPerMillionTokens: number | null;
+    cachedInputCostPerMillionTokens: number | null;
+    outputCostPerMillionTokens: number | null;
+  }>;
+};
+
 export type MonthlyUsageResponse = {
   timezone: string;
   startMonth: string;
@@ -140,6 +152,10 @@ export async function refreshUsageData(forceLimits: boolean): Promise<UsageRefre
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
   return invoke<OverviewResponse>("fetch_overview", { range });
+}
+
+export async function fetchModelPricingCatalog(): Promise<ModelPricingCatalogResponse> {
+  return invoke<ModelPricingCatalogResponse>("fetch_model_pricing_catalog");
 }
 
 export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {

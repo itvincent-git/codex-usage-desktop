@@ -1,4 +1,6 @@
-use crate::types::{ModelUsage, PricingStatus};
+use crate::types::{
+    ModelPricingCatalogEntry, ModelPricingCatalogResponse, ModelUsage, PricingStatus,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -10,6 +12,7 @@ use std::{
 const LITELLM_PRICING_URL: &str =
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 const MILLION: f64 = 1_000_000.0;
+const CACHE_VERSION: u32 = 2;
 const PROVIDER_PREFIXES: [&str; 3] = ["openai/", "azure/", "openrouter/openai/"];
 const CODEX_MODEL_PREFIXES: [&str; 5] = [
     "gpt-5",
@@ -29,6 +32,7 @@ pub struct Pricing {
 #[derive(Debug, Clone)]
 pub struct PricingSource {
     pricing: BTreeMap<String, LiteLlmModelPricing>,
+    is_limited: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -39,9 +43,20 @@ pub struct ResolvedPricing {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct LiteLlmModelPricing {
+    #[serde(default)]
+    litellm_provider: Option<String>,
+    #[serde(default)]
+    mode: Option<String>,
     input_cost_per_token: Option<f64>,
     cache_read_input_token_cost: Option<f64>,
     output_cost_per_token: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct PricingCache {
+    version: u32,
+    is_complete: bool,
+    pricing: BTreeMap<String, LiteLlmModelPricing>,
 }
 
 impl PricingSource {
@@ -50,13 +65,16 @@ impl PricingSource {
     }
 
     pub fn load_cached_or_embedded(cache_path: Option<PathBuf>) -> Self {
-        let pricing = cache_path
+        let cache = cache_path
             .as_deref()
             .ok_or_else(|| "Pricing cache path missing".to_string())
             .and_then(read_cache)
-            .unwrap_or_else(|_| embedded_pricing());
+            .unwrap_or_else(|_| embedded_cache());
 
-        Self { pricing }
+        Self {
+            pricing: cache.pricing,
+            is_limited: !cache.is_complete,
+        }
     }
 
     fn load_with<F>(cache_path: Option<PathBuf>, load_remote: F) -> Self
@@ -86,7 +104,7 @@ impl PricingSource {
             }
         }
 
-        let pricing = if use_cache {
+        let cache = if use_cache {
             if let Some(age) = cache_age_secs {
                 log::info!(
                     "Loaded pricing from local cache (age: {}s, less than 24h).",
@@ -105,11 +123,16 @@ impl PricingSource {
 
             match load_remote() {
                 Ok(remote_pricing) => {
+                    let remote_cache = PricingCache {
+                        version: CACHE_VERSION,
+                        is_complete: true,
+                        pricing: remote_pricing,
+                    };
                     log::info!("Successfully fetched and cached remote pricing.");
                     if let Some(ref path) = cache_path {
-                        let _ = write_cache(path, &remote_pricing);
+                        let _ = write_cache(path, &remote_cache);
                     }
-                    remote_pricing
+                    remote_cache
                 }
                 Err(err) => {
                     log::warn!(
@@ -125,7 +148,7 @@ impl PricingSource {
                         cached
                     } else {
                         log::info!("Falling back to embedded pricing (creating fresh cache file to prevent retries for 24h).");
-                        let embedded = embedded_pricing();
+                        let embedded = embedded_cache();
                         if let Some(ref path) = cache_path {
                             let _ = write_cache(path, &embedded);
                         }
@@ -135,19 +158,76 @@ impl PricingSource {
             }
         };
 
-        Self { pricing }
+        Self {
+            pricing: cache.pricing,
+            is_limited: !cache.is_complete,
+        }
     }
 
     #[cfg(test)]
     pub fn embedded() -> Self {
         Self {
             pricing: embedded_pricing(),
+            is_limited: true,
         }
     }
 
     #[cfg(test)]
     fn from_pricing(pricing: BTreeMap<String, LiteLlmModelPricing>) -> Self {
-        Self { pricing }
+        Self {
+            pricing,
+            is_limited: false,
+        }
+    }
+
+    pub fn catalog(&self) -> ModelPricingCatalogResponse {
+        let mut models = self
+            .pricing
+            .iter()
+            .filter_map(|(model, pricing)| {
+                is_chat_token_pricing(pricing).then(|| {
+                    let input = pricing.input_cost_per_token.map(|value| value * MILLION);
+                    let cached = pricing
+                        .cache_read_input_token_cost
+                        .or(pricing.input_cost_per_token)
+                        .map(|value| value * MILLION);
+                    let output = pricing.output_cost_per_token.map(|value| value * MILLION);
+                    let is_free = [input, cached, output]
+                        .into_iter()
+                        .flatten()
+                        .all(|value| value == 0.0);
+                    ModelPricingCatalogEntry {
+                        model: model.clone(),
+                        provider: pricing
+                            .litellm_provider
+                            .clone()
+                            .unwrap_or_else(|| provider_from_model(model)),
+                        pricing_status: if is_free {
+                            PricingStatus::Free
+                        } else {
+                            PricingStatus::Priced
+                        },
+                        input_cost_per_million_tokens: input,
+                        cached_input_cost_per_million_tokens: cached,
+                        output_cost_per_million_tokens: output,
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        models.sort_by(|left, right| {
+            left.model
+                .to_lowercase()
+                .cmp(&right.model.to_lowercase())
+                .then_with(|| {
+                    left.provider
+                        .to_lowercase()
+                        .cmp(&right.provider.to_lowercase())
+                })
+        });
+        ModelPricingCatalogResponse {
+            is_limited: self.is_limited,
+            models,
+        }
     }
 
     pub fn pricing_for_model(&self, model: &str) -> Pricing {
@@ -213,14 +293,17 @@ impl PricingSource {
         }
 
         let lower = model.to_lowercase();
-        self.pricing.iter().find_map(|(key, pricing)| {
-            let comparison = key.to_lowercase();
-            if comparison.contains(&lower) || lower.contains(&comparison) {
-                Some(pricing)
-            } else {
-                None
-            }
-        })
+        self.pricing
+            .iter()
+            .filter(|(key, pricing)| is_openai_candidate(key, pricing))
+            .find_map(|(key, pricing)| {
+                let comparison = key.to_lowercase();
+                if comparison.contains(&lower) || lower.contains(&comparison) {
+                    Some(pricing)
+                } else {
+                    None
+                }
+            })
     }
 }
 
@@ -282,35 +365,36 @@ fn load_remote_pricing() -> Result<BTreeMap<String, LiteLlmModelPricing>, String
     let raw = response
         .json::<BTreeMap<String, serde_json::Value>>()
         .map_err(|error| error.to_string())?;
-    Ok(filter_codex_pricing(raw))
+    Ok(filter_chat_pricing(raw))
 }
 
-fn filter_codex_pricing(
+fn filter_chat_pricing(
     raw: BTreeMap<String, serde_json::Value>,
 ) -> BTreeMap<String, LiteLlmModelPricing> {
     raw.into_iter()
         .filter_map(|(model, value)| {
-            if !is_codex_model(&model) {
-                return None;
-            }
-
             serde_json::from_value::<LiteLlmModelPricing>(value)
                 .ok()
+                .filter(is_chat_token_pricing)
                 .map(|pricing| (model, pricing))
         })
         .collect()
 }
 
-fn read_cache(path: &Path) -> Result<BTreeMap<String, LiteLlmModelPricing>, String> {
+fn read_cache(path: &Path) -> Result<PricingCache, String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
-    serde_json::from_str(&content).map_err(|error| error.to_string())
+    let cache: PricingCache = serde_json::from_str(&content).map_err(|error| error.to_string())?;
+    if cache.version != CACHE_VERSION {
+        return Err("Unsupported pricing cache version".to_string());
+    }
+    Ok(cache)
 }
 
-fn write_cache(path: &Path, pricing: &BTreeMap<String, LiteLlmModelPricing>) -> Result<(), String> {
+fn write_cache(path: &Path, cache: &PricingCache) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    let content = serde_json::to_string(pricing).map_err(|error| error.to_string())?;
+    let content = serde_json::to_string(cache).map_err(|error| error.to_string())?;
     fs::write(path, content).map_err(|error| error.to_string())
 }
 
@@ -334,6 +418,8 @@ fn embedded_pricing() -> BTreeMap<String, LiteLlmModelPricing> {
         (
             model.to_string(),
             LiteLlmModelPricing {
+                litellm_provider: Some("openai".to_string()),
+                mode: Some("chat".to_string()),
                 input_cost_per_token: Some(input),
                 cache_read_input_token_cost: Some(cached),
                 output_cost_per_token: Some(output),
@@ -341,6 +427,40 @@ fn embedded_pricing() -> BTreeMap<String, LiteLlmModelPricing> {
         )
     })
     .collect()
+}
+
+fn embedded_cache() -> PricingCache {
+    PricingCache {
+        version: CACHE_VERSION,
+        is_complete: false,
+        pricing: embedded_pricing(),
+    }
+}
+
+fn is_chat_token_pricing(pricing: &LiteLlmModelPricing) -> bool {
+    pricing.mode.as_deref() == Some("chat")
+        && (pricing.input_cost_per_token.is_some()
+            || pricing.cache_read_input_token_cost.is_some()
+            || pricing.output_cost_per_token.is_some())
+}
+
+fn provider_from_model(model: &str) -> String {
+    model
+        .split('/')
+        .next()
+        .filter(|value| !value.is_empty())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+fn is_openai_candidate(model: &str, pricing: &LiteLlmModelPricing) -> bool {
+    is_codex_model(model)
+        || pricing.litellm_provider.as_deref().is_some_and(|provider| {
+            matches!(
+                provider.to_ascii_lowercase().as_str(),
+                "openai" | "azure" | "azure_ai" | "openrouter"
+            )
+        })
 }
 
 fn alias_for_model(model: &str) -> Option<&'static str> {
@@ -406,9 +526,18 @@ mod tests {
                 input_cost_per_token: Some(1.0e-6),
                 cache_read_input_token_cost: Some(2.0e-7),
                 output_cost_per_token: Some(3.0e-6),
+                ..Default::default()
             },
         )]);
-        write_cache(&path, &cached).unwrap();
+        write_cache(
+            &path,
+            &PricingCache {
+                version: CACHE_VERSION,
+                is_complete: true,
+                pricing: cached,
+            },
+        )
+        .unwrap();
 
         let source = PricingSource::load_with(Some(path.clone()), || {
             panic!("remote pricing should not load when the cache is valid")
@@ -455,6 +584,7 @@ mod tests {
                     input_cost_per_token: Some(0.0),
                     cache_read_input_token_cost: Some(0.0),
                     output_cost_per_token: Some(0.0),
+                    ..Default::default()
                 },
             ),
             (
@@ -463,6 +593,7 @@ mod tests {
                     input_cost_per_token: Some(1.75e-6),
                     cache_read_input_token_cost: Some(1.75e-7),
                     output_cost_per_token: Some(1.4e-5),
+                    ..Default::default()
                 },
             ),
         ]));
@@ -485,6 +616,7 @@ mod tests {
                 input_cost_per_token: Some(5.0e-6),
                 cache_read_input_token_cost: None,
                 output_cost_per_token: Some(3.0e-5),
+                ..Default::default()
             },
         )]));
 
@@ -507,6 +639,96 @@ mod tests {
             ResolvedPricing {
                 status: PricingStatus::Free,
                 pricing: Pricing::free(),
+            }
+        );
+    }
+
+    #[test]
+    fn catalog_filters_chat_token_models_and_preserves_providers() {
+        let raw = BTreeMap::from([
+            (
+                "provider-a/shared".to_string(),
+                serde_json::json!({"mode":"chat","litellm_provider":"provider-a","input_cost_per_token":0.0,"output_cost_per_token":0.0}),
+            ),
+            (
+                "provider-b/shared".to_string(),
+                serde_json::json!({"mode":"chat","litellm_provider":"provider-b","input_cost_per_token":0.000002}),
+            ),
+            (
+                "embedding".to_string(),
+                serde_json::json!({"mode":"embedding","litellm_provider":"provider-a","input_cost_per_token":0.000001}),
+            ),
+            (
+                "no-price".to_string(),
+                serde_json::json!({"mode":"chat","litellm_provider":"provider-a"}),
+            ),
+        ]);
+
+        let catalog = PricingSource::from_pricing(filter_chat_pricing(raw)).catalog();
+
+        assert_eq!(catalog.models.len(), 2);
+        assert_eq!(catalog.models[0].provider, "provider-a");
+        assert_eq!(catalog.models[0].pricing_status, PricingStatus::Free);
+        assert_eq!(catalog.models[1].provider, "provider-b");
+        assert_eq!(catalog.models[1].input_cost_per_million_tokens, Some(2.0));
+    }
+
+    #[test]
+    fn catalog_keeps_missing_prices_null_and_falls_back_for_cached_input() {
+        let pricing = LiteLlmModelPricing {
+            litellm_provider: Some("test".to_string()),
+            mode: Some("chat".to_string()),
+            input_cost_per_token: Some(1.5e-6),
+            cache_read_input_token_cost: None,
+            output_cost_per_token: None,
+        };
+        let catalog =
+            PricingSource::from_pricing(BTreeMap::from([("model".to_string(), pricing)])).catalog();
+
+        assert_eq!(catalog.models[0].input_cost_per_million_tokens, Some(1.5));
+        assert_eq!(
+            catalog.models[0].cached_input_cost_per_million_tokens,
+            Some(1.5)
+        );
+        assert_eq!(catalog.models[0].output_cost_per_million_tokens, None);
+    }
+
+    #[test]
+    fn old_cache_is_invalidated_and_remote_failure_uses_limited_embedded_catalog() {
+        let path = temp_pricing_cache_path("old-version");
+        std::fs::write(&path, r#"{"gpt-5":{"input_cost_per_token":0.000001}}"#).unwrap();
+
+        let source = PricingSource::load_with(Some(path.clone()), || Err("offline".to_string()));
+
+        assert!(source.catalog().is_limited);
+        assert!(!source.catalog().models.is_empty());
+        let cache = read_cache(&path).unwrap();
+        assert_eq!(cache.version, CACHE_VERSION);
+        assert!(!cache.is_complete);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn non_openai_catalog_entries_do_not_change_codex_fuzzy_resolution() {
+        let mut pricing = embedded_pricing();
+        pricing.insert(
+            "other/gpt-5.5-special".to_string(),
+            LiteLlmModelPricing {
+                litellm_provider: Some("other".to_string()),
+                mode: Some("chat".to_string()),
+                input_cost_per_token: Some(999.0),
+                cache_read_input_token_cost: Some(999.0),
+                output_cost_per_token: Some(999.0),
+            },
+        );
+        let source = PricingSource::from_pricing(pricing);
+
+        assert_eq!(
+            source.pricing_for_model("gpt-5.5"),
+            Pricing {
+                input_cost_per_m_token: 5.0,
+                cached_input_cost_per_m_token: 0.5,
+                output_cost_per_m_token: 30.0,
             }
         );
     }

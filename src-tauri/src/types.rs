@@ -92,6 +92,24 @@ pub enum PricingStatus {
     Unavailable,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPricingCatalogEntry {
+    pub model: String,
+    pub provider: String,
+    pub pricing_status: PricingStatus,
+    pub input_cost_per_million_tokens: Option<f64>,
+    pub cached_input_cost_per_million_tokens: Option<f64>,
+    pub output_cost_per_million_tokens: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPricingCatalogResponse {
+    pub is_limited: bool,
+    pub models: Vec<ModelPricingCatalogEntry>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OverviewProjectRow {
