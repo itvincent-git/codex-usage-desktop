@@ -1,4 +1,8 @@
 {
+  "1.25.0": {
+    "zh": "- feat(models): add searchable pricing catalog",
+    "en": "- feat(models): add searchable pricing catalog"
+  },
   "1.24.0": {
     "zh": "- feat: debug = 1\n- feat: reorganize limits into reset column\n- fix: stabilize reset credit details",
     "en": "- feat: debug = 1\n- feat: reorganize limits into reset column\n- fix: stabilize reset credit details"
