@@ -1,4 +1,8 @@
 {
+  "1.25.1": {
+    "zh": "- fix: recheck updates while app stays open",
+    "en": "- fix: recheck updates while app stays open"
+  },
   "1.25.0": {
     "zh": "- feat(models): add searchable pricing catalog",
     "en": "- feat(models): add searchable pricing catalog"
