@@ -50,6 +50,8 @@ function isNewerVersion(current: string, target: string): boolean {
 }
 
 const AUTO_RESCAN_MS = 5 * 60_000;
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
+const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
 const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
 const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
 
@@ -249,6 +251,7 @@ export function useUsageDashboard() {
   const lastLimitsFetchTimeRef = useRef<number>(0);
   const lastAutoScanTimeRef = useRef<number>(0);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
+  const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
 
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
     const data = await fetchOverview(nextRange);
@@ -363,7 +366,7 @@ export function useUsageDashboard() {
     }
   });
 
-  const runBackgroundUpdateCheck = useEffectEvent(async () => {
+  const performBackgroundUpdateCheck = useEffectEvent(async () => {
     let cachedInfo: UpdateCheckResponse | null = null;
     try {
       const now = Date.now();
@@ -473,6 +476,20 @@ export function useUsageDashboard() {
     }
   });
 
+  const runBackgroundUpdateCheck = useEffectEvent(async () => {
+    if (!updateCheckInFlightRef.current) {
+      const checkPromise = performBackgroundUpdateCheck();
+      updateCheckInFlightRef.current = checkPromise;
+      void checkPromise.finally(() => {
+        if (updateCheckInFlightRef.current === checkPromise) {
+          updateCheckInFlightRef.current = null;
+        }
+      });
+    }
+
+    await updateCheckInFlightRef.current;
+  });
+
   const bootstrap = useEffectEvent(async () => {
     if (hasBootstrappedRef.current) {
       return;
@@ -531,6 +548,47 @@ export function useUsageDashboard() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    let cancelled = false;
+    let timer: number | null = null;
+
+    const readTimestamp = (key: string) => {
+      const value = Number(localStorage.getItem(key));
+      return Number.isFinite(value) && value > 0 ? value : null;
+    };
+
+    const scheduleNextCheck = () => {
+      const now = Date.now();
+      const lastSuccess = localStorage.getItem("last_update_check_result")
+        ? readTimestamp("last_update_check_time")
+        : null;
+      const lastFailure = readTimestamp("last_update_check_failed_time");
+      const nextCheckAt = Math.max(
+        lastSuccess ? lastSuccess + UPDATE_CHECK_INTERVAL_MS : now + UPDATE_CHECK_RETRY_MS,
+        lastFailure ? lastFailure + UPDATE_CHECK_RETRY_MS : now,
+      );
+
+      timer = window.setTimeout(() => {
+        void runBackgroundUpdateCheck().finally(() => {
+          if (!cancelled) {
+            scheduleNextCheck();
+          }
+        });
+      }, Math.max(0, nextCheckAt - now));
+    };
+
+    scheduleNextCheck();
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [bootstrapped, runBackgroundUpdateCheck]);
 
   // Re-fetch usage when the page/window regains focus after being inactive ≥5 min.
   useEffect(() => {

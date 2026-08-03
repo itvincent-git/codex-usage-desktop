@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import i18n from "./i18n";
 import tauriConfig from "../src-tauri/tauri.conf.json";
@@ -181,6 +181,10 @@ function mockLoadedDashboard() {
 }
 
 describe("App", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     invokeMock.mockReset();
@@ -229,6 +233,39 @@ describe("App", () => {
     expect(screen.getByText("Estimating cost")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset cache" })).not.toBeInTheDocument();
+  });
+
+  it("checks for updates again after the app stays open for 24 hours", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-03T00:00:00.000Z"));
+    localStorage.setItem("last_update_check_time", Date.now().toString());
+    localStorage.setItem("last_update_check_result", JSON.stringify({
+      hasUpdate: false,
+      currentVersion: tauriConfig.version,
+      latestVersion: tauriConfig.version,
+      latestTag: `v${tauriConfig.version}`,
+      releaseName: null,
+      releaseNotes: null,
+      releaseUrl: "",
+    }));
+    mockLoadedDashboard();
+
+    render(<App />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("check_for_updates");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60_000 - 1);
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith("check_for_updates");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(invokeMock).toHaveBeenCalledWith("check_for_updates");
   });
 
   it("prevents the default page context menu", () => {
