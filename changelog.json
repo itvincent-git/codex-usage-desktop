@@ -1,4 +1,8 @@
 {
+  "1.26.0": {
+    "zh": "- feat: redesign app icon\n- fix: restore app icon background\n- feat: add rounded illuminated app icon",
+    "en": "- feat: redesign app icon\n- fix: restore app icon background\n- feat: add rounded illuminated app icon"
+  },
   "1.25.1": {
     "zh": "- fix: recheck updates while app stays open",
     "en": "- fix: recheck updates while app stays open"
