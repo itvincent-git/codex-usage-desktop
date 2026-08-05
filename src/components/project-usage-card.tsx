@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { OverviewResponse } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import {
@@ -59,17 +61,22 @@ export function ProjectUsageCard({ projects, onProjectClick }: ProjectUsageCardP
           </div>
           <div className="flex items-center gap-2 text-xs">
             <label htmlFor="project-sort" className="text-muted-foreground">{t("projects.sort.label")}</label>
-            <select id="project-sort" value={sort} onChange={(event) => changeSort(event.target.value as ProjectSort)} className="rounded-lg border border-border bg-surface px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-primary/30">
-              <option value="total">{t("projects.sort.total")}</option>
-              <option value="name">{t("projects.sort.name")}</option>
-              <option value="input">{t("projects.sort.input")}</option>
-              <option value="cached">{t("projects.sort.cached")}</option>
-              <option value="output">{t("projects.sort.output")}</option>
-              <option value="cost">{t("projects.sort.cost")}</option>
-            </select>
-            <button type="button" onClick={() => setDirection((current) => current === "asc" ? "desc" : "asc")} className="rounded-lg border border-border p-2 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label={direction === "asc" ? t("projects.sort.ascending") : t("projects.sort.descending")}>
+            <Select value={sort} onValueChange={(value) => changeSort(value as ProjectSort)}>
+              <SelectTrigger id="project-sort" aria-label={t("projects.sort.label")} className="h-9 w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="total">{t("projects.sort.total")}</SelectItem>
+                <SelectItem value="name">{t("projects.sort.name")}</SelectItem>
+                <SelectItem value="input">{t("projects.sort.input")}</SelectItem>
+                <SelectItem value="cached">{t("projects.sort.cached")}</SelectItem>
+                <SelectItem value="output">{t("projects.sort.output")}</SelectItem>
+                <SelectItem value="cost">{t("projects.sort.cost")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="secondary" size="icon" onClick={() => setDirection((current) => current === "asc" ? "desc" : "asc")} className="h-9 w-9 text-muted-foreground" aria-label={direction === "asc" ? t("projects.sort.ascending") : t("projects.sort.descending")}>
               {direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </div>
       </CardHeader>

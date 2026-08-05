@@ -2,7 +2,7 @@
 
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ProjectUsageCard } from "./project-usage-card";
 import type { OverviewResponse } from "@/lib/api";
 
@@ -11,6 +11,10 @@ function project(displayName: string, totalTokens: number, costUSD: number): Ove
   return { project: `/repo/${displayName}`, displayName, inputTokens: totalTokens - outputTokens, cachedInputTokens: Math.min(totalTokens - outputTokens, 20), outputTokens, totalTokens, costUSD };
 }
 
+beforeAll(() => {
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+
 describe("ProjectUsageCard", () => {
   it("sorts, switches direction, and opens rows with keyboard", async () => {
     const onProjectClick = vi.fn();
@@ -18,7 +22,8 @@ describe("ProjectUsageCard", () => {
 
     const rows = () => screen.getAllByRole("button", { name: /Open analytics/ });
     expect(rows()[0]).toHaveAccessibleName("Open analytics for Bravo");
-    await userEvent.selectOptions(screen.getByLabelText("Sort by"), "name");
+    screen.getByRole("combobox", { name: "Sort by" }).focus();
+    await userEvent.keyboard("[Enter][Home][ArrowDown][Enter]");
     expect(rows()[0]).toHaveAccessibleName("Open analytics for Alpha");
     await userEvent.click(screen.getByRole("button", { name: "Ascending order" }));
     expect(rows()[0]).toHaveAccessibleName("Open analytics for Bravo");
