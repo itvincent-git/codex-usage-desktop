@@ -209,17 +209,46 @@
   },
   "monthly": {
     "title": "月度使用明细",
-    "subtitle": "自 {{start}} 至 {{end}} 的自然月度使用总量 (时区: {{tz}})。",
+    "subtitle": "{{start}} 至 {{end}} 的自然月使用总量，按 {{tz}} 时区统计。",
     "cols": {
       "month": "月份",
-      "tokens": "Tokens 消耗",
+      "tokens": "Token 构成",
       "cost": "成本",
       "cache": "缓存命中率"
     },
     "no_data": "尚无按月汇总的数据。",
     "month_range": "{{start}} 至 {{end}}",
     "no_usage": "无数据",
-    "no_usage_months": "无数据 ({{count}} 个月)"
+    "no_usage_months": "无数据 ({{count}} 个月)",
+    "comparison_range": "比较范围：{{start}} 至 {{end}}",
+    "token_legend_label": "Token 颜色图例",
+    "cost_legend_label": "成本色阶：不超过区间峰值三分之一为绿色，不超过三分之二为橙色，超过三分之二为红色",
+    "cost_scale": "成本相对峰值",
+    "uncached_input": "非缓存输入",
+    "cached_input": "缓存输入",
+    "input_including_cache": "输入（含缓存）",
+    "cached_with_rate": "缓存（{{rate}}）",
+    "output": "输出",
+    "peak": "最高",
+    "token_bar_label": "Token 构成：非缓存输入 {{input}}，缓存输入 {{cached}}，输出 {{output}}，总计 {{total}}",
+    "total_bar_label": "总 Token {{total}}，为区间峰值的 {{percent}}",
+    "cost_bar_label": "成本 {{cost}}，为区间峰值的 {{percent}}",
+    "delta": {
+      "comparison": "环比",
+      "new": "新增",
+      "unavailable": "暂无环比基准"
+    },
+    "sort": {
+      "label": "排序字段",
+      "month": "月份",
+      "totalTokens": "总 Token",
+      "inputTokens": "输入",
+      "cachedInputTokens": "缓存 Token",
+      "outputTokens": "输出",
+      "costUSD": "成本",
+      "asc": "升序",
+      "desc": "降序"
+    }
   },
   "models": {
     "title": "模型使用详情",

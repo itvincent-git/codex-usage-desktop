@@ -111,16 +111,6 @@ export default function App() {
 
   const metrics = overview ? buildMetricCards(overview, range, t) : [];
   const projects = overview?.projects ?? [];
-  const sortedMonthlyUsage = useMemo(
-    () =>
-      monthlyUsage
-        ? {
-            ...monthlyUsage,
-            monthly: [...monthlyUsage.monthly].sort((left, right) => right.month.localeCompare(left.month)),
-          }
-        : null,
-    [monthlyUsage],
-  );
   const loadingTitle = overview ? t("loading.loading_range", { range: getRangeLabel(range, t) }) : t("loading.preparing_cache");
   const loadingDescription = overview
     ? t("loading.selected_window_desc")
@@ -372,8 +362,16 @@ export default function App() {
             </div>
           ) : null}
 
-          {!isLoading && view === "monthly" && !isMonthlyLoading && sortedMonthlyUsage ? (
-            <MonthlyUsageTable data={sortedMonthlyUsage} />
+          {!isLoading && view === "monthly" && !isMonthlyLoading && monthlyUsage ? (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground">{t("monthly.title")}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("monthly.subtitle", { start: monthlyUsage.startMonth, end: monthlyUsage.endMonth, tz: monthlyUsage.timezone })}
+                </p>
+              </div>
+              <MonthlyUsageTable data={monthlyUsage} />
+            </div>
           ) : null}
 
           {!isLoading && view === "sessions" && !isSessionsLoading ? (

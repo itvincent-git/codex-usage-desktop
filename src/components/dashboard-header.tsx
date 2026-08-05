@@ -129,19 +129,6 @@ export function DashboardHeader({
             <button
               type="button"
               role="tab"
-              aria-selected={view === "projects"}
-              className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
-                view === "projects"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => onViewChange("projects")}
-            >
-              {t("common.project")}
-            </button>
-            <button
-              type="button"
-              role="tab"
               aria-selected={view === "monthly"}
               className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
                 view === "monthly"
@@ -151,6 +138,19 @@ export function DashboardHeader({
               onClick={() => onViewChange("monthly")}
             >
               {t("common.monthly")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "projects"}
+              className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
+                view === "projects"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => onViewChange("projects")}
+            >
+              {t("common.project")}
             </button>
             <button
               type="button"

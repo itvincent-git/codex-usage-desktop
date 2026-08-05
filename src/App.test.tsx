@@ -896,19 +896,26 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
-    expect(screen.queryByText("Monthly Usage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Monthly Usage Details")).not.toBeInTheDocument();
+    expect(invokeMock).not.toHaveBeenCalledWith("fetch_monthly_usage");
+
+    const tabLabels = screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabLabels.indexOf("Monthly")).toBe(tabLabels.indexOf("Daily") + 1);
+    expect(tabLabels.indexOf("Project")).toBe(tabLabels.indexOf("Monthly") + 1);
 
     await userEvent.click(screen.getByRole("tab", { name: "Monthly" }));
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_monthly_usage"));
-    expect(screen.getByText("Monthly Usage")).toBeInTheDocument();
-    expect(screen.getByText("Natural-month totals from 2025-06 to 2026-05 in UTC.")).toBeInTheDocument();
+    const monthlyTitle = screen.getByRole("heading", { name: "Monthly Usage Details" });
+    expect(monthlyTitle.tagName).toBe("H2");
+    expect(monthlyTitle.closest(".rounded-lg")).toBeNull();
+    expect(screen.getByText("Natural-month totals from 2025-06 to 2026-05, using the UTC timezone.")).toBeInTheDocument();
     const latestMonthlyCell = screen.getByRole("cell", { name: "2026-05" });
     const inactiveMonthlyCell = screen.getByRole("cell", { name: "2026-02 to 2026-04" });
     expect(latestMonthlyCell.compareDocumentPosition(inactiveMonthlyCell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("No usage (3 months)")).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: "2026-04" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("columnheader", { name: "Token Composition" })).toBeInTheDocument();
     expect(screen.getAllByText("1,600").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("usage-trends-card")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
