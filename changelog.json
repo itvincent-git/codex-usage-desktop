@@ -1,4 +1,8 @@
 {
+  "1.27.0": {
+    "zh": "- feat: redesign monthly usage comparison\n- feat: redesign project usage analytics\n- fix(projects): align controls and detail visuals\n- fix(ui): align project table with monthly view",
+    "en": "- feat: redesign monthly usage comparison\n- feat: redesign project usage analytics\n- fix(projects): align controls and detail visuals\n- fix(ui): align project table with monthly view"
+  },
   "1.26.0": {
     "zh": "- feat: redesign app icon\n- fix: restore app icon background\n- feat: add rounded illuminated app icon",
     "en": "- feat: redesign app icon\n- fix: restore app icon background\n- feat: add rounded illuminated app icon"
