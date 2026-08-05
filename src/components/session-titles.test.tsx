@@ -485,25 +485,52 @@ describe("session titles", () => {
   });
 
   it("filters project sessions by summary name", async () => {
-    invokeMock.mockResolvedValue([
-      session({ path: "/tmp/alpha.jsonl", sessionId: "alpha-id.jsonl", threadName: "Alpha launch notes" }),
-      session({ path: "/tmp/beta.jsonl", sessionId: "beta-id.jsonl", threadName: "Beta cleanup" }),
-    ]);
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_session_details") return [
+        session({ path: "/tmp/alpha.jsonl", sessionId: "alpha-id.jsonl", threadName: "Alpha launch notes" }),
+        session({ path: "/tmp/beta.jsonl", sessionId: "beta-id.jsonl", threadName: "Beta cleanup" }),
+      ];
+      if (command === "fetch_project_analytics") return {
+        project: "/repo/app", displayName: "app", range: "30d", startDate: "2026-07-01", endDate: "2026-07-30", timezone: "UTC",
+        summary: { project: "/repo/app", displayName: "app", inputTokens: 200, cachedInputTokens: 40, outputTokens: 80, totalTokens: 280, costUSD: 0.002 },
+        models: Array.from({ length: 7 }, (_, index) => ({ model: `model-${index + 1}`, totalTokens: 70 - index * 10 })),
+        daily: [{ date: "2026-07-30", inputTokens: 200, cachedInputTokens: 40, outputTokens: 80, totalTokens: 280, costUSD: 0.002 }],
+      };
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
 
     render(
       <ProjectSessionsModal
         project={{ project: "/repo/app", displayName: "app", totalTokens: 280, costUSD: 0.002 }}
+        range="30d"
         onClose={vi.fn()}
         onGoToSessions={vi.fn()}
       />,
     );
 
     await waitFor(() => expect(screen.getByText("Alpha launch notes")).toBeInTheDocument());
+    expect(invokeMock).toHaveBeenCalledWith("fetch_project_analytics", { project: "/repo/app", range: "30d" });
+    expect(screen.getByText("Other")).toBeInTheDocument();
+    expect(screen.getByText("Daily token and cost trend")).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText("Search title, session ID, or model..."), "alpha launch");
 
     expect(screen.getByText("Alpha launch notes")).toBeInTheDocument();
-    expect(screen.getByText("alpha-id")).toBeInTheDocument();
+    expect(screen.getByText(/alpha-id/)).toBeInTheDocument();
     expect(screen.queryByText("Beta cleanup")).not.toBeInTheDocument();
+  });
+
+  it("keeps sessions usable when project analytics fails", async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_project_analytics") throw new Error("analytics offline");
+      if (command === "fetch_session_details") return [session({ threadName: "Available session" })];
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<ProjectSessionsModal project={{ project: "/repo/app", displayName: "app", totalTokens: 140, costUSD: 0.001 }} range="7d" onClose={vi.fn()} onGoToSessions={vi.fn()} />);
+
+    expect(await screen.findByText("Available session")).toBeInTheDocument();
+    expect(await screen.findByText(/analytics offline/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search title, session ID, or model...")).toBeEnabled();
   });
 
   it("falls back to the session ID in session details", async () => {

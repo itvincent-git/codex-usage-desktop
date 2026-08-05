@@ -53,6 +53,18 @@ export type OverviewResponse = {
   }>;
 };
 
+export type ProjectAnalyticsResponse = {
+  project: string;
+  displayName: string;
+  range: RangeKey;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  summary: OverviewResponse["projects"][number];
+  models: Array<{ model: string; totalTokens: number }>;
+  daily: OverviewResponse["daily"];
+};
+
 export type ModelPricingCatalogResponse = {
   isLimited: boolean;
   models: Array<{
@@ -152,6 +164,10 @@ export async function refreshUsageData(forceLimits: boolean): Promise<UsageRefre
 
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
   return invoke<OverviewResponse>("fetch_overview", { range });
+}
+
+export async function fetchProjectAnalytics(project: string, range: RangeKey): Promise<ProjectAnalyticsResponse> {
+  return invoke<ProjectAnalyticsResponse>("fetch_project_analytics", { project, range });
 }
 
 export async function fetchModelPricingCatalog(): Promise<ModelPricingCatalogResponse> {

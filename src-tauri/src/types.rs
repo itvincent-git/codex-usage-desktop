@@ -125,6 +125,27 @@ pub struct OverviewProjectRow {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectAnalyticsModelRow {
+    pub model: String,
+    pub total_tokens: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectAnalyticsResponse {
+    pub project: String,
+    pub display_name: String,
+    pub range: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub timezone: String,
+    pub summary: OverviewProjectRow,
+    pub models: Vec<ProjectAnalyticsModelRow>,
+    pub daily: Vec<OverviewDailyRow>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverviewResponse {
     pub range: String,
     pub days: i64,

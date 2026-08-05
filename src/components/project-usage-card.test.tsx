@@ -1,0 +1,41 @@
+// @vitest-environment jsdom
+
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+import { ProjectUsageCard } from "./project-usage-card";
+import type { OverviewResponse } from "@/lib/api";
+
+function project(displayName: string, totalTokens: number, costUSD: number): OverviewResponse["projects"][number] {
+  const outputTokens = Math.min(totalTokens, 20);
+  return { project: `/repo/${displayName}`, displayName, inputTokens: totalTokens - outputTokens, cachedInputTokens: Math.min(totalTokens - outputTokens, 20), outputTokens, totalTokens, costUSD };
+}
+
+describe("ProjectUsageCard", () => {
+  it("sorts, switches direction, and opens rows with keyboard", async () => {
+    const onProjectClick = vi.fn();
+    render(<ProjectUsageCard projects={[project("Alpha", 100, 3), project("Bravo", 200, 9)]} onProjectClick={onProjectClick} />);
+
+    const rows = () => screen.getAllByRole("button", { name: /Open analytics/ });
+    expect(rows()[0]).toHaveAccessibleName("Open analytics for Bravo");
+    await userEvent.selectOptions(screen.getByLabelText("Sort by"), "name");
+    expect(rows()[0]).toHaveAccessibleName("Open analytics for Alpha");
+    await userEvent.click(screen.getByRole("button", { name: "Ascending order" }));
+    expect(rows()[0]).toHaveAccessibleName("Open analytics for Bravo");
+    rows()[0].focus();
+    await userEvent.keyboard("{Enter}");
+    await userEvent.keyboard(" ");
+    expect(onProjectClick).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows peak badges and relative cost tones", () => {
+    render(<ProjectUsageCard projects={[project("Zero", 0, 0), project("Low", 100, 3), project("Medium", 100, 6), project("High", 100, 9)]} />);
+    const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(row("Zero").querySelector("[data-cost-tone='zero']")).toBeInTheDocument();
+    expect(row("Low").querySelector("[data-cost-tone='low']")).toBeInTheDocument();
+    expect(row("Medium").querySelector("[data-cost-tone='medium']")).toBeInTheDocument();
+    expect(row("High").querySelector("[data-cost-tone='high']")).toBeInTheDocument();
+    expect(within(row("Zero")).queryByText("Highest")).not.toBeInTheDocument();
+    expect(within(row("High")).getAllByText("Highest").length).toBeGreaterThan(0);
+  });
+});

@@ -4,7 +4,8 @@ use crate::{
     pricing::{calculate_cost_usd, PricingSource},
     types::{
         ModelUsage, MonthlyUsageResponse, MonthlyUsageRow, OverviewDailyRow, OverviewModelRow,
-        OverviewProjectRow, OverviewResponse, OverviewTotals, ProjectUsage,
+        OverviewProjectRow, OverviewResponse, OverviewTotals, ProjectAnalyticsModelRow,
+        ProjectAnalyticsResponse, ProjectUsage,
     },
 };
 use chrono::{Datelike, NaiveDate, Utc};
@@ -28,15 +29,8 @@ fn range_days(range: &str) -> Option<i64> {
     }
 }
 
-pub fn get_overview(
-    db: &Connection,
-    range: &str,
-    timezone: Option<String>,
-    pricing_source: &PricingSource,
-) -> Result<OverviewResponse, String> {
-    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
-
-    let (start_date, end_date, days) = if range.starts_with("custom:") {
+fn resolve_range(range: &str, timezone: &str) -> Result<(String, String, i64), String> {
+    if range.starts_with("custom:") {
         let parts: Vec<&str> = range["custom:".len()..].split('_').collect();
         if parts.len() != 2 {
             return Err(format!("Invalid custom range format: {}", range));
@@ -51,13 +45,24 @@ pub fn get_overview(
             return Err("End date must be after or equal to start date".to_string());
         }
         let days = end_parsed.signed_duration_since(start_parsed).num_days() + 1;
-        (start_str.to_string(), end_str.to_string(), days)
+        Ok((start_str.to_string(), end_str.to_string(), days))
     } else {
         let days = range_days(range).ok_or_else(|| format!("Unsupported range: {range}"))?;
-        let end_date = date_key_in_timezone(Utc::now(), &timezone);
+        let end_date = date_key_in_timezone(Utc::now(), timezone);
         let start_date = shift_date_key(&end_date, -(days - 1))?;
-        (start_date, end_date, days)
-    };
+        Ok((start_date, end_date, days))
+    }
+}
+
+pub fn get_overview(
+    db: &Connection,
+    range: &str,
+    timezone: Option<String>,
+    pricing_source: &PricingSource,
+) -> Result<OverviewResponse, String> {
+    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
+
+    let (start_date, end_date, days) = resolve_range(range, &timezone)?;
 
     let rows = query_daily_rows(db, &start_date, &end_date)?;
     let rows_by_date = rows
@@ -179,6 +184,106 @@ pub fn get_overview(
     })
 }
 
+pub fn get_project_analytics(
+    db: &Connection,
+    project: &str,
+    range: &str,
+    timezone: Option<String>,
+    pricing_source: &PricingSource,
+) -> Result<ProjectAnalyticsResponse, String> {
+    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
+    let (start_date, end_date, _) = resolve_range(range, &timezone)?;
+    let rows = query_daily_rows(db, &start_date, &end_date)?;
+    let mut usage_by_date = BTreeMap::<String, ProjectUsage>::new();
+    let mut summary = ProjectUsage::default();
+    let mut found = false;
+
+    for row in rows {
+        if let Some(usage) = row.projects.get(project) {
+            found = true;
+            usage_by_date.insert(row.date, usage.clone());
+            summary.input_tokens += usage.input_tokens;
+            summary.cached_input_tokens += usage.cached_input_tokens;
+            summary.output_tokens += usage.output_tokens;
+            summary.reasoning_output_tokens += usage.reasoning_output_tokens;
+            summary.total_tokens += usage.total_tokens;
+            for (model, model_usage) in &usage.models {
+                let total = summary.models.entry(model.clone()).or_default();
+                total.input_tokens += model_usage.input_tokens;
+                total.cached_input_tokens += model_usage.cached_input_tokens;
+                total.output_tokens += model_usage.output_tokens;
+                total.reasoning_output_tokens += model_usage.reasoning_output_tokens;
+                total.total_tokens += model_usage.total_tokens;
+            }
+        }
+    }
+
+    if !found {
+        return Err(format!("Project not found in selected range: {project}"));
+    }
+
+    let daily = list_date_keys(&start_date, &end_date)?
+        .into_iter()
+        .map(|date| {
+            let usage = usage_by_date.get(&date);
+            let cost_usd = usage
+                .map(|usage| {
+                    usage
+                        .models
+                        .iter()
+                        .map(|(model, model_usage)| {
+                            calculate_cost_usd(model_usage, pricing_source.pricing_for_model(model))
+                        })
+                        .sum()
+                })
+                .unwrap_or(0.0);
+            OverviewDailyRow {
+                date,
+                input_tokens: usage.map(|usage| usage.input_tokens).unwrap_or(0),
+                cached_input_tokens: usage.map(|usage| usage.cached_input_tokens).unwrap_or(0),
+                output_tokens: usage.map(|usage| usage.output_tokens).unwrap_or(0),
+                total_tokens: usage.map(|usage| usage.total_tokens).unwrap_or(0),
+                cost_usd,
+            }
+        })
+        .collect::<Vec<_>>();
+    let cost_usd = daily.iter().map(|day| day.cost_usd).sum();
+    let mut models = summary
+        .models
+        .iter()
+        .map(|(model, usage)| ProjectAnalyticsModelRow {
+            model: model.clone(),
+            total_tokens: usage.total_tokens,
+        })
+        .collect::<Vec<_>>();
+    models.sort_by(|a, b| {
+        b.total_tokens
+            .cmp(&a.total_tokens)
+            .then_with(|| a.model.cmp(&b.model))
+    });
+    let display_name = project_display_name(project);
+
+    Ok(ProjectAnalyticsResponse {
+        project: project.to_string(),
+        display_name: display_name.clone(),
+        range: range.to_string(),
+        start_date,
+        end_date,
+        timezone,
+        summary: OverviewProjectRow {
+            project: project.to_string(),
+            display_name,
+            input_tokens: summary.input_tokens,
+            cached_input_tokens: summary.cached_input_tokens,
+            output_tokens: summary.output_tokens,
+            total_tokens: summary.total_tokens,
+            cost_usd,
+        },
+        models,
+        daily,
+    })
+}
+
 fn overview_model_row(
     model: String,
     usage: ModelUsage,
@@ -186,8 +291,8 @@ fn overview_model_row(
 ) -> OverviewModelRow {
     let resolved = pricing_source.resolve_pricing_for_model(&model);
     let cost_usd = calculate_cost_usd(&usage, resolved.pricing);
-    let prices = (resolved.status != crate::types::PricingStatus::Unavailable)
-        .then_some(resolved.pricing);
+    let prices =
+        (resolved.status != crate::types::PricingStatus::Unavailable).then_some(resolved.pricing);
     OverviewModelRow {
         model,
         input_tokens: usage.input_tokens,
@@ -197,7 +302,8 @@ fn overview_model_row(
         cost_usd,
         pricing_status: resolved.status,
         input_cost_per_million_tokens: prices.map(|price| price.input_cost_per_m_token),
-        cached_input_cost_per_million_tokens: prices.map(|price| price.cached_input_cost_per_m_token),
+        cached_input_cost_per_million_tokens: prices
+            .map(|price| price.cached_input_cost_per_m_token),
         output_cost_per_million_tokens: prices.map(|price| price.output_cost_per_m_token),
         effective_cost_per_million_tokens: if usage.total_tokens > 0
             && resolved.status != crate::types::PricingStatus::Unavailable
@@ -339,7 +445,9 @@ mod tests {
         assert_eq!(priced.cached_input_cost_per_million_tokens, Some(0.125));
         assert_eq!(priced.output_cost_per_million_tokens, Some(10.0));
         assert!((priced.cost_usd - 6.025).abs() < f64::EPSILON);
-        assert!((priced.effective_cost_per_million_tokens.unwrap() - 4.016666666666667).abs() < 1e-12);
+        assert!(
+            (priced.effective_cost_per_million_tokens.unwrap() - 4.016666666666667).abs() < 1e-12
+        );
 
         let free = overview_model_row("openrouter/free".to_string(), usage.clone(), &source);
         assert_eq!(free.pricing_status, PricingStatus::Free);
@@ -394,6 +502,106 @@ mod tests {
         assert_eq!(shift_month_key("2026-01", -1).unwrap(), "2025-12");
         assert_eq!(shift_month_key("2025-12", 1).unwrap(), "2026-01");
         assert_eq!(shift_month_key("2026-05", -11).unwrap(), "2025-06");
+    }
+
+    #[test]
+    fn project_analytics_filters_project_fills_days_and_aggregates_models_and_cost() {
+        let path = temp_db_path("project-analytics");
+        let mut db = open_database(&path).unwrap();
+        let project_usage = |input, cached, output, model: &str| {
+            let total = input + output;
+            ProjectUsage {
+                input_tokens: input,
+                cached_input_tokens: cached,
+                output_tokens: output,
+                reasoning_output_tokens: 0,
+                total_tokens: total,
+                models: BTreeMap::from([(
+                    model.to_string(),
+                    ModelUsage {
+                        input_tokens: input,
+                        cached_input_tokens: cached,
+                        output_tokens: output,
+                        reasoning_output_tokens: 0,
+                        total_tokens: total,
+                        is_fallback: None,
+                    },
+                )]),
+            }
+        };
+        let mut first = daily_row("2026-07-01", 0, 0, 0, 0, 0.0);
+        first.projects = BTreeMap::from([
+            (
+                "/repo/app".to_string(),
+                project_usage(1_000_000, 200_000, 100_000, "gpt-5"),
+            ),
+            (
+                "/repo/other".to_string(),
+                project_usage(9_000_000, 0, 0, "gpt-5"),
+            ),
+        ]);
+        let mut third = daily_row("2026-07-03", 0, 0, 0, 0, 0.0);
+        third.projects = BTreeMap::from([(
+            "/repo/app".to_string(),
+            project_usage(500_000, 100_000, 50_000, "gpt-5-mini"),
+        )]);
+        let mut outside = daily_row("2026-06-30", 0, 0, 0, 0, 0.0);
+        outside.projects = BTreeMap::from([(
+            "/repo/app".to_string(),
+            project_usage(8_000_000, 0, 0, "gpt-5"),
+        )]);
+        upsert_daily_rows(&mut db, &[outside, first, third]).unwrap();
+
+        let response = get_project_analytics(
+            &db,
+            "/repo/app",
+            "custom:2026-07-01_2026-07-03",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap();
+
+        assert_eq!(response.project, "/repo/app");
+        assert_eq!(response.display_name, "app");
+        assert_eq!(response.start_date, "2026-07-01");
+        assert_eq!(response.end_date, "2026-07-03");
+        assert_eq!(response.summary.input_tokens, 1_500_000);
+        assert_eq!(response.summary.cached_input_tokens, 300_000);
+        assert_eq!(response.summary.output_tokens, 150_000);
+        assert_eq!(response.summary.total_tokens, 1_650_000);
+        assert_eq!(response.daily.len(), 3);
+        assert_eq!(response.daily[1].date, "2026-07-02");
+        assert_eq!(response.daily[1].total_tokens, 0);
+        assert_eq!(
+            response
+                .models
+                .iter()
+                .map(|row| row.model.as_str())
+                .collect::<Vec<_>>(),
+            vec!["gpt-5", "gpt-5-mini"]
+        );
+        let expected = calculate_cost_usd(
+            &project_usage(1_000_000, 200_000, 100_000, "gpt-5").models["gpt-5"],
+            PricingSource::embedded().pricing_for_model("gpt-5"),
+        ) + calculate_cost_usd(
+            &project_usage(500_000, 100_000, 50_000, "gpt-5-mini").models["gpt-5-mini"],
+            PricingSource::embedded().pricing_for_model("gpt-5-mini"),
+        );
+        assert!((response.summary.cost_usd - expected).abs() < 1e-12);
+        assert!(
+            (response.daily.iter().map(|day| day.cost_usd).sum::<f64>() - expected).abs() < 1e-12
+        );
+
+        let error = get_project_analytics(
+            &db,
+            "/repo/missing",
+            "custom:2026-07-01_2026-07-03",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap_err();
+        assert!(error.contains("Project not found"));
+        let _ = std::fs::remove_file(path);
     }
 
     fn daily_row(

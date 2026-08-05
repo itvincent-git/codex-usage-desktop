@@ -419,6 +419,7 @@ export default function App() {
           {selectedProjectForModal && (
             <ProjectSessionsModal
               project={selectedProjectForModal}
+              range={range}
               onClose={() => setSelectedProjectForModal(null)}
               onGoToSessions={(projectPath) => {
                 setSelectedProjectForModal(null);

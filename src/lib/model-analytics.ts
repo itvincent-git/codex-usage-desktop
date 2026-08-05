@@ -5,7 +5,7 @@ export type ModelSort = "tokens" | "cost" | "effective";
 export type PriceTone = "low" | "medium" | "high" | "equal" | "unavailable";
 
 const MODEL_COLORS = ["#0ea5e9", "#8b5cf6", "#06b6d4", "#d946ef", "#f97316", "#14b8a6"] as const;
-const MODEL_PAGE_COLORS = ["#2563eb", "#d97706", "#16a34a", "#c026d3", "#dc2626", "#0891b2"] as const;
+export const MODEL_PAGE_COLORS = ["#2563eb", "#d97706", "#16a34a", "#c026d3", "#dc2626", "#0891b2"] as const;
 export const OTHER_MODEL_COLOR = "#94a3b8";
 const MODEL_TONE_CLASSES = [
   "border-sky-500/20 bg-sky-500/10 text-sky-500",

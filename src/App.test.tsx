@@ -689,7 +689,7 @@ describe("App", () => {
     await userEvent.click(projectUsageTab);
 
     expect(screen.getByRole("heading", { name: "Project Usage Details" })).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader", { name: "Total Tokens" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("columnheader", { name: "Token composition" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: /codex-usage-desktop/ })).toBeInTheDocument();
 
     // Click the Daily tab to show the DailyUsageTable
