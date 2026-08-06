@@ -1001,7 +1001,7 @@ describe("App", () => {
             costUSD: 0.001,
             turnCount: 1,
             messageCount: 1,
-            toolCallCount: 1,
+            toolCallCount: 2,
             patchCount: 2,
             errorCount: 1,
           },
@@ -1028,6 +1028,28 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:00.500Z",
                   completedAt: "2026-06-11T00:00:01.500Z",
                   durationMs: 1000,
+                  isError: false,
+                },
+                {
+                  callId: "call-input",
+                  name: "request_user_input",
+                  status: "completed",
+                  arguments: JSON.stringify({
+                    questions: [{
+                      header: "Display mode",
+                      id: "display_mode",
+                      question: "How should the session item be displayed?",
+                      options: [
+                        { label: "Option cards (Recommended)", description: "Show each choice as a readable option card." },
+                        { label: "Raw JSON", description: "Keep showing the tool arguments as JSON." },
+                      ],
+                    }],
+                  }),
+                  output: JSON.stringify({ answers: { display_mode: { answers: ["Option cards (Recommended)"] } } }),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.510Z",
+                  completedAt: "2026-06-11T00:00:01.550Z",
+                  durationMs: 40,
                   isError: false,
                 },
               ],
@@ -1064,6 +1086,29 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:00.500Z",
                   completedAt: "2026-06-11T00:00:01.500Z",
                   durationMs: 1000,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
+                  callId: "call-input",
+                  name: "request_user_input",
+                  status: "completed",
+                  arguments: JSON.stringify({
+                    questions: [{
+                      header: "Display mode",
+                      id: "display_mode",
+                      question: "How should the session item be displayed?",
+                      options: [
+                        { label: "Option cards (Recommended)", description: "Show each choice as a readable option card." },
+                        { label: "Raw JSON", description: "Keep showing the tool arguments as JSON." },
+                      ],
+                    }],
+                  }),
+                  output: JSON.stringify({ answers: { display_mode: { answers: ["Option cards (Recommended)"] } } }),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.510Z",
+                  completedAt: "2026-06-11T00:00:01.550Z",
+                  durationMs: 40,
                   isError: false,
                 },
                 { kind: "patch", callId: "patch-1", success: true, output: "PATCH_SUCCESS_OUTPUT", timestamp: "2026-06-11T00:00:01.600Z", isError: false },
@@ -1108,7 +1153,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("1 tool");
+    expect(turnButton).toHaveTextContent("2 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1150,6 +1195,12 @@ describe("App", () => {
     expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall.querySelector(".line-clamp-1")).toBeInTheDocument();
     expect(toolCall.querySelector(".line-clamp-5")).toBeInTheDocument();
+    expect(screen.getByText("User input request")).toBeInTheDocument();
+    expect(screen.getByText("Display mode")).toBeInTheDocument();
+    expect(screen.getByText("How should the session item be displayed?")).toBeInTheDocument();
+    expect(screen.getByText("Option cards (Recommended)").closest("li")).toHaveClass("border-primary/50");
+    expect(screen.getByText("Raw JSON").closest("li")).not.toHaveClass("border-primary/50");
+    expect(screen.getByText("Show each choice as a readable option card.")).toBeInTheDocument();
 
     const reasoningTitle = screen.getByText("Reasoning summary");
     expect(reasoningTitle.parentElement?.parentElement).toHaveClass("border-amber-300/70");

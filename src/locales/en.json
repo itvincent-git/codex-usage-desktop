@@ -487,6 +487,8 @@
       "arguments": "Arguments",
       "output": "Output",
       "stderr": "Stderr",
+      "user_input_request": "User input request",
+      "custom_answer": "Custom answer",
       "patch_failed": "Patch failed",
       "patch_result": "Patch result",
       "patch_output": "Patch output",

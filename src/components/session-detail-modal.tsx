@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clipboard, FileJson, Loader2, MessageSquare, Terminal, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronRight, Clipboard, FileJson, Loader2, MessageSquare, Terminal, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -219,9 +219,120 @@ function ToolPreview({ title, text, lines }: { title: string; text: string; line
   );
 }
 
+type UserInputQuestion = {
+  header: string;
+  id: string;
+  question: string;
+  options: Array<{ label: string; description: string }>;
+};
+
+function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
+  if (!argumentsJson) return null;
+
+  try {
+    const parsed = JSON.parse(argumentsJson) as { questions?: unknown };
+    if (!Array.isArray(parsed.questions)) return null;
+
+    const questions = parsed.questions.filter((question): question is UserInputQuestion => {
+      if (!question || typeof question !== "object") return false;
+      const value = question as Partial<UserInputQuestion>;
+      return typeof value.header === "string"
+        && typeof value.id === "string"
+        && typeof value.question === "string"
+        && Array.isArray(value.options)
+        && value.options.every((option) => option
+          && typeof option === "object"
+          && typeof option.label === "string"
+          && typeof option.description === "string");
+    });
+
+    return questions.length > 0 ? questions : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseUserInputAnswers(outputJson: string | null): Record<string, string[]> {
+  if (!outputJson) return {};
+
+  try {
+    const parsed = JSON.parse(outputJson) as { answers?: Record<string, { answers?: unknown }> };
+    if (!parsed.answers || typeof parsed.answers !== "object") return {};
+    return Object.fromEntries(Object.entries(parsed.answers).flatMap(([id, answer]) => (
+      Array.isArray(answer?.answers) && answer.answers.every((value) => typeof value === "string")
+        ? [[id, answer.answers]]
+        : []
+    )));
+  } catch {
+    return {};
+  }
+}
+
+function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[] }) {
+  const { t } = useTranslation();
+  const answers = parseUserInputAnswers(item.output);
+
+  return (
+    <div className={`rounded-lg border p-3 ${ITEM_TONES.tool}`}>
+      <div className={`flex items-center gap-1 text-xs font-semibold ${ITEM_TITLE_TONES.tool}`}>
+        <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+        <span>{t("sessions.detail.user_input_request")}</span>
+      </div>
+      <div className="mt-3 space-y-3">
+        {questions.map((question) => {
+          const selectedAnswers = answers[question.id] ?? [];
+          const customAnswers = selectedAnswers.filter((answer) => !question.options.some((option) => option.label === answer));
+
+          return (
+            <section key={question.id} className="rounded-lg border border-border/50 bg-muted/35 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{question.header}</div>
+              <div className="mt-1 text-sm font-semibold text-foreground">{question.question}</div>
+              <ol className="mt-3 space-y-2">
+                {question.options.map((option, index) => {
+                  const isSelected = selectedAnswers.includes(option.label);
+                  return (
+                    <li
+                      key={`${question.id}-${option.label}`}
+                      className={`flex gap-3 rounded-md border px-3 py-2 ${isSelected ? "border-primary/50 bg-primary/10" : "border-border/60 bg-background/60"}`}
+                    >
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}>
+                        {isSelected ? <Check className="h-3 w-3" /> : index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {customAnswers.map((answer) => (
+                <div key={answer} className="mt-2 flex gap-3 rounded-md border border-primary/50 bg-primary/10 px-3 py-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.custom_answer")}</span>
+                    <span className="mt-0.5 block whitespace-pre-wrap break-words text-sm text-foreground">{answer}</span>
+                  </span>
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
+  const userInputQuestions = item.name === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
+
+  if (userInputQuestions) {
+    return <UserInputItem item={item} questions={userInputQuestions} />;
+  }
 
   return (
     <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>

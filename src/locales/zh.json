@@ -492,6 +492,8 @@
       "arguments": "参数",
       "output": "输出",
       "stderr": "标准错误",
+      "user_input_request": "用户输入请求",
+      "custom_answer": "自定义回答",
       "patch_failed": "补丁失败",
       "patch_result": "补丁结果",
       "patch_output": "补丁输出",
