@@ -62,6 +62,22 @@ function firstUserPreview(turn: SessionReplayDetail["turns"][number]) {
   return normalized.length > 140 ? `${normalized.slice(0, 140)}...` : normalized;
 }
 
+type ReplayItem = SessionReplayDetail["turns"][number]["items"][number];
+
+function orderedItems(turn: SessionReplayDetail["turns"][number]): ReplayItem[] {
+  if (turn.items?.length) return turn.items;
+  return [
+    ...turn.systemMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "system", source: message.kind, text: message.text })),
+    ...turn.userMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "user", source: message.kind, text: message.text })),
+    ...turn.assistantMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "assistant", source: message.kind, text: message.text })),
+    ...turn.reasoningSummaries.map((message) => ({ kind: "reasoning" as const, timestamp: message.timestamp, text: message.text })),
+    ...turn.toolCalls.map((tool) => ({ kind: "toolCall" as const, ...tool })),
+    ...turn.patchResults.map((patch) => ({ kind: "patch" as const, ...patch })),
+    ...turn.tokenEvents.map((usage) => ({ kind: "tokenUsage" as const, ...usage })),
+    ...turn.errors.map((text) => ({ kind: "error" as const, timestamp: null, text })),
+  ];
+}
+
 function metric(label: string, value: string, tone: "default" | "danger" = "default") {
   return (
     <div className="min-w-0 rounded-lg border border-border/60 bg-surface/70 px-3 py-2">
@@ -108,6 +124,79 @@ function TextBlock({
   );
 }
 
+function TimelineItem({ item }: { item: ReplayItem }) {
+  const { t } = useTranslation();
+
+  if (item.kind === "message") {
+    const title = item.role === "user"
+      ? t("sessions.detail.user")
+      : item.role === "assistant"
+        ? t("sessions.detail.assistant")
+        : item.role === "developer"
+          ? "Developer"
+          : t("sessions.detail.system");
+    const tone = item.role === "user" ? "border-primary/30 bg-primary/5" : "border-border/50 bg-muted/35";
+    return (
+      <div className={`rounded-lg border p-3 ${tone}`}>
+        <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <span>{title}</span>
+          <span className="font-mono normal-case tracking-normal">{formatTimestamp(item.timestamp)}</span>
+        </div>
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{item.text}</pre>
+      </div>
+    );
+  }
+
+  if (item.kind === "reasoning") {
+    return <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} />;
+  }
+
+  if (item.kind === "toolCall") {
+    return (
+      <details className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
+        <summary className="cursor-pointer text-xs font-semibold">
+          <Terminal className="mr-1 inline h-3.5 w-3.5" />
+          {item.name} {item.status ? `· ${item.status}` : ""}
+        </summary>
+        <div className="mt-3 space-y-2">
+          {item.arguments ? <TextBlock title={t("sessions.detail.arguments")} text={item.arguments} /> : null}
+          {item.output ? <TextBlock title={t("sessions.detail.output")} text={item.output} /> : null}
+          {item.stderr ? <TextBlock title={t("sessions.detail.stderr")} text={item.stderr} /> : null}
+        </div>
+      </details>
+    );
+  }
+
+  if (item.kind === "patch") {
+    return (
+      <details className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
+        <summary className="cursor-pointer text-xs font-semibold">
+          {item.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}
+        </summary>
+        {item.output ? <div className="mt-3"><TextBlock title={t("sessions.detail.patch_output")} text={item.output} /></div> : null}
+      </details>
+    );
+  }
+
+  if (item.kind === "tokenUsage") {
+    return (
+      <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+        {formatTimestamp(item.timestamp)} · {item.model} · {t("sessions.detail.tokens_count", { value: formatNumber(item.totalTokens) })}
+      </div>
+    );
+  }
+
+  if (item.kind === "error") {
+    return <div className="rounded-lg border border-error/35 bg-error/5 p-3 text-sm text-error">{item.text}</div>;
+  }
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+      {item.label}{item.text ? ` · ${item.text}` : ""}
+    </div>
+  );
+}
+
 export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
@@ -141,7 +230,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
     void fetchSessionDetail(session.path)
       .then((data) => {
-        if (!cancelled) setDetail(data);
+        if (!cancelled) {
+          setDetail(data);
+          setExpandedTurns(new Set(data.turns.map((turn, index) => `${turn.turnId}-${index}`)));
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -354,49 +446,9 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   </button>
                   {isExpanded ? (
                   <div className="mt-3 space-y-3">
-                    {turn.systemMessages.map((message, i) => (
-                      <TextBlock
-                        key={`s-${i}`}
-                        title={t("sessions.detail.system")}
-                        text={message.text}
-                        defaultCollapsed
-                      />
+                    {orderedItems(turn).map((item, itemIndex) => (
+                      <TimelineItem key={`${item.kind}-${itemIndex}`} item={item} />
                     ))}
-                    {turn.userMessages.map((message, i) => <TextBlock key={`u-${i}`} title={t("sessions.detail.user")} text={message.text} />)}
-                    {turn.assistantMessages.map((message, i) => <TextBlock key={`a-${i}`} title={t("sessions.detail.assistant")} text={message.text} />)}
-                    {turn.reasoningSummaries.map((message, i) => <TextBlock key={`r-${i}`} title={t("sessions.detail.reasoning_summary")} text={message.text} />)}
-                    {turn.toolCalls.map((tool, i) => (
-                      <details key={`t-${i}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
-                        <summary className="cursor-pointer text-xs font-semibold">
-                          <Terminal className="mr-1 inline h-3.5 w-3.5" />
-                          {tool.name} {tool.status ? `· ${tool.status}` : ""}
-                        </summary>
-                        {tool.arguments ? <TextBlock title={t("sessions.detail.arguments")} text={tool.arguments} /> : null}
-                        {tool.output ? <TextBlock title={t("sessions.detail.output")} text={tool.output} /> : null}
-                        {tool.stderr ? <TextBlock title={t("sessions.detail.stderr")} text={tool.stderr} /> : null}
-                      </details>
-                    ))}
-                    {turn.patchResults.map((patch, i) => (
-                      <details key={`p-${i}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
-                        <summary className="cursor-pointer text-xs font-semibold">
-                          {patch.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}
-                        </summary>
-                        {patch.output ? <TextBlock title={t("sessions.detail.patch_output")} text={patch.output} /> : null}
-                      </details>
-                    ))}
-                    {turn.tokenEvents.length > 0 ? (
-                      <div className="rounded-lg border border-border/50 bg-muted/35 p-3 text-xs">
-                        <div className="mb-2 font-semibold">{t("sessions.detail.token_events")}</div>
-                        <div className="space-y-1 font-mono">
-                          {turn.tokenEvents.map((event, i) => (
-                            <div key={`tok-${i}`}>
-                              {formatTimestamp(event.timestamp)} · {event.model} · {t("sessions.detail.tokens_count", { value: formatNumber(event.totalTokens) })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                    {turn.errors.map((turnError, i) => <TextBlock key={`e-${i}`} title={t("sessions.detail.error")} text={turnError} />)}
                   </div>
                   ) : null}
                 </section>

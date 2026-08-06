@@ -1068,23 +1068,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
     expect(screen.getByText("Session summary")).toBeInTheDocument();
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
-    expect(turnButton).toHaveAttribute("aria-expanded", "false");
+    expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("2 messages");
     expect(turnButton).toHaveTextContent("1 tool");
     expect(turnButton).toHaveTextContent("0 patches");
     expect(turnButton).toHaveTextContent("0 errors");
     expect(turnButton).toHaveTextContent("1 token event");
-    expect(screen.queryByText("System prompt")).not.toBeInTheDocument();
-    expect(screen.queryByText("Use the repo instructions.")).not.toBeInTheDocument();
-    expect(screen.getByText("Replay this session")).toBeInTheDocument();
-    expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
-
-    await userEvent.click(turnButton);
-    expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("System prompt")).toBeInTheDocument();
     expect(screen.getByText("Use the repo instructions.")).toBeInTheDocument();
+    expect(screen.getAllByText("Replay this session").length).toBeGreaterThan(0);
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByText("shell · completed"));
     await userEvent.click(screen.getByRole("button", { name: "Show full text" }));

@@ -1,7 +1,7 @@
 use crate::{
     db::{query_session_rollup_record, SessionRollupRecord},
     types::{
-        DailyUsageRow, ModelUsage, SessionReplayDetail, SessionReplayMessage,
+        DailyUsageRow, ModelUsage, SessionReplayDetail, SessionReplayItem, SessionReplayMessage,
         SessionReplayPatchResult, SessionReplaySummary, SessionReplayTokenEvent,
         SessionReplayToolCall, SessionReplayTurn,
     },
@@ -198,40 +198,78 @@ impl ReplayParseState {
             _ if is_user_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    push_unique_message(
+                    if push_unique_message(
                         &mut turn.user_messages,
                         SessionReplayMessage {
-                            timestamp,
+                            timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
-                            text,
+                            text: text.clone(),
                         },
-                    );
+                    ) {
+                        turn.items.push(SessionReplayItem::Message {
+                            timestamp,
+                            role: "user".to_string(),
+                            source: event_type.to_string(),
+                            text,
+                        });
+                    }
                 }
             }
             _ if is_assistant_message(event_type, event) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    push_unique_message(
+                    if push_unique_message(
                         &mut turn.assistant_messages,
                         SessionReplayMessage {
-                            timestamp,
+                            timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
-                            text,
+                            text: text.clone(),
                         },
-                    );
+                    ) {
+                        turn.items.push(SessionReplayItem::Message {
+                            timestamp,
+                            role: "assistant".to_string(),
+                            source: event_type.to_string(),
+                            text,
+                        });
+                    }
+                }
+            }
+            _ if is_system_message(event_type, event) => {
+                if let Some(text) = extract_message_text(event) {
+                    let role = string_field(event, "role").unwrap_or_else(|| "system".to_string());
+                    let turn = self.turn_mut(&turn_id);
+                    if push_unique_message(
+                        &mut turn.system_messages,
+                        SessionReplayMessage {
+                            timestamp: timestamp.clone(),
+                            kind: event_type.to_string(),
+                            text: text.clone(),
+                        },
+                    ) {
+                        turn.items.push(SessionReplayItem::Message {
+                            timestamp,
+                            role,
+                            source: event_type.to_string(),
+                            text,
+                        });
+                    }
                 }
             }
             _ if is_reasoning_message(event_type) => {
                 if let Some(text) = extract_message_text(event) {
                     let turn = self.turn_mut(&turn_id);
-                    push_unique_message(
+                    if push_unique_message(
                         &mut turn.reasoning_summaries,
                         SessionReplayMessage {
-                            timestamp,
+                            timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
-                            text,
+                            text: text.clone(),
                         },
-                    );
+                    ) {
+                        turn.items
+                            .push(SessionReplayItem::Reasoning { timestamp, text });
+                    }
                 }
             }
             _ if is_tool_call(event_type) => {
@@ -244,20 +282,21 @@ impl ReplayParseState {
                         (turn_id.clone(), name.clone(), arguments.clone()),
                     );
                 }
-                self.turn_mut(&turn_id)
-                    .tool_calls
-                    .push(SessionReplayToolCall {
-                        call_id,
-                        name,
-                        status: None,
-                        arguments,
-                        output: None,
-                        stderr: None,
-                        started_at: timestamp,
-                        completed_at: None,
-                        duration_ms: None,
-                        is_error: false,
-                    });
+                let tool = SessionReplayToolCall {
+                    call_id,
+                    name,
+                    status: None,
+                    arguments,
+                    output: None,
+                    stderr: None,
+                    started_at: timestamp,
+                    completed_at: None,
+                    duration_ms: None,
+                    is_error: false,
+                };
+                let turn = self.turn_mut(&turn_id);
+                turn.tool_calls.push(tool.clone());
+                turn.items.push(SessionReplayItem::ToolCall { tool });
             }
             _ if is_tool_output(event_type) => {
                 self.ingest_tool_output(&turn_id, event, timestamp);
@@ -266,9 +305,20 @@ impl ReplayParseState {
                 self.ingest_patch_event(&turn_id, event, timestamp);
             }
             _ if is_error_event(event_type, event) => {
+                let text = extract_error_text(event).unwrap_or_else(|| event_type.to_string());
                 let turn = self.turn_mut(&turn_id);
-                turn.errors
-                    .push(extract_error_text(event).unwrap_or_else(|| event_type.to_string()));
+                turn.errors.push(text.clone());
+                turn.items
+                    .push(SessionReplayItem::Error { timestamp, text });
+            }
+            "context_compacted" | "compacted" => {
+                self.turn_mut(&turn_id)
+                    .items
+                    .push(SessionReplayItem::Notice {
+                        timestamp,
+                        label: "context_compacted".to_string(),
+                        text: string_field(event, "message"),
+                    })
             }
             _ => {}
         }
@@ -363,17 +413,18 @@ impl ReplayParseState {
             .current_turn_id
             .clone()
             .unwrap_or_else(|| UNGROUPED_TURN_ID.to_string());
-        self.turn_mut(&turn_id)
-            .token_events
-            .push(SessionReplayTokenEvent {
-                timestamp,
-                model,
-                input_tokens: usage.input_tokens,
-                cached_input_tokens: usage.cached_input_tokens,
-                output_tokens: usage.output_tokens,
-                reasoning_output_tokens: usage.reasoning_output_tokens,
-                total_tokens: usage.total_tokens,
-            });
+        let usage = SessionReplayTokenEvent {
+            timestamp,
+            model,
+            input_tokens: usage.input_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            output_tokens: usage.output_tokens,
+            reasoning_output_tokens: usage.reasoning_output_tokens,
+            total_tokens: usage.total_tokens,
+        };
+        let turn = self.turn_mut(&turn_id);
+        turn.token_events.push(usage.clone());
+        turn.items.push(SessionReplayItem::TokenUsage { usage });
     }
 
     fn ingest_tool_output(
@@ -399,7 +450,7 @@ impl ReplayParseState {
                 .get("output")
                 .and_then(|output| string_field(output, "stderr"))
         });
-        let status = string_field(event, "status");
+        let status = string_field(event, "status").or_else(|| Some("completed".to_string()));
         let is_error = status
             .as_deref()
             .map(|status| !matches!(status, "success" | "ok" | "completed"))
@@ -423,11 +474,45 @@ impl ReplayParseState {
                 tool.duration_ms =
                     duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref());
                 tool.is_error = is_error;
+                if let Some(SessionReplayItem::ToolCall { tool: item_tool }) = turn
+                    .items
+                    .iter_mut()
+                    .find(|item| matches!(item, SessionReplayItem::ToolCall { tool } if tool.call_id.as_ref() == Some(call_id)))
+                {
+                    *item_tool = tool.clone();
+                }
                 return;
             }
         }
 
-        turn.tool_calls.push(SessionReplayToolCall {
+        if let Some(tool_index) = turn
+            .tool_calls
+            .iter()
+            .rposition(|tool| tool.completed_at.is_none() && tool.name == name)
+        {
+            let tool = &mut turn.tool_calls[tool_index];
+            if tool.call_id.is_none() {
+                tool.call_id = call_id;
+            }
+            tool.output = output;
+            tool.stderr = stderr;
+            tool.status = status;
+            tool.completed_at = timestamp;
+            tool.duration_ms =
+                duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref());
+            tool.is_error = is_error;
+            if let Some(SessionReplayItem::ToolCall { tool: item_tool }) = turn
+                .items
+                .iter_mut()
+                .rev()
+                .find(|item| matches!(item, SessionReplayItem::ToolCall { tool } if tool.completed_at.is_none() && tool.name == name))
+            {
+                *item_tool = tool.clone();
+            }
+            return;
+        }
+
+        let tool = SessionReplayToolCall {
             call_id,
             name,
             status,
@@ -438,7 +523,9 @@ impl ReplayParseState {
             completed_at: timestamp,
             duration_ms: None,
             is_error,
-        });
+        };
+        turn.tool_calls.push(tool.clone());
+        turn.items.push(SessionReplayItem::ToolCall { tool });
     }
 
     fn ingest_patch_event(
@@ -455,15 +542,16 @@ impl ReplayParseState {
         });
         let output = extract_tool_output(event).or_else(|| extract_message_text(event));
         let is_error = success == Some(false);
-        self.turn_mut(fallback_turn_id)
-            .patch_results
-            .push(SessionReplayPatchResult {
-                call_id: extract_call_id(event),
-                success,
-                output,
-                timestamp,
-                is_error,
-            });
+        let patch = SessionReplayPatchResult {
+            call_id: extract_call_id(event),
+            success,
+            output,
+            timestamp,
+            is_error,
+        };
+        let turn = self.turn_mut(fallback_turn_id);
+        turn.patch_results.push(patch.clone());
+        turn.items.push(SessionReplayItem::Patch { patch });
     }
 
     fn turn_mut(&mut self, turn_id: &str) -> &mut SessionReplayTurn {
@@ -471,6 +559,17 @@ impl ReplayParseState {
             self.turn_order.push(turn_id.to_string());
             let mut turn = empty_turn(turn_id);
             turn.system_messages = self.system_messages.clone();
+            turn.items
+                .extend(
+                    self.system_messages
+                        .iter()
+                        .map(|message| SessionReplayItem::Message {
+                            timestamp: message.timestamp.clone(),
+                            role: "system".to_string(),
+                            source: message.kind.clone(),
+                            text: message.text.clone(),
+                        }),
+                );
             self.turns.insert(turn_id.to_string(), turn);
         }
         self.turns.get_mut(turn_id).expect("turn exists")
@@ -491,17 +590,23 @@ fn empty_turn(turn_id: &str) -> SessionReplayTurn {
         patch_results: Vec::new(),
         token_events: Vec::new(),
         errors: Vec::new(),
+        items: Vec::new(),
     }
 }
 
-fn push_unique_message(messages: &mut Vec<SessionReplayMessage>, message: SessionReplayMessage) {
-    if messages
-        .iter()
-        .any(|existing| existing.text == message.text)
-    {
-        return;
+fn push_unique_message(
+    messages: &mut Vec<SessionReplayMessage>,
+    message: SessionReplayMessage,
+) -> bool {
+    let is_mirrored_rollout_event = messages.last().is_some_and(|existing| {
+        existing.text == message.text
+            && ((existing.kind == "message") != (message.kind == "message"))
+    });
+    if is_mirrored_rollout_event {
+        return false;
     }
     messages.push(message);
+    true
 }
 
 fn build_summary(
@@ -574,12 +679,29 @@ fn is_assistant_message(event_type: &str, event: &Value) -> bool {
         || (event_type == "message" && string_field(event, "role").as_deref() == Some("assistant"))
 }
 
+fn is_system_message(event_type: &str, event: &Value) -> bool {
+    event_type == "message"
+        && matches!(
+            string_field(event, "role").as_deref(),
+            Some("system" | "developer")
+        )
+}
+
 fn is_reasoning_message(event_type: &str) -> bool {
     event_type.contains("reasoning") || event_type.contains("summary")
 }
 
 fn is_tool_call(event_type: &str) -> bool {
-    event_type.contains("tool_call")
+    (event_type.contains("tool_call") && !is_tool_output(event_type))
+        || matches!(
+            event_type,
+            "function_call"
+                | "custom_tool_call"
+                | "local_shell_call"
+                | "tool_search_call"
+                | "web_search_call"
+                | "image_generation_call"
+        )
         || event_type == "exec_command_begin"
         || event_type == "mcp_tool_call_begin"
 }
@@ -589,6 +711,12 @@ fn is_tool_output(event_type: &str) -> bool {
         || event_type.contains("tool_output")
         || event_type == "exec_command_end"
         || event_type == "mcp_tool_call_end"
+        || event_type == "web_search_end"
+        || event_type == "image_generation_end"
+        || matches!(
+            event_type,
+            "function_call_output" | "custom_tool_call_output" | "tool_search_output"
+        )
 }
 
 fn is_patch_event(event_type: &str) -> bool {
@@ -626,6 +754,7 @@ fn extract_message_text(value: &Value) -> Option<String> {
             })
         })
         .or_else(|| extract_content_text(value.get("content")?))
+        .or_else(|| extract_content_text(value.get("summary")?))
         .or_else(|| {
             value
                 .get("content")
@@ -638,13 +767,35 @@ fn extract_content_text(content: &Value) -> Option<String> {
     let texts = content
         .as_array()?
         .iter()
-        .filter_map(|part| string_field(part, "text").or_else(|| string_field(part, "content")))
+        .filter_map(|part| {
+            string_field(part, "text")
+                .or_else(|| string_field(part, "content"))
+                .or_else(|| summarize_non_text_content(part))
+        })
         .collect::<Vec<_>>();
     if texts.is_empty() {
         None
     } else {
         Some(texts.join("\n"))
     }
+}
+
+fn summarize_non_text_content(part: &Value) -> Option<String> {
+    let kind = string_field(part, "type")?;
+    let value = string_field(part, "image_url")
+        .or_else(|| string_field(part, "file_url"))
+        .or_else(|| string_field(part, "name"));
+    let value = value.map(|value| {
+        if value.starts_with("data:") {
+            "embedded data".to_string()
+        } else {
+            value
+        }
+    });
+    Some(match value {
+        Some(value) => format!("[{kind}: {value}]"),
+        None => format!("[{kind}]"),
+    })
 }
 
 fn extract_system_prompt_text(value: &Value) -> Option<String> {
@@ -676,6 +827,15 @@ fn extract_tool_name(value: &Value) -> Option<String> {
                 string_field(tool, "name").or_else(|| tool.as_str().map(ToString::to_string))
             })
         })
+        .or_else(|| match value.get("type").and_then(Value::as_str) {
+            Some("local_shell_call") => Some("local_shell".to_string()),
+            Some("tool_search_call") => Some("tool_search".to_string()),
+            Some("web_search_call") => Some("web_search".to_string()),
+            Some("web_search_end") => Some("web_search".to_string()),
+            Some("image_generation_call") => Some("image_generation".to_string()),
+            Some("image_generation_end") => Some("image_generation".to_string()),
+            _ => None,
+        })
 }
 
 fn extract_tool_arguments(value: &Value) -> Option<String> {
@@ -683,6 +843,10 @@ fn extract_tool_arguments(value: &Value) -> Option<String> {
         .get("arguments")
         .or_else(|| value.get("args"))
         .or_else(|| value.get("params"))
+        .or_else(|| value.get("input"))
+        .or_else(|| value.get("action"))
+        .or_else(|| value.get("execution"))
+        .or_else(|| value.get("revised_prompt"))
         .map(value_to_compact_string)
 }
 
@@ -690,6 +854,9 @@ fn extract_tool_output(value: &Value) -> Option<String> {
     string_field(value, "output")
         .or_else(|| string_field(value, "stdout"))
         .or_else(|| string_field(value, "stderr"))
+        .or_else(|| string_field(value, "result"))
+        .or_else(|| value.get("results").map(value_to_pretty_string))
+        .or_else(|| string_field(value, "saved_path"))
         .or_else(|| value.get("output").map(value_to_pretty_string))
 }
 
@@ -976,6 +1143,108 @@ mod tests {
         assert_eq!(detail.turns[0].user_messages.len(), 1);
         assert_eq!(detail.turns[0].assistant_messages.len(), 1);
         assert_eq!(detail.summary.message_count, 2);
+    }
+
+    #[test]
+    fn preserves_rollout_order_and_current_response_tool_calls() {
+        let raw = [
+            event_msg(
+                "2026-06-01T00:00:00.000Z",
+                serde_json::json!({"type":"task_started","turn_id":"turn-1"}),
+            ),
+            response_item(
+                "2026-06-01T00:00:01.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "developer",
+                    "content": [{"type":"input_text","text":"Follow AGENTS.md"}]
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:02.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type":"input_text","text":"Run the tests"}]
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:03.000Z",
+                serde_json::json!({
+                    "type":"reasoning",
+                    "summary":[{"type":"summary_text","text":"I should inspect first."}]
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:04.000Z",
+                serde_json::json!({
+                    "type":"function_call",
+                    "name":"exec_command",
+                    "call_id":"call-1",
+                    "arguments":"{\"cmd\":\"pnpm test\"}"
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:05.000Z",
+                serde_json::json!({
+                    "type":"function_call_output",
+                    "call_id":"call-1",
+                    "output":"all tests passed"
+                }),
+            ),
+            response_item(
+                "2026-06-01T00:00:06.000Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type":"output_text","text":"Done"}]
+                }),
+            ),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+        let turn = &detail.turns[0];
+
+        assert_eq!(turn.system_messages[0].text, "Follow AGENTS.md");
+        assert_eq!(turn.reasoning_summaries[0].text, "I should inspect first.");
+        assert_eq!(turn.tool_calls[0].name, "exec_command");
+        assert_eq!(turn.tool_calls[0].status.as_deref(), Some("completed"));
+        assert_eq!(
+            turn.tool_calls[0].output.as_deref(),
+            Some("all tests passed")
+        );
+        assert!(
+            matches!(turn.items[0], SessionReplayItem::Message { ref role, .. } if role == "developer")
+        );
+        assert!(
+            matches!(turn.items[1], SessionReplayItem::Message { ref role, .. } if role == "user")
+        );
+        assert!(matches!(turn.items[2], SessionReplayItem::Reasoning { .. }));
+        assert!(matches!(turn.items[3], SessionReplayItem::ToolCall { .. }));
+        assert!(
+            matches!(turn.items[4], SessionReplayItem::Message { ref role, .. } if role == "assistant")
+        );
+    }
+
+    #[test]
+    fn preserves_legitimately_repeated_messages() {
+        let raw = [
+            response_item(
+                "2026-06-01T00:00:01.000Z",
+                serde_json::json!({"type":"message","role":"user","content":[{"type":"input_text","text":"Retry"}]}),
+            ),
+            response_item(
+                "2026-06-01T00:00:02.000Z",
+                serde_json::json!({"type":"message","role":"user","content":[{"type":"input_text","text":"Retry"}]}),
+            ),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+
+        assert_eq!(detail.turns[0].user_messages.len(), 2);
+        assert_eq!(detail.turns[0].items.len(), 2);
     }
 
     #[test]

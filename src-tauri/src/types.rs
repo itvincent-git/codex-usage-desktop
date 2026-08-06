@@ -396,6 +396,42 @@ pub struct SessionReplayTokenEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SessionReplayItem {
+    Message {
+        timestamp: Option<String>,
+        role: String,
+        source: String,
+        text: String,
+    },
+    Reasoning {
+        timestamp: Option<String>,
+        text: String,
+    },
+    ToolCall {
+        #[serde(flatten)]
+        tool: SessionReplayToolCall,
+    },
+    Patch {
+        #[serde(flatten)]
+        patch: SessionReplayPatchResult,
+    },
+    TokenUsage {
+        #[serde(flatten)]
+        usage: SessionReplayTokenEvent,
+    },
+    Error {
+        timestamp: Option<String>,
+        text: String,
+    },
+    Notice {
+        timestamp: Option<String>,
+        label: String,
+        text: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionReplayTurn {
     pub turn_id: String,
@@ -410,6 +446,7 @@ pub struct SessionReplayTurn {
     pub patch_results: Vec<SessionReplayPatchResult>,
     pub token_events: Vec<SessionReplayTokenEvent>,
     pub errors: Vec<String>,
+    pub items: Vec<SessionReplayItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
