@@ -18,6 +18,7 @@ const RAW_PREVIEW_LINES = 12;
 const RAW_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
 const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const EXEC_TOOL_NAMES = new Set(["exec", "exec_command"]);
 
 const ITEM_TONES = {
   system: "border-zinc-300/70 bg-zinc-100/60 dark:border-zinc-700/70 dark:bg-zinc-900/40",
@@ -219,6 +220,72 @@ function ToolPreview({ title, text, lines }: { title: string; text: string; line
   );
 }
 
+type ExecArguments = {
+  command: string;
+  workdir: string | null;
+};
+
+type ExecOutput = {
+  stdout: string | null;
+  stderr: string | null;
+  exitCode: number | null;
+  wallTimeSeconds: number | null;
+  sessionId: string | number | null;
+};
+
+function parseJsonObject(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseExecArguments(value: string | null): ExecArguments | null {
+  const parsed = parseJsonObject(value);
+  if (!parsed) return null;
+
+  const command = typeof parsed.cmd === "string"
+    ? parsed.cmd
+    : typeof parsed.command === "string"
+      ? parsed.command
+      : null;
+  if (!command) return null;
+
+  const workdir = typeof parsed.workdir === "string"
+    ? parsed.workdir
+    : typeof parsed.cwd === "string"
+      ? parsed.cwd
+      : null;
+  return { command, workdir };
+}
+
+function parseExecOutput(value: string | null): ExecOutput | null {
+  const parsed = parseJsonObject(value);
+  if (!parsed) return null;
+
+  const stdout = typeof parsed.output === "string"
+    ? parsed.output
+    : typeof parsed.stdout === "string"
+      ? parsed.stdout
+      : null;
+  const stderr = typeof parsed.stderr === "string" ? parsed.stderr : null;
+  const exitCode = typeof parsed.exit_code === "number" ? parsed.exit_code : null;
+  const wallTimeSeconds = typeof parsed.wall_time_seconds === "number" ? parsed.wall_time_seconds : null;
+  const sessionId = typeof parsed.session_id === "string" || typeof parsed.session_id === "number"
+    ? parsed.session_id
+    : null;
+
+  return stdout !== null || stderr !== null || exitCode !== null || wallTimeSeconds !== null || sessionId !== null
+    ? { stdout, stderr, exitCode, wallTimeSeconds, sessionId }
+    : null;
+}
+
 type UserInputQuestion = {
   header: string;
   id: string;
@@ -329,6 +396,12 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const userInputQuestions = item.name === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
+  const isExec = EXEC_TOOL_NAMES.has(item.name);
+  const execArguments = isExec ? parseExecArguments(item.arguments) : null;
+  const execOutput = isExec ? parseExecOutput(item.output) : null;
+  const argumentsText = execArguments?.command ?? item.arguments;
+  const outputText = execOutput?.stdout ?? (execOutput ? null : item.output);
+  const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} />;
@@ -351,19 +424,36 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
           {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
         </span>
       </button>
-      {isExpanded ? (
-        <div className="mt-3 space-y-2">
-          {item.arguments ? <ToolTextBlock title={t("sessions.detail.arguments")} text={item.arguments} /> : null}
-          {item.output ? <ToolTextBlock title={t("sessions.detail.output")} text={item.output} /> : null}
-          {item.stderr ? <ToolTextBlock title={t("sessions.detail.stderr")} text={item.stderr} /> : null}
-        </div>
-      ) : (
-        <div className="mt-3 space-y-2">
-          {item.arguments ? <ToolPreview title={t("sessions.detail.arguments")} text={item.arguments} lines={1} /> : null}
-          {item.output ? <ToolPreview title={t("sessions.detail.output")} text={item.output} lines={5} /> : null}
-          {item.stderr ? <ToolPreview title={t("sessions.detail.stderr")} text={item.stderr} lines={5} /> : null}
-        </div>
-      )}
+      <div className="mt-3 space-y-2">
+        {argumentsText ? (
+          isExpanded
+            ? <ToolTextBlock title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} />
+            : <ToolPreview title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} lines={1} />
+        ) : null}
+        {execArguments?.workdir ? (
+          <div className="rounded-md border border-border/50 bg-muted/35 px-3 py-2 text-xs">
+            <span className="font-semibold text-muted-foreground">{t("sessions.detail.working_directory")}: </span>
+            <span className="break-all font-mono text-foreground">{execArguments.workdir}</span>
+          </div>
+        ) : null}
+        {execOutput && (execOutput.exitCode !== null || execOutput.wallTimeSeconds !== null || execOutput.sessionId !== null) ? (
+          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            {execOutput.exitCode !== null ? <span className="rounded-full border border-border/60 bg-background/60 px-2 py-1">{t("sessions.detail.exit_code")}: {execOutput.exitCode}</span> : null}
+            {execOutput.wallTimeSeconds !== null ? <span className="rounded-full border border-border/60 bg-background/60 px-2 py-1">{t("sessions.detail.wall_time")}: {execOutput.wallTimeSeconds}s</span> : null}
+            {execOutput.sessionId !== null ? <span className="rounded-full border border-border/60 bg-background/60 px-2 py-1">{t("sessions.detail.process_session")}: {execOutput.sessionId}</span> : null}
+          </div>
+        ) : null}
+        {outputText ? (
+          isExpanded
+            ? <ToolTextBlock title={t("sessions.detail.output")} text={outputText} />
+            : <ToolPreview title={t("sessions.detail.output")} text={outputText} lines={5} />
+        ) : null}
+        {stderrText ? (
+          isExpanded
+            ? <ToolTextBlock title={t("sessions.detail.stderr")} text={stderrText} />
+            : <ToolPreview title={t("sessions.detail.stderr")} text={stderrText} lines={5} />
+        ) : null}
+      </div>
     </div>
   );
 }
