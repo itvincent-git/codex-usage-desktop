@@ -1,4 +1,8 @@
 {
+  "1.27.1": {
+    "zh": "- fix(ui): remove nested project session scrolling",
+    "en": "- fix(ui): remove nested project session scrolling"
+  },
   "1.27.0": {
     "zh": "- feat: redesign monthly usage comparison\n- feat: redesign project usage analytics\n- fix(projects): align controls and detail visuals\n- fix(ui): align project table with monthly view",
     "en": "- feat: redesign monthly usage comparison\n- feat: redesign project usage analytics\n- fix(projects): align controls and detail visuals\n- fix(ui): align project table with monthly view"
