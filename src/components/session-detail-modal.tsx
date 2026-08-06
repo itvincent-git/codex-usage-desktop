@@ -233,6 +233,11 @@ type ExecOutput = {
   sessionId: string | number | null;
 };
 
+type ToolContentBlocks = {
+  text: string | null;
+  images: string[];
+};
+
 function parseJsonObject(value: string | null): Record<string, unknown> | null {
   if (!value) return null;
 
@@ -265,27 +270,34 @@ function parseExecArguments(value: string | null): ExecArguments | null {
   return { command, workdir };
 }
 
-function parseExecOutput(value: string | null): ExecOutput | null {
+function parseToolContentBlocks(value: string | null): ToolContentBlocks | null {
   if (!value) return null;
 
   try {
     const parsed: unknown = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      const text = parsed.flatMap((block) => (
-        block !== null
-          && typeof block === "object"
-          && typeof (block as Record<string, unknown>).text === "string"
-          ? [(block as Record<string, unknown>).text as string]
-          : []
-      )).join("");
-      if (text) {
-        return { stdout: text, stderr: null, exitCode: null, wallTimeSeconds: null, sessionId: null };
+    if (!Array.isArray(parsed)) return null;
+    let text = "";
+    const images: string[] = [];
+
+    for (const block of parsed) {
+      if (block === null || typeof block !== "object") return null;
+      const content = block as Record<string, unknown>;
+      if (typeof content.text === "string") {
+        text += content.text;
+      } else if (typeof content.image_url === "string") {
+        images.push(content.image_url);
+      } else {
+        return null;
       }
     }
+
+    return text || images.length > 0 ? { text: text || null, images } : null;
   } catch {
     return null;
   }
+}
 
+function parseExecOutput(value: string | null): ExecOutput | null {
   const parsed = parseJsonObject(value);
   if (!parsed) return null;
 
@@ -419,8 +431,9 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const isExec = EXEC_TOOL_NAMES.has(item.name);
   const execArguments = isExec ? parseExecArguments(item.arguments) : null;
   const execOutput = isExec ? parseExecOutput(item.output) : null;
+  const contentBlocks = parseToolContentBlocks(item.output);
   const argumentsText = execArguments?.command ?? item.arguments;
-  const outputText = execOutput?.stdout ?? (execOutput ? null : item.output);
+  const outputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
@@ -467,6 +480,26 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
           isExpanded
             ? <ToolTextBlock title={t("sessions.detail.output")} text={outputText} />
             : <ToolPreview title={t("sessions.detail.output")} text={outputText} lines={5} />
+        ) : null}
+        {contentBlocks?.images.length ? (
+          <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {t("sessions.detail.image_count", { count: contentBlocks.images.length })}
+            </div>
+            {isExpanded ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {contentBlocks.images.map((imageUrl, index) => (
+                  <img
+                    key={`${item.callId ?? item.name}-${index}`}
+                    src={imageUrl}
+                    alt={t("sessions.detail.output_image", { index: index + 1 })}
+                    loading="lazy"
+                    className="max-h-80 w-full rounded-md border border-border/60 bg-background object-contain"
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {stderrText ? (
           isExpanded

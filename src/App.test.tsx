@@ -1006,7 +1006,7 @@ describe("App", () => {
             costUSD: 0.001,
             turnCount: 1,
             messageCount: 1,
-            toolCallCount: 2,
+            toolCallCount: 3,
             patchCount: 2,
             errorCount: 1,
           },
@@ -1033,6 +1033,22 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:00.500Z",
                   completedAt: "2026-06-11T00:00:01.500Z",
                   durationMs: 1000,
+                  isError: false,
+                },
+                {
+                  callId: "call-wait",
+                  name: "wait",
+                  status: "completed",
+                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000 }),
+                  output: JSON.stringify([
+                    { text: "Wait completed\n", type: "input_text" },
+                    { text: "Background task output", type: "input_text" },
+                    { detail: "high", image_url: "data:image/png;base64,dGVzdA==", type: "input_image" },
+                  ]),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
                   isError: false,
                 },
                 {
@@ -1091,6 +1107,23 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:00.500Z",
                   completedAt: "2026-06-11T00:00:01.500Z",
                   durationMs: 1000,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
+                  callId: "call-wait",
+                  name: "wait",
+                  status: "completed",
+                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000 }),
+                  output: JSON.stringify([
+                    { text: "Wait completed\n", type: "input_text" },
+                    { text: "Background task output", type: "input_text" },
+                    { detail: "high", image_url: "data:image/png;base64,dGVzdA==", type: "input_image" },
+                  ]),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
                   isError: false,
                 },
                 {
@@ -1158,7 +1191,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("2 tools");
+    expect(turnButton).toHaveTextContent("3 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1205,6 +1238,16 @@ describe("App", () => {
     expect(toolCall).toHaveTextContent("Script completed");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
+    const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
+    const waitCall = waitCallButton.parentElement!;
+    expect(waitCall).toHaveTextContent("Wait completed");
+    expect(waitCall).toHaveTextContent("Background task output");
+    expect(waitCall).toHaveTextContent("1 output image");
+    expect(waitCall).not.toHaveTextContent("input_text");
+    expect(waitCall).not.toHaveTextContent('"text"');
+    expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
+    await userEvent.click(waitCallButton);
+    expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
     expect(screen.getByText("User input request")).toBeInTheDocument();
     expect(screen.getByText("Display mode")).toBeInTheDocument();
     expect(screen.getByText("How should the session item be displayed?")).toBeInTheDocument();
