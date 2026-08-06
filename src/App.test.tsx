@@ -1001,9 +1001,9 @@ describe("App", () => {
             costUSD: 0.001,
             turnCount: 1,
             messageCount: 1,
-            toolCallCount: 0,
-            patchCount: 0,
-            errorCount: 0,
+            toolCallCount: 1,
+            patchCount: 2,
+            errorCount: 1,
           },
           turns: [
             {
@@ -1016,7 +1016,7 @@ describe("App", () => {
               ],
               userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" }],
               assistantMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" }],
-              reasoningSummaries: [],
+              reasoningSummaries: [{ timestamp: "2026-06-11T00:00:00.250Z", kind: "reasoning", text: "Reasoning fixture" }],
               toolCalls: [
                 {
                   callId: "call-1",
@@ -1031,7 +1031,10 @@ describe("App", () => {
                   isError: false,
                 },
               ],
-              patchResults: [],
+              patchResults: [
+                { callId: "patch-1", success: true, output: "PATCH_SUCCESS_OUTPUT", timestamp: "2026-06-11T00:00:01.600Z", isError: false },
+                { callId: "patch-2", success: false, output: "PATCH_FAILURE_OUTPUT", timestamp: "2026-06-11T00:00:01.700Z", isError: true },
+              ],
               tokenEvents: [
                 {
                   timestamp: "2026-06-11T00:00:02.000Z",
@@ -1043,12 +1046,13 @@ describe("App", () => {
                   totalTokens: 140,
                 },
               ],
-              errors: [],
+              errors: ["Replay error fixture"],
               items: [
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "system", source: "base_instructions", text: "system-1\nsystem-2\nsystem-3\nSYSTEM_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "developer", source: "developer_message", text: "developer-1\ndeveloper-2\ndeveloper-3\nDEVELOPER_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "user", source: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" },
+                { kind: "reasoning", timestamp: "2026-06-11T00:00:00.250Z", text: "Reasoning fixture" },
                 {
                   kind: "toolCall",
                   callId: "call-1",
@@ -1062,6 +1066,8 @@ describe("App", () => {
                   durationMs: 1000,
                   isError: false,
                 },
+                { kind: "patch", callId: "patch-1", success: true, output: "PATCH_SUCCESS_OUTPUT", timestamp: "2026-06-11T00:00:01.600Z", isError: false },
+                { kind: "patch", callId: "patch-2", success: false, output: "PATCH_FAILURE_OUTPUT", timestamp: "2026-06-11T00:00:01.700Z", isError: true },
                 {
                   kind: "tokenUsage",
                   timestamp: "2026-06-11T00:00:02.000Z",
@@ -1072,6 +1078,8 @@ describe("App", () => {
                   reasoningOutputTokens: 0,
                   totalTokens: 140,
                 },
+                { kind: "error", timestamp: "2026-06-11T00:00:01.800Z", text: "Replay error fixture" },
+                { kind: "notice", timestamp: "2026-06-11T00:00:01.900Z", label: "Replay notice", text: "Notice fixture" },
               ],
             },
           ],
@@ -1099,11 +1107,12 @@ describe("App", () => {
     expect(screen.getByText("Session summary")).toBeInTheDocument();
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
-    expect(turnButton).toHaveTextContent("3 messages");
+    expect(turnButton).toHaveTextContent("4 messages");
     expect(turnButton).toHaveTextContent("1 tool");
-    expect(turnButton).toHaveTextContent("0 patches");
-    expect(turnButton).toHaveTextContent("0 errors");
+    expect(turnButton).toHaveTextContent("2 patches");
+    expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
+    expect(turnButton).toHaveTextContent("Collapse");
     expect(screen.getByText("System prompt")).toBeInTheDocument();
     const systemButton = screen.getByRole("button", { name: /System prompt/ });
     const developerButton = screen.getByRole("button", { name: /Developer/ });
@@ -1113,6 +1122,14 @@ describe("App", () => {
     expect(developerButton).toHaveAttribute("aria-expanded", "false");
     expect(userButton).toHaveAttribute("aria-expanded", "false");
     expect(assistantButton).toHaveAttribute("aria-expanded", "false");
+    expect(systemButton).toHaveTextContent("Expand");
+    expect(developerButton).toHaveTextContent("Expand");
+    expect(userButton).toHaveTextContent("Expand");
+    expect(assistantButton).toHaveTextContent("Expand");
+    expect(systemButton.parentElement).toHaveClass("border-zinc-300/70");
+    expect(developerButton.parentElement).toHaveClass("border-violet-300/70");
+    expect(userButton.parentElement).toHaveClass("border-blue-300/70");
+    expect(assistantButton.parentElement).toHaveClass("border-emerald-300/70");
     expect(systemButton.nextElementSibling).toHaveClass("line-clamp-3");
     expect(developerButton.nextElementSibling).toHaveClass("line-clamp-3");
     expect(userButton.nextElementSibling).toHaveClass("line-clamp-[10]");
@@ -1129,18 +1146,45 @@ describe("App", () => {
     const toolCallButton = screen.getByRole("button", { name: /exec_command · completed/ });
     const toolCall = toolCallButton.parentElement!;
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
+    expect(toolCallButton).toHaveTextContent("Expand");
+    expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall.querySelector(".line-clamp-1")).toBeInTheDocument();
     expect(toolCall.querySelector(".line-clamp-5")).toBeInTheDocument();
+
+    const reasoningTitle = screen.getByText("Reasoning summary");
+    expect(reasoningTitle.parentElement?.parentElement).toHaveClass("border-amber-300/70");
+    const patchButton = screen.getByRole("button", { name: /Patch result/ });
+    const failedPatchButton = screen.getByRole("button", { name: /Patch failed/ });
+    expect(patchButton).toHaveAttribute("aria-expanded", "false");
+    expect(patchButton).toHaveTextContent("Expand");
+    expect(patchButton.parentElement).toHaveClass("border-green-300/70");
+    expect(failedPatchButton.parentElement).toHaveClass("border-error/40");
+    expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
+    expect(screen.getByText(/140 tokens/)).toHaveClass("border-fuchsia-300/70");
+    expect(screen.getByText("Replay error fixture")).toHaveClass("border-error/40");
+    expect(screen.getByText(/Replay notice/)).toHaveClass("border-sky-300/70");
+
+    await userEvent.click(patchButton);
+    expect(patchButton).toHaveAttribute("aria-expanded", "true");
+    expect(patchButton).toHaveTextContent("Collapse");
+    expect(screen.getByText("PATCH_SUCCESS_OUTPUT")).toBeInTheDocument();
+    await userEvent.click(patchButton);
+    expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
+
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
+    expect(toolCallButton).toHaveTextContent("Collapse");
     expect(screen.getByText(/LONG_TOOL_OUTPUT_TAIL/)).toBeInTheDocument();
     expect(screen.getByText(/LONG_ARGUMENT_TAIL/)).toBeInTheDocument();
 
     await userEvent.click(systemButton);
     expect(systemButton).toHaveAttribute("aria-expanded", "true");
+    expect(systemButton).toHaveTextContent("Collapse");
     expect(screen.getByText(/SYSTEM_TAIL/)).toBeInTheDocument();
 
     await userEvent.click(turnButton);
+    expect(turnButton).toHaveAttribute("aria-expanded", "false");
+    expect(turnButton).toHaveTextContent("Expand");
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Raw JSONL" }));

@@ -17,6 +17,33 @@ const TEXT_PREVIEW_LENGTH = 1200;
 const RAW_PREVIEW_LINES = 12;
 const RAW_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
+const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const ITEM_TONES = {
+  system: "border-zinc-300/70 bg-zinc-100/60 dark:border-zinc-700/70 dark:bg-zinc-900/40",
+  developer: "border-violet-300/70 bg-violet-50/70 dark:border-violet-800/70 dark:bg-violet-950/30",
+  user: "border-blue-300/70 bg-blue-50/70 dark:border-blue-800/70 dark:bg-blue-950/30",
+  assistant: "border-emerald-300/70 bg-emerald-50/70 dark:border-emerald-800/70 dark:bg-emerald-950/30",
+  reasoning: "border-amber-300/70 bg-amber-50/70 dark:border-amber-800/70 dark:bg-amber-950/30",
+  tool: "border-cyan-300/70 bg-cyan-50/70 dark:border-cyan-800/70 dark:bg-cyan-950/30",
+  patch: "border-green-300/70 bg-green-50/70 dark:border-green-800/70 dark:bg-green-950/30",
+  token: "border-fuchsia-300/70 bg-fuchsia-50/70 dark:border-fuchsia-800/70 dark:bg-fuchsia-950/30",
+  error: "border-error/40 bg-error/5",
+  notice: "border-sky-300/70 bg-sky-50/70 dark:border-sky-800/70 dark:bg-sky-950/30",
+} as const;
+
+const ITEM_TITLE_TONES = {
+  system: "text-zinc-600 dark:text-zinc-300",
+  developer: "text-violet-700 dark:text-violet-300",
+  user: "text-blue-700 dark:text-blue-300",
+  assistant: "text-emerald-700 dark:text-emerald-300",
+  reasoning: "text-amber-700 dark:text-amber-300",
+  tool: "text-cyan-700 dark:text-cyan-300",
+  patch: "text-green-700 dark:text-green-300",
+  token: "text-fuchsia-700 dark:text-fuchsia-300",
+  error: "text-error",
+  notice: "text-sky-700 dark:text-sky-300",
+} as const;
 
 function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
@@ -101,10 +128,12 @@ function TextBlock({
   title,
   text,
   defaultCollapsed = false,
+  titleClassName = "text-muted-foreground",
 }: {
   title: string;
   text: string;
   defaultCollapsed?: boolean;
+  titleClassName?: string;
 }) {
   const { t } = useTranslation();
   const [isFullVisible, setIsFullVisible] = useState(!defaultCollapsed && text.length <= LONG_TEXT_THRESHOLD);
@@ -113,7 +142,7 @@ function TextBlock({
 
   return (
     <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
+      <div className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${titleClassName}`}>{title}</div>
       <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
         {isFullVisible ? text : preview}
       </pre>
@@ -140,27 +169,30 @@ function MessageItem({ item }: { item: Extract<ReplayItem, { kind: "message" }> 
     : item.role === "assistant"
       ? t("sessions.detail.assistant")
       : item.role === "developer"
-        ? "Developer"
+        ? t("sessions.detail.developer")
         : t("sessions.detail.system");
   const previewLines = item.role === "user" || item.role === "assistant" ? 10 : 3;
   const previewClass = previewLines === 10 ? "line-clamp-[10]" : "line-clamp-3";
-  const tone = item.role === "user" ? "border-primary/30 bg-primary/5" : "border-border/50 bg-muted/35";
+  const toneKey = item.role === "user" || item.role === "assistant" || item.role === "developer" ? item.role : "system";
 
   return (
-    <div className={`rounded-lg border p-3 ${tone}`}>
+    <div className={`rounded-lg border p-3 ${ITEM_TONES[toneKey]}`}>
       <button
         type="button"
-        className="mb-2 flex w-full items-center justify-between gap-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        className={`mb-2 flex w-full items-center justify-between gap-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] ${ITEM_TITLE_TONES[toneKey]} ${DISCLOSURE_BUTTON_CLASS}`}
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((value) => !value)}
       >
-        <span className="flex items-center gap-1">
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          {title}
+        <span>{title}</span>
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="font-mono normal-case tracking-normal text-muted-foreground">{formatTimestamp(item.timestamp)}</span>
+          <span className="flex items-center gap-1 normal-case tracking-normal">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
         </span>
-        <span className="font-mono normal-case tracking-normal">{formatTimestamp(item.timestamp)}</span>
       </button>
-      <pre className={`${isExpanded ? "" : previewClass} whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
+      <pre className={`${isExpanded ? "" : previewClass} rounded-md border border-border/50 bg-muted/35 p-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
         {isExpanded ? item.text : buildCollapsedPreview(item.text, previewLines)}
       </pre>
     </div>
@@ -178,7 +210,7 @@ function ToolTextBlock({ title, text }: { title: string; text: string }) {
 
 function ToolPreview({ title, text, lines }: { title: string; text: string; lines: 1 | 5 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-lg border border-border/50 bg-muted/35 p-3">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
       <pre className={`${lines === 1 ? "line-clamp-1" : "line-clamp-5"} whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground`}>
         {buildCollapsedPreview(text, lines)}
@@ -192,16 +224,21 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
+    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
       <button
         type="button"
-        className="flex w-full items-center gap-1 text-left text-xs font-semibold"
+        className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((value) => !value)}
       >
-        {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        <Terminal className="h-3.5 w-3.5" />
-        <span>{item.name} {item.status ? `· ${item.status}` : ""}</span>
+        <span className="flex min-w-0 items-center gap-1">
+          <Terminal className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{item.name} {item.status ? `· ${item.status}` : ""}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        </span>
       </button>
       {isExpanded ? (
         <div className="mt-3 space-y-2">
@@ -220,6 +257,30 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   );
 }
 
+function PatchItem({ item }: { item: Extract<ReplayItem, { kind: "patch" }> }) {
+  const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isError = item.isError || item.success === false;
+
+  return (
+    <div className={`rounded-lg border p-3 ${isError ? ITEM_TONES.error : ITEM_TONES.patch}`}>
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.patch} ${DISCLOSURE_BUTTON_CLASS}`}
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((value) => !value)}
+      >
+        <span>{item.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        </span>
+      </button>
+      {isExpanded && item.output ? <div className="mt-3"><TextBlock title={t("sessions.detail.patch_output")} text={item.output} /></div> : null}
+    </div>
+  );
+}
+
 function TimelineItem({ item }: { item: ReplayItem }) {
   const { t } = useTranslation();
 
@@ -228,7 +289,11 @@ function TimelineItem({ item }: { item: ReplayItem }) {
   }
 
   if (item.kind === "reasoning") {
-    return <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} />;
+    return (
+      <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
+        <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} titleClassName={ITEM_TITLE_TONES.reasoning} />
+      </div>
+    );
   }
 
   if (item.kind === "toolCall") {
@@ -236,30 +301,23 @@ function TimelineItem({ item }: { item: ReplayItem }) {
   }
 
   if (item.kind === "patch") {
-    return (
-      <details className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
-        <summary className="cursor-pointer text-xs font-semibold">
-          {item.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}
-        </summary>
-        {item.output ? <div className="mt-3"><TextBlock title={t("sessions.detail.patch_output")} text={item.output} /></div> : null}
-      </details>
-    );
+    return <PatchItem item={item} />;
   }
 
   if (item.kind === "tokenUsage") {
     return (
-      <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+      <div className={`rounded-lg border px-3 py-2 font-mono text-[11px] ${ITEM_TONES.token} ${ITEM_TITLE_TONES.token}`}>
         {formatTimestamp(item.timestamp)} · {item.model} · {t("sessions.detail.tokens_count", { value: formatNumber(item.totalTokens) })}
       </div>
     );
   }
 
   if (item.kind === "error") {
-    return <div className="rounded-lg border border-error/35 bg-error/5 p-3 text-sm text-error">{item.text}</div>;
+    return <div className={`rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}>{item.text}</div>;
   }
 
   return (
-    <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+    <div className={`rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
       {item.label}{item.text ? ` · ${item.text}` : ""}
     </div>
   );
@@ -487,13 +545,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                 <section key={turnKey} className="rounded-lg border border-border/60 bg-surface p-4">
                   <button
                     type="button"
-                    className="flex w-full flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between"
+                    className={`flex w-full flex-col gap-3 rounded-md text-left sm:flex-row sm:items-start sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}
                     aria-expanded={isExpanded}
                     onClick={() => toggleTurn(turnKey)}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 font-bold">
-                        {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                         <MessageSquare className="h-4 w-4 text-primary" />
                         {t("sessions.detail.turn", { id: turn.turnId })}
                       </div>
@@ -508,8 +565,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                         <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.token_event_count", { count: turn.tokenEvents.length })}</span>
                       </div>
                     </div>
-                    <div className="shrink-0 text-xs text-muted-foreground">
-                      {formatTimestamp(turn.startedAt)} · {formatDuration(turn.durationMs)}
+                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+                      <span>{formatTimestamp(turn.startedAt)} · {formatDuration(turn.durationMs)}</span>
+                      <span className="flex items-center gap-1 font-semibold text-foreground">
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+                      </span>
                     </div>
                   </button>
                   {isExpanded ? (
