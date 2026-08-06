@@ -925,7 +925,10 @@ describe("App", () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const execArguments = JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000 });
-    const execOutput = JSON.stringify({ exit_code: 0, output: longToolOutput, wall_time_seconds: 1.25 });
+    const execOutput = JSON.stringify([
+      { text: "Script completed\nWall time 1.25s\nOutput:\n", type: "input_text" },
+      { text: longToolOutput, type: "input_text" },
+    ]);
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
       `${"x".repeat(4100)}raw-only-marker`,
@@ -1199,9 +1202,9 @@ describe("App", () => {
     expect(toolCall.querySelector(".line-clamp-5")).toBeInTheDocument();
     expect(toolCall).toHaveTextContent("Command");
     expect(toolCall).toHaveTextContent("Working directory: /repo/app");
-    expect(toolCall).toHaveTextContent("Exit code: 0");
-    expect(toolCall).toHaveTextContent("Wall time: 1.25s");
-    expect(toolCall).not.toHaveTextContent("wall_time_seconds");
+    expect(toolCall).toHaveTextContent("Script completed");
+    expect(toolCall).not.toHaveTextContent("input_text");
+    expect(toolCall).not.toHaveTextContent('"text"');
     expect(screen.getByText("User input request")).toBeInTheDocument();
     expect(screen.getByText("Display mode")).toBeInTheDocument();
     expect(screen.getByText("How should the session item be displayed?")).toBeInTheDocument();

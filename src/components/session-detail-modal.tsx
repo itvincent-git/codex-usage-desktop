@@ -266,6 +266,26 @@ function parseExecArguments(value: string | null): ExecArguments | null {
 }
 
 function parseExecOutput(value: string | null): ExecOutput | null {
+  if (!value) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      const text = parsed.flatMap((block) => (
+        block !== null
+          && typeof block === "object"
+          && typeof (block as Record<string, unknown>).text === "string"
+          ? [(block as Record<string, unknown>).text as string]
+          : []
+      )).join("");
+      if (text) {
+        return { stdout: text, stderr: null, exitCode: null, wallTimeSeconds: null, sessionId: null };
+      }
+    }
+  } catch {
+    return null;
+  }
+
   const parsed = parseJsonObject(value);
   if (!parsed) return null;
 
