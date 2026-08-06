@@ -509,6 +509,9 @@ describe("session titles", () => {
     );
 
     await waitFor(() => expect(screen.getByText("Alpha launch notes")).toBeInTheDocument());
+    const sessionsTableContainer = screen.getByRole("table").parentElement!;
+    expect(sessionsTableContainer).toHaveClass("overflow-x-auto");
+    expect(sessionsTableContainer).not.toHaveClass("overflow-auto", "max-h-[36vh]");
     expect(invokeMock).toHaveBeenCalledWith("fetch_project_analytics", { project: "/repo/app", range: "30d" });
     expect(screen.getByText("Other")).toBeInTheDocument();
     expect(screen.getByText("Daily token and cost trend")).toBeInTheDocument();
