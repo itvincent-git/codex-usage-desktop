@@ -923,6 +923,7 @@ describe("App", () => {
 
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
+    const longArguments = `${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
       `${"x".repeat(4100)}raw-only-marker`,
@@ -1011,17 +1012,17 @@ describe("App", () => {
               completedAt: "2026-06-11T00:00:02.000Z",
               durationMs: 2000,
               systemMessages: [
-                { timestamp: "2026-06-11T00:00:00.000Z", kind: "base_instructions", text: "Use the repo instructions." },
+                { timestamp: "2026-06-11T00:00:00.000Z", kind: "base_instructions", text: "system-1\nsystem-2\nsystem-3\nSYSTEM_TAIL" },
               ],
-              userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session" }],
-              assistantMessages: [],
+              userMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" }],
+              assistantMessages: [{ timestamp: "2026-06-11T00:00:00.000Z", kind: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" }],
               reasoningSummaries: [],
               toolCalls: [
                 {
                   callId: "call-1",
-                  name: "shell",
+                  name: "exec_command",
                   status: "completed",
-                  arguments: null,
+                  arguments: longArguments,
                   output: longToolOutput,
                   stderr: null,
                   startedAt: "2026-06-11T00:00:00.500Z",
@@ -1043,6 +1044,35 @@ describe("App", () => {
                 },
               ],
               errors: [],
+              items: [
+                { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "system", source: "base_instructions", text: "system-1\nsystem-2\nsystem-3\nSYSTEM_TAIL" },
+                { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "developer", source: "developer_message", text: "developer-1\ndeveloper-2\ndeveloper-3\nDEVELOPER_TAIL" },
+                { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "user", source: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" },
+                { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" },
+                {
+                  kind: "toolCall",
+                  callId: "call-1",
+                  name: "exec_command",
+                  status: "completed",
+                  arguments: longArguments,
+                  output: longToolOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:00.500Z",
+                  completedAt: "2026-06-11T00:00:01.500Z",
+                  durationMs: 1000,
+                  isError: false,
+                },
+                {
+                  kind: "tokenUsage",
+                  timestamp: "2026-06-11T00:00:02.000Z",
+                  model: "gpt-5",
+                  inputTokens: 100,
+                  cachedInputTokens: 20,
+                  outputTokens: 40,
+                  reasoningOutputTokens: 0,
+                  totalTokens: 140,
+                },
+              ],
             },
           ],
         };
@@ -1069,20 +1099,46 @@ describe("App", () => {
     expect(screen.getByText("Session summary")).toBeInTheDocument();
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
-    expect(turnButton).toHaveTextContent("2 messages");
+    expect(turnButton).toHaveTextContent("3 messages");
     expect(turnButton).toHaveTextContent("1 tool");
     expect(turnButton).toHaveTextContent("0 patches");
     expect(turnButton).toHaveTextContent("0 errors");
     expect(turnButton).toHaveTextContent("1 token event");
     expect(screen.getByText("System prompt")).toBeInTheDocument();
-    expect(screen.getByText("Use the repo instructions.")).toBeInTheDocument();
-    expect(screen.getAllByText("Replay this session").length).toBeGreaterThan(0);
+    const systemButton = screen.getByRole("button", { name: /System prompt/ });
+    const developerButton = screen.getByRole("button", { name: /Developer/ });
+    const userButton = screen.getByRole("button", { name: /User/ });
+    const assistantButton = screen.getByRole("button", { name: /Assistant/ });
+    expect(systemButton).toHaveAttribute("aria-expanded", "false");
+    expect(developerButton).toHaveAttribute("aria-expanded", "false");
+    expect(userButton).toHaveAttribute("aria-expanded", "false");
+    expect(assistantButton).toHaveAttribute("aria-expanded", "false");
+    expect(systemButton.nextElementSibling).toHaveClass("line-clamp-3");
+    expect(developerButton.nextElementSibling).toHaveClass("line-clamp-3");
+    expect(userButton.nextElementSibling).toHaveClass("line-clamp-[10]");
+    expect(assistantButton.nextElementSibling).toHaveClass("line-clamp-[10]");
+    expect(systemButton.nextElementSibling).not.toHaveTextContent("SYSTEM_TAIL");
+    expect(developerButton.nextElementSibling).not.toHaveTextContent("DEVELOPER_TAIL");
+    expect(userButton.nextElementSibling).not.toHaveTextContent("USER_TAIL");
+    expect(assistantButton.nextElementSibling).not.toHaveTextContent("ASSISTANT_TAIL");
+    expect(screen.getAllByText(/Replay this session/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByText("shell · completed"));
-    await userEvent.click(screen.getByRole("button", { name: "Show full text" }));
+    const toolCallButton = screen.getByRole("button", { name: /exec_command · completed/ });
+    const toolCall = toolCallButton.parentElement!;
+    expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
+    expect(toolCall.querySelector(".line-clamp-1")).toBeInTheDocument();
+    expect(toolCall.querySelector(".line-clamp-5")).toBeInTheDocument();
+    await userEvent.click(toolCallButton);
+    expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(/LONG_TOOL_OUTPUT_TAIL/)).toBeInTheDocument();
+    expect(screen.getByText(/LONG_ARGUMENT_TAIL/)).toBeInTheDocument();
+
+    await userEvent.click(systemButton);
+    expect(systemButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/SYSTEM_TAIL/)).toBeInTheDocument();
 
     await userEvent.click(turnButton);
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();

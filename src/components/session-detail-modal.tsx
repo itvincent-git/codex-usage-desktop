@@ -16,6 +16,7 @@ const LONG_TEXT_THRESHOLD = 2000;
 const TEXT_PREVIEW_LENGTH = 1200;
 const RAW_PREVIEW_LINES = 12;
 const RAW_PREVIEW_LINE_LENGTH = 240;
+const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
 
 function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
@@ -49,6 +50,13 @@ function buildRawPreview(rawJsonl: string) {
     .slice(0, RAW_PREVIEW_LINES)
     .map((line) => (line.length > RAW_PREVIEW_LINE_LENGTH ? `${line.slice(0, RAW_PREVIEW_LINE_LENGTH)}...` : line))
     .join("\n");
+}
+
+function buildCollapsedPreview(text: string, lines: number) {
+  const preview = text.split("\n").slice(0, lines).join("\n");
+  const maxLength = lines * COLLAPSED_PREVIEW_LINE_LENGTH;
+  const isTruncated = preview.length < text.length || preview.length > maxLength;
+  return isTruncated ? `${preview.slice(0, maxLength)}...` : preview;
 }
 
 function countMessages(turn: SessionReplayDetail["turns"][number]) {
@@ -124,27 +132,99 @@ function TextBlock({
   );
 }
 
+function MessageItem({ item }: { item: Extract<ReplayItem, { kind: "message" }> }) {
+  const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const title = item.role === "user"
+    ? t("sessions.detail.user")
+    : item.role === "assistant"
+      ? t("sessions.detail.assistant")
+      : item.role === "developer"
+        ? "Developer"
+        : t("sessions.detail.system");
+  const previewLines = item.role === "user" || item.role === "assistant" ? 10 : 3;
+  const previewClass = previewLines === 10 ? "line-clamp-[10]" : "line-clamp-3";
+  const tone = item.role === "user" ? "border-primary/30 bg-primary/5" : "border-border/50 bg-muted/35";
+
+  return (
+    <div className={`rounded-lg border p-3 ${tone}`}>
+      <button
+        type="button"
+        className="mb-2 flex w-full items-center justify-between gap-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((value) => !value)}
+      >
+        <span className="flex items-center gap-1">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {title}
+        </span>
+        <span className="font-mono normal-case tracking-normal">{formatTimestamp(item.timestamp)}</span>
+      </button>
+      <pre className={`${isExpanded ? "" : previewClass} whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
+        {isExpanded ? item.text : buildCollapsedPreview(item.text, previewLines)}
+      </pre>
+    </div>
+  );
+}
+
+function ToolTextBlock({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
+      <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{text}</pre>
+    </div>
+  );
+}
+
+function ToolPreview({ title, text, lines }: { title: string; text: string; lines: 1 | 5 }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
+      <pre className={`${lines === 1 ? "line-clamp-1" : "line-clamp-5"} whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground`}>
+        {buildCollapsedPreview(text, lines)}
+      </pre>
+    </div>
+  );
+}
+
+function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
+  const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
+      <button
+        type="button"
+        className="flex w-full items-center gap-1 text-left text-xs font-semibold"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((value) => !value)}
+      >
+        {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        <Terminal className="h-3.5 w-3.5" />
+        <span>{item.name} {item.status ? `· ${item.status}` : ""}</span>
+      </button>
+      {isExpanded ? (
+        <div className="mt-3 space-y-2">
+          {item.arguments ? <ToolTextBlock title={t("sessions.detail.arguments")} text={item.arguments} /> : null}
+          {item.output ? <ToolTextBlock title={t("sessions.detail.output")} text={item.output} /> : null}
+          {item.stderr ? <ToolTextBlock title={t("sessions.detail.stderr")} text={item.stderr} /> : null}
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {item.arguments ? <ToolPreview title={t("sessions.detail.arguments")} text={item.arguments} lines={1} /> : null}
+          {item.output ? <ToolPreview title={t("sessions.detail.output")} text={item.output} lines={5} /> : null}
+          {item.stderr ? <ToolPreview title={t("sessions.detail.stderr")} text={item.stderr} lines={5} /> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TimelineItem({ item }: { item: ReplayItem }) {
   const { t } = useTranslation();
 
   if (item.kind === "message") {
-    const title = item.role === "user"
-      ? t("sessions.detail.user")
-      : item.role === "assistant"
-        ? t("sessions.detail.assistant")
-        : item.role === "developer"
-          ? "Developer"
-          : t("sessions.detail.system");
-    const tone = item.role === "user" ? "border-primary/30 bg-primary/5" : "border-border/50 bg-muted/35";
-    return (
-      <div className={`rounded-lg border p-3 ${tone}`}>
-        <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          <span>{title}</span>
-          <span className="font-mono normal-case tracking-normal">{formatTimestamp(item.timestamp)}</span>
-        </div>
-        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{item.text}</pre>
-      </div>
-    );
+    return <MessageItem item={item} />;
   }
 
   if (item.kind === "reasoning") {
@@ -152,19 +232,7 @@ function TimelineItem({ item }: { item: ReplayItem }) {
   }
 
   if (item.kind === "toolCall") {
-    return (
-      <details className={`rounded-lg border p-3 ${item.isError ? "border-error/35 bg-error/5" : "border-border/50 bg-muted/35"}`}>
-        <summary className="cursor-pointer text-xs font-semibold">
-          <Terminal className="mr-1 inline h-3.5 w-3.5" />
-          {item.name} {item.status ? `· ${item.status}` : ""}
-        </summary>
-        <div className="mt-3 space-y-2">
-          {item.arguments ? <TextBlock title={t("sessions.detail.arguments")} text={item.arguments} /> : null}
-          {item.output ? <TextBlock title={t("sessions.detail.output")} text={item.output} /> : null}
-          {item.stderr ? <TextBlock title={t("sessions.detail.stderr")} text={item.stderr} /> : null}
-        </div>
-      </details>
-    );
+    return <ToolCallItem item={item} />;
   }
 
   if (item.kind === "patch") {
