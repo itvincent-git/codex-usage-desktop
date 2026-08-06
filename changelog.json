@@ -1,4 +1,8 @@
 {
+  "2.0.0": {
+    "zh": "- feat: redesign session replay timeline\n- feat: collapse session replay details by default\n- feat: improve session detail item clarity\n- feat(session): render user input options\n- feat(session): format exec tool output\n- fix(session): render exec content blocks\n- fix(session): render tool content blocks",
+    "en": "- feat: redesign session replay timeline\n- feat: collapse session replay details by default\n- feat: improve session detail item clarity\n- feat(session): render user input options\n- feat(session): format exec tool output\n- fix(session): render exec content blocks\n- fix(session): render tool content blocks"
+  },
   "1.27.1": {
     "zh": "- fix(ui): remove nested project session scrolling",
     "en": "- fix(ui): remove nested project session scrolling"
