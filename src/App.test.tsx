@@ -923,7 +923,7 @@ describe("App", () => {
 
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
-    const longArguments = `${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
+    const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const execArguments = JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000 });
     const execOutput = JSON.stringify([
       { text: "Script completed\nWall time 1.25s\nOutput:\n", type: "input_text" },
@@ -1025,7 +1025,7 @@ describe("App", () => {
               toolCalls: [
                 {
                   callId: "call-1",
-                  name: "exec_command",
+                  name: "exec",
                   status: "completed",
                   arguments: execArguments,
                   output: execOutput,
@@ -1039,7 +1039,7 @@ describe("App", () => {
                   callId: "call-wait",
                   name: "wait",
                   status: "completed",
-                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000 }),
+                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000, max_tokens: 30000 }),
                   output: JSON.stringify([
                     { text: "Wait completed\n", type: "input_text" },
                     { text: "Background task output", type: "input_text" },
@@ -1099,7 +1099,7 @@ describe("App", () => {
                 {
                   kind: "toolCall",
                   callId: "call-1",
-                  name: "exec_command",
+                  name: "exec",
                   status: "completed",
                   arguments: execArguments,
                   output: execOutput,
@@ -1114,7 +1114,7 @@ describe("App", () => {
                   callId: "call-wait",
                   name: "wait",
                   status: "completed",
-                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000 }),
+                  arguments: JSON.stringify({ cell_id: "8", yield_time_ms: 1000, max_tokens: 30000 }),
                   output: JSON.stringify([
                     { text: "Wait completed\n", type: "input_text" },
                     { text: "Background task output", type: "input_text" },
@@ -1184,6 +1184,11 @@ describe("App", () => {
     await userEvent.click(screen.getByText("Replay summary"));
 
     expect(await screen.findByRole("dialog", { name: "Updated replay summary" })).toBeInTheDocument();
+    const detailHeader = screen.getByRole("dialog", { name: "Updated replay summary" }).querySelector("header")!;
+    expect(detailHeader).toHaveClass("py-2.5");
+    expect(within(detailHeader).getByText("session-replay")).toHaveClass("border-zinc-300/70");
+    expect(within(detailHeader).getByText("/repo/app")).toHaveClass("border-blue-300/60");
+    expect(within(detailHeader).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
     expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
     expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
@@ -1226,7 +1231,7 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    const toolCallButton = screen.getByRole("button", { name: /exec_command · completed/ });
+    const toolCallButton = screen.getByRole("button", { name: /exec · completed/ });
     const toolCall = toolCallButton.parentElement!;
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCallButton).toHaveTextContent("Expand");
@@ -1240,6 +1245,12 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent('"text"');
     const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
     const waitCall = waitCallButton.parentElement!;
+    expect(waitCall).toHaveTextContent("Process session8");
+    expect(waitCall).toHaveTextContent("Wait interval (ms)1000");
+    expect(waitCall).toHaveTextContent("Output token limit30000");
+    expect(waitCall).not.toHaveTextContent("cell_id");
+    expect(waitCall).not.toHaveTextContent("yield_time_ms");
+    expect(waitCall).not.toHaveTextContent("max_tokens");
     expect(waitCall).toHaveTextContent("Wait completed");
     expect(waitCall).toHaveTextContent("Background task output");
     expect(waitCall).toHaveTextContent("1 output image");
@@ -1280,6 +1291,7 @@ describe("App", () => {
     expect(toolCallButton).toHaveTextContent("Collapse");
     expect(screen.getByText(/LONG_TOOL_OUTPUT_TAIL/)).toBeInTheDocument();
     expect(screen.getByText(/LONG_ARGUMENT_TAIL/)).toBeInTheDocument();
+    expect(toolCall.textContent).toContain("first command\nsecond command");
 
     await userEvent.click(systemButton);
     expect(systemButton).toHaveAttribute("aria-expanded", "true");

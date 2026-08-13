@@ -251,6 +251,17 @@ function parseJsonObject(value: string | null): Record<string, unknown> | null {
   }
 }
 
+function baseToolName(name: string) {
+  return name.split(".").at(-1) ?? name;
+}
+
+function formatToolArgumentValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value === null) return "null";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value, null, 2);
+}
+
 function parseExecArguments(value: string | null): ExecArguments | null {
   const parsed = parseJsonObject(value);
   if (!parsed) return null;
@@ -427,12 +438,17 @@ function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: 
 function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const userInputQuestions = item.name === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
-  const isExec = EXEC_TOOL_NAMES.has(item.name);
+  const toolName = baseToolName(item.name);
+  const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
+  const isExec = EXEC_TOOL_NAMES.has(toolName);
   const execArguments = isExec ? parseExecArguments(item.arguments) : null;
+  const parsedArguments = parseJsonObject(item.arguments);
+  const argumentEntries = parsedArguments
+    ? Object.entries(parsedArguments).filter(([key]) => !execArguments || !["cmd", "command", "workdir", "cwd"].includes(key))
+    : [];
   const execOutput = isExec ? parseExecOutput(item.output) : null;
   const contentBlocks = parseToolContentBlocks(item.output);
-  const argumentsText = execArguments?.command ?? item.arguments;
+  const argumentsText = execArguments?.command ?? (parsedArguments ? null : item.arguments);
   const outputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const stderrText = execOutput?.stderr ?? item.stderr;
 
@@ -462,6 +478,20 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
           isExpanded
             ? <ToolTextBlock title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} />
             : <ToolPreview title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} lines={1} />
+        ) : null}
+        {argumentEntries.length > 0 ? (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {argumentEntries.map(([key, value]) => (
+              <div key={key} className="min-w-0 rounded-md border border-cyan-300/50 bg-cyan-50/60 px-3 py-2 dark:border-cyan-800/50 dark:bg-cyan-950/25">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-cyan-700 dark:text-cyan-300">
+                  {t(`sessions.detail.tool_argument_labels.${key}`, { defaultValue: key.replaceAll("_", " ") })}
+                </div>
+                <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+                  {formatToolArgumentValue(value)}
+                </pre>
+              </div>
+            ))}
+          </div>
         ) : null}
         {execArguments?.workdir ? (
           <div className="rounded-md border border-border/50 bg-muted/35 px-3 py-2 text-xs">
@@ -701,36 +731,32 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
       aria-labelledby="session-detail-title"
     >
       <div className="flex h-screen w-full flex-col overflow-hidden overscroll-contain">
-        <header className="border-b border-border/70 bg-surface px-5 py-4 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 space-y-2">
-              <div className="flex items-center gap-2">
+        <header className="border-b border-border/70 bg-surface px-5 py-2.5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <FileJson className="h-4 w-4 text-primary" />
-                <h2 id="session-detail-title" className="truncate text-lg font-bold tracking-tight">
+                <h2 id="session-detail-title" className="mr-1 min-w-0 truncate text-base font-bold tracking-tight">
                   {threadName || cleanSessionId(session.sessionId)}
                 </h2>
-              </div>
-              {threadName ? (
-                <p className="truncate font-mono text-xs text-muted-foreground" title={session.sessionId}>
+                {threadName ? (
+                  <span className="max-w-[260px] truncate rounded border border-zinc-300/70 bg-zinc-100/80 px-2 py-0.5 font-mono text-[10px] text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" title={session.sessionId}>
                   {cleanSessionId(session.sessionId)}
-                </p>
-              ) : null}
-              <div className="flex flex-wrap gap-1.5">
+                  </span>
+                ) : null}
                 {projects.map((project) => (
-                  <span key={project} className="max-w-[360px] truncate rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground" title={project}>
+                  <span key={project} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project}>
                     {project}
                   </span>
                 ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
                 {models.map((model) => (
-                  <span key={model} className="rounded-full border border-primary/15 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                     {model}
                   </span>
                 ))}
               </div>
             </div>
-            <Button ref={closeButtonRef} variant="secondary" size="sm" onClick={onClose} aria-label={t("sessions.detail.close_aria")}>
+            <Button ref={closeButtonRef} variant="secondary" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t("sessions.detail.close_aria")}>
               <X className="h-4 w-4" />
             </Button>
           </div>
