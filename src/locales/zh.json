@@ -458,6 +458,7 @@
       "tool_calls": "工具调用",
       "patches": "补丁",
       "errors": "错误",
+      "details": "详情",
       "timeline": "时间线",
       "raw_jsonl": "原始 JSONL",
       "loading_replay": "正在加载会话回放",

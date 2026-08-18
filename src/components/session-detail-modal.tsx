@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronRight, Clipboard, FileJson, Loader2, MessageSquare, Terminal, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -114,13 +114,22 @@ function orderedItems(turn: SessionReplayDetail["turns"][number]): ReplayItem[] 
   ];
 }
 
-function metric(label: string, value: string, tone: "default" | "danger" = "default") {
+const METRIC_TONES = {
+  blue: "border-blue-300/60 bg-blue-50/80 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  violet: "border-violet-300/60 bg-violet-50/80 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  emerald: "border-emerald-300/60 bg-emerald-50/80 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  cyan: "border-cyan-300/60 bg-cyan-50/80 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300",
+  amber: "border-amber-300/60 bg-amber-50/80 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  green: "border-green-300/60 bg-green-50/80 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300",
+  red: "border-red-300/60 bg-red-50/80 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300",
+} as const;
+
+function metric(label: string, value: string, icon: ReactNode, tone: keyof typeof METRIC_TONES) {
   return (
-    <div className="min-w-0 rounded-lg border border-border/60 bg-surface/70 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-      <div className={tone === "danger" ? "mt-1 text-sm font-bold text-error" : "mt-1 text-sm font-bold text-foreground"}>
-        {value}
-      </div>
+    <div className={`flex min-w-max items-center justify-center gap-1.5 rounded-md border px-2 py-1 ${METRIC_TONES[tone]}`}>
+      <span className="shrink-0">{icon}</span>
+      <span className="text-[10px] font-medium opacity-75">{label}</span>
+      <span className="font-mono text-xs font-bold tabular-nums">{value}</span>
     </div>
   );
 }
@@ -615,6 +624,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [copied, setCopied] = useState(false);
   const [expandedTurns, setExpandedTurns] = useState<Set<string>>(() => new Set());
   const [showFullRaw, setShowFullRaw] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -637,6 +648,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setActiveTab("timeline");
     setExpandedTurns(new Set());
     setShowFullRaw(false);
+    setShowDetails(false);
+    setIsScrolled(false);
 
     void fetchSessionDetail(session.path)
       .then((data) => {
@@ -731,67 +744,71 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
       aria-labelledby="session-detail-title"
     >
       <div className="flex h-screen w-full flex-col overflow-hidden overscroll-contain">
-        <header className="border-b border-border/70 bg-surface px-5 py-2.5 shadow-sm">
-          <div className="flex items-center gap-3">
+        <header className={`z-10 border-b border-border/70 bg-surface px-4 shadow-sm transition-[padding] ${isScrolled ? "py-1" : "py-1.5"}`}>
+          <div className="flex min-h-8 items-center gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <FileJson className="h-4 w-4 text-primary" />
-                <h2 id="session-detail-title" className="mr-1 min-w-0 truncate text-base font-bold tracking-tight">
+                <h2 id="session-detail-title" className={`mr-1 min-w-0 truncate font-bold tracking-tight transition-[font-size] ${isScrolled ? "text-sm" : "text-base"}`}>
                   {threadName || cleanSessionId(session.sessionId)}
                 </h2>
-                {threadName ? (
-                  <span className="max-w-[260px] truncate rounded border border-zinc-300/70 bg-zinc-100/80 px-2 py-0.5 font-mono text-[10px] text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" title={session.sessionId}>
-                  {cleanSessionId(session.sessionId)}
-                  </span>
-                ) : null}
-                {projects.map((project) => (
-                  <span key={project} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project}>
-                    {project}
-                  </span>
-                ))}
-                {models.map((model) => (
-                  <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    {model}
-                  </span>
-                ))}
               </div>
             </div>
+            <button
+              type="button"
+              className={`flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+              aria-expanded={showDetails}
+              onClick={() => setShowDetails((value) => !value)}
+            >
+              <Info className="h-3.5 w-3.5" />
+              {t("sessions.detail.details")}
+              {showDetails ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+            <nav className="flex shrink-0 items-center rounded-md bg-muted/70 p-0.5">
+              <button type="button" onClick={() => setActiveTab("timeline")} className={`rounded px-2 py-1 text-xs font-semibold transition ${activeTab === "timeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                {t("sessions.detail.timeline")}
+              </button>
+              <button type="button" onClick={() => setActiveTab("raw")} className={`rounded px-2 py-1 text-xs font-semibold transition ${activeTab === "raw" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                {t("sessions.detail.raw_jsonl")}
+              </button>
+            </nav>
             <Button ref={closeButtonRef} variant="secondary" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t("sessions.detail.close_aria")}>
               <X className="h-4 w-4" />
             </Button>
           </div>
+          <div className="mt-1 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            {metric(t("sessions.detail.duration"), formatDuration(detail?.summary.durationMs), <Clock3 className="h-3.5 w-3.5" />, "blue")}
+            {metric(t("sessions.detail.total_tokens"), formatNumber(detail?.summary.totalTokens ?? session.totalTokens), <Database className="h-3.5 w-3.5" />, "violet")}
+            {metric(t("sessions.detail.cost"), formatCurrency(detail?.summary.costUSD ?? session.costUSD), <Coins className="h-3.5 w-3.5" />, "emerald")}
+            {metric(t("sessions.detail.cache"), formatPercent(cacheRate), <Database className="h-3.5 w-3.5" />, "cyan")}
+            {metric(t("sessions.detail.tool_calls"), formatNumber(detail?.summary.toolCallCount ?? 0), <Wrench className="h-3.5 w-3.5" />, "amber")}
+            {metric(t("sessions.detail.patches"), formatNumber(detail?.summary.patchCount ?? 0), <FileDiff className="h-3.5 w-3.5" />, "green")}
+            {metric(t("sessions.detail.errors"), formatNumber(detail?.summary.errorCount ?? 0), <AlertTriangle className="h-3.5 w-3.5" />, "red")}
+          </div>
+          {showDetails ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-1.5 text-[11px] text-muted-foreground">
+              {threadName ? <span className="max-w-[260px] truncate rounded border border-zinc-300/70 bg-zinc-100/80 px-2 py-0.5 font-mono text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" title={session.sessionId}>{cleanSessionId(session.sessionId)}</span> : null}
+              {projects.map((project) => <span key={project} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project}>{project}</span>)}
+              {models.map((model) => <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{model}</span>)}
+              <span>{t("sessions.detail.started", { value: formatTimestamp(detail?.summary.startTime ?? null) })}</span>
+              <span>·</span>
+              <span>{t("sessions.detail.ended", { value: formatTimestamp(detail?.summary.endTime ?? null) })}</span>
+              <span>·</span>
+              <span>{t("sessions.detail.first_token", { value: formatDuration(detail?.summary.timeToFirstTokenMs) })}</span>
+              <span>·</span>
+              <span>{t("sessions.detail.cli", { value: detail?.summary.cliVersion ?? "--" })}</span>
+            </div>
+          ) : null}
         </header>
 
-        <section className="border-b border-border/60 bg-background px-5 py-3">
-          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
-            {metric(t("sessions.detail.duration"), formatDuration(detail?.summary.durationMs))}
-            {metric(t("sessions.detail.total_tokens"), formatNumber(detail?.summary.totalTokens ?? session.totalTokens))}
-            {metric(t("sessions.detail.cost"), formatCurrency(detail?.summary.costUSD ?? session.costUSD))}
-            {metric(t("sessions.detail.cache"), formatPercent(cacheRate))}
-            {metric(t("sessions.detail.tool_calls"), formatNumber(detail?.summary.toolCallCount ?? 0))}
-            {metric(t("sessions.detail.patches"), formatNumber(detail?.summary.patchCount ?? 0))}
-            {metric(t("sessions.detail.errors"), formatNumber(detail?.summary.errorCount ?? 0), (detail?.summary.errorCount ?? 0) > 0 ? "danger" : "default")}
-          </div>
-        </section>
-
-        <nav className="flex items-center gap-2 border-b border-border/60 bg-background px-5 py-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("timeline")}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${activeTab === "timeline" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-          >
-            {t("sessions.detail.timeline")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("raw")}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${activeTab === "raw" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-          >
-            {t("sessions.detail.raw_jsonl")}
-          </button>
-        </nav>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 px-5 py-4">
+        <div
+          data-testid="session-detail-scroll"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 px-4 py-3"
+          onScroll={(event) => {
+            const nextIsScrolled = event.currentTarget.scrollTop > 12;
+            setIsScrolled((current) => current === nextIsScrolled ? current : nextIsScrolled);
+          }}
+        >
           {error ? (
             <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
               <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -803,41 +820,28 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               {t("sessions.detail.loading_replay")}
             </div>
           ) : activeTab === "timeline" ? (
-            <div className="mx-auto max-w-6xl space-y-4">
-              <section className="rounded-lg border border-border/60 bg-surface p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  {t("sessions.detail.session_summary")}
-                </div>
-                <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                  <div>{t("sessions.detail.started", { value: formatTimestamp(detail.summary.startTime) })}</div>
-                  <div>{t("sessions.detail.ended", { value: formatTimestamp(detail.summary.endTime) })}</div>
-                  <div>{t("sessions.detail.first_token", { value: formatDuration(detail.summary.timeToFirstTokenMs) })}</div>
-                  <div>{t("sessions.detail.cli", { value: detail.summary.cliVersion ?? "--" })}</div>
-                </div>
-              </section>
-
+            <div className="mx-auto max-w-6xl space-y-2.5">
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey);
                 const userPreview = firstUserPreview(turn);
                 return (
-                <section key={turnKey} className="rounded-lg border border-border/60 bg-surface p-4">
+                <section key={turnKey} className="rounded-lg border border-border/60 bg-surface px-3 py-2.5">
                   <button
                     type="button"
-                    className={`flex w-full flex-col gap-3 rounded-md text-left sm:flex-row sm:items-start sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}
+                    className={`flex w-full flex-col gap-1.5 rounded-md text-left sm:flex-row sm:items-center sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}
                     aria-expanded={isExpanded}
                     onClick={() => toggleTurn(turnKey)}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 font-bold">
+                      <div className="flex items-center gap-2 text-sm font-bold">
                         <MessageSquare className="h-4 w-4 text-primary" />
                         {t("sessions.detail.turn", { id: turn.turnId })}
                       </div>
                       {userPreview ? (
-                        <div className="mt-2 truncate text-sm text-muted-foreground">{userPreview}</div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">{userPreview}</div>
                       ) : null}
-                      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
                         <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.message_count", { count: countMessages(turn) })}</span>
                         <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.tool_count", { count: turn.toolCalls.length })}</span>
                         <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.patch_count", { count: turn.patchResults.length })}</span>
@@ -854,7 +858,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     </div>
                   </button>
                   {isExpanded ? (
-                  <div className="mt-3 space-y-3">
+                  <div className="relative mt-2 ml-1 space-y-2 border-l-2 border-border/70 pl-4 before:absolute before:-left-[5px] before:top-1 before:h-2 before:w-2 before:rounded-full before:bg-primary">
                     {orderedItems(turn).map((item, itemIndex) => (
                       <TimelineItem key={`${item.kind}-${itemIndex}`} item={item} />
                     ))}

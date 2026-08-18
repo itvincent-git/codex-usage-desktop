@@ -1185,14 +1185,19 @@ describe("App", () => {
 
     expect(await screen.findByRole("dialog", { name: "Updated replay summary" })).toBeInTheDocument();
     const detailHeader = screen.getByRole("dialog", { name: "Updated replay summary" }).querySelector("header")!;
-    expect(detailHeader).toHaveClass("py-2.5");
+    expect(detailHeader).toHaveClass("py-1.5");
+    expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(within(detailHeader).queryByText("session-replay")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Details/ }));
+    expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "true");
     expect(within(detailHeader).getByText("session-replay")).toHaveClass("border-zinc-300/70");
     expect(within(detailHeader).getByText("/repo/app")).toHaveClass("border-blue-300/60");
     expect(within(detailHeader).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
     expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
     expect(document.body.style.overflow).toBe("hidden");
     expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
-    expect(screen.getByText("Session summary")).toBeInTheDocument();
+    fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 20 } });
+    expect(detailHeader).toHaveClass("py-1");
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");

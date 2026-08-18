@@ -458,6 +458,7 @@
       "tool_calls": "Tool calls",
       "patches": "Patches",
       "errors": "Errors",
+      "details": "Details",
       "timeline": "Timeline",
       "raw_jsonl": "Raw JSONL",
       "loading_replay": "Loading session replay",
