@@ -487,6 +487,7 @@
       "reasoning_summary": "Reasoning summary",
       "arguments": "Arguments",
       "command": "Command",
+      "patch_input": "Patch",
       "working_directory": "Working directory",
       "exit_code": "Exit code",
       "wall_time": "Wall time",

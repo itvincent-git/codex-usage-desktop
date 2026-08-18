@@ -925,6 +925,7 @@ describe("App", () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const execArguments = JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000 });
+    const applyPatchArguments = 'const patch = "*** Begin Patch\\n*** Update File: /repo/app/src/example.ts\\n@@\\n-old\\n+new\\n*** End Patch";\ntext(await tools.apply_patch(patch));';
     const execOutput = JSON.stringify([
       { text: "Script completed\nWall time 1.25s\nOutput:\n", type: "input_text" },
       { text: longToolOutput, type: "input_text" },
@@ -1006,7 +1007,7 @@ describe("App", () => {
             costUSD: 0.001,
             turnCount: 1,
             messageCount: 1,
-            toolCallCount: 3,
+            toolCallCount: 4,
             patchCount: 2,
             errorCount: 1,
           },
@@ -1049,6 +1050,18 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:01.500Z",
                   completedAt: "2026-06-11T00:00:01.510Z",
                   durationMs: 10,
+                  isError: false,
+                },
+                {
+                  callId: "call-apply-patch",
+                  name: "functions.exec",
+                  status: "completed",
+                  arguments: applyPatchArguments,
+                  output: JSON.stringify({}),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.505Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 5,
                   isError: false,
                 },
                 {
@@ -1128,6 +1141,19 @@ describe("App", () => {
                 },
                 {
                   kind: "toolCall",
+                  callId: "call-apply-patch",
+                  name: "functions.exec",
+                  status: "completed",
+                  arguments: applyPatchArguments,
+                  output: JSON.stringify({}),
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.505Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 5,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
                   callId: "call-input",
                   name: "request_user_input",
                   status: "completed",
@@ -1201,7 +1227,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("3 tools");
+    expect(turnButton).toHaveTextContent("4 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1264,6 +1290,11 @@ describe("App", () => {
     expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
+    const applyPatchCall = screen.getByRole("button", { name: /functions.exec · completed/ }).parentElement!;
+    expect(applyPatchCall).toHaveTextContent("Patch");
+    expect(applyPatchCall).toHaveTextContent("*** Begin Patch");
+    expect(applyPatchCall).not.toHaveTextContent("const patch =");
+    expect(applyPatchCall).not.toHaveTextContent("\\n*** Update File");
     expect(screen.getByText("User input request")).toBeInTheDocument();
     expect(screen.getByText("Display mode")).toBeInTheDocument();
     expect(screen.getByText("How should the session item be displayed?")).toBeInTheDocument();

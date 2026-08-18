@@ -492,6 +492,7 @@
       "reasoning_summary": "推理摘要",
       "arguments": "参数",
       "command": "命令",
+      "patch_input": "补丁",
       "working_directory": "工作目录",
       "exit_code": "退出码",
       "wall_time": "执行耗时",

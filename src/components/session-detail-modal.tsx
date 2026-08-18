@@ -232,6 +232,7 @@ function ToolPreview({ title, text, lines }: { title: string; text: string; line
 type ExecArguments = {
   command: string;
   workdir: string | null;
+  kind: "command" | "patch";
 };
 
 type ExecOutput = {
@@ -273,21 +274,32 @@ function formatToolArgumentValue(value: unknown) {
 
 function parseExecArguments(value: string | null): ExecArguments | null {
   const parsed = parseJsonObject(value);
-  if (!parsed) return null;
+  if (parsed) {
+    const command = typeof parsed.cmd === "string"
+      ? parsed.cmd
+      : typeof parsed.command === "string"
+        ? parsed.command
+        : null;
+    if (!command) return null;
 
-  const command = typeof parsed.cmd === "string"
-    ? parsed.cmd
-    : typeof parsed.command === "string"
-      ? parsed.command
-      : null;
-  if (!command) return null;
+    const workdir = typeof parsed.workdir === "string"
+      ? parsed.workdir
+      : typeof parsed.cwd === "string"
+        ? parsed.cwd
+        : null;
+    return { command, workdir, kind: "command" };
+  }
 
-  const workdir = typeof parsed.workdir === "string"
-    ? parsed.workdir
-    : typeof parsed.cwd === "string"
-      ? parsed.cwd
-      : null;
-  return { command, workdir };
+  if (!value) return null;
+  const assignment = value.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*("(?:\\.|[^"\\])*")\s*;/s);
+  if (!assignment || !value.includes(`tools.apply_patch(${assignment[1]})`)) return null;
+
+  try {
+    const patch = JSON.parse(assignment[2]);
+    return typeof patch === "string" ? { command: patch, workdir: null, kind: "patch" } : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseToolContentBlocks(value: string | null): ToolContentBlocks | null {
@@ -458,6 +470,9 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const execOutput = isExec ? parseExecOutput(item.output) : null;
   const contentBlocks = parseToolContentBlocks(item.output);
   const argumentsText = execArguments?.command ?? (parsedArguments ? null : item.arguments);
+  const argumentsTitle = execArguments?.kind === "patch"
+    ? t("sessions.detail.patch_input")
+    : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
   const outputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const stderrText = execOutput?.stderr ?? item.stderr;
 
@@ -485,8 +500,8 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
       <div className="mt-3 space-y-2">
         {argumentsText ? (
           isExpanded
-            ? <ToolTextBlock title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} />
-            : <ToolPreview title={t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments")} text={argumentsText} lines={1} />
+            ? <ToolTextBlock title={argumentsTitle} text={argumentsText} />
+            : <ToolPreview title={argumentsTitle} text={argumentsText} lines={1} />
         ) : null}
         {argumentEntries.length > 0 ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
