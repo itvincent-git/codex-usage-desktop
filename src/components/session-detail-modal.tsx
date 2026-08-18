@@ -664,12 +664,25 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
     const commandOutput = outputText ? cleanExecOutput(outputText) : null;
     return (
       <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
-        <div className="flex min-w-0 gap-2 text-foreground">
-          <span className="shrink-0">• Ran</span>
-          <span className="min-w-0 whitespace-pre-wrap break-words">{buildCollapsedPreview(execArguments.command, 1)}</span>
-        </div>
+        <button
+          type="button"
+          className={`flex w-full min-w-0 items-start justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+          aria-expanded={isExpanded}
+          onClick={() => setIsExpanded((value) => !value)}
+        >
+          <span className="flex min-w-0 gap-2">
+            <span className="shrink-0">• Ran</span>
+            <span className="min-w-0 whitespace-pre-wrap break-words">
+              {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
+        </button>
         {commandOutput ? (
-          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-muted-foreground">└ {buildCollapsedPreview(commandOutput, 5)}</pre>
+          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-muted-foreground">└ {isExpanded ? commandOutput : buildCollapsedPreview(commandOutput, 5)}</pre>
         ) : null}
         {stderrText ? (
           <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-error">└ {stderrText}</pre>

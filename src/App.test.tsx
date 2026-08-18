@@ -1262,7 +1262,10 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    const toolCall = screen.getByText("• Ran").parentElement!.parentElement!;
+    const toolCallButton = screen.getByText("• Ran").closest("button")!;
+    const toolCall = toolCallButton.parentElement!;
+    expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
+    expect(toolCallButton).toHaveTextContent("Expand");
     expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall).toHaveTextContent("first command");
     expect(toolCall).toHaveTextContent("└ tool output preview");
@@ -1273,6 +1276,15 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
+    await userEvent.click(toolCallButton);
+    expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
+    expect(toolCallButton).toHaveTextContent("Collapse");
+    expect(toolCall).toHaveTextContent("LONG_ARGUMENT_TAIL");
+    expect(toolCall).toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
+    await userEvent.click(toolCallButton);
+    expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
+    expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
+    expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
     const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
     const waitCall = waitCallButton.parentElement!;
     expect(waitCall).toHaveTextContent("Process session8");
