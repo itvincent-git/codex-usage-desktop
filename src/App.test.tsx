@@ -924,10 +924,10 @@ describe("App", () => {
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
-    const execArguments = `const r = await tools.exec_command(${JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000, max_output_tokens: 4000 })}); text(r.output);`;
+    const execArguments = `const r = await tools.exec_command({cmd:${JSON.stringify(longArguments)},workdir:"/repo/app",yield_time_ms:10000,max_output_tokens:4000}); text(r.output);`;
     const applyPatchArguments = 'const patch = "*** Begin Patch\\n*** Update File: /repo/app/src/example.ts\\n@@\\n-old\\n+new\\n*** End Patch";\ntext(await tools.apply_patch(patch));';
     const execOutput = JSON.stringify([
-      { text: "Script completed\nWall time 1.25s\nOutput:\n", type: "input_text" },
+      { text: "Script completed\nWait time 1.25 seconds\nOutput:\n", type: "input_text" },
       { text: longToolOutput, type: "input_text" },
     ]);
     const rawJsonl = [
@@ -1269,6 +1269,7 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("Working directory: /repo/app");
     expect(toolCall).not.toHaveTextContent("Script completed");
     expect(toolCall).not.toHaveTextContent("Wall time");
+    expect(toolCall).not.toHaveTextContent("Wait time");
     expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');

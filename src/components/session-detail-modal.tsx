@@ -405,7 +405,43 @@ function parseExecCommandCall(value: string) {
     if (character === "{") depth += 1;
     if (character === "}") {
       depth -= 1;
-      if (depth === 0) return parseJsonObject(value.slice(objectStart, index + 1));
+      if (depth === 0) {
+        const objectLiteral = value.slice(objectStart, index + 1);
+        const parsed = parseJsonObject(objectLiteral);
+        if (parsed) return parsed;
+
+        let normalized = "";
+        let normalizedInString = false;
+        let normalizedIsEscaped = false;
+        for (let literalIndex = 0; literalIndex < objectLiteral.length; literalIndex += 1) {
+          const literalCharacter = objectLiteral[literalIndex];
+          normalized += literalCharacter;
+
+          if (normalizedInString) {
+            if (normalizedIsEscaped) {
+              normalizedIsEscaped = false;
+            } else if (literalCharacter === "\\") {
+              normalizedIsEscaped = true;
+            } else if (literalCharacter === '"') {
+              normalizedInString = false;
+            }
+            continue;
+          }
+
+          if (literalCharacter === '"') {
+            normalizedInString = true;
+            continue;
+          }
+          if (literalCharacter !== "{" && literalCharacter !== ",") continue;
+
+          const property = objectLiteral.slice(literalIndex + 1).match(/^(\s*)([A-Za-z_$][\w$]*)(\s*:)/);
+          if (!property) continue;
+          normalized += `${property[1]}"${property[2]}"${property[3]}`;
+          literalIndex += property[0].length;
+        }
+
+        return parseJsonObject(normalized);
+      }
     }
   }
 
@@ -491,7 +527,7 @@ function parseExecOutput(value: string | null): ExecOutput | null {
 }
 
 function cleanExecOutput(text: string) {
-  return text.replace(/^Script completed\r?\nWall time [^\r\n]+\r?\nOutput:\r?\n/, "");
+  return text.replace(/^Script completed\r?\n(?:Wall|Wait) time [^\r\n]+\r?\nOutput:\r?\n/, "");
 }
 
 type UserInputQuestion = {
