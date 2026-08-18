@@ -500,8 +500,11 @@
       "process_session": "进程会话",
       "tool_argument_labels": {
         "cell_id": "进程会话",
+        "session_id": "进程会话",
+        "chars": "输入",
         "yield_time_ms": "等待间隔（毫秒）",
-        "max_tokens": "输出 Token 上限"
+        "max_tokens": "输出 Token 上限",
+        "max_output_tokens": "输出 Token 上限"
       },
       "output": "输出",
       "image_count": "{{count}} 张输出图片",

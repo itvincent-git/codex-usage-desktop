@@ -377,8 +377,8 @@ function formatToolArgumentValue(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function parseExecCommandCall(value: string) {
-  const marker = "tools.exec_command(";
+function parseNestedToolCall(value: string, toolName: string) {
+  const marker = `tools.${toolName}(`;
   const start = value.indexOf(marker);
   if (start < 0) return null;
 
@@ -449,7 +449,7 @@ function parseExecCommandCall(value: string) {
 }
 
 function parseExecArguments(value: string | null): ExecArguments | null {
-  const parsed = parseJsonObject(value) ?? (value ? parseExecCommandCall(value) : null);
+  const parsed = parseJsonObject(value) ?? (value ? parseNestedToolCall(value, "exec_command") : null);
   if (parsed) {
     const command = typeof parsed.cmd === "string"
       ? parsed.cmd
@@ -645,15 +645,19 @@ function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: 
 function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const toolName = baseToolName(item.name);
+  const outerToolName = baseToolName(item.name);
+  const nestedWriteStdinArguments = EXEC_TOOL_NAMES.has(outerToolName) && item.arguments
+    ? parseNestedToolCall(item.arguments, "write_stdin")
+    : null;
+  const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
   const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
-  const isExec = EXEC_TOOL_NAMES.has(toolName);
+  const isExec = EXEC_TOOL_NAMES.has(outerToolName);
   const execArguments = isExec ? parseExecArguments(item.arguments) : null;
-  const parsedArguments = parseJsonObject(item.arguments);
+  const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const argumentEntries = parsedArguments
     ? Object.entries(parsedArguments).filter(([key]) => !execArguments || !["cmd", "command", "workdir", "cwd"].includes(key))
     : [];
-  const execOutput = isExec ? parseExecOutput(item.output) : null;
+  const execOutput = isExec ? parseExecOutput(item.output) ?? parseExecOutput(item.output ? cleanExecOutput(item.output) : null) : null;
   const contentBlocks = parseToolContentBlocks(item.output);
   const argumentsText = execArguments?.command ?? (parsedArguments ? null : item.arguments);
   const argumentsTitle = execArguments?.kind === "patch"
@@ -708,7 +712,7 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
       >
         <span className="flex min-w-0 items-center gap-1">
           <Terminal className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{item.name} {item.status ? `· ${item.status}` : ""}</span>
+          <span className="truncate">{nestedWriteStdinArguments ? toolName : item.name} {item.status ? `· ${item.status}` : ""}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}

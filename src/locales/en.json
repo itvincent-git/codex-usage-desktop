@@ -496,8 +496,11 @@
       "process_session": "Process session",
       "tool_argument_labels": {
         "cell_id": "Process session",
+        "session_id": "Process session",
+        "chars": "Input",
         "yield_time_ms": "Wait interval (ms)",
-        "max_tokens": "Output token limit"
+        "max_tokens": "Output token limit",
+        "max_output_tokens": "Output token limit"
       },
       "output": "Output",
       "image_count_one": "{{count}} output image",
