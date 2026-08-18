@@ -1,4 +1,8 @@
 {
+  "2.1.0": {
+    "zh": "- feat: improve session detail readability\n- feat: compact session detail layout\n- fix(session): format exec patch arguments\n- feat(session): render patch arguments as diffs\n- fix(session): simplify exec command details\n- fix(session): parse exec object literal arguments\n- fix(session): restore exec detail expansion\n- fix(session): hide redundant tool outputs\n- fix(session): format nested write stdin calls",
+    "en": "- feat: improve session detail readability\n- feat: compact session detail layout\n- fix(session): format exec patch arguments\n- feat(session): render patch arguments as diffs\n- fix(session): simplify exec command details\n- fix(session): parse exec object literal arguments\n- fix(session): restore exec detail expansion\n- fix(session): hide redundant tool outputs\n- fix(session): format nested write stdin calls"
+  },
   "2.0.0": {
     "zh": "- feat: redesign session replay timeline\n- feat: collapse session replay details by default\n- feat: improve session detail item clarity\n- feat(session): render user input options\n- feat(session): format exec tool output\n- fix(session): render exec content blocks\n- fix(session): render tool content blocks",
     "en": "- feat: redesign session replay timeline\n- feat: collapse session replay details by default\n- feat: improve session detail item clarity\n- feat(session): render user input options\n- feat(session): format exec tool output\n- fix(session): render exec content blocks\n- fix(session): render tool content blocks"
