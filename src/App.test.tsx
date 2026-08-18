@@ -1309,6 +1309,8 @@ describe("App", () => {
     expect(applyPatchCall).not.toHaveTextContent("*** Begin Patch");
     expect(applyPatchCall).not.toHaveTextContent("const patch =");
     expect(applyPatchCall).not.toHaveTextContent("\\n*** Update File");
+    expect(applyPatchCall).not.toHaveTextContent("Output");
+    expect(applyPatchCall).not.toHaveTextContent("{}");
     await userEvent.click(applyPatchButton);
     expect(applyPatchCall).toHaveTextContent("src/example.ts");
     expect(screen.getByText("+new").parentElement).toHaveClass("bg-green-500/15");
@@ -1322,23 +1324,13 @@ describe("App", () => {
 
     const reasoningTitle = screen.getByText("Reasoning summary");
     expect(reasoningTitle.parentElement?.parentElement).toHaveClass("border-amber-300/70");
-    const patchButton = screen.getByRole("button", { name: /Patch result/ });
     const failedPatchButton = screen.getByRole("button", { name: /Patch failed/ });
-    expect(patchButton).toHaveAttribute("aria-expanded", "false");
-    expect(patchButton).toHaveTextContent("Expand");
-    expect(patchButton.parentElement).toHaveClass("border-green-300/70");
+    expect(screen.queryByRole("button", { name: /Patch result/ })).not.toBeInTheDocument();
     expect(failedPatchButton.parentElement).toHaveClass("border-error/40");
     expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
     expect(screen.getByText(/140 tokens/)).toHaveClass("border-fuchsia-300/70");
     expect(screen.getByText("Replay error fixture")).toHaveClass("border-error/40");
     expect(screen.getByText(/Replay notice/)).toHaveClass("border-sky-300/70");
-
-    await userEvent.click(patchButton);
-    expect(patchButton).toHaveAttribute("aria-expanded", "true");
-    expect(patchButton).toHaveTextContent("Collapse");
-    expect(screen.getByText("PATCH_SUCCESS_OUTPUT")).toBeInTheDocument();
-    await userEvent.click(patchButton);
-    expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
 
     await userEvent.click(systemButton);
     expect(systemButton).toHaveAttribute("aria-expanded", "true");

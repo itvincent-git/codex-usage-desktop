@@ -530,6 +530,12 @@ function cleanExecOutput(text: string) {
   return text.replace(/^Script completed\r?\n(?:Wall|Wait) time [^\r\n]+\r?\nOutput:\r?\n/, "");
 }
 
+function isEmptyExecOutput(text: string | null) {
+  if (!text) return true;
+  const cleaned = cleanExecOutput(text).trim();
+  return cleaned === "" || cleaned === "{}";
+}
+
 type UserInputQuestion = {
   header: string;
   id: string;
@@ -653,7 +659,8 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const argumentsTitle = execArguments?.kind === "patch"
     ? t("sessions.detail.patch_input")
     : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
-  const outputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
+  const rawOutputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
+  const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
   const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
@@ -822,7 +829,7 @@ function TimelineItem({ item }: { item: ReplayItem }) {
   }
 
   if (item.kind === "patch") {
-    return <PatchItem item={item} />;
+    return item.isError || item.success === false ? <PatchItem item={item} /> : null;
   }
 
   if (item.kind === "tokenUsage") {
