@@ -377,8 +377,43 @@ function formatToolArgumentValue(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+function parseExecCommandCall(value: string) {
+  const marker = "tools.exec_command(";
+  const start = value.indexOf(marker);
+  if (start < 0) return null;
+
+  const objectStart = value.indexOf("{", start + marker.length);
+  if (objectStart < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  for (let index = objectStart; index < value.length; index += 1) {
+    const character = value[index];
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (character === "\\") {
+        isEscaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (character === '"') inString = true;
+    if (character === "{") depth += 1;
+    if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return parseJsonObject(value.slice(objectStart, index + 1));
+    }
+  }
+
+  return null;
+}
+
 function parseExecArguments(value: string | null): ExecArguments | null {
-  const parsed = parseJsonObject(value);
+  const parsed = parseJsonObject(value) ?? (value ? parseExecCommandCall(value) : null);
   if (parsed) {
     const command = typeof parsed.cmd === "string"
       ? parsed.cmd
@@ -453,6 +488,10 @@ function parseExecOutput(value: string | null): ExecOutput | null {
   return stdout !== null || stderr !== null || exitCode !== null || wallTimeSeconds !== null || sessionId !== null
     ? { stdout, stderr, exitCode, wallTimeSeconds, sessionId }
     : null;
+}
+
+function cleanExecOutput(text: string) {
+  return text.replace(/^Script completed\r?\nWall time [^\r\n]+\r?\nOutput:\r?\n/, "");
 }
 
 type UserInputQuestion = {
@@ -583,6 +622,24 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} />;
+  }
+
+  if (execArguments?.kind === "command") {
+    const commandOutput = outputText ? cleanExecOutput(outputText) : null;
+    return (
+      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+        <div className="flex min-w-0 gap-2 text-foreground">
+          <span className="shrink-0">• Ran</span>
+          <span className="min-w-0 whitespace-pre-wrap break-words">{buildCollapsedPreview(execArguments.command, 1)}</span>
+        </div>
+        {commandOutput ? (
+          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-muted-foreground">└ {buildCollapsedPreview(commandOutput, 5)}</pre>
+        ) : null}
+        {stderrText ? (
+          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-error">└ {stderrText}</pre>
+        ) : null}
+      </div>
+    );
   }
 
   return (

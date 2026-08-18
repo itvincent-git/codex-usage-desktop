@@ -924,7 +924,7 @@ describe("App", () => {
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
-    const execArguments = JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000 });
+    const execArguments = `const r = await tools.exec_command(${JSON.stringify({ cmd: longArguments, workdir: "/repo/app", yield_time_ms: 10_000, max_output_tokens: 4000 })}); text(r.output);`;
     const applyPatchArguments = 'const patch = "*** Begin Patch\\n*** Update File: /repo/app/src/example.ts\\n@@\\n-old\\n+new\\n*** End Patch";\ntext(await tools.apply_patch(patch));';
     const execOutput = JSON.stringify([
       { text: "Script completed\nWall time 1.25s\nOutput:\n", type: "input_text" },
@@ -1210,6 +1210,7 @@ describe("App", () => {
     await userEvent.click(screen.getByText("Replay summary"));
 
     expect(await screen.findByRole("dialog", { name: "Updated replay summary" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
     const detailHeader = screen.getByRole("dialog", { name: "Updated replay summary" }).querySelector("header")!;
     expect(detailHeader).toHaveClass("py-1.5");
     expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "false");
@@ -1221,7 +1222,6 @@ describe("App", () => {
     expect(within(detailHeader).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
     expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
     expect(document.body.style.overflow).toBe("hidden");
-    expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
     fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 20 } });
     expect(detailHeader).toHaveClass("py-1");
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
@@ -1262,16 +1262,14 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    const toolCallButton = screen.getByRole("button", { name: /exec · completed/ });
-    const toolCall = toolCallButton.parentElement!;
-    expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
-    expect(toolCallButton).toHaveTextContent("Expand");
+    const toolCall = screen.getByText("• Ran").parentElement!.parentElement!;
     expect(toolCall).toHaveClass("border-cyan-300/70");
-    expect(toolCall.querySelector(".line-clamp-1")).toBeInTheDocument();
-    expect(toolCall.querySelector(".line-clamp-5")).toBeInTheDocument();
-    expect(toolCall).toHaveTextContent("Command");
-    expect(toolCall).toHaveTextContent("Working directory: /repo/app");
-    expect(toolCall).toHaveTextContent("Script completed");
+    expect(toolCall).toHaveTextContent("first command");
+    expect(toolCall).toHaveTextContent("└ tool output preview");
+    expect(toolCall).not.toHaveTextContent("Working directory: /repo/app");
+    expect(toolCall).not.toHaveTextContent("Script completed");
+    expect(toolCall).not.toHaveTextContent("Wall time");
+    expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
     const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
@@ -1328,13 +1326,6 @@ describe("App", () => {
     expect(screen.getByText("PATCH_SUCCESS_OUTPUT")).toBeInTheDocument();
     await userEvent.click(patchButton);
     expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
-
-    await userEvent.click(toolCallButton);
-    expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
-    expect(toolCallButton).toHaveTextContent("Collapse");
-    expect(screen.getByText(/LONG_TOOL_OUTPUT_TAIL/)).toBeInTheDocument();
-    expect(screen.getByText(/LONG_ARGUMENT_TAIL/)).toBeInTheDocument();
-    expect(toolCall.textContent).toContain("first command\nsecond command");
 
     await userEvent.click(systemButton);
     expect(systemButton).toHaveAttribute("aria-expanded", "true");
