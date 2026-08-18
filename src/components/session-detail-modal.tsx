@@ -229,6 +229,111 @@ function ToolPreview({ title, text, lines }: { title: string; text: string; line
   );
 }
 
+type PatchDiffFile = {
+  path: string;
+  lines: string[];
+  additions: number;
+  deletions: number;
+};
+
+function parsePatchDiff(patch: string): PatchDiffFile[] {
+  const files: PatchDiffFile[] = [];
+  let current: PatchDiffFile | null = null;
+
+  for (const line of patch.split("\n")) {
+    const fileMatch = line.match(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/);
+    if (fileMatch) {
+      current = { path: fileMatch[1], lines: [], additions: 0, deletions: 0 };
+      files.push(current);
+      continue;
+    }
+    if (!current || line === "*** Begin Patch" || line === "*** End Patch") continue;
+    current.lines.push(line);
+    if (line.startsWith("+") && !line.startsWith("+++")) current.additions += 1;
+    if (line.startsWith("-") && !line.startsWith("---")) current.deletions += 1;
+  }
+
+  return files;
+}
+
+function numberPatchLines(lines: string[]) {
+  let oldLine: number | null = null;
+  let newLine: number | null = null;
+
+  return lines.map((text) => {
+    const hunk = text.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      return { text, lineNumber: null };
+    }
+    if (text.startsWith("@@")) {
+      oldLine = null;
+      newLine = null;
+      return { text, lineNumber: null };
+    }
+
+    const lineNumber = text.startsWith("-") ? oldLine : newLine;
+    if (!text.startsWith("+") && oldLine !== null) oldLine += 1;
+    if (!text.startsWith("-") && newLine !== null) newLine += 1;
+    return { text, lineNumber };
+  });
+}
+
+function PatchDiffBlock({ patch, expanded }: { patch: string; expanded: boolean }) {
+  const { t } = useTranslation();
+  const files = parsePatchDiff(patch);
+  const additions = files.reduce((total, file) => total + file.additions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+
+  if (files.length === 0) {
+    return expanded
+      ? <ToolTextBlock title={t("sessions.detail.patch_input")} text={patch} />
+      : <ToolPreview title={t("sessions.detail.patch_input")} text={patch} lines={1} />;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/60 bg-background/70 font-mono text-xs">
+      <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2 font-semibold">
+        <FileDiff className="h-3.5 w-3.5 text-muted-foreground" />
+        <span>{t("sessions.detail.edited_files", { count: files.length })}</span>
+        <span className="text-green-600 dark:text-green-400">+{additions}</span>
+        <span className="text-red-600 dark:text-red-400">-{deletions}</span>
+      </div>
+      {expanded ? files.map((file) => (
+        <section key={file.path}>
+          <div className="flex items-center gap-2 border-b border-border/50 bg-muted/40 px-3 py-2 font-semibold">
+            <span className="text-muted-foreground">└</span>
+            <span className="min-w-0 flex-1 break-all">{file.path}</span>
+            <span className="text-green-600 dark:text-green-400">+{file.additions}</span>
+            <span className="text-red-600 dark:text-red-400">-{file.deletions}</span>
+          </div>
+          <div className="overflow-x-auto py-1">
+            {numberPatchLines(file.lines).map(({ text: line, lineNumber }, index) => {
+              const isAddition = line.startsWith("+") && !line.startsWith("+++");
+              const isDeletion = line.startsWith("-") && !line.startsWith("---");
+              const isHunk = line.startsWith("@@");
+              const tone = isAddition
+                ? "bg-green-500/15 text-green-950 dark:text-green-100"
+                : isDeletion
+                  ? "bg-red-500/15 text-red-950 dark:text-red-100"
+                  : isHunk
+                    ? "text-muted-foreground"
+                    : "text-foreground";
+              return (
+                <div key={`${index}-${line}`} className={`flex min-w-max w-full ${tone}`}>
+                  <span className="w-10 shrink-0 select-none border-r border-border/40 px-2 text-right text-muted-foreground/60">{lineNumber ?? ""}</span>
+                  <span className="whitespace-pre px-3">{line || " "}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )) : null}
+    </div>
+  );
+}
+
 type ExecArguments = {
   command: string;
   workdir: string | null;
@@ -499,9 +604,11 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
       </button>
       <div className="mt-3 space-y-2">
         {argumentsText ? (
-          isExpanded
-            ? <ToolTextBlock title={argumentsTitle} text={argumentsText} />
-            : <ToolPreview title={argumentsTitle} text={argumentsText} lines={1} />
+          execArguments?.kind === "patch"
+            ? <PatchDiffBlock patch={argumentsText} expanded={isExpanded} />
+            : isExpanded
+              ? <ToolTextBlock title={argumentsTitle} text={argumentsText} />
+              : <ToolPreview title={argumentsTitle} text={argumentsText} lines={1} />
         ) : null}
         {argumentEntries.length > 0 ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

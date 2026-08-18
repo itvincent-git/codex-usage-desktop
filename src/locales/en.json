@@ -488,6 +488,8 @@
       "arguments": "Arguments",
       "command": "Command",
       "patch_input": "Patch",
+      "edited_files_one": "Edited {{count}} file",
+      "edited_files_other": "Edited {{count}} files",
       "working_directory": "Working directory",
       "exit_code": "Exit code",
       "wall_time": "Wall time",
