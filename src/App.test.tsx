@@ -930,6 +930,14 @@ describe("App", () => {
       { text: "Script completed\nWall time 1.25 seconds\nOutput:\n", type: "input_text" },
       { text: "First result\n--------------------------------------------------------------------------------\nSecond result\n--------------------------------------------------------------------------------\n{\"nested\":{\"visible\":true}}", type: "input_text" },
     ]);
+    const directWebSearchOutput = JSON.stringify([{
+      type: "text_result",
+      title: "Codex Usage Desktop",
+      url: "https://github.com/itvincent-git/codex-usage-desktop",
+      domain: "github.com",
+      snippet: "A local dashboard for Codex CLI token usage.",
+      ref_id: "turn0search0",
+    }]);
     const writeStdinArguments = 'const r = await tools.write_stdin({session_id:82101,chars:"",yield_time_ms:5000,max_output_tokens:10000}); text(JSON.stringify(r));';
     const writeStdinOutput = `Script completed\nWall time 5.0 seconds\nOutput:\n${JSON.stringify({
       chunk_id: "2eb40f",
@@ -1050,6 +1058,18 @@ describe("App", () => {
                   isError: false,
                 },
                 {
+                  callId: "call-direct-web-search",
+                  name: "web_search",
+                  status: "completed",
+                  arguments: JSON.stringify({ q: "codex usage desktop" }),
+                  output: directWebSearchOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
+                  isError: false,
+                },
+                {
                   callId: "call-web-search",
                   name: "exec",
                   status: "completed",
@@ -1146,6 +1166,19 @@ describe("App", () => {
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "user", source: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" },
                 { kind: "reasoning", timestamp: "2026-06-11T00:00:00.250Z", text: "Reasoning fixture" },
+                {
+                  kind: "toolCall",
+                  callId: "call-direct-web-search",
+                  name: "web_search",
+                  status: "completed",
+                  arguments: JSON.stringify({ q: "codex usage desktop" }),
+                  output: directWebSearchOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
+                  isError: false,
+                },
                 {
                   kind: "toolCall",
                   callId: "call-web-search",
@@ -1290,7 +1323,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("6 tools");
+    expect(turnButton).toHaveTextContent("7 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1362,6 +1395,13 @@ describe("App", () => {
     expect(webSearchCall).toHaveTextContent("Second result");
     expect(webSearchCall).toHaveTextContent("Search result 3");
     expect(webSearchCall).toHaveTextContent('\n  "nested": {\n    "visible": true\n  }');
+    const directWebSearchLink = screen.getByRole("link", { name: "Codex Usage Desktop" });
+    const directWebSearchCall = directWebSearchLink.closest("article")!.parentElement!.parentElement!;
+    expect(directWebSearchLink).toHaveAttribute("href", "https://github.com/itvincent-git/codex-usage-desktop");
+    expect(directWebSearchCall).toHaveTextContent("github.com");
+    expect(directWebSearchCall).toHaveTextContent("A local dashboard for Codex CLI token usage.");
+    expect(directWebSearchCall).not.toHaveTextContent('"ref_id"');
+    expect(directWebSearchCall).not.toHaveTextContent('"type"');
     const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
     const waitCall = waitCallButton.parentElement!;
     expect(waitCall).toHaveTextContent("Process session8");

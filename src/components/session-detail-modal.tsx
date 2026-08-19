@@ -509,6 +509,37 @@ function splitWebSearchResults(text: string) {
     .filter(Boolean);
 }
 
+type WebSearchResult = {
+  title: string;
+  url: string | null;
+  domain: string | null;
+  snippet: string | null;
+};
+
+function parseWebSearchResultCards(value: string | null): WebSearchResult[] | null {
+  if (!value) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+
+    const results = parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const result = entry as Record<string, unknown>;
+      if (result.type !== "text_result" || typeof result.title !== "string") return [];
+      return [{
+        title: result.title,
+        url: typeof result.url === "string" ? result.url : null,
+        domain: typeof result.domain === "string" ? result.domain : null,
+        snippet: typeof result.snippet === "string" ? result.snippet : null,
+      }];
+    });
+    return results.length > 0 ? results : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseToolContentBlocks(value: string | null): ToolContentBlocks | null {
   if (!value) return null;
 
@@ -676,9 +707,11 @@ function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: 
 function WebSearchItem({
   item,
   queries,
+  structuredResults,
 }: {
   item: Extract<ReplayItem, { kind: "toolCall" }>;
   queries: string[];
+  structuredResults: WebSearchResult[] | null;
 }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -704,13 +737,27 @@ function WebSearchItem({
         </span>
       </button>
       <div className="mt-3 space-y-2">
-        <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.search_queries")}</div>
-          <ul className="space-y-1 font-mono text-xs leading-relaxed text-foreground">
-            {queries.map((query, index) => <li key={`${index}-${query}`} className="break-words">• {query}</li>)}
-          </ul>
-        </div>
-        {results.length > 0 ? isExpanded ? (
+        {queries.length > 0 ? (
+          <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.search_queries")}</div>
+            <ul className="space-y-1 font-mono text-xs leading-relaxed text-foreground">
+              {queries.map((query, index) => <li key={`${index}-${query}`} className="break-words">• {query}</li>)}
+            </ul>
+          </div>
+        ) : null}
+        {structuredResults ? (
+          <div className="space-y-2">
+            {structuredResults.map((result, index) => (
+              <article key={`${index}-${result.url ?? result.title}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
+                {result.url ? (
+                  <a href={result.url} target="_blank" rel="noreferrer" className="block break-words text-sm font-semibold text-primary hover:underline">{result.title}</a>
+                ) : <div className="break-words text-sm font-semibold text-foreground">{result.title}</div>}
+                {result.domain ? <div className="mt-1 text-xs text-muted-foreground">{result.domain}</div> : null}
+                {result.snippet ? <p className={`mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground ${isExpanded ? "" : "line-clamp-3"}`}>{result.snippet}</p> : null}
+              </article>
+            ))}
+          </div>
+        ) : results.length > 0 ? isExpanded ? (
           <div className="space-y-2">
             {results.map((result, index) => (
               <ToolTextBlock key={`${index}-${result.slice(0, 80)}`} title={t("sessions.detail.search_result", { index: index + 1 })} text={result} />
@@ -735,6 +782,7 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
   const webSearchQueries = isExec ? parseWebSearchQueries(item.arguments) : null;
+  const webSearchResults = parseWebSearchResultCards(item.output);
   const execArguments = isExec ? parseExecArguments(item.arguments) : null;
   const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const argumentEntries = parsedArguments
@@ -754,8 +802,8 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
     return <UserInputItem item={item} questions={userInputQuestions} />;
   }
 
-  if (webSearchQueries) {
-    return <WebSearchItem item={item} queries={webSearchQueries} />;
+  if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
+    return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} />;
   }
 
   if (execArguments?.kind === "command") {
