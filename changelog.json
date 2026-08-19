@@ -1,4 +1,8 @@
 {
+  "2.1.1": {
+    "zh": "- test(session): fix modal focus trap boundary",
+    "en": "- test(session): fix modal focus trap boundary"
+  },
   "2.1.0": {
     "zh": "- feat: improve session detail readability\n- feat: compact session detail layout\n- fix(session): format exec patch arguments\n- feat(session): render patch arguments as diffs\n- fix(session): simplify exec command details\n- fix(session): parse exec object literal arguments\n- fix(session): restore exec detail expansion\n- fix(session): hide redundant tool outputs\n- fix(session): format nested write stdin calls",
     "en": "- feat: improve session detail readability\n- feat: compact session detail layout\n- fix(session): format exec patch arguments\n- feat(session): render patch arguments as diffs\n- fix(session): simplify exec command details\n- fix(session): parse exec object literal arguments\n- fix(session): restore exec detail expansion\n- fix(session): hide redundant tool outputs\n- fix(session): format nested write stdin calls"
