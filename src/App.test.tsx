@@ -925,6 +925,11 @@ describe("App", () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const execArguments = `const r = await tools.exec_command({cmd:${JSON.stringify(longArguments)},workdir:"/repo/app",yield_time_ms:10000,max_output_tokens:4000}); text(r.output);`;
+    const webSearchArguments = 'const res = await tools.web__run({search_query:[{q:"first search query"},{q:"second search query"}],response_length:"short"}); text(res);';
+    const webSearchOutput = JSON.stringify([
+      { text: "Script completed\nWall time 1.25 seconds\nOutput:\n", type: "input_text" },
+      { text: "First result\n--------------------------------------------------------------------------------\nSecond result\n--------------------------------------------------------------------------------\n{\"nested\":{\"visible\":true}}", type: "input_text" },
+    ]);
     const writeStdinArguments = 'const r = await tools.write_stdin({session_id:82101,chars:"",yield_time_ms:5000,max_output_tokens:10000}); text(JSON.stringify(r));';
     const writeStdinOutput = `Script completed\nWall time 5.0 seconds\nOutput:\n${JSON.stringify({
       chunk_id: "2eb40f",
@@ -1045,6 +1050,18 @@ describe("App", () => {
                   isError: false,
                 },
                 {
+                  callId: "call-web-search",
+                  name: "exec",
+                  status: "completed",
+                  arguments: webSearchArguments,
+                  output: webSearchOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
+                  isError: false,
+                },
+                {
                   callId: "call-wait",
                   name: "wait",
                   status: "completed",
@@ -1129,6 +1146,19 @@ describe("App", () => {
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "user", source: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" },
                 { kind: "reasoning", timestamp: "2026-06-11T00:00:00.250Z", text: "Reasoning fixture" },
+                {
+                  kind: "toolCall",
+                  callId: "call-web-search",
+                  name: "exec",
+                  status: "completed",
+                  arguments: webSearchArguments,
+                  output: webSearchOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.510Z",
+                  durationMs: 10,
+                  isError: false,
+                },
                 {
                   kind: "toolCall",
                   callId: "call-1",
@@ -1260,7 +1290,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("5 tools");
+    expect(turnButton).toHaveTextContent("6 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1318,6 +1348,20 @@ describe("App", () => {
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
+    const webSearchButton = screen.getByRole("button", { name: /Web search · completed/ });
+    const webSearchCall = webSearchButton.parentElement!;
+    expect(webSearchCall).toHaveTextContent("first search query");
+    expect(webSearchCall).toHaveTextContent("second search query");
+    expect(webSearchCall).not.toHaveTextContent("tools.web__run");
+    expect(webSearchCall).not.toHaveTextContent("search_query");
+    expect(webSearchCall).not.toHaveTextContent("--------------------------------------------------------------------------------");
+    await userEvent.click(webSearchButton);
+    expect(webSearchCall).toHaveTextContent("Search result 1");
+    expect(webSearchCall).toHaveTextContent("First result");
+    expect(webSearchCall).toHaveTextContent("Search result 2");
+    expect(webSearchCall).toHaveTextContent("Second result");
+    expect(webSearchCall).toHaveTextContent("Search result 3");
+    expect(webSearchCall).toHaveTextContent('\n  "nested": {\n    "visible": true\n  }');
     const waitCallButton = screen.getByRole("button", { name: /wait · completed/ });
     const waitCall = waitCallButton.parentElement!;
     expect(waitCall).toHaveTextContent("Process session8");

@@ -210,20 +210,22 @@ function MessageItem({ item }: { item: Extract<ReplayItem, { kind: "message" }> 
 }
 
 function ToolTextBlock({ title, text }: { title: string; text: string }) {
+  const displayText = formatJsonForDisplay(text);
   return (
     <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
-      <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{text}</pre>
+      <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{displayText}</pre>
     </div>
   );
 }
 
 function ToolPreview({ title, text, lines }: { title: string; text: string; lines: 1 | 5 }) {
+  const displayText = formatJsonForDisplay(text);
   return (
     <div className="min-w-0 rounded-lg border border-border/50 bg-muted/35 p-3">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
       <pre className={`${lines === 1 ? "line-clamp-1" : "line-clamp-5"} whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground`}>
-        {buildCollapsedPreview(text, lines)}
+        {buildCollapsedPreview(displayText, lines)}
       </pre>
     </div>
   );
@@ -377,6 +379,15 @@ function formatToolArgumentValue(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+function formatJsonForDisplay(text: string) {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed !== null && typeof parsed === "object" ? JSON.stringify(parsed, null, 2) : text;
+  } catch {
+    return text;
+  }
+}
+
 function parseNestedToolCall(value: string, toolName: string) {
   const marker = `tools.${toolName}(`;
   const start = value.indexOf(marker);
@@ -476,6 +487,26 @@ function parseExecArguments(value: string | null): ExecArguments | null {
   } catch {
     return null;
   }
+}
+
+function parseWebSearchQueries(value: string | null) {
+  if (!value) return null;
+  const parsed = parseNestedToolCall(value, "web__run");
+  if (!parsed || !Array.isArray(parsed.search_query)) return null;
+
+  const queries = parsed.search_query.flatMap((entry) => (
+    entry && typeof entry === "object" && typeof (entry as { q?: unknown }).q === "string"
+      ? [(entry as { q: string }).q]
+      : []
+  ));
+  return queries.length > 0 ? queries : null;
+}
+
+function splitWebSearchResults(text: string) {
+  return cleanExecOutput(text)
+    .split(/-{10,}/)
+    .map((result) => result.trim())
+    .filter(Boolean);
 }
 
 function parseToolContentBlocks(value: string | null): ToolContentBlocks | null {
@@ -642,6 +673,57 @@ function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: 
   );
 }
 
+function WebSearchItem({
+  item,
+  queries,
+}: {
+  item: Extract<ReplayItem, { kind: "toolCall" }>;
+  queries: string[];
+}) {
+  const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const contentBlocks = parseToolContentBlocks(item.output);
+  const output = contentBlocks?.text ?? item.output;
+  const results = output ? splitWebSearchResults(output) : [];
+
+  return (
+    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((value) => !value)}
+      >
+        <span className="flex min-w-0 items-center gap-1">
+          <Terminal className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{t("sessions.detail.web_search")} {item.status ? `· ${item.status}` : ""}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        </span>
+      </button>
+      <div className="mt-3 space-y-2">
+        <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.search_queries")}</div>
+          <ul className="space-y-1 font-mono text-xs leading-relaxed text-foreground">
+            {queries.map((query, index) => <li key={`${index}-${query}`} className="break-words">• {query}</li>)}
+          </ul>
+        </div>
+        {results.length > 0 ? isExpanded ? (
+          <div className="space-y-2">
+            {results.map((result, index) => (
+              <ToolTextBlock key={`${index}-${result.slice(0, 80)}`} title={t("sessions.detail.search_result", { index: index + 1 })} text={result} />
+            ))}
+          </div>
+        ) : (
+          <ToolPreview title={t("sessions.detail.output")} text={results.join("\n\n")} lines={5} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -652,6 +734,7 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
   const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
+  const webSearchQueries = isExec ? parseWebSearchQueries(item.arguments) : null;
   const execArguments = isExec ? parseExecArguments(item.arguments) : null;
   const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const argumentEntries = parsedArguments
@@ -669,6 +752,10 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} />;
+  }
+
+  if (webSearchQueries) {
+    return <WebSearchItem item={item} queries={webSearchQueries} />;
   }
 
   if (execArguments?.kind === "command") {

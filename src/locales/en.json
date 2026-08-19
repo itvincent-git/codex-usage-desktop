@@ -503,6 +503,9 @@
         "max_output_tokens": "Output token limit"
       },
       "output": "Output",
+      "web_search": "Web search",
+      "search_queries": "Search queries",
+      "search_result": "Search result {{index}}",
       "image_count_one": "{{count}} output image",
       "image_count_other": "{{count}} output images",
       "output_image": "Output image {{index}}",
