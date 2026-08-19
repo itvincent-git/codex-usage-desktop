@@ -1400,7 +1400,7 @@ describe("App", () => {
     await userEvent.click(showFullButton);
     expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
 
-    screen.getByRole("button", { name: "Close session detail" }).focus();
+    screen.getByRole("button", { name: /Details/ }).focus();
     fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
     expect(screen.getByRole("button", { name: /Copy|Copied/ })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
