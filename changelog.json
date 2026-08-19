@@ -1,4 +1,8 @@
 {
+  "2.2.0": {
+    "zh": "- fix(updater): ignore incomplete releases\n- feat(session): format web search tool calls\n- feat(session): render web search results as cards\n- feat: format completed test waits in session replay",
+    "en": "- fix(updater): ignore incomplete releases\n- feat(session): format web search tool calls\n- feat(session): render web search results as cards\n- feat: format completed test waits in session replay"
+  },
   "2.1.1": {
     "zh": "- test(session): fix modal focus trap boundary",
     "en": "- test(session): fix modal focus trap boundary"
