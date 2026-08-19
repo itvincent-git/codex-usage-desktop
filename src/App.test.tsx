@@ -951,6 +951,12 @@ describe("App", () => {
       { text: "Script completed\nWait time 1.25 seconds\nOutput:\n", type: "input_text" },
       { text: longToolOutput, type: "input_text" },
     ]);
+    const completedTestWaitOutput = JSON.stringify([
+      {
+        type: "input_text",
+        text: "Script completed\nWall time 17.8 seconds\nOutput:\n$ node --test scripts/release-tests.cjs && vitest run src/App.test.tsx\n",
+      },
+    ]);
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
       `${"x".repeat(4100)}raw-only-marker`,
@@ -1098,6 +1104,18 @@ describe("App", () => {
                   isError: false,
                 },
                 {
+                  callId: "call-test-wait",
+                  name: "wait",
+                  status: "completed",
+                  arguments: JSON.stringify({ cell_id: "4", yield_time_ms: 30000, max_tokens: 50000 }),
+                  output: completedTestWaitOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.510Z",
+                  completedAt: "2026-06-11T00:00:19.310Z",
+                  durationMs: 17800,
+                  isError: false,
+                },
+                {
                   callId: "call-write-stdin",
                   name: "exec",
                   status: "completed",
@@ -1220,6 +1238,19 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:01.500Z",
                   completedAt: "2026-06-11T00:00:01.510Z",
                   durationMs: 10,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
+                  callId: "call-test-wait",
+                  name: "wait",
+                  status: "completed",
+                  arguments: JSON.stringify({ cell_id: "4", yield_time_ms: 30000, max_tokens: 50000 }),
+                  output: completedTestWaitOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.510Z",
+                  completedAt: "2026-06-11T00:00:19.310Z",
+                  durationMs: 17800,
                   isError: false,
                 },
                 {
@@ -1418,6 +1449,10 @@ describe("App", () => {
     expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
+    expect(screen.getByText("Waiting for test task to complete...")).toBeInTheDocument();
+    expect(screen.getByText("✓ Test task completed · 17.8s")).toBeInTheDocument();
+    expect(screen.getByText("node --test scripts/release-tests.cjs && vitest run src/App.test.tsx")).toBeInTheDocument();
+    expect(screen.queryByText("50000")).not.toBeInTheDocument();
     const writeStdinCallButton = screen.getByRole("button", { name: /write_stdin · completed/ });
     const writeStdinCall = writeStdinCallButton.parentElement!;
     expect(writeStdinCall).toHaveTextContent("Process session82101");

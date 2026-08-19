@@ -605,6 +605,21 @@ type UserInputQuestion = {
   options: Array<{ label: string; description: string }>;
 };
 
+type WaitTaskResult = {
+  command: string;
+  duration: string;
+};
+
+function parseWaitTaskResult(value: string | null): WaitTaskResult | null {
+  const content = parseToolContentBlocks(value)?.text ?? value;
+  if (!content) return null;
+
+  const match = content.match(/^Script completed\r?\nWall time ([^\r\n]+) seconds\r?\nOutput:\r?\n\$\s+([^\r\n]+)\s*$/);
+  if (!match || !/(?:^|\s)(?:test|vitest|jest|pytest)(?:\s|$)/i.test(match[2])) return null;
+
+  return { duration: match[1], command: match[2] };
+}
+
 function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
   if (!argumentsJson) return null;
 
@@ -797,6 +812,7 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const rawOutputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
   const stderrText = execOutput?.stderr ?? item.stderr;
+  const waitTaskResult = outerToolName === "wait" ? parseWaitTaskResult(item.output) : null;
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} />;
@@ -804,6 +820,18 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
     return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} />;
+  }
+
+  if (waitTaskResult) {
+    return (
+      <div className="rounded-lg border border-border/60 bg-muted/25 p-3 font-mono text-xs leading-relaxed">
+        <div className="text-muted-foreground">⏳ {t("sessions.detail.waiting_for_test_task")}</div>
+        <div className="mt-1 text-emerald-700 dark:text-emerald-300">
+          ✓ {t("sessions.detail.test_task_completed")} · {waitTaskResult.duration}s
+        </div>
+        <div className="mt-1 break-words pl-4 text-foreground">{waitTaskResult.command}</div>
+      </div>
+    );
   }
 
   if (execArguments?.kind === "command") {

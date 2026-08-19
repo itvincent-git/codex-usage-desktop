@@ -503,6 +503,8 @@
         "max_output_tokens": "Output token limit"
       },
       "output": "Output",
+      "waiting_for_test_task": "Waiting for test task to complete...",
+      "test_task_completed": "Test task completed",
       "web_search": "Web search",
       "search_queries": "Search queries",
       "search_result": "Search result {{index}}",
