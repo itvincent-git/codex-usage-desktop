@@ -337,177 +337,58 @@ async fn check_for_updates(
                 err_msg
             })?;
 
-        // Struct to parse version from tauri.conf.json
+        // The updater manifest is uploaded only after every platform build succeeds.
+        // Do not use the version committed to main because it can get ahead of the
+        // latest installable release when a release workflow fails.
         #[derive(serde::Deserialize)]
-        struct TauriConfDto {
+        struct UpdaterManifestDto {
             version: String,
         }
 
-        let mut latest_version_from_static: Option<String> = None;
+        let manifest_url = "https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/latest.json";
+        let manifest_response = client
+            .get(manifest_url)
+            .header("User-Agent", "codex-usage-desktop")
+            .header("Accept", "application/json")
+            .send()
+            .map_err(|e| format!("Update manifest request failed: {e}"))?;
 
-        // --- Tier 1: Try Raw GitHub ---
-        log::info!("Checking version via Raw GitHub.");
-        let raw_url = "https://raw.githubusercontent.com/itvincent-git/codex-usage-desktop/main/src-tauri/tauri.conf.json";
-        match client.get(raw_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
-            Ok(response) if response.status().is_success() => {
-                if let Ok(conf) = response.json::<TauriConfDto>() {
-                    log::info!("Raw GitHub returned version: {}", conf.version);
-                    latest_version_from_static = Some(conf.version);
-                }
-            }
-            Ok(response) => {
-                log::warn!("Raw GitHub check failed with status: {}", response.status());
-            }
-            Err(err) => {
-                log::warn!("Raw GitHub check failed with error: {}", err);
-            }
+        if !manifest_response.status().is_success() {
+            return Err(format!(
+                "Update manifest returned status {}",
+                manifest_response.status()
+            ));
         }
 
-        // --- Tier 2: Try jsDelivr CDN (Fallback) ---
-        if latest_version_from_static.is_none() {
-            log::info!("Checking version via jsDelivr CDN.");
-            let cdn_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/src-tauri/tauri.conf.json";
-            match client.get(cdn_url).header("User-Agent", "codex-usage-desktop").header("Accept", "application/json").send() {
-                Ok(response) if response.status().is_success() => {
-                    if let Ok(conf) = response.json::<TauriConfDto>() {
-                        log::info!("jsDelivr CDN returned version: {}", conf.version);
-                        latest_version_from_static = Some(conf.version);
-                    }
-                }
-                Ok(response) => {
-                    log::warn!("jsDelivr CDN check failed with status: {}", response.status());
-                }
-                Err(err) => {
-                    log::warn!("jsDelivr CDN check failed with error: {}", err);
-                }
-            }
-        }
+        let manifest: UpdaterManifestDto = manifest_response
+            .json()
+            .map_err(|e| format!("Failed to parse update manifest: {e}"))?;
+        let version = manifest.version;
+        let has_update = is_newer(&current_version, &version);
 
-        // If CDN or Raw GitHub successfully returned version info
-        if let Some(version) = latest_version_from_static {
-            let has_update = is_newer(&current_version, &version);
-
-            if !has_update {
-                log::info!("CDN/Raw check: Version {} is not newer than current {}. No update needed.", version, current_version);
-                return Ok(UpdateCheckResponse {
-                    has_update: false,
-                    current_version,
-                    latest_version: version.clone(),
-                    latest_tag: format!("app-v{}", version),
-                    release_name: None,
-                    release_notes: None,
-                    release_url: "".to_string(),
-                    etag: None,
-                    not_modified: Some(false),
-                });
-            }
-
-            // If there IS a new version, try to get release details from GitHub API
-            log::info!("CDN/Raw check: New version {} detected! Querying GitHub API for release notes.", version);
-            let mut api_request = client
-                .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
-                .header("User-Agent", "codex-usage-desktop")
-                .header("Accept", "application/json");
-
-            if let Some(ref e) = etag {
-                api_request = api_request.header("If-None-Match", e);
-            }
-
-            match api_request.send() {
-                Ok(response) => {
-                    let status = response.status();
-                    if status == reqwest::StatusCode::NOT_MODIFIED {
-                        log::info!("GitHub API returned 304. Utilizing static version details.");
-                        return Ok(UpdateCheckResponse {
-                            has_update: true,
-                            current_version,
-                            latest_version: version.clone(),
-                            latest_tag: format!("app-v{}", version),
-                            release_name: Some(format!("Codex Usage Desktop v{}", version)),
-                            release_notes: Some("A new update is available. Please view the release page for details.".to_string()),
-                            release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
-                            etag,
-                            not_modified: Some(true),
-                        });
-                    }
-
-                    if status.is_success() {
-                        let response_etag = response.headers().get("etag")
-                            .and_then(|v| v.to_str().ok())
-                            .map(|s| s.to_string());
-
-                        #[derive(serde::Deserialize)]
-                        struct GithubReleaseDto {
-                            tag_name: String,
-                            name: Option<String>,
-                            html_url: String,
-                            body: Option<String>,
-                        }
-
-                        if let Ok(release) = response.json::<GithubReleaseDto>() {
-                            log::info!("Successfully retrieved release notes from GitHub API for v{}.", version);
-                            return Ok(UpdateCheckResponse {
-                                has_update: true,
-                                current_version,
-                                latest_version: release.tag_name.trim_start_matches("app-v").trim_start_matches('v').to_string(),
-                                latest_tag: release.tag_name,
-                                release_name: release.name,
-                                release_notes: release.body,
-                                release_url: release.html_url,
-                                etag: response_etag,
-                                not_modified: Some(false),
-                            });
-                        }
-                    }
-                    log::warn!("GitHub API failed with status {}. Falling back to CDN metadata.", status);
-                }
-                Err(err) => {
-                    log::warn!("GitHub API request failed: {}. Falling back to CDN metadata.", err);
-                }
-            }
-
-            // Fallback response if GitHub API fails but we know there is an update
-            // Try to retrieve release notes from CDN changelog.json as a fallback
-            let mut notes = "GitHub API rate limit exceeded or network timeout. Please check the release page to view update logs and download the latest version.\n\nGitHub API 访问受限或超时，请直接前往发布页面查看更新日志并下载最新版本。".to_string();
-            let cdn_changelog_url = "https://cdn.jsdelivr.net/gh/itvincent-git/codex-usage-desktop@main/changelog.json";
-
-            match client
-                .get(cdn_changelog_url)
-                .header("User-Agent", "codex-usage-desktop")
-                .header("Accept", "application/json")
-                .send()
-            {
-                Ok(res) if res.status().is_success() => {
-                    if let Ok(changelog) = res.json::<serde_json::Value>() {
-                        if let Some(entry) = changelog.get(&version) {
-                            if entry.is_string() {
-                                if let Some(s) = entry.as_str() {
-                                    notes = s.to_string();
-                                }
-                            } else {
-                                notes = entry.to_string();
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-
+        if !has_update {
+            log::info!(
+                "Updater manifest version {} is not newer than current {}.",
+                version,
+                current_version
+            );
             return Ok(UpdateCheckResponse {
-                has_update: true,
+                has_update: false,
                 current_version,
                 latest_version: version.clone(),
                 latest_tag: format!("app-v{}", version),
-                release_name: Some(format!("Codex Usage Desktop v{}", version)),
-                release_notes: Some(notes),
-                release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
+                release_name: None,
+                release_notes: None,
+                release_url: "".to_string(),
                 etag: None,
                 not_modified: Some(false),
             });
         }
 
-        // --- Tier 3: Primary GitHub API Check (Fallback if Tiers 1 and 2 both failed completely) ---
-        log::info!("CDN and Raw checks both failed. Attempting primary GitHub API query directly.");
+        log::info!(
+            "Updater manifest reports installable version {}. Querying release notes.",
+            version
+        );
         let mut api_request = client
             .get("https://api.github.com/repos/itvincent-git/codex-usage-desktop/releases/latest")
             .header("User-Agent", "codex-usage-desktop")
@@ -526,25 +407,33 @@ async fn check_for_updates(
         let status = response.status();
 
         if status == reqwest::StatusCode::NOT_MODIFIED {
-            log::info!("Update check: 304 Not Modified. ETag matched.");
+            log::info!("GitHub API returned 304. Using updater manifest details.");
             return Ok(UpdateCheckResponse {
-                has_update: false,
+                has_update: true,
                 current_version,
-                latest_version: "".to_string(),
-                latest_tag: "".to_string(),
-                release_name: None,
-                release_notes: None,
-                release_url: "".to_string(),
+                latest_version: version.clone(),
+                latest_tag: format!("app-v{}", version),
+                release_name: Some(format!("Codex Usage Desktop v{}", version)),
+                release_notes: Some("A new update is available. Please view the release page for details.".to_string()),
+                release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
                 etag,
                 not_modified: Some(true),
             });
         }
 
         if !status.is_success() {
-            let body = response.text().unwrap_or_else(|_| "Unavailable".to_string());
-            let err_msg = format!("GitHub API returned error status: {status}. Response: {body}");
-            log::error!("{}", err_msg);
-            return Err(err_msg);
+            log::warn!("GitHub API returned status {status}. Using updater manifest details.");
+            return Ok(UpdateCheckResponse {
+                has_update: true,
+                current_version,
+                latest_version: version.clone(),
+                latest_tag: format!("app-v{}", version),
+                release_name: Some(format!("Codex Usage Desktop v{}", version)),
+                release_notes: None,
+                release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
+                etag: None,
+                not_modified: Some(false),
+            });
         }
 
         let response_etag = response.headers().get("etag")
@@ -559,28 +448,46 @@ async fn check_for_updates(
             body: Option<String>,
         }
 
-        let release: GithubReleaseDto = response
-            .json()
-            .map_err(|e| {
-                let err_msg = format!("Failed to parse release JSON: {e}");
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
+        let release: GithubReleaseDto = response.json().map_err(|e| {
+            let err_msg = format!("Failed to parse release JSON: {e}");
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
+        let release_version = release
+            .tag_name
+            .trim_start_matches("app-v")
+            .trim_start_matches('v');
 
-        let has_update = is_newer(&current_version, &release.tag_name);
+        if release_version != version {
+            log::warn!(
+                "Release API version {} does not match updater manifest version {}.",
+                release_version,
+                version
+            );
+            return Ok(UpdateCheckResponse {
+                has_update: true,
+                current_version,
+                latest_version: version.clone(),
+                latest_tag: format!("app-v{}", version),
+                release_name: Some(format!("Codex Usage Desktop v{}", version)),
+                release_notes: None,
+                release_url: "https://github.com/itvincent-git/codex-usage-desktop/releases/latest".to_string(),
+                etag: None,
+                not_modified: Some(false),
+            });
+        }
 
         log::info!(
-            "Update check completed via primary GitHub API. Latest version: {} (Tag: {}), has_update: {}, ETag: {:?}",
-            release.tag_name.trim_start_matches("app-v").trim_start_matches('v'),
+            "Update check completed. Latest installable version: {} (Tag: {}), ETag: {:?}",
+            version,
             release.tag_name,
-            has_update,
             response_etag
         );
 
         Ok(UpdateCheckResponse {
             has_update,
             current_version,
-            latest_version: release.tag_name.trim_start_matches("app-v").trim_start_matches('v').to_string(),
+            latest_version: version,
             latest_tag: release.tag_name,
             release_name: release.name,
             release_notes: release.body,

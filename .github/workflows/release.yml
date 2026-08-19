@@ -152,7 +152,7 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: Codex Usage Desktop ${{ env.RELEASE_TAG }}
           releaseBody: ${{ steps.release_notes.outputs.body }}
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
@@ -195,6 +195,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          draft: true
           files: release-assets/*
 
       - name: Prepare and validate Windows assets
@@ -239,6 +240,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          draft: true
           files: release-assets/*
 
   updater-manifest:
@@ -296,4 +298,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          draft: true
           files: latest.json
+
+      - name: Publish completed release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest
