@@ -28,14 +28,14 @@
   },
   "header": {
     "app_title": "Codex Usage Desktop",
-    "upgrade": "v{{version}} をアップグレードします",
+    "upgrade": "v{{version}} に更新",
     "downloading_update": "ダウンロード中...",
     "downloading_update_progress": "{{percent}}% をダウンロード中",
     "restart_update": "更新するには再起動してください",
     "upgrade_title": "クリックしてアプリケーションをアップグレードします"
   },
   "update": {
-    "new_version": "新しいアップデートが利用可能: v{{version}}",
+    "new_version": "新しいバージョンが利用可能: v{{version}}",
     "latest_badge": "最新",
     "banner_text": "Codex Usage Desktop の新しいバージョンが準備できました。現在 v{{currentVersion}} を使用しています。",
     "hide_release_notes": "リリースノートを非表示にする",
@@ -43,7 +43,7 @@
     "upgrade_now": "今すぐアップグレード",
     "downloading": "ダウンロード中...",
     "downloading_progress": "{{percent}}% をダウンロード中",
-    "restart_now": "再起動してアップデートする",
+    "restart_now": "再起動して更新",
     "view_release": "リリースを見る",
     "dismiss_aria": "更新通知を閉じる",
     "rate_limit_error": "GitHub API レート制限を超過したか、ネットワーク タイムアウトになりました。リリース ページで更新ログを確認し、最新バージョンをダウンロードしてください。"
@@ -60,19 +60,19 @@
     "selected_window_desc": "選択した期間の使用量とコストを読み込み中です。",
     "natural_month_desc": "自然月の合計を集計します。",
     "session_logs_desc": "個々のセッション ログを解析します。",
-    "reading_sessions": "読書会",
+    "reading_sessions": "セッションを読み込み中",
     "aggregating_tokens": "トークンの集約",
-    "estimating_cost": "コストの見積り"
+    "estimating_cost": "コストを推定中"
   },
   "hero": {
     "title": "Codex トークン使用量",
     "subtitle": "ローカル開発者トークンの追跡とコスト見積もり。",
     "last_updated": "最終更新日 {{time}}",
-    "last_updated_never": "決して更新されない",
+    "last_updated_never": "未更新",
     "rescan_duration": "再スキャンは {{duration}} に完了しました",
     "refresh": "リフレッシュ",
-    "refreshing": "爽やかな...",
-    "export": "輸出",
+    "refreshing": "更新中...",
+    "export": "エクスポート",
     "exporting": "エクスポート中...",
     "export_excel": "エクセル(.xlsx)",
     "export_markdown": "マークダウン (.md)",
@@ -103,11 +103,11 @@
     },
     "costPerMillion": {
       "label": "コスト/100万",
-      "detail": "100 万あたりの混合コスト"
+    "detail": "100万トークンあたりの加重平均コスト"
     }
   },
   "limits": {
-    "title": "コーデックスの制限",
+    "title": "Codexの利用上限",
     "description": "ローカル Codex CLI からのライブ アカウント制限。",
     "updated": "{{time}} を更新しました",
     "not_fetched": "まだ取得されていません",
@@ -115,18 +115,18 @@
     "login_instruction": "ライブレート制限を表示するには、ターミナルでログインコマンドを実行するか、ブラウザ/IDE 拡張機能を介して Codex を認証してください。",
     "click_to_select": "クリックして選択してください",
     "login_hint": "ヒント: ターミナルで上記のコマンドを実行するか、ブラウザ/IDE 拡張機能を介して Codex アカウントにログインしてください。",
-    "unavailable_reason": "現在、コーデックスの制限を取得できません。ネットワークと Codex のログイン状態を確認して、再試行してください。",
+    "unavailable_reason": "現在Codexの利用上限を取得できません。ネットワークとCodexへのログイン状態を確認して、もう一度お試しください。",
     "window_5hour": "5時間制限",
     "window_weekly": "週間制限",
     "window_monthly": "月間利用制限",
     "unavailable": "利用不可",
-    "no_window_returned": "Codex から返されるレート制限ウィンドウはありません。",
+    "no_window_returned": "Codexからレート制限ウィンドウが返されませんでした。",
     "remaining": "残り",
     "consumed": "消費された",
-    "window": "ウィンドウ",
-    "reset_credits": "クレジットをリセットする",
+    "window": "期間",
+    "reset_credits": "リセットクレジット",
     "reset_credits_open": "ChatGPT でリセット クレジットを開く",
-    "reset_credits_toggle": "リセットされたクレジット有効期限の詳細を表示または非表示にする",
+    "reset_credits_toggle": "リセットクレジットの有効期限詳細を表示/非表示",
     "reset_credits_available": "{{count}} が利用可能です",
     "reset_credit_number": "クレジット {{index}}",
     "reset_credit_expires_at": "有効期限 {{date}}",
@@ -137,8 +137,8 @@
     "reset_credits_none": "利用可能なリセット クレジットはありません",
     "left": "残り",
     "status_near_limit": "上限間近",
-    "status_moderate": "適度",
-    "status_healthy": "健康",
+    "status_moderate": "中程度",
+    "status_healthy": "余裕あり",
     "reset_unavailable": "リセット不可",
     "resetting_soon": "まもなくリセット",
     "reset_at": "{{time}} ({{timeLeft}}) でリセット",
@@ -179,7 +179,7 @@
     "pagination_next": "次へ",
     "pagination_info": "{{total}} 日間の {{start}} から {{end}} を表示しています",
     "date_range": "{{start}} から {{end}}",
-    "no_activity": "活動なし",
+    "no_activity": "アクティビティなし",
     "no_activity_days": "アクティビティはありません ({{count}} 日)",
     "comparison_range": "{{range}} を比較しています",
     "token_legend_label": "トークンの色の凡例",
@@ -276,8 +276,8 @@
       "next": "次のページ"
     },
     "no_data": "このウィンドウにはモデル アクティビティがありません。",
-    "other": "他の",
-    "pricing_unavailable": "価格設定がありません",
+    "other": "その他",
+    "pricing_unavailable": "価格情報なし",
     "of_usage": "使用量の",
     "of_cost": "コストの",
     "summary": {
@@ -285,7 +285,7 @@
       "total_tokens": "総トークン数",
       "estimated_cost": "推定コスト",
       "cache_hit": "キャッシュヒット率",
-      "effective_price": "全体の実効価格 / 100 万"
+      "effective_price": "全体の実効価格 / 100万トークン"
     },
     "composition": {
       "title": "トークン構成",
@@ -321,14 +321,14 @@
       "input": "入力",
       "cached": "キャッシュされた",
       "output": "出力",
-      "effective": "効果的",
-      "input_tooltip": "100 万個の非キャッシュ入力トークンの標準価格",
-      "cached_tooltip": "100 万個のキャッシュされた入力トークンの標準価格",
+    "effective": "実効",
+      "input_tooltip": "100万非キャッシュ入力トークンあたりの標準価格",
+      "cached_tooltip": "100万キャッシュ入力トークンあたりの標準価格",
       "output_tooltip": "100万出力トークンの標準価格",
       "effective_tooltip": "この使用量構成の推定コストをトークン合計で割った値"
     },
     "price_legend": {
-      "label": "相対価格熱の伝説",
+    "label": "相対価格の凡例",
       "low": "低価格",
       "medium": "中価格帯",
       "high": "高価格",
@@ -337,9 +337,9 @@
   },
   "projects": {
     "title": "プロジェクトの使用状況の詳細",
-    "subtitle": "プロジェクト ディレクトリごとにトークンとコストの合計を分析します。",
+    "subtitle": "プロジェクトディレクトリ別にトークンとコストの合計を分析します。",
     "card_title": "プロジェクト使用量",
-    "card_subtitle": "選択したウィンドウのプロジェクト ディレクトリごとにグループ化されたトークンとコストの合計。",
+    "card_subtitle": "選択した期間のプロジェクトディレクトリ別のトークン数とコストの合計。",
     "cols": {
       "project": "プロジェクトディレクトリ",
       "tokens": "総トークン数",
@@ -378,7 +378,7 @@
     "open_details": "{{project}} の分析を開く",
     "bar_label": "{{total}} 合計トークン: {{cached}} キャッシュを含む {{input}} 入力、および {{output}} 出力",
     "action_view_sessions": "セッションを見る",
-    "no_projects": "プロジェクト ディレクトリはまだログで追跡されていません。"
+    "no_projects": "ログに記録されたプロジェクトディレクトリはまだありません。"
   },
   "project_modal": {
     "title": "{{projectName}} のセッション",
@@ -392,8 +392,8 @@
     "no_sessions": "このプロジェクトのセッションが見つかりませんでした。",
     "project_details": "プロジェクトの詳細",
     "active_files": "アクティブなファイル",
-    "showing_filtered": "{{filtered}} 一致するセッションを表示しています",
-    "subtitle_desc": "このディレクトリに書き込む個々のセッション",
+    "showing_filtered": "一致する{{filtered}}件のセッションを表示中",
+    "subtitle_desc": "このディレクトリに記録された個々のセッション",
     "search_placeholder": "タイトル、セッション ID、またはモデルを検索します...",
     "no_matching_sessions": "検索クエリに一致するセッションはありません",
     "clear_search_hint": "検索クエリをクリアするか、別の用語を検索してみてください。",
@@ -438,7 +438,7 @@
     "err_end_before_start": "終了日を開始日より前にすることはできません。",
     "btn_clear": "クリア",
     "btn_cancel": "キャンセル",
-    "btn_apply": "適用範囲"
+    "btn_apply": "期間を適用"
   },
   "sessions": {
     "title": "セッションの詳細",
@@ -459,7 +459,7 @@
     "no_data": "現在の検索フィルターに一致するセッション ログはありません。",
     "showing_info": "{{count}} セッションを表示しています",
     "showing_info_filtered": "{{total}} セッション中 {{filtered}} を表示しています",
-    "no_sessions_desc": "Codex CLI セッション ログが見つからないか、使用状況イベントが含まれていません。 「ローカルログを再スキャン」をクリックして再度確認します。",
+    "no_sessions_desc": "Codex CLIのセッションログが見つからないか、使用イベントが含まれていません。「ローカルログを再スキャン」をクリックして再確認してください。",
     "filtering_by_project": "プロジェクトによるフィルタリング",
     "count_sessions_one": "1セッション",
     "count_sessions_other": "{{count}} セッション",
@@ -476,8 +476,8 @@
     "output": "出力",
     "token_bar_label": "トークンの内訳: {{input}} 非キャッシュ入力、{{cached}} キャッシュ入力、{{output}} 出力、{{total}} 合計",
     "token_bar_empty": "トークンアクティビティはありません",
-    "token_total_label": "合計トークン数 {{total}};最も高い可視セッションの {{percent}}",
-    "cost_pill_label": "コスト {{cost}};最も高い可視セッションの {{percent}}",
+    "token_total_label": "合計トークン数 {{total}}。表示中セッションの最大値に対して{{percent}}",
+    "cost_pill_label": "コスト {{cost}}。表示中セッションの最大値に対して{{percent}}",
     "open_session": "セッションを開く {{title}}",
     "quota": {
       "title": "観察されたクォータ使用量",
@@ -487,7 +487,7 @@
       "approx": "概算",
       "aria_label": "推定 5 時間および週ごとの割り当て使用量",
       "resets": "リセット: {{value}}",
-      "caveat": "整数ログのスナップショットから推定されます。丸めやその他の同時 Codex セッションは、帰属に影響を与える可能性があります。各リセット ウィンドウは個別に表示されます。"
+      "caveat": "整数ログのスナップショットから推定しています。丸めや同時実行中の他のCodexセッションにより、計上結果が変わる場合があります。リセット期間ごとに個別表示します。"
     },
     "detail": {
       "modal_title": "セッションの詳細",
@@ -497,7 +497,7 @@
       "trigger": "トリガー/コマンド",
       "file_path": "ファイルパス",
       "mode": "呼び出しモード",
-      "type": "リクエストタイプ",
+      "type": "リクエスト種別",
       "tokens": "トークン",
       "tokens_breakdown": "内訳 (入力 / 出力 / キャッシュ)",
       "estimated_cost": "推定コスト",
@@ -533,7 +533,7 @@
       "developer": "開発者",
       "user": "ユーザー",
       "assistant": "アシスタント",
-      "expand": "拡大する",
+    "expand": "展開",
     "collapse": "折りたたむ",
       "reasoning_summary": "推論の要約",
       "arguments": "引数",
@@ -565,10 +565,10 @@
       "image_count_one": "出力画像 {{count}}枚",
       "image_count_other": "出力画像 {{count}}枚",
       "output_image": "出力画像 {{index}}",
-      "stderr": "標準エラー",
+    "stderr": "標準エラー出力",
       "user_input_request": "ユーザー入力リクエスト",
       "custom_answer": "カスタム回答",
-      "patch_failed": "パッチが失敗しました",
+    "patch_failed": "パッチの適用に失敗しました",
       "patch_result": "パッチ結果",
       "patch_output": "パッチ出力",
       "token_events": "トークンイベント",
@@ -588,7 +588,7 @@
     "subtitle": "ローカルアプリの状態と復旧操作を管理します。",
     "nav_aria": "設定セクション",
     "nav_general": "一般",
-    "nav_menu_bar": "メニューバー/システムトレイ",
+    "nav_menu_bar": "メニューバー / トレイ",
     "nav_maintenance": "メンテナンス",
     "cache_title": "ローカルキャッシュ",
     "cache_desc": "キャッシュされた使用状況、増分スキャン データ、価格データをクリアし、ローカル Codex ログから再構築します。",
