@@ -437,8 +437,18 @@
     "token_bar_empty": "无 Token 活动",
     "token_total_label": "Token 总数 {{total}}；相当于当前可见会话最高值的 {{percent}}",
     "cost_pill_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
-    "open_session": "打开会话 {{title}}",
-    "detail": {
+  "open_session": "打开会话 {{title}}",
+  "quota": {
+    "title": "观测到的限额消耗",
+    "estimated": "估算",
+    "five_hour": "5h",
+    "weekly": "周",
+    "approx": "约",
+    "aria_label": "估算的 5 小时及每周限额消耗",
+    "resets": "重置时间：{{value}}",
+    "caveat": "根据日志中的整数快照估算。取整及同时运行的其他 Codex 会话可能影响归因；跨重置周期分别展示。"
+  },
+  "detail": {
       "modal_title": "会话详情",
       "close_aria": "关闭会话详情",
       "timestamp": "记录时间",

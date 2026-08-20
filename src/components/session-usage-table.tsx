@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { modelTone } from "@/lib/model-tone";
+import { SessionQuotaUsageView } from "./session-quota-usage";
 
 type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
@@ -483,6 +484,7 @@ export function SessionUsageTable({
                               </>
                             )}
                           </div>
+                          <SessionQuotaUsageView usage={session.quotaUsage} />
                           {isInactive ? <div className="text-[9px] italic text-muted-foreground">{t("daily.no_activity")}</div> : null}
                         </div>
 

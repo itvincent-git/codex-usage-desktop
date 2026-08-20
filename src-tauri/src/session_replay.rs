@@ -1554,6 +1554,7 @@ mod tests {
                 size_bytes: raw.len() as i64,
                 rows: vec![],
                 prompt_title: Some("Replay this session".to_string()),
+                quota_usage: None,
             }],
             "2026-06-01T00:00:00.000Z",
         )

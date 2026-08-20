@@ -302,6 +302,25 @@ pub struct SessionDailyUsageRow {
     pub cost_usd: f64,
     pub models: Vec<String>,
     pub projects: Vec<String>,
+    pub quota_usage: Option<SessionQuotaUsage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionQuotaUsage {
+    pub five_hour: Vec<SessionQuotaWindowUsage>,
+    pub weekly: Vec<SessionQuotaWindowUsage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionQuotaWindowUsage {
+    pub window_minutes: i64,
+    pub resets_at: Option<String>,
+    pub observed_start_at: String,
+    pub observed_end_at: String,
+    pub observed_delta_percent: f64,
+    pub below_resolution: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -322,6 +341,7 @@ pub struct SessionDetailRow {
     pub models: Vec<String>,
     pub projects: Vec<String>,
     pub daily_usage: Vec<SessionDailyUsageRow>,
+    pub quota_usage: Option<SessionQuotaUsage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

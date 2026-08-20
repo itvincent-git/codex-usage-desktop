@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
+import { SessionQuotaUsageView } from "./session-quota-usage";
 
 type SessionDetailModalProps = {
   session: SessionDetailRow;
@@ -1311,6 +1312,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
             </div>
           ) : activeTab === "timeline" ? (
             <div className="mx-auto max-w-6xl space-y-2.5">
+              <SessionQuotaUsageView usage={session.quotaUsage} detailed />
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey);

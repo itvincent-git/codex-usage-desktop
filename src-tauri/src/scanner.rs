@@ -4,17 +4,21 @@ use crate::{
     db::{
         delete_missing_daily_rows, delete_missing_session_file_rollups, query_session_file_rollup,
         record_scan_run, upsert_daily_rows, upsert_session_file_rollups, SessionFileRollup,
+        SessionQuotaRollup,
     },
     pricing::{calculate_cost_usd, PricingSource},
-    types::{DailyUsageRow, ModelUsage, ProjectUsage, ScanMetrics, ScanResponse},
+    types::{
+        DailyUsageRow, ModelUsage, ProjectUsage, ScanMetrics, ScanResponse, SessionQuotaWindowUsage,
+    },
 };
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde_json::Value;
+#[cfg(test)]
+use std::io::{BufRead, BufReader};
 use std::{
     collections::BTreeMap,
     fs,
-    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     time::{Instant, SystemTime},
 };
@@ -38,6 +42,14 @@ struct UsageEvent {
     project_path: String,
     usage: ModelUsage,
     is_fallback_model: bool,
+}
+
+#[derive(Debug, Clone)]
+struct QuotaSnapshot {
+    timestamp: DateTime<Utc>,
+    window_minutes: i64,
+    used_percent: f64,
+    resets_at: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -147,15 +159,18 @@ fn load_daily_rows(
             query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
         {
             metrics.files_reused += 1;
-            if rollup.prompt_title.is_none() && backfill_prompt_title(&file.path, &mut rollup) {
-                changed_rollups.push(rollup.clone());
+            if rollup.prompt_title.is_none() || rollup.quota_usage.is_none() {
+                if backfill_session_metadata(&file.path, timezone, &mut rollup) {
+                    changed_rollups.push(rollup.clone());
+                }
             }
             all_rows.extend(rollup.rows);
             continue;
         }
 
         let mut events = Vec::new();
-        let prompt_title = load_session_file(&file.path, &mut events)?;
+        let (prompt_title, quota_usage) =
+            load_session_file_with_quota(&file.path, &mut events, timezone)?;
         let rows = build_daily_rows(&events, timezone, updated_at, pricing_source);
         metrics.files_parsed += 1;
         metrics.bytes_read += file.size_bytes as u64;
@@ -165,6 +180,7 @@ fn load_daily_rows(
             size_bytes: file.size_bytes,
             rows: rows.clone(),
             prompt_title: Some(prompt_title),
+            quota_usage: Some(quota_usage),
         });
         all_rows.extend(rows);
     }
@@ -224,13 +240,23 @@ fn modified_at_ms(metadata: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
+#[cfg(test)]
 fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<String, String> {
+    load_session_file_with_quota(path, events, "UTC").map(|(title, _)| title)
+}
+
+fn load_session_file_with_quota(
+    path: &Path,
+    events: &mut Vec<UsageEvent>,
+    timezone: &str,
+) -> Result<(String, SessionQuotaRollup), String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
     let mut previous_totals: Option<RawUsage> = None;
     let mut current_model: Option<String> = None;
     let mut current_model_is_fallback = false;
     let mut current_project_path: Option<String> = None;
     let mut prompt_title = None;
+    let mut quota_snapshots = Vec::new();
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -284,6 +310,7 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<String
         };
 
         let info = payload.get("info").unwrap_or(&Value::Null);
+        extract_quota_snapshots(info, timestamp, &mut quota_snapshots);
         let last_usage = normalize_raw_usage(info.get("last_token_usage"));
         let total_usage = normalize_raw_usage(info.get("total_token_usage"));
         let raw = last_usage.or_else(|| {
@@ -340,18 +367,26 @@ fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<String
         });
     }
 
-    Ok(prompt_title.unwrap_or_default())
+    Ok((
+        prompt_title.unwrap_or_default(),
+        build_quota_rollup(&quota_snapshots, timezone),
+    ))
 }
 
-fn backfill_prompt_title(path: &Path, rollup: &mut SessionFileRollup) -> bool {
-    match load_prompt_title(path) {
-        Ok(title) => {
-            rollup.prompt_title = Some(title);
+fn backfill_session_metadata(path: &Path, timezone: &str, rollup: &mut SessionFileRollup) -> bool {
+    match load_session_file_with_quota(path, &mut Vec::new(), timezone) {
+        Ok((title, quota_usage)) => {
+            if rollup.prompt_title.is_none() {
+                rollup.prompt_title = Some(title);
+            }
+            if rollup.quota_usage.is_none() {
+                rollup.quota_usage = Some(quota_usage);
+            }
             true
         }
         Err(error) => {
             log::warn!(
-                "Failed to backfill session title from {}: {error}",
+                "Failed to backfill session metadata from {}: {error}",
                 path.display()
             );
             false
@@ -359,6 +394,147 @@ fn backfill_prompt_title(path: &Path, rollup: &mut SessionFileRollup) -> bool {
     }
 }
 
+fn extract_quota_snapshots(
+    info: &Value,
+    timestamp: DateTime<Utc>,
+    output: &mut Vec<QuotaSnapshot>,
+) {
+    let limits = info.get("rate_limits").or_else(|| info.get("rateLimits"));
+    let Some(limits) = limits else { return };
+
+    for key in ["primary", "secondary"] {
+        let Some(window) = limits.get(key) else {
+            continue;
+        };
+        let window_minutes = window
+            .get("window_minutes")
+            .or_else(|| window.get("windowMinutes"))
+            .or_else(|| window.get("window_duration_mins"))
+            .or_else(|| window.get("windowDurationMins"))
+            .and_then(Value::as_i64);
+        let used_percent = window
+            .get("used_percent")
+            .or_else(|| window.get("usedPercent"))
+            .and_then(Value::as_f64);
+        let (Some(window_minutes @ (300 | 10080)), Some(used_percent)) =
+            (window_minutes, used_percent)
+        else {
+            continue;
+        };
+        let resets_at = window
+            .get("resets_at")
+            .or_else(|| window.get("resetsAt"))
+            .and_then(format_reset_at);
+        output.push(QuotaSnapshot {
+            timestamp,
+            window_minutes,
+            used_percent,
+            resets_at,
+        });
+    }
+}
+
+fn format_reset_at(value: &Value) -> Option<String> {
+    if let Some(value) = value.as_str() {
+        return Some(value.to_string());
+    }
+    value
+        .as_i64()
+        .and_then(|seconds| DateTime::<Utc>::from_timestamp(seconds, 0))
+        .map(|timestamp| timestamp.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+}
+
+fn build_quota_rollup(snapshots: &[QuotaSnapshot], timezone: &str) -> SessionQuotaRollup {
+    let mut rollup = SessionQuotaRollup::default();
+    for window_minutes in [300, 10080] {
+        let mut matching = snapshots
+            .iter()
+            .filter(|snapshot| snapshot.window_minutes == window_minutes)
+            .cloned()
+            .collect::<Vec<_>>();
+        matching.sort_by_key(|snapshot| snapshot.timestamp);
+        let (windows, daily) = summarize_quota_windows(&matching, timezone);
+        if window_minutes == 300 {
+            rollup.session.five_hour = windows;
+            for (date, windows) in daily {
+                rollup.daily.entry(date).or_default().five_hour = windows;
+            }
+        } else {
+            rollup.session.weekly = windows;
+            for (date, windows) in daily {
+                rollup.daily.entry(date).or_default().weekly = windows;
+            }
+        }
+    }
+    rollup
+}
+
+fn summarize_quota_windows(
+    snapshots: &[QuotaSnapshot],
+    timezone: &str,
+) -> (
+    Vec<SessionQuotaWindowUsage>,
+    BTreeMap<String, Vec<SessionQuotaWindowUsage>>,
+) {
+    let mut windows = Vec::new();
+    let mut daily = BTreeMap::<String, Vec<SessionQuotaWindowUsage>>::new();
+    let mut start = 0;
+
+    for index in 1..=snapshots.len() {
+        let reset = index < snapshots.len()
+            && snapshots[index].used_percent < snapshots[index - 1].used_percent;
+        if index == snapshots.len() || reset {
+            let segment = &snapshots[start..index];
+            if segment.len() >= 2 {
+                windows.push(quota_window_usage(segment));
+                let mut daily_segments = BTreeMap::<String, Vec<QuotaSnapshot>>::new();
+                for pair in segment.windows(2) {
+                    let date = date_key_in_timezone(pair[1].timestamp, timezone);
+                    let entry = daily_segments.entry(date).or_default();
+                    if entry.is_empty() {
+                        entry.push(pair[0].clone());
+                    }
+                    entry.push(pair[1].clone());
+                }
+                for (date, daily_segment) in daily_segments {
+                    daily
+                        .entry(date)
+                        .or_default()
+                        .push(quota_window_usage(&daily_segment));
+                }
+            }
+            start = index;
+        }
+    }
+
+    (windows, daily)
+}
+
+fn quota_window_usage(snapshots: &[QuotaSnapshot]) -> SessionQuotaWindowUsage {
+    let first = snapshots.first().expect("quota segment has snapshots");
+    let last = snapshots.last().expect("quota segment has snapshots");
+    let observed_delta_percent = snapshots
+        .windows(2)
+        .map(|pair| (pair[1].used_percent - pair[0].used_percent).max(0.0))
+        .sum::<f64>();
+    SessionQuotaWindowUsage {
+        window_minutes: first.window_minutes,
+        resets_at: snapshots
+            .iter()
+            .rev()
+            .find_map(|snapshot| snapshot.resets_at.clone()),
+        observed_start_at: first
+            .timestamp
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        observed_end_at: last
+            .timestamp
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        observed_delta_percent,
+        below_resolution: observed_delta_percent.round() == 0.0,
+    }
+}
+
+#[cfg(test)]
 fn load_prompt_title(path: &Path) -> Result<String, String> {
     let file = fs::File::open(path).map_err(|error| error.to_string())?;
     for line in BufReader::new(file).lines() {
@@ -953,7 +1129,7 @@ mod tests {
         )
         .unwrap();
         db.execute(
-            "UPDATE session_file_rollups SET prompt_title = NULL, updated_at = 'legacy'",
+            "UPDATE session_file_rollups SET prompt_title = NULL, quota_usage_json = NULL, updated_at = 'legacy'",
             [],
         )
         .unwrap();
@@ -972,6 +1148,14 @@ mod tests {
         assert_eq!(migrated.metrics.files_parsed, 0);
         assert_eq!(migrated.metrics.files_reused, 1);
         assert_eq!(record.prompt_title.as_deref(), Some("Initial request"));
+        let has_quota_usage: bool = db
+            .query_row(
+                "SELECT quota_usage_json IS NOT NULL FROM session_file_rollups WHERE path = ?",
+                [&session_path.to_string_lossy().as_ref()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(has_quota_usage);
         assert_eq!(record.rows[0].total_tokens, 1300);
 
         let unchanged = load_daily_rows(
@@ -1047,6 +1231,7 @@ mod tests {
                     size_bytes: failed_metadata.len() as i64,
                     rows: vec![cached_row],
                     prompt_title: None,
+                    quota_usage: None,
                 },
                 SessionFileRollup {
                     path: valid_path.to_string_lossy().to_string(),
@@ -1054,6 +1239,7 @@ mod tests {
                     size_bytes: valid_metadata.len() as i64,
                     rows: vec![],
                     prompt_title: None,
+                    quota_usage: None,
                 },
             ],
             "legacy",
@@ -1157,6 +1343,112 @@ mod tests {
         assert_eq!(third.metrics.files_reused, 0);
     }
 
+    #[test]
+    fn parses_five_hour_and_weekly_quota_snapshots() {
+        let temp_dir = tempfile_dir();
+        let path = temp_dir.join("quota.jsonl");
+        fs::write(
+            &path,
+            [
+                quota_event("2026-07-01T10:00:00Z", 10.0, 20.0, 1_783_000_000),
+                quota_event("2026-07-01T10:05:00Z", 13.0, 21.0, 1_783_000_003),
+            ]
+            .join("\n"),
+        )
+        .unwrap();
+
+        let (_, quota) = load_session_file_with_quota(&path, &mut Vec::new(), "UTC").unwrap();
+
+        assert_eq!(quota.session.five_hour.len(), 1);
+        assert_eq!(quota.session.weekly.len(), 1);
+        assert_eq!(quota.session.five_hour[0].observed_delta_percent, 3.0);
+        assert_eq!(quota.session.weekly[0].observed_delta_percent, 1.0);
+        assert_eq!(quota.session.five_hour[0].window_minutes, 300);
+    }
+
+    #[test]
+    fn quota_windows_handle_duplicates_missing_values_and_single_snapshots() {
+        let timestamp = |value: &str| value.parse::<DateTime<Utc>>().unwrap();
+        let snapshots = vec![
+            QuotaSnapshot {
+                timestamp: timestamp("2026-07-01T10:00:00Z"),
+                window_minutes: 300,
+                used_percent: 10.0,
+                resets_at: None,
+            },
+            QuotaSnapshot {
+                timestamp: timestamp("2026-07-01T10:01:00Z"),
+                window_minutes: 300,
+                used_percent: 10.0,
+                resets_at: None,
+            },
+        ];
+
+        let duplicate = build_quota_rollup(&snapshots, "UTC");
+        assert!(duplicate.session.five_hour[0].below_resolution);
+        assert_eq!(duplicate.session.five_hour[0].observed_delta_percent, 0.0);
+        assert!(duplicate.session.weekly.is_empty());
+
+        let single = build_quota_rollup(&snapshots[..1], "UTC");
+        assert!(single.session.five_hour.is_empty());
+    }
+
+    #[test]
+    fn quota_usage_splits_on_reset_but_ignores_reset_timestamp_drift() {
+        let timestamp = |value: &str| value.parse::<DateTime<Utc>>().unwrap();
+        let snapshot = |time: &str, used_percent: f64, reset: &str| QuotaSnapshot {
+            timestamp: timestamp(time),
+            window_minutes: 300,
+            used_percent,
+            resets_at: Some(reset.to_string()),
+        };
+        let snapshots = vec![
+            snapshot("2026-07-01T10:00:00Z", 10.0, "2026-07-01T15:00:00Z"),
+            snapshot("2026-07-01T10:05:00Z", 12.0, "2026-07-01T15:00:03Z"),
+            snapshot("2026-07-01T15:01:00Z", 1.0, "2026-07-01T20:00:00Z"),
+            snapshot("2026-07-01T15:05:00Z", 4.0, "2026-07-01T20:00:02Z"),
+        ];
+
+        let quota = build_quota_rollup(&snapshots, "UTC");
+
+        assert_eq!(quota.session.five_hour.len(), 2);
+        assert_eq!(quota.session.five_hour[0].observed_delta_percent, 2.0);
+        assert_eq!(quota.session.five_hour[1].observed_delta_percent, 3.0);
+    }
+
+    #[test]
+    fn quota_increments_belong_to_the_later_snapshot_application_date() {
+        let timestamp = |value: &str| value.parse::<DateTime<Utc>>().unwrap();
+        let snapshots = vec![
+            QuotaSnapshot {
+                timestamp: timestamp("2026-07-01T15:59:00Z"),
+                window_minutes: 10080,
+                used_percent: 20.0,
+                resets_at: None,
+            },
+            QuotaSnapshot {
+                timestamp: timestamp("2026-07-01T16:01:00Z"),
+                window_minutes: 10080,
+                used_percent: 22.0,
+                resets_at: None,
+            },
+            QuotaSnapshot {
+                timestamp: timestamp("2026-07-02T01:00:00Z"),
+                window_minutes: 10080,
+                used_percent: 23.0,
+                resets_at: None,
+            },
+        ];
+
+        let quota = build_quota_rollup(&snapshots, "Asia/Shanghai");
+
+        assert_eq!(
+            quota.daily["2026-07-02"].weekly[0].observed_delta_percent,
+            3.0
+        );
+        assert!(!quota.daily.contains_key("2026-07-01"));
+    }
+
     fn tempfile_dir() -> PathBuf {
         let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
@@ -1228,6 +1520,31 @@ mod tests {
                         "output_tokens": last_output,
                         "reasoning_output_tokens": 0,
                         "total_tokens": last_tokens
+                    }
+                }
+            }
+        })
+        .to_string()
+    }
+
+    fn quota_event(timestamp: &str, five_hour: f64, weekly: f64, resets_at: i64) -> String {
+        serde_json::json!({
+            "timestamp": timestamp,
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "rate_limits": {
+                        "primary": {
+                            "used_percent": five_hour,
+                            "window_minutes": 300,
+                            "resets_at": resets_at
+                        },
+                        "secondary": {
+                            "used_percent": weekly,
+                            "window_minutes": 10080,
+                            "resets_at": resets_at + 100
+                        }
                     }
                 }
             }

@@ -245,6 +245,21 @@ export type SessionDailyUsageRow = {
   costUSD: number;
   models: string[];
   projects: string[];
+  quotaUsage?: SessionQuotaUsage | null;
+};
+
+export type SessionQuotaWindowUsage = {
+  windowMinutes: number;
+  resetsAt: string | null;
+  observedStartAt: string;
+  observedEndAt: string;
+  observedDeltaPercent: number;
+  belowResolution: boolean;
+};
+
+export type SessionQuotaUsage = {
+  fiveHour: SessionQuotaWindowUsage[];
+  weekly: SessionQuotaWindowUsage[];
 };
 
 export type SessionDetailRow = {
@@ -262,6 +277,7 @@ export type SessionDetailRow = {
   models: string[];
   projects: string[];
   dailyUsage: SessionDailyUsageRow[];
+  quotaUsage?: SessionQuotaUsage | null;
 };
 
 export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {

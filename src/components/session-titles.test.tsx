@@ -7,6 +7,7 @@ import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
 import { SessionUsageTable } from "./session-usage-table";
 import type { SessionDetailRow } from "@/lib/api";
+import i18n from "@/i18n";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -47,6 +48,40 @@ function session(overrides: Partial<SessionDetailRow>): SessionDetailRow {
 }
 
 describe("session daily usage", () => {
+  it("shows daily quota windows, low-resolution values, multiple resets, and unavailable data", () => {
+    const window = (delta: number, belowResolution = false) => ({
+      windowMinutes: 300,
+      resetsAt: "2026-07-15T13:00:00Z",
+      observedStartAt: "2026-07-15T08:00:00Z",
+      observedEndAt: "2026-07-15T09:00:00Z",
+      observedDeltaPercent: delta,
+      belowResolution,
+    });
+    render(<SessionUsageTable sessions={[session({
+      threadName: "Quota session",
+      quotaUsage: { fiveHour: [window(99)], weekly: [] },
+      dailyUsage: [{
+        date: "2026-07-15",
+        inputTokens: 100,
+        cachedInputTokens: 20,
+        outputTokens: 40,
+        reasoningOutputTokens: 0,
+        totalTokens: 140,
+        costUSD: 0.001,
+        models: ["gpt-5"],
+        projects: ["/repo/app"],
+        quotaUsage: { fiveHour: [window(2), window(0, true)], weekly: [] },
+      }],
+    })]} />);
+
+    const card = screen.getByText("Quota session").closest("article")!;
+    expect(within(card).getByText("5h Approx. +2%")).toBeInTheDocument();
+    expect(within(card).getByText("5h <1%")).toBeInTheDocument();
+    expect(within(card).getByText("Weekly --")).toBeInTheDocument();
+    expect(card).not.toHaveTextContent("99%");
+    expect(within(card).getByLabelText("Estimated 5-hour and weekly quota usage")).toHaveAttribute("title", expect.stringContaining("concurrent"));
+  });
+
   it("splits resumed usage by rollup date and opens the complete session", async () => {
     const onSessionClick = vi.fn();
     const resumed = session({
@@ -572,5 +607,42 @@ describe("session titles", () => {
     render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
 
     expect(await screen.findByRole("dialog", { name: "fallback-session" })).toBeInTheDocument();
+  });
+
+  it("shows complete quota windows and localized estimation guidance in session details", async () => {
+    await i18n.changeLanguage("zh");
+    invokeMock.mockResolvedValue({
+      path: "/tmp/fallback.jsonl",
+      sessionId: "fallback-session.jsonl",
+      threadName: null,
+      modifiedAtMs: 0,
+      sizeBytes: 0,
+      rawJsonl: "",
+      summary: {
+        startTime: null, endTime: null, durationMs: null, timeToFirstTokenMs: null,
+        cwd: null, projects: [], models: [], cliVersion: null, git: {}, inputTokens: 0,
+        cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0, totalTokens: 0,
+        costUSD: 0, turnCount: 0, messageCount: 0, toolCallCount: 0, patchCount: 0, errorCount: 0,
+      },
+      turns: [],
+    });
+    const quotaWindow = {
+      windowMinutes: 300,
+      resetsAt: "2026-07-15T13:00:00Z",
+      observedStartAt: "2026-07-15T08:00:00Z",
+      observedEndAt: "2026-07-15T09:00:00Z",
+      observedDeltaPercent: 4,
+      belowResolution: false,
+    };
+
+    render(<SessionDetailModal session={session({ quotaUsage: { fiveHour: [quotaWindow, { ...quotaWindow, observedDeltaPercent: 2 }], weekly: [] } })} onClose={vi.fn()} />);
+
+    expect(await screen.findByText("观测到的限额消耗")).toBeInTheDocument();
+    expect(screen.getByText("5h")).toBeInTheDocument();
+    expect(screen.getByText("周")).toBeInTheDocument();
+    expect(screen.getByText("约 +4%")).toBeInTheDocument();
+    expect(screen.getByText("约 +2%")).toBeInTheDocument();
+    expect(screen.getByText(/取整及同时运行的其他 Codex 会话/)).toBeInTheDocument();
+    await i18n.changeLanguage("en");
   });
 });

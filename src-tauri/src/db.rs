@@ -1,7 +1,9 @@
 use crate::types::{
     DailyUsageRow, ModelUsage, ProjectUsage, SessionDailyUsageRow, SessionDetailRow,
+    SessionQuotaUsage,
 };
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 
 pub fn open_database(database_path: &Path) -> Result<Connection, String> {
@@ -38,6 +40,7 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           size_bytes INTEGER NOT NULL,
           rows_json TEXT NOT NULL,
           prompt_title TEXT,
+          quota_usage_json TEXT,
           updated_at TEXT NOT NULL
         );
         "#,
@@ -48,6 +51,12 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "daily_usage_rollups",
         "projects_json",
         "ALTER TABLE daily_usage_rollups ADD COLUMN projects_json TEXT NOT NULL DEFAULT '{}'",
+    )?;
+    ensure_column(
+        &db,
+        "session_file_rollups",
+        "quota_usage_json",
+        "ALTER TABLE session_file_rollups ADD COLUMN quota_usage_json TEXT",
     )?;
     ensure_column(
         &db,
@@ -65,6 +74,14 @@ pub struct SessionFileRollup {
     pub size_bytes: i64,
     pub rows: Vec<DailyUsageRow>,
     pub prompt_title: Option<String>,
+    pub quota_usage: Option<SessionQuotaRollup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionQuotaRollup {
+    pub session: SessionQuotaUsage,
+    pub daily: BTreeMap<String, SessionQuotaUsage>,
 }
 
 #[derive(Debug, Clone)]
@@ -217,23 +234,33 @@ pub fn query_session_file_rollup(
 ) -> Result<Option<SessionFileRollup>, String> {
     let result = db.query_row(
         r#"
-        SELECT rows_json, prompt_title
+        SELECT rows_json, prompt_title, quota_usage_json
         FROM session_file_rollups
         WHERE path = ? AND modified_at_ms = ? AND size_bytes = ?
         "#,
         params![path, modified_at_ms, size_bytes],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        },
     );
 
     match result {
-        Ok((rows_json, prompt_title)) => {
+        Ok((rows_json, prompt_title, quota_usage_json)) => {
             let rows = serde_json::from_str(&rows_json).map_err(|error| error.to_string())?;
+            let quota_usage = quota_usage_json
+                .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
+                .transpose()?;
             Ok(Some(SessionFileRollup {
                 path: path.to_string(),
                 modified_at_ms,
                 size_bytes,
                 rows,
                 prompt_title,
+                quota_usage,
             }))
         }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -289,13 +316,15 @@ pub fn upsert_session_file_rollups(
                   size_bytes,
                   rows_json,
                   prompt_title,
+                  quota_usage_json,
                   updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                   modified_at_ms = excluded.modified_at_ms,
                   size_bytes = excluded.size_bytes,
                   rows_json = excluded.rows_json,
                   prompt_title = excluded.prompt_title,
+                  quota_usage_json = excluded.quota_usage_json,
                   updated_at = excluded.updated_at
                 "#,
             )
@@ -304,6 +333,12 @@ pub fn upsert_session_file_rollups(
         for rollup in rollups {
             let rows_json =
                 serde_json::to_string(&rollup.rows).map_err(|error| error.to_string())?;
+            let quota_usage_json = rollup
+                .quota_usage
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| error.to_string())?;
             statement
                 .execute(params![
                     rollup.path,
@@ -311,6 +346,7 @@ pub fn upsert_session_file_rollups(
                     rollup.size_bytes,
                     rows_json,
                     rollup.prompt_title,
+                    quota_usage_json,
                     updated_at
                 ])
                 .map_err(|error| error.to_string())?;
@@ -423,7 +459,8 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
               modified_at_ms,
               size_bytes,
               rows_json,
-              prompt_title
+              prompt_title,
+              quota_usage_json
             FROM session_file_rollups
             ORDER BY modified_at_ms DESC
             "#,
@@ -437,6 +474,9 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let size_bytes: i64 = row.get(2)?;
             let rows_json: String = row.get(3)?;
             let prompt_title: Option<String> = row.get(4)?;
+            let quota_usage = row
+                .get::<_, Option<String>>(5)?
+                .and_then(|json| serde_json::from_str::<SessionQuotaRollup>(&json).ok());
 
             let daily_rows =
                 serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
@@ -452,6 +492,9 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let mut daily_usage = Vec::with_capacity(daily_rows.len());
 
             for r in daily_rows {
+                let quota_usage_for_date = quota_usage
+                    .as_ref()
+                    .and_then(|usage| usage.daily.get(&r.date).cloned());
                 input_tokens += r.input_tokens;
                 cached_input_tokens += r.cached_input_tokens;
                 output_tokens += r.output_tokens;
@@ -474,6 +517,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                     cost_usd: r.cost_usd,
                     models: r.models.into_keys().collect(),
                     projects: r.projects.into_keys().collect(),
+                    quota_usage: quota_usage_for_date,
                 });
             }
 
@@ -498,6 +542,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 models: models.into_iter().collect(),
                 projects: projects.into_iter().collect(),
                 daily_usage,
+                quota_usage: quota_usage.map(|usage| usage.session),
             })
         })
         .map_err(|error| error.to_string())?;
@@ -568,6 +613,16 @@ mod tests {
             .any(|column| column == "prompt_title");
 
         assert!(has_prompt_title);
+        let has_quota_usage_json = db
+            .prepare("PRAGMA table_info(session_file_rollups)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .iter()
+            .any(|column| column == "quota_usage_json");
+        assert!(has_quota_usage_json);
         let _ = std::fs::remove_file(path);
     }
 
@@ -587,6 +642,7 @@ mod tests {
                     size_bytes: 2,
                     rows: vec![],
                     prompt_title: Some("First real request".to_string()),
+                    quota_usage: None,
                 },
                 SessionFileRollup {
                     path: "/tmp/untitled.jsonl".to_string(),
@@ -594,6 +650,7 @@ mod tests {
                     size_bytes: 1,
                     rows: vec![],
                     prompt_title: Some(String::new()),
+                    quota_usage: None,
                 },
             ],
             "2026-07-16T00:00:00.000Z",
@@ -650,6 +707,7 @@ mod tests {
                 size_bytes: 200,
                 rows: vec![daily_row("2026-07-01", 1), daily_row("2026-07-02", 2)],
                 prompt_title: None,
+                quota_usage: None,
             }],
             "2026-07-02T00:00:00.000Z",
         )
