@@ -1,4 +1,8 @@
 {
+  "2.2.1": {
+    "zh": "- test: fix session replay assertions",
+    "en": "- test: fix session replay assertions"
+  },
   "2.2.0": {
     "zh": "- fix(updater): ignore incomplete releases\n- feat(session): format web search tool calls\n- feat(session): render web search results as cards\n- feat: format completed test waits in session replay",
     "en": "- fix(updater): ignore incomplete releases\n- feat(session): format web search tool calls\n- feat(session): render web search results as cards\n- feat: format completed test waits in session replay"
