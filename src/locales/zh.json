@@ -507,19 +507,10 @@
         "max_output_tokens": "输出 Token 上限"
       },
       "output": "输出",
-      "command_activity": {
-        "tests_and_typecheck": { "running": "运行测试和类型检查", "success": "测试和类型检查通过", "failed": "测试或类型检查失败" },
-        "tests": { "running": "运行测试", "success": "测试通过", "failed": "测试失败" },
-        "typecheck": { "running": "运行类型检查", "success": "类型检查通过", "failed": "类型检查失败" },
-        "command": { "running": "运行命令", "success": "命令执行成功", "failed": "命令执行失败" }
-      },
-      "failed_test_count": "{{count}} 个测试未通过",
-      "failed_test_count_one": "{{count}} 个测试未通过",
-      "failed_test_count_other": "{{count}} 个测试未通过",
-      "view_live_output": "查看实时输出",
-      "view_output": "查看输出",
-      "view_errors": "查看错误",
-      "hide_output": "收起输出",
+      "activity_running": "Running",
+      "activity_ran": "Ran",
+      "exit_success_tooltip": "进程已成功退出",
+      "exit_failure_tooltip": "进程退出时发生错误",
       "web_search": "网页搜索",
       "search_queries": "搜索条件",
       "search_result": "搜索结果 {{index}}",

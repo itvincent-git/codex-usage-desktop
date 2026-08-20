@@ -524,9 +524,18 @@ impl ReplayParseState {
                 } else {
                     timestamp
                 };
-                tool.duration_ms = output_state.duration_ms.or_else(|| {
-                    duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref())
-                });
+                tool.duration_ms = output_state
+                    .duration_ms
+                    .map(|duration_ms| {
+                        if source_call_id.as_ref() != Some(call_id) {
+                            tool.duration_ms.unwrap_or(0) + duration_ms
+                        } else {
+                            duration_ms
+                        }
+                    })
+                    .or_else(|| {
+                        duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref())
+                    });
                 tool.is_error = is_error;
                 let registered_cell = output_state
                     .cell_id
@@ -1489,7 +1498,7 @@ mod tests {
                 serde_json::json!({
                     "type": "custom_tool_call_output",
                     "call_id": "call-wait",
-                    "output": "Script completed\nWall time 28.8 seconds\nOutput:\nall tests passed"
+                    "output": "Script completed\nWall time 17.8 seconds\nOutput:\n{\"exit_code\":0}\nall tests passed"
                 }),
             ),
         ]

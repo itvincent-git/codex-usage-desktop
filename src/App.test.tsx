@@ -1384,12 +1384,13 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    const toolCall = screen.getByText(/Command completed/).parentElement!;
-    const toolCallButton = within(toolCall).getByRole("button", { name: "View output" });
+    const toolCallButton = screen.getByRole("button", { name: /Ran \(1s, exit 0\) first command/ });
+    const toolCall = toolCallButton.parentElement!;
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
+    expect(toolCallButton.querySelector('[title="Process exited successfully"]')).toHaveClass("text-emerald-700");
     expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall).toHaveTextContent("first command");
-    expect(toolCall).not.toHaveTextContent("tool output preview");
+    expect(toolCall).toHaveTextContent("└ tool output preview");
     expect(toolCall).not.toHaveTextContent("Working directory: /repo/app");
     expect(toolCall).not.toHaveTextContent("Script completed");
     expect(toolCall).not.toHaveTextContent("Wall time");
@@ -1399,18 +1400,20 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent('"text"');
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
-    expect(toolCallButton).toHaveTextContent("Hide output");
+    expect(toolCallButton).toHaveTextContent("Collapse");
     expect(toolCall).toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
-    expect(screen.getByText("⏳ Running tests and type check · 11s")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View live output" })).toBeInTheDocument();
-    expect(screen.getByText("✕ Tests failed · 14.2s")).toBeInTheDocument();
-    expect(screen.getByText("2 tests failed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View errors" })).toBeInTheDocument();
+    const runningActivity = screen.getByRole("button", { name: /Running \(11s\) pnpm test src\/App.test.tsx && pnpm typecheck/ });
+    expect(runningActivity).toHaveAttribute("aria-expanded", "false");
+    expect(runningActivity.parentElement).toHaveTextContent("└ running test output");
+    const failedActivity = screen.getByRole("button", { name: /Ran \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
+    expect(failedActivity).toHaveAttribute("aria-expanded", "false");
+    expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error");
+    expect(failedActivity.parentElement).toHaveTextContent("└ 2 tests failed");
     const webSearchButton = screen.getAllByRole("button", { name: /Web search · completed/ })
       .find((button) => button.parentElement?.textContent?.includes("first search query"))!;
     const webSearchCall = webSearchButton.parentElement!;

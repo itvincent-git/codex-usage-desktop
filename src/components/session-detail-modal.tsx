@@ -618,16 +618,25 @@ function formatActivityDuration(ms: number | null) {
   return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
 }
 
-function commandActivityKey(command: string, status: "running" | "success" | "failed") {
-  const runsTests = /(?:^|\s|\/)(?:test(?::[\w-]+)?|vitest|jest|pytest)(?:\s|$)/i.test(command);
-  const runsTypecheck = /(?:typecheck|tsc(?:\s|$))/i.test(command);
-  const task = runsTests && runsTypecheck ? "tests_and_typecheck" : runsTests ? "tests" : runsTypecheck ? "typecheck" : "command";
-  return `sessions.detail.command_activity.${task}.${status}`;
+function processExitCode(output: string | null, isError: boolean) {
+  if (output) {
+    const match = output.match(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+)(-?\d+)/i);
+    if (match) return Number(match[1]);
+  }
+  return isError ? 1 : 0;
 }
 
-function failedTestCount(output: string | null) {
-  const match = output?.match(/(?:Tests?\s+)?(\d+)\s+(?:tests?\s+)?failed\b/i);
-  return match ? Number(match[1]) : null;
+function ActivityOutput({ text, expanded, tone }: { text: string; expanded: boolean; tone: string }) {
+  const lines = (expanded ? text : buildCollapsedPreview(text, 5)).split("\n");
+  return (
+    <pre className={`mt-1 whitespace-pre-wrap break-words pl-2 ${tone}`}>
+      {lines.map((line, index) => (
+        <span key={`${index}-${line}`} className="block">
+          {index === lines.length - 1 ? "└" : "│"} {line}
+        </span>
+      ))}
+    </pre>
+  );
 }
 
 function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
@@ -835,44 +844,41 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
     const commandOutput = outputText ? cleanExecOutput(outputText) : null;
     const activityStatus = item.isError ? "failed" : item.status === "running" ? "running" : "success";
     const duration = formatActivityDuration(item.durationMs);
-    const failureCount = activityStatus === "failed" ? failedTestCount(commandOutput) : null;
-    const icon = activityStatus === "running" ? "⏳" : activityStatus === "failed" ? "✕" : "✓";
-    const titleTone = activityStatus === "failed"
+    const exitCode = processExitCode(item.output, item.isError);
+    const statusTone = activityStatus === "failed"
       ? "text-error"
       : activityStatus === "success"
         ? "text-emerald-700 dark:text-emerald-300"
         : "text-foreground";
+    const outputTone = activityStatus === "failed" ? "text-error" : "text-muted-foreground";
     return (
       <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
-        <div className={`font-sans text-sm font-semibold ${titleTone}`}>
-          {icon} {t(commandActivityKey(execArguments.command, activityStatus))}{duration ? ` · ${duration}` : ""}
-        </div>
-        <pre className="mt-1 whitespace-pre-wrap break-words pl-5 text-foreground">
-          {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
-        </pre>
-        {failureCount !== null ? (
-          <div className="mt-3 pl-5 font-sans text-sm font-medium text-error">
-            {t("sessions.detail.failed_test_count", { count: failureCount })}
-          </div>
-        ) : null}
-        {commandOutput ? (
-          <div className="mt-3 pl-5">
-            <button
-              type="button"
-              className={`flex items-center gap-1 font-sans text-xs text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`}
-              aria-expanded={isExpanded}
-              onClick={() => setIsExpanded((value) => !value)}
-            >
-              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              {isExpanded
-                ? t("sessions.detail.hide_output")
-                : t(activityStatus === "running" ? "sessions.detail.view_live_output" : activityStatus === "failed" ? "sessions.detail.view_errors" : "sessions.detail.view_output")}
-            </button>
-            {isExpanded ? <pre className={`mt-2 whitespace-pre-wrap break-words ${activityStatus === "failed" ? "text-error" : "text-muted-foreground"}`}>{commandOutput}</pre> : null}
-          </div>
-        ) : null}
+        <button
+          type="button"
+          className={`flex w-full min-w-0 items-start justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+          aria-expanded={isExpanded}
+          onClick={() => setIsExpanded((value) => !value)}
+        >
+          <span className="flex min-w-0 gap-1.5">
+            <span className={`shrink-0 ${statusTone}`}>•</span>
+            <span className="min-w-0 whitespace-pre-wrap break-words">
+              {activityStatus === "running" ? t("sessions.detail.activity_running") : t("sessions.detail.activity_ran")}
+              {duration ? ` (${duration}${activityStatus === "running" ? "" : ", "}` : activityStatus === "running" ? "" : " ("}
+              {activityStatus !== "running" ? (
+                <span className={statusTone} title={t(exitCode === 0 ? "sessions.detail.exit_success_tooltip" : "sessions.detail.exit_failure_tooltip")}>exit {exitCode}</span>
+              ) : null}
+              {duration || activityStatus !== "running" ? ") " : " "}
+              {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 font-sans text-muted-foreground">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
+        </button>
+        {commandOutput ? <ActivityOutput text={commandOutput} expanded={isExpanded} tone={outputTone} /> : null}
         {stderrText ? (
-          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-error">└ {stderrText}</pre>
+          <ActivityOutput text={stderrText} expanded={isExpanded} tone="text-error" />
         ) : null}
       </div>
     );
