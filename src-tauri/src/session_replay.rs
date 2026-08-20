@@ -45,6 +45,8 @@ struct ReplayParseState {
     pending_tools: BTreeMap<String, (String, String, Option<String>)>,
     tool_aliases: BTreeMap<String, String>,
     cell_tools: BTreeMap<String, (String, String)>,
+    process_continuations: BTreeMap<String, ProcessContinuation>,
+    token_target_tool: Option<(String, String)>,
 }
 
 pub fn fetch_session_detail(db: &Connection, path: &str) -> Result<SessionReplayDetail, String> {
@@ -278,14 +280,14 @@ impl ReplayParseState {
                 let call_id = extract_call_id(event);
                 let name = extract_tool_name(event).unwrap_or_else(|| event_type.to_string());
                 let arguments = extract_tool_arguments(event);
-                if let (Some(call_id), Some(cell_id)) = (
+                if let (Some(call_id), Some(continuation)) = (
                     call_id.as_ref(),
                     arguments
                         .as_deref()
-                        .and_then(|arguments| extract_wait_cell_id(&name, arguments)),
+                        .and_then(|arguments| extract_process_continuation(&name, arguments)),
                 ) {
                     if let Some((target_turn_id, target_call_id)) =
-                        self.cell_tools.get(&cell_id).cloned()
+                        self.cell_tools.get(&continuation.session_id).cloned()
                     {
                         if let Some((_, target_name, target_arguments)) =
                             self.pending_tools.get(&target_call_id).cloned()
@@ -295,6 +297,8 @@ impl ReplayParseState {
                                 (target_turn_id, target_name, target_arguments),
                             );
                             self.tool_aliases.insert(call_id.clone(), target_call_id);
+                            self.process_continuations
+                                .insert(call_id.clone(), continuation);
                             return;
                         }
                     }
@@ -445,8 +449,24 @@ impl ReplayParseState {
             reasoning_output_tokens: usage.reasoning_output_tokens,
             total_tokens: usage.total_tokens,
         };
+        let token_target = self.token_target_tool.take();
         let turn = self.turn_mut(&turn_id);
         turn.token_events.push(usage.clone());
+        if let Some((target_turn_id, target_call_id)) =
+            token_target.filter(|(target_turn_id, _)| target_turn_id == &turn_id)
+        {
+            if let Some(tool_index) = turn.items.iter().position(|item| {
+                matches!(item, SessionReplayItem::ToolCall { tool } if tool.call_id.as_ref() == Some(&target_call_id))
+            }) {
+                let token_item = SessionReplayItem::TokenUsage { usage };
+                if matches!(turn.items.get(tool_index + 1), Some(SessionReplayItem::TokenUsage { .. })) {
+                    turn.items[tool_index + 1] = token_item;
+                } else {
+                    turn.items.insert(tool_index + 1, token_item);
+                }
+                return;
+            }
+        }
         turn.items.push(SessionReplayItem::TokenUsage { usage });
     }
 
@@ -457,6 +477,9 @@ impl ReplayParseState {
         timestamp: Option<String>,
     ) {
         let source_call_id = extract_call_id(event);
+        let continuation = source_call_id
+            .as_ref()
+            .and_then(|call_id| self.process_continuations.remove(call_id));
         let call_id = source_call_id
             .as_ref()
             .and_then(|call_id| self.tool_aliases.get(call_id))
@@ -491,22 +514,42 @@ impl ReplayParseState {
             .as_deref()
             .map(parse_process_output)
             .unwrap_or_default();
-        let status = if output_state.is_error {
+        let is_process_activity = continuation.is_some()
+            || is_exec_command_call(&name, arguments.as_deref())
+            || output_state.cell_id.is_some()
+            || output_state.has_process_exit;
+        let process_was_stopped = output_state.is_stopped
+            || continuation.as_ref().is_some_and(|value| {
+                value.input.as_deref() == Some("\u{3}") && output_state.has_process_exit
+            });
+        let status = if process_was_stopped {
+            Some("stopped".to_string())
+        } else if output_state.is_error {
             Some("failed".to_string())
+        } else if continuation.as_ref().is_some_and(|value| {
+            value.kind == ProcessContinuationKind::WriteStdin && !output_state.has_process_exit
+        }) {
+            Some("running".to_string())
         } else if output_state.is_running {
             Some("running".to_string())
         } else {
             string_field(event, "status").or_else(|| Some("completed".to_string()))
         };
-        let is_error = output_state.is_error
-            || status
-                .as_deref()
-                .map(|status| !matches!(status, "success" | "ok" | "completed"))
-                .unwrap_or(false)
-            || stderr
-                .as_deref()
-                .map(|value| !value.trim().is_empty())
-                .unwrap_or(false);
+        let is_error = !process_was_stopped
+            && (output_state.is_error
+                || status
+                    .as_deref()
+                    .map(|status| {
+                        !matches!(
+                            status,
+                            "success" | "ok" | "completed" | "running" | "stopped"
+                        )
+                    })
+                    .unwrap_or(false)
+                || stderr
+                    .as_deref()
+                    .map(|value| !value.trim().is_empty())
+                    .unwrap_or(false));
 
         let turn = self.turn_mut(&turn_id);
         if let Some(call_id) = &call_id {
@@ -516,26 +559,30 @@ impl ReplayParseState {
                 .position(|tool| tool.call_id.as_ref() == Some(call_id))
             {
                 let tool = &mut turn.tool_calls[tool_index];
+                let output = if is_process_activity {
+                    merge_process_output(
+                        continuation.as_ref().and_then(process_input_marker),
+                        output_state.output,
+                    )
+                } else {
+                    output
+                };
                 tool.output = merge_process_output(tool.output.take(), output);
                 tool.stderr = stderr;
-                tool.status = status;
-                tool.completed_at = if output_state.is_running {
+                tool.status = status.clone();
+                tool.completed_at = if status.as_deref() == Some("running") {
                     None
                 } else {
-                    timestamp
+                    timestamp.clone()
                 };
-                tool.duration_ms = output_state
-                    .duration_ms
-                    .map(|duration_ms| {
-                        if source_call_id.as_ref() != Some(call_id) {
-                            tool.duration_ms.unwrap_or(0) + duration_ms
-                        } else {
-                            duration_ms
-                        }
-                    })
-                    .or_else(|| {
+                tool.duration_ms = if is_process_activity {
+                    duration_between(tool.started_at.as_deref(), timestamp.as_deref())
+                        .or(output_state.duration_ms)
+                } else {
+                    output_state.duration_ms.or_else(|| {
                         duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref())
-                    });
+                    })
+                };
                 tool.is_error = is_error;
                 let registered_cell = output_state
                     .cell_id
@@ -551,6 +598,7 @@ impl ReplayParseState {
                 if let Some((cell_id, tool_ref)) = registered_cell {
                     self.cell_tools.insert(cell_id, tool_ref);
                 }
+                self.token_target_tool = Some((turn_id, call_id.clone()));
                 return;
             }
         }
@@ -963,11 +1011,16 @@ fn duration_between(start: Option<&str>, end: Option<&str>) -> Option<i64> {
 struct ProcessOutputState {
     cell_id: Option<String>,
     duration_ms: Option<i64>,
+    output: Option<String>,
+    has_process_exit: bool,
     is_running: bool,
+    is_stopped: bool,
     is_error: bool,
 }
 
 fn parse_process_output(output: &str) -> ProcessOutputState {
+    let decoded_output = decode_tool_output_text(output);
+    let output = decoded_output.as_deref().unwrap_or(output);
     let cell_id = output
         .split("Script running with cell ID ")
         .nth(1)
@@ -984,7 +1037,6 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
                 .map(|seconds| (seconds * 1000.0).round() as i64)
         })
     });
-    let is_running = cell_id.is_some() && !output.contains("Script completed");
     let normalized = output.to_ascii_lowercase();
     let exit_code = ["\"exit_code\"", "exit code:", "process exited with code"]
         .iter()
@@ -999,35 +1051,227 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
                     .and_then(|code| code.parse::<i64>().ok())
             })
         });
-    let is_error = normalized.contains("script failed") || exit_code.is_some_and(|code| code != 0);
+    let signal = ["SIGINT", "SIGTERM", "SIGKILL", "SIGHUP"]
+        .into_iter()
+        .find(|signal| output.contains(signal));
+    let has_process_exit = exit_code.is_some() || signal.is_some();
+    let is_running = cell_id.is_some() && !has_process_exit;
+    let is_stopped = signal.is_some();
+    let is_error = !is_stopped
+        && (normalized.contains("script failed") || exit_code.is_some_and(|code| code != 0));
+    let mut process_output = extract_process_chunk(output);
+    if let Some(exit_code) = exit_code {
+        process_output = merge_process_output(
+            process_output,
+            Some(format!("Process exited with code {exit_code}")),
+        );
+    }
+    if let Some(signal) = signal {
+        process_output = merge_process_output(
+            process_output,
+            Some(format!("Process stopped with signal {signal}")),
+        );
+    }
 
     ProcessOutputState {
         cell_id,
         duration_ms,
+        output: process_output,
+        has_process_exit,
         is_running,
+        is_stopped,
         is_error,
     }
 }
 
-fn extract_wait_cell_id(tool_name: &str, arguments: &str) -> Option<String> {
-    let is_wait = tool_name.rsplit('.').next() == Some("wait") || arguments.contains("tools.wait");
-    if !is_wait {
-        return None;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcessContinuationKind {
+    Wait,
+    WriteStdin,
+}
+
+#[derive(Debug, Clone)]
+struct ProcessContinuation {
+    kind: ProcessContinuationKind,
+    session_id: String,
+    input: Option<String>,
+}
+
+fn extract_process_continuation(tool_name: &str, arguments: &str) -> Option<ProcessContinuation> {
+    let base_name = tool_name.rsplit('.').next().unwrap_or(tool_name);
+    let (kind, called_name, id_key) =
+        if base_name == "write_stdin" || arguments.contains("tools.write_stdin") {
+            (
+                ProcessContinuationKind::WriteStdin,
+                "write_stdin",
+                "session_id",
+            )
+        } else if base_name == "wait" || arguments.contains("tools.wait") {
+            (ProcessContinuationKind::Wait, "wait", "cell_id")
+        } else {
+            return None;
+        };
+    let parsed = extract_nested_tool_arguments(arguments, called_name);
+    let session_id = parsed
+        .as_ref()
+        .and_then(|value| value.get(id_key))
+        .and_then(|value| {
+            value
+                .as_str()
+                .map(ToString::to_string)
+                .or_else(|| value.as_i64().map(|value| value.to_string()))
+        })
+        .or_else(|| extract_argument_scalar(arguments, called_name, id_key))?;
+    let input = (kind == ProcessContinuationKind::WriteStdin)
+        .then(|| {
+            parsed
+                .as_ref()
+                .and_then(|value| value.get("chars"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+                .or_else(|| extract_argument_string(arguments, called_name, "chars"))
+                .unwrap_or_default()
+        })
+        .filter(|value| !value.is_empty());
+
+    Some(ProcessContinuation {
+        kind,
+        session_id,
+        input,
+    })
+}
+
+fn is_exec_command_call(tool_name: &str, arguments: Option<&str>) -> bool {
+    let base_name = tool_name.rsplit('.').next().unwrap_or(tool_name);
+    base_name == "exec_command"
+        || arguments.is_some_and(|arguments| arguments.contains("tools.exec_command"))
+}
+
+fn extract_nested_tool_arguments(arguments: &str, tool_name: &str) -> Option<Value> {
+    if let Ok(value) = serde_json::from_str::<Value>(arguments) {
+        return value.is_object().then_some(value);
     }
-    let wait_arguments = arguments.split("tools.wait").nth(1).unwrap_or(arguments);
-    let marker = wait_arguments
-        .find("cell_id")
-        .map(|index| &wait_arguments[index + "cell_id".len()..])?;
+    let marker = format!("tools.{tool_name}(");
+    let rest = arguments.split(&marker).nth(1)?;
+    let start = rest.find('{')?;
+    let bytes = rest.as_bytes();
+    let mut depth = 0_i32;
+    let mut in_string = false;
+    let mut escaped = false;
+    for index in start..bytes.len() {
+        let byte = bytes[index];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return serde_json::from_str(&rest[start..=index]).ok();
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn extract_argument_scalar(arguments: &str, tool_name: &str, key: &str) -> Option<String> {
+    let tool_arguments = arguments
+        .split(&format!("tools.{tool_name}"))
+        .nth(1)
+        .unwrap_or(arguments);
+    let marker = tool_arguments
+        .find(key)
+        .map(|index| &tool_arguments[index + key.len()..])?;
     let value = marker.trim_start_matches(|character: char| {
         character.is_whitespace() || matches!(character, ':' | '=' | '\\' | '"' | '\'')
     });
-    let cell_id = value
+    let value = value
         .split(|character: char| {
             character.is_whitespace() || matches!(character, ',' | '}' | ')' | '\\' | '"' | '\'')
         })
         .next()
         .unwrap_or("");
-    (!cell_id.is_empty()).then(|| cell_id.to_string())
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn extract_argument_string(arguments: &str, tool_name: &str, key: &str) -> Option<String> {
+    let tool_arguments = arguments
+        .split(&format!("tools.{tool_name}"))
+        .nth(1)
+        .unwrap_or(arguments);
+    let marker = tool_arguments
+        .find(key)
+        .map(|index| &tool_arguments[index + key.len()..])?;
+    let value = marker.trim_start_matches(|character: char| {
+        character.is_whitespace() || matches!(character, ':' | '=')
+    });
+    if value.starts_with('"') {
+        let mut escaped = false;
+        for (index, character) in value.char_indices().skip(1) {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                return serde_json::from_str(&value[..=index]).ok();
+            }
+        }
+    }
+    None
+}
+
+fn process_input_marker(continuation: &ProcessContinuation) -> Option<String> {
+    let input = continuation.input.as_deref()?;
+    if input == "\u{3}" {
+        Some("› Sent Ctrl+C".to_string())
+    } else {
+        Some(format!("› Sent: {}", input.trim_end_matches(['\r', '\n'])))
+    }
+}
+
+fn extract_process_chunk(output: &str) -> Option<String> {
+    let decoded_output = decode_tool_output_text(output);
+    let output = decoded_output.as_deref().unwrap_or(output);
+    let payload = output
+        .split_once("\nOutput:\n")
+        .map(|(_, payload)| payload)
+        .or_else(|| {
+            output
+                .split_once("\r\nOutput:\r\n")
+                .map(|(_, payload)| payload)
+        })
+        .unwrap_or(output);
+    if let Ok(value) = serde_json::from_str::<Value>(payload.trim()) {
+        if let Some(chunk) = value.get("output").and_then(Value::as_str) {
+            return (!chunk.is_empty()).then(|| chunk.to_string());
+        }
+        if value.is_object() {
+            return None;
+        }
+    }
+    let cleaned = payload.trim();
+    (!cleaned.is_empty()).then(|| cleaned.to_string())
+}
+
+fn decode_tool_output_text(output: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(output).ok()?;
+    let blocks = value.as_array()?;
+    let text = blocks
+        .iter()
+        .filter_map(|block| block.get("text").and_then(Value::as_str))
+        .collect::<String>();
+    (!text.is_empty()).then_some(text)
 }
 
 fn merge_process_output(existing: Option<String>, new: Option<String>) -> Option<String> {
@@ -1464,7 +1708,7 @@ mod tests {
     }
 
     #[test]
-    fn merges_exec_and_wait_events_by_process_cell_id() {
+    fn merges_process_continuations_by_session_id_without_summing_poll_durations() {
         let raw = [
             turn_context("2026-08-19T13:30:58.000Z", "turn-1", "gpt-5", "/repo/app"),
             response_item(
@@ -1484,8 +1728,64 @@ mod tests {
                     "output": "Script running with cell ID 4\nWall time 11.0 seconds\nOutput:\npartial test output"
                 }),
             ),
+            event_msg(
+                "2026-08-19T13:31:10.276Z",
+                token_payload(
+                    "turn-1", "gpt-5", 50_000, 400, 384, 50_784, 50_000, 400, 384,
+                    50_784,
+                ),
+            ),
             response_item(
-                "2026-08-19T13:31:10.300Z",
+                "2026-08-19T13:31:10.500Z",
+                serde_json::json!({
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type":"output_text","text":"Still waiting."}]
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:11.300Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-write-poll",
+                    "name": "exec",
+                    "input": "const r = await tools.write_stdin({\"session_id\":4,\"chars\":\"\",\"yield_time_ms\":3000}); text(r);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:14.300Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-write-poll",
+                    "output": "Script completed\nWall time 3.0 seconds\nOutput:\n{\"session_id\":4,\"wall_time_seconds\":3.0,\"output\":\"more test output\"}"
+                }),
+            ),
+            event_msg(
+                "2026-08-19T13:31:14.301Z",
+                token_payload(
+                    "turn-1", "gpt-5", 55_000, 500, 1_500, 56_500, 55_000, 500, 1_500,
+                    56_500,
+                ),
+            ),
+            response_item(
+                "2026-08-19T13:31:15.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-write-input",
+                    "name": "exec",
+                    "input": "const r = await tools.write_stdin({\"session_id\":4,\"chars\":\"y\\n\",\"yield_time_ms\":1000}); text(r);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:16.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-write-input",
+                    "output": "Script completed\nWall time 1.0 seconds\nOutput:\n{\"session_id\":4,\"wall_time_seconds\":1.0,\"output\":\"accepted input\"}"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:17.000Z",
                 serde_json::json!({
                     "type": "custom_tool_call",
                     "call_id": "call-wait",
@@ -1498,7 +1798,7 @@ mod tests {
                 serde_json::json!({
                     "type": "custom_tool_call_output",
                     "call_id": "call-wait",
-                    "output": "Script completed\nWall time 17.8 seconds\nOutput:\n{\"exit_code\":0}\nall tests passed"
+                    "output": "Script completed\nWall time 11.0 seconds\nOutput:\n{\"exit_code\":0,\"output\":\"all tests passed\"}"
                 }),
             ),
         ]
@@ -1508,7 +1808,7 @@ mod tests {
         let turn = &detail.turns[0];
 
         assert_eq!(turn.tool_calls.len(), 1);
-        assert_eq!(turn.items.len(), 1);
+        assert_eq!(turn.items.len(), 3);
         assert_eq!(detail.summary.tool_call_count, 1);
         assert_eq!(turn.tool_calls[0].call_id.as_deref(), Some("call-exec"));
         assert_eq!(turn.tool_calls[0].status.as_deref(), Some("completed"));
@@ -1522,7 +1822,130 @@ mod tests {
             .output
             .as_deref()
             .unwrap()
+            .contains("more test output"));
+        assert!(turn.tool_calls[0]
+            .output
+            .as_deref()
+            .unwrap()
+            .contains("› Sent: y"));
+        assert!(turn.tool_calls[0]
+            .output
+            .as_deref()
+            .unwrap()
             .contains("all tests passed"));
+        assert!(matches!(
+            turn.items.get(1),
+            Some(SessionReplayItem::TokenUsage { usage }) if usage.total_tokens == 56_500
+        ));
+        assert!(matches!(
+            turn.items.get(2),
+            Some(SessionReplayItem::Message { text, .. }) if text == "Still waiting."
+        ));
+    }
+
+    #[test]
+    fn keeps_write_stdin_poll_running_without_a_process_exit() {
+        let raw = [
+            turn_context("2026-08-19T13:30:58.000Z", "turn-1", "gpt-5", "/repo/app"),
+            response_item(
+                "2026-08-19T13:30:59.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-exec",
+                    "name": "exec",
+                    "input": "const r = await tools.exec_command({\"cmd\":\"pnpm tauri dev\"}); text(r.output);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:09.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-exec",
+                    "output": "Script running with cell ID 44519\nWall time 10.0 seconds\nOutput:\nstarted"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:10.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-poll",
+                    "name": "exec",
+                    "input": "const r = await tools.write_stdin({session_id:44519,chars:\"\",yield_time_ms:5000}); text(r.output);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:15.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-poll",
+                    "output": [
+                        {"type":"input_text","text":"Script completed\nWall time 5.0 seconds\nOutput:\n"},
+                        {"type":"input_text","text":"still running"}
+                    ]
+                }),
+            ),
+        ].join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+        let tool = &detail.turns[0].tool_calls[0];
+
+        assert_eq!(detail.turns[0].tool_calls.len(), 1);
+        assert_eq!(detail.turns[0].items.len(), 1);
+        assert_eq!(tool.status.as_deref(), Some("running"));
+        assert_eq!(tool.completed_at, None);
+        assert_eq!(tool.duration_ms, Some(16_000));
+        assert!(tool.output.as_deref().unwrap().contains("still running"));
+    }
+
+    #[test]
+    fn marks_a_signaled_process_as_stopped_and_records_ctrl_c_input() {
+        let raw = [
+            turn_context("2026-08-19T13:30:58.000Z", "turn-1", "gpt-5", "/repo/app"),
+            response_item(
+                "2026-08-19T13:30:59.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-exec",
+                    "name": "exec",
+                    "input": "const r = await tools.exec_command({\"cmd\":\"pnpm tauri dev\"}); text(r.output);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:09.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-exec",
+                    "output": "Script running with cell ID 44519\nWall time 10.0 seconds\nOutput:\nstarted"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:10.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-stop",
+                    "name": "exec",
+                    "input": "const r = await tools.write_stdin({session_id:44519,chars:\"\\u0003\"}); text(r);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:11.000Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-stop",
+                    "output": "Script completed\nWall time 1.0 seconds\nOutput:\n{\"signal\":\"SIGTERM\",\"output\":\"shutting down\"}"
+                }),
+            ),
+        ].join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+        let tool = &detail.turns[0].tool_calls[0];
+
+        assert_eq!(detail.turns[0].tool_calls.len(), 1);
+        assert_eq!(tool.status.as_deref(), Some("stopped"));
+        assert_eq!(tool.duration_ms, Some(12_000));
+        assert!(!tool.is_error);
+        assert!(tool.output.as_deref().unwrap().contains("› Sent Ctrl+C"));
+        assert!(tool.output.as_deref().unwrap().contains("SIGTERM"));
     }
 
     #[test]

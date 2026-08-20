@@ -938,14 +938,6 @@ describe("App", () => {
       snippet: "A local dashboard for Codex CLI token usage.",
       ref_id: "turn0search0",
     }]);
-    const writeStdinArguments = 'const r = await tools.write_stdin({session_id:82101,chars:"",yield_time_ms:5000,max_output_tokens:10000}); text(JSON.stringify(r));';
-    const writeStdinOutput = `Script completed\nWall time 5.0 seconds\nOutput:\n${JSON.stringify({
-      chunk_id: "2eb40f",
-      wall_time_seconds: 5.001460518,
-      session_id: 82101,
-      original_token_count: 31,
-      output: "     Running BeforeDevCommand (`pnpm dev`)\r\n     Running DevCommand (`cargo run --no-default-features --color always --`)\r\n",
-    })}`;
     const applyPatchArguments = 'const patch = "*** Begin Patch\\n*** Update File: /repo/app/src/example.ts\\n@@\\n-old\\n+new\\n*** End Patch";\ntext(await tools.apply_patch(patch));';
     const execOutput = JSON.stringify([
       { text: "Script completed\nWait time 1.25 seconds\nOutput:\n", type: "input_text" },
@@ -1098,18 +1090,6 @@ describe("App", () => {
                   isError: false,
                 },
                 {
-                  callId: "call-write-stdin",
-                  name: "exec",
-                  status: "completed",
-                  arguments: writeStdinArguments,
-                  output: writeStdinOutput,
-                  stderr: null,
-                  startedAt: "2026-06-11T00:00:01.510Z",
-                  completedAt: "2026-06-11T00:00:01.520Z",
-                  durationMs: 10,
-                  isError: false,
-                },
-                {
                   callId: "call-apply-patch",
                   name: "functions.exec",
                   status: "completed",
@@ -1216,12 +1196,22 @@ describe("App", () => {
                   totalTokens: 50_784,
                 },
                 {
+                  kind: "tokenUsage",
+                  timestamp: "2026-06-11T00:00:02.100Z",
+                  model: "gpt-5",
+                  inputTokens: 55_000,
+                  cachedInputTokens: 500,
+                  outputTokens: 1_500,
+                  reasoningOutputTokens: 0,
+                  totalTokens: 56_500,
+                },
+                {
                   kind: "toolCall",
                   callId: "call-running-tests",
                   name: "exec",
                   status: "running",
                   arguments: JSON.stringify({ cmd: "pnpm test src/App.test.tsx && pnpm typecheck" }),
-                  output: "Script running with cell ID 4\nWall time 11.0 seconds\nOutput:\nrunning test output",
+                  output: "running test output\n› Sent: y\ncontinued test output",
                   stderr: null,
                   startedAt: "2026-06-11T00:00:01.500Z",
                   completedAt: null,
@@ -1243,6 +1233,19 @@ describe("App", () => {
                 },
                 {
                   kind: "toolCall",
+                  callId: "call-stopped-dev-server",
+                  name: "exec",
+                  status: "stopped",
+                  arguments: JSON.stringify({ cmd: "pnpm tauri dev" }),
+                  output: "shutting down\nProcess stopped with signal SIGTERM",
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:13.500Z",
+                  durationMs: 12000,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
                   callId: "call-wait",
                   name: "wait",
                   status: "completed",
@@ -1255,19 +1258,6 @@ describe("App", () => {
                   stderr: null,
                   startedAt: "2026-06-11T00:00:01.500Z",
                   completedAt: "2026-06-11T00:00:01.510Z",
-                  durationMs: 10,
-                  isError: false,
-                },
-                {
-                  kind: "toolCall",
-                  callId: "call-write-stdin",
-                  name: "exec",
-                  status: "completed",
-                  arguments: writeStdinArguments,
-                  output: writeStdinOutput,
-                  stderr: null,
-                  startedAt: "2026-06-11T00:00:01.510Z",
-                  completedAt: "2026-06-11T00:00:01.520Z",
                   durationMs: 10,
                   isError: false,
                 },
@@ -1349,7 +1339,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("7 tools");
+    expect(turnButton).toHaveTextContent("6 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1398,9 +1388,10 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
-    const tokenMetadata = within(toolCallButton).getByText("50.8k tokens");
+    const tokenMetadata = within(toolCallButton).getByText("56.5k tokens");
     expect(tokenMetadata).toHaveClass("text-violet-500/80");
-    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Model: gpt-5\nTokens: 50,784\nTime:"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Model: gpt-5\nTokens: 56,500\nTime:"));
+    expect(toolCall).not.toHaveTextContent("50.8k tokens");
     expect(toolCall).not.toHaveClass("border-fuchsia-300/70");
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
@@ -1413,11 +1404,16 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
     const runningActivity = screen.getByRole("button", { name: /Running \(11s\) pnpm test src\/App.test.tsx && pnpm typecheck/ });
     expect(runningActivity).toHaveAttribute("aria-expanded", "false");
-    expect(runningActivity.parentElement).toHaveTextContent("└ running test output");
+    expect(runningActivity.parentElement).toHaveTextContent("running test output");
+    await userEvent.click(runningActivity);
+    expect(runningActivity.parentElement).toHaveTextContent("› Sent: y");
     const failedActivity = screen.getByRole("button", { name: /Ran \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
     expect(failedActivity).toHaveAttribute("aria-expanded", "false");
     expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error");
     expect(failedActivity.parentElement).toHaveTextContent("└ 2 tests failed");
+    const stoppedActivity = screen.getByRole("button", { name: /Stopped \(12s, SIGTERM\) pnpm tauri dev/ });
+    expect(stoppedActivity.parentElement).toHaveTextContent("└ shutting down");
+    expect(stoppedActivity.parentElement).not.toHaveTextContent("Process stopped with signal");
     const webSearchButton = screen.getAllByRole("button", { name: /Web search · completed/ })
       .find((button) => button.parentElement?.textContent?.includes("first search query"))!;
     const webSearchCall = webSearchButton.parentElement!;
@@ -1456,16 +1452,7 @@ describe("App", () => {
     expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
-    const writeStdinCallButton = screen.getByRole("button", { name: /write_stdin · completed/ });
-    const writeStdinCall = writeStdinCallButton.parentElement!;
-    expect(writeStdinCall).toHaveTextContent("Process session82101");
-    expect(writeStdinCall).toHaveTextContent("Wait interval (ms)5000");
-    expect(writeStdinCall).toHaveTextContent("Output token limit10000");
-    expect(writeStdinCall).toHaveTextContent("Running BeforeDevCommand");
-    expect(writeStdinCall).toHaveTextContent("Wall time: 5.001460518s");
-    expect(writeStdinCall).not.toHaveTextContent("tools.write_stdin");
-    expect(writeStdinCall).not.toHaveTextContent("Script completed");
-    expect(writeStdinCall).not.toHaveTextContent("original_token_count");
+    expect(screen.queryByRole("button", { name: /write_stdin/ })).not.toBeInTheDocument();
     const applyPatchButton = screen.getByRole("button", { name: /functions.exec · completed/ });
     const applyPatchCall = applyPatchButton.parentElement!;
     expect(applyPatchCall).toHaveTextContent("Edited 1 file");
@@ -1494,8 +1481,8 @@ describe("App", () => {
     expect(failedPatchButton.parentElement).toHaveClass("border-error/40");
     expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
     expect(screen.queryByText(/50,784 tokens/)).not.toBeInTheDocument();
-    expect(screen.getByText("Replay error fixture")).toHaveClass("border-error/40");
-    expect(screen.getByText(/Replay notice/)).toHaveClass("border-sky-300/70");
+    expect(screen.getByText("Replay error fixture").parentElement).toHaveClass("border-error/40");
+    expect(screen.getByText(/Replay notice/).parentElement).toHaveClass("border-sky-300/70");
 
     await userEvent.click(systemButton);
     expect(systemButton).toHaveAttribute("aria-expanded", "true");

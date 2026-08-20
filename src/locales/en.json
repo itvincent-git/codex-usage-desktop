@@ -515,6 +515,7 @@
       "output": "Output",
       "activity_running": "Running",
       "activity_ran": "Ran",
+      "activity_stopped": "Stopped",
       "exit_success_tooltip": "Process exited successfully",
       "exit_failure_tooltip": "Process exited with an error",
       "web_search": "Web search",

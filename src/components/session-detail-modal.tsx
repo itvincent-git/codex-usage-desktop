@@ -129,7 +129,7 @@ function timelineEntries(items: ReplayItem[]): TimelineEntry[] {
   for (const item of items) {
     if (item.kind === "tokenUsage") {
       const previousEntry = entries.findLast((entry) => isVisibleTimelineItem(entry.item));
-      if (previousEntry && !previousEntry.tokenUsage) {
+      if (previousEntry) {
         previousEntry.tokenUsage = item;
         continue;
       }
@@ -644,6 +644,7 @@ function cleanExecOutput(text: string) {
     .split(/\r?\n/)
     .filter((line) => !/^Script (?:running with cell ID .+|completed)$/.test(line)
       && !/^(?:Wall|Wait) time [^\r\n]+$/.test(line)
+      && !/^Process (?:exited with code -?\d+|stopped with signal SIG[A-Z]+)$/.test(line)
       && line !== "Output:")
     .join("\n")
     .trim();
@@ -675,6 +676,10 @@ function processExitCode(output: string | null, isError: boolean) {
     if (match) return Number(match[1]);
   }
   return isError ? 1 : 0;
+}
+
+function processSignal(output: string | null) {
+  return output?.match(/Process stopped with signal (SIG[A-Z]+)/)?.[1] ?? null;
 }
 
 function ActivityOutput({ text, expanded, tone }: { text: string; expanded: boolean; tone: string }) {
@@ -901,14 +906,23 @@ function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: 
 
   if (execArguments?.kind === "command") {
     const commandOutput = outputText ? cleanExecOutput(outputText) : null;
-    const activityStatus = item.isError ? "failed" : item.status === "running" ? "running" : "success";
+    const activityStatus = item.status === "stopped"
+      ? "stopped"
+      : item.isError
+        ? "failed"
+        : item.status === "running"
+          ? "running"
+          : "success";
     const duration = formatActivityDuration(item.durationMs);
     const exitCode = processExitCode(item.output, item.isError);
+    const signal = processSignal(item.output);
     const statusTone = activityStatus === "failed"
       ? "text-error"
       : activityStatus === "success"
         ? "text-emerald-700 dark:text-emerald-300"
-        : "text-foreground";
+        : activityStatus === "stopped"
+          ? "text-amber-700 dark:text-amber-300"
+          : "text-foreground";
     const outputTone = activityStatus === "failed" ? "text-error" : "text-muted-foreground";
     return (
       <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
@@ -921,12 +935,18 @@ function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: 
           <span className="flex min-w-0 gap-1.5">
             <span className={`shrink-0 ${statusTone}`}>•</span>
             <span className="min-w-0 whitespace-pre-wrap break-words">
-              {activityStatus === "running" ? t("sessions.detail.activity_running") : t("sessions.detail.activity_ran")}
-              {duration ? ` (${duration}${activityStatus === "running" ? "" : ", "}` : activityStatus === "running" ? "" : " ("}
-              {activityStatus !== "running" ? (
+              {activityStatus === "running"
+                ? t("sessions.detail.activity_running")
+                : activityStatus === "stopped"
+                  ? t("sessions.detail.activity_stopped")
+                  : t("sessions.detail.activity_ran")}
+              {duration || activityStatus !== "running" ? " (" : " "}
+              {duration}
+              {duration && activityStatus !== "running" && (activityStatus !== "stopped" || signal) ? ", " : null}
+              {activityStatus === "stopped" ? signal : activityStatus !== "running" ? (
                 <span className={statusTone} title={t(exitCode === 0 ? "sessions.detail.exit_success_tooltip" : "sessions.detail.exit_failure_tooltip")}>exit {exitCode}</span>
               ) : null}
-              {duration || activityStatus !== "running" ? ") " : " "}
+              {duration || activityStatus !== "running" ? ") " : null}
               {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
             </span>
           </span>
