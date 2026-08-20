@@ -43,6 +43,8 @@ struct ReplayParseState {
     turns: BTreeMap<String, SessionReplayTurn>,
     turn_order: Vec<String>,
     pending_tools: BTreeMap<String, (String, String, Option<String>)>,
+    tool_aliases: BTreeMap<String, String>,
+    cell_tools: BTreeMap<String, (String, String)>,
 }
 
 pub fn fetch_session_detail(db: &Connection, path: &str) -> Result<SessionReplayDetail, String> {
@@ -276,6 +278,27 @@ impl ReplayParseState {
                 let call_id = extract_call_id(event);
                 let name = extract_tool_name(event).unwrap_or_else(|| event_type.to_string());
                 let arguments = extract_tool_arguments(event);
+                if let (Some(call_id), Some(cell_id)) = (
+                    call_id.as_ref(),
+                    arguments
+                        .as_deref()
+                        .and_then(|arguments| extract_wait_cell_id(&name, arguments)),
+                ) {
+                    if let Some((target_turn_id, target_call_id)) =
+                        self.cell_tools.get(&cell_id).cloned()
+                    {
+                        if let Some((_, target_name, target_arguments)) =
+                            self.pending_tools.get(&target_call_id).cloned()
+                        {
+                            self.pending_tools.insert(
+                                call_id.clone(),
+                                (target_turn_id, target_name, target_arguments),
+                            );
+                            self.tool_aliases.insert(call_id.clone(), target_call_id);
+                            return;
+                        }
+                    }
+                }
                 if let Some(call_id) = &call_id {
                     self.pending_tools.insert(
                         call_id.clone(),
@@ -433,10 +456,24 @@ impl ReplayParseState {
         event: &Value,
         timestamp: Option<String>,
     ) {
-        let call_id = extract_call_id(event);
+        let source_call_id = extract_call_id(event);
+        let call_id = source_call_id
+            .as_ref()
+            .and_then(|call_id| self.tool_aliases.get(call_id))
+            .cloned()
+            .or_else(|| source_call_id.clone());
         let (turn_id, name, arguments) = call_id
             .as_ref()
-            .and_then(|call_id| self.pending_tools.get(call_id).cloned())
+            .and_then(|call_id| {
+                self.pending_tools
+                    .get(call_id)
+                    .or_else(|| {
+                        source_call_id
+                            .as_ref()
+                            .and_then(|source_call_id| self.pending_tools.get(source_call_id))
+                    })
+                    .cloned()
+            })
             .unwrap_or_else(|| {
                 (
                     fallback_turn_id.to_string(),
@@ -450,11 +487,22 @@ impl ReplayParseState {
                 .get("output")
                 .and_then(|output| string_field(output, "stderr"))
         });
-        let status = string_field(event, "status").or_else(|| Some("completed".to_string()));
-        let is_error = status
+        let output_state = output
             .as_deref()
-            .map(|status| !matches!(status, "success" | "ok" | "completed"))
-            .unwrap_or(false)
+            .map(parse_process_output)
+            .unwrap_or_default();
+        let status = if output_state.is_error {
+            Some("failed".to_string())
+        } else if output_state.is_running {
+            Some("running".to_string())
+        } else {
+            string_field(event, "status").or_else(|| Some("completed".to_string()))
+        };
+        let is_error = output_state.is_error
+            || status
+                .as_deref()
+                .map(|status| !matches!(status, "success" | "ok" | "completed"))
+                .unwrap_or(false)
             || stderr
                 .as_deref()
                 .map(|value| !value.trim().is_empty())
@@ -462,24 +510,37 @@ impl ReplayParseState {
 
         let turn = self.turn_mut(&turn_id);
         if let Some(call_id) = &call_id {
-            if let Some(tool) = turn
+            if let Some(tool_index) = turn
                 .tool_calls
-                .iter_mut()
-                .find(|tool| tool.call_id.as_ref() == Some(call_id))
+                .iter()
+                .position(|tool| tool.call_id.as_ref() == Some(call_id))
             {
-                tool.output = output;
+                let tool = &mut turn.tool_calls[tool_index];
+                tool.output = merge_process_output(tool.output.take(), output);
                 tool.stderr = stderr;
                 tool.status = status;
-                tool.completed_at = timestamp;
-                tool.duration_ms =
-                    duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref());
+                tool.completed_at = if output_state.is_running {
+                    None
+                } else {
+                    timestamp
+                };
+                tool.duration_ms = output_state.duration_ms.or_else(|| {
+                    duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref())
+                });
                 tool.is_error = is_error;
+                let registered_cell = output_state
+                    .cell_id
+                    .zip(tool.call_id.clone())
+                    .map(|(cell_id, call_id)| (cell_id, (turn_id.clone(), call_id)));
                 if let Some(SessionReplayItem::ToolCall { tool: item_tool }) = turn
                     .items
                     .iter_mut()
                     .find(|item| matches!(item, SessionReplayItem::ToolCall { tool } if tool.call_id.as_ref() == Some(call_id)))
                 {
                     *item_tool = tool.clone();
+                }
+                if let Some((cell_id, tool_ref)) = registered_cell {
+                    self.cell_tools.insert(cell_id, tool_ref);
                 }
                 return;
             }
@@ -887,6 +948,85 @@ fn duration_between(start: Option<&str>, end: Option<&str>) -> Option<i64> {
         .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
         .map(|value| value.with_timezone(&Utc))?;
     Some((end - start).num_milliseconds().max(0))
+}
+
+#[derive(Default)]
+struct ProcessOutputState {
+    cell_id: Option<String>,
+    duration_ms: Option<i64>,
+    is_running: bool,
+    is_error: bool,
+}
+
+fn parse_process_output(output: &str) -> ProcessOutputState {
+    let cell_id = output
+        .split("Script running with cell ID ")
+        .nth(1)
+        .and_then(|value| value.lines().next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string);
+    let duration_ms = ["Wall time ", "Wait time "].iter().find_map(|prefix| {
+        output.split(prefix).nth(1).and_then(|value| {
+            value
+                .split_whitespace()
+                .next()
+                .and_then(|seconds| seconds.parse::<f64>().ok())
+                .map(|seconds| (seconds * 1000.0).round() as i64)
+        })
+    });
+    let is_running = cell_id.is_some() && !output.contains("Script completed");
+    let normalized = output.to_ascii_lowercase();
+    let exit_code = ["\"exit_code\"", "exit code:", "process exited with code"]
+        .iter()
+        .find_map(|marker| {
+            normalized.split(marker).nth(1).and_then(|value| {
+                value
+                    .trim_start_matches(|character: char| {
+                        character.is_whitespace() || matches!(character, ':' | '=')
+                    })
+                    .split(|character: char| !character.is_ascii_digit() && character != '-')
+                    .next()
+                    .and_then(|code| code.parse::<i64>().ok())
+            })
+        });
+    let is_error = normalized.contains("script failed") || exit_code.is_some_and(|code| code != 0);
+
+    ProcessOutputState {
+        cell_id,
+        duration_ms,
+        is_running,
+        is_error,
+    }
+}
+
+fn extract_wait_cell_id(tool_name: &str, arguments: &str) -> Option<String> {
+    let is_wait = tool_name.rsplit('.').next() == Some("wait") || arguments.contains("tools.wait");
+    if !is_wait {
+        return None;
+    }
+    let wait_arguments = arguments.split("tools.wait").nth(1).unwrap_or(arguments);
+    let marker = wait_arguments
+        .find("cell_id")
+        .map(|index| &wait_arguments[index + "cell_id".len()..])?;
+    let value = marker.trim_start_matches(|character: char| {
+        character.is_whitespace() || matches!(character, ':' | '=' | '\\' | '"' | '\'')
+    });
+    let cell_id = value
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, ',' | '}' | ')' | '\\' | '"' | '\'')
+        })
+        .next()
+        .unwrap_or("");
+    (!cell_id.is_empty()).then(|| cell_id.to_string())
+}
+
+fn merge_process_output(existing: Option<String>, new: Option<String>) -> Option<String> {
+    match (existing, new) {
+        (Some(existing), Some(new)) if existing != new => Some(format!("{existing}\n{new}")),
+        (Some(existing), _) => Some(existing),
+        (_, new) => new,
+    }
 }
 
 fn merge_payload_info(payload: &Value, info: &Value) -> Value {
@@ -1312,6 +1452,79 @@ mod tests {
         );
         assert!(detail.turns[0].patch_results[0].is_error);
         assert_eq!(detail.summary.error_count, 2);
+    }
+
+    #[test]
+    fn merges_exec_and_wait_events_by_process_cell_id() {
+        let raw = [
+            turn_context("2026-08-19T13:30:58.000Z", "turn-1", "gpt-5", "/repo/app"),
+            response_item(
+                "2026-08-19T13:30:59.255Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-exec",
+                    "name": "exec",
+                    "input": "const r = await tools.exec_command({\"cmd\":\"pnpm test src/App.test.tsx && pnpm typecheck\",\"yield_time_ms\":30000}); text(r.output);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:10.275Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-exec",
+                    "output": "Script running with cell ID 4\nWall time 11.0 seconds\nOutput:\npartial test output"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:10.300Z",
+                serde_json::json!({
+                    "type": "custom_tool_call",
+                    "call_id": "call-wait",
+                    "name": "exec",
+                    "input": "const r = await tools.wait({\"cell_id\":\"4\",\"yield_time_ms\":30000}); text(r);"
+                }),
+            ),
+            response_item(
+                "2026-08-19T13:31:28.055Z",
+                serde_json::json!({
+                    "type": "custom_tool_call_output",
+                    "call_id": "call-wait",
+                    "output": "Script completed\nWall time 28.8 seconds\nOutput:\nall tests passed"
+                }),
+            ),
+        ]
+        .join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+        let turn = &detail.turns[0];
+
+        assert_eq!(turn.tool_calls.len(), 1);
+        assert_eq!(turn.items.len(), 1);
+        assert_eq!(detail.summary.tool_call_count, 1);
+        assert_eq!(turn.tool_calls[0].call_id.as_deref(), Some("call-exec"));
+        assert_eq!(turn.tool_calls[0].status.as_deref(), Some("completed"));
+        assert_eq!(turn.tool_calls[0].duration_ms, Some(28_800));
+        assert!(turn.tool_calls[0]
+            .output
+            .as_deref()
+            .unwrap()
+            .contains("partial test output"));
+        assert!(turn.tool_calls[0]
+            .output
+            .as_deref()
+            .unwrap()
+            .contains("all tests passed"));
+    }
+
+    #[test]
+    fn recognizes_nonzero_process_exit_codes_as_failures() {
+        let output = parse_process_output(
+            "Script completed\nWall time 14.2 seconds\nOutput:\n{\"exit_code\":2}",
+        );
+
+        assert_eq!(output.duration_ms, Some(14_200));
+        assert!(output.is_error);
+        assert!(!output.is_running);
     }
 
     #[test]

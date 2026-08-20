@@ -951,12 +951,6 @@ describe("App", () => {
       { text: "Script completed\nWait time 1.25 seconds\nOutput:\n", type: "input_text" },
       { text: longToolOutput, type: "input_text" },
     ]);
-    const completedTestWaitOutput = JSON.stringify([
-      {
-        type: "input_text",
-        text: "Script completed\nWall time 17.8 seconds\nOutput:\n$ node --test scripts/release-tests.cjs && vitest run src/App.test.tsx\n",
-      },
-    ]);
     const rawJsonl = [
       JSON.stringify({ timestamp: "2026-06-11T00:00:00.000Z", type: "event_msg", payload: { type: "user_message", turn_id: "turn-1", text: "Replay this session" } }),
       `${"x".repeat(4100)}raw-only-marker`,
@@ -1104,18 +1098,6 @@ describe("App", () => {
                   isError: false,
                 },
                 {
-                  callId: "call-test-wait",
-                  name: "wait",
-                  status: "completed",
-                  arguments: JSON.stringify({ cell_id: "4", yield_time_ms: 30000, max_tokens: 50000 }),
-                  output: completedTestWaitOutput,
-                  stderr: null,
-                  startedAt: "2026-06-11T00:00:01.510Z",
-                  completedAt: "2026-06-11T00:00:19.310Z",
-                  durationMs: 17800,
-                  isError: false,
-                },
-                {
                   callId: "call-write-stdin",
                   name: "exec",
                   status: "completed",
@@ -1225,6 +1207,32 @@ describe("App", () => {
                 },
                 {
                   kind: "toolCall",
+                  callId: "call-running-tests",
+                  name: "exec",
+                  status: "running",
+                  arguments: JSON.stringify({ cmd: "pnpm test src/App.test.tsx && pnpm typecheck" }),
+                  output: "Script running with cell ID 4\nWall time 11.0 seconds\nOutput:\nrunning test output",
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: null,
+                  durationMs: 11000,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
+                  callId: "call-failed-tests",
+                  name: "exec",
+                  status: "failed",
+                  arguments: JSON.stringify({ cmd: "pnpm test src/App.test.tsx" }),
+                  output: "Script completed\nWall time 14.2 seconds\nOutput:\n2 tests failed",
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:15.700Z",
+                  durationMs: 14200,
+                  isError: true,
+                },
+                {
+                  kind: "toolCall",
                   callId: "call-wait",
                   name: "wait",
                   status: "completed",
@@ -1238,19 +1246,6 @@ describe("App", () => {
                   startedAt: "2026-06-11T00:00:01.500Z",
                   completedAt: "2026-06-11T00:00:01.510Z",
                   durationMs: 10,
-                  isError: false,
-                },
-                {
-                  kind: "toolCall",
-                  callId: "call-test-wait",
-                  name: "wait",
-                  status: "completed",
-                  arguments: JSON.stringify({ cell_id: "4", yield_time_ms: 30000, max_tokens: 50000 }),
-                  output: completedTestWaitOutput,
-                  stderr: null,
-                  startedAt: "2026-06-11T00:00:01.510Z",
-                  completedAt: "2026-06-11T00:00:19.310Z",
-                  durationMs: 17800,
                   isError: false,
                 },
                 {
@@ -1354,7 +1349,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("8 tools");
+    expect(turnButton).toHaveTextContent("7 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1389,13 +1384,12 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    const toolCallButton = screen.getByText("• Ran").closest("button")!;
-    const toolCall = toolCallButton.parentElement!;
+    const toolCall = screen.getByText(/Command completed/).parentElement!;
+    const toolCallButton = within(toolCall).getByRole("button", { name: "View output" });
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
-    expect(toolCallButton).toHaveTextContent("Expand");
     expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall).toHaveTextContent("first command");
-    expect(toolCall).toHaveTextContent("└ tool output preview");
+    expect(toolCall).not.toHaveTextContent("tool output preview");
     expect(toolCall).not.toHaveTextContent("Working directory: /repo/app");
     expect(toolCall).not.toHaveTextContent("Script completed");
     expect(toolCall).not.toHaveTextContent("Wall time");
@@ -1405,13 +1399,18 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent('"text"');
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
-    expect(toolCallButton).toHaveTextContent("Collapse");
+    expect(toolCallButton).toHaveTextContent("Hide output");
     expect(toolCall).toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
+    expect(screen.getByText("⏳ Running tests and type check · 11s")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View live output" })).toBeInTheDocument();
+    expect(screen.getByText("✕ Tests failed · 14.2s")).toBeInTheDocument();
+    expect(screen.getByText("2 tests failed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View errors" })).toBeInTheDocument();
     const webSearchButton = screen.getAllByRole("button", { name: /Web search · completed/ })
       .find((button) => button.parentElement?.textContent?.includes("first search query"))!;
     const webSearchCall = webSearchButton.parentElement!;
@@ -1450,10 +1449,6 @@ describe("App", () => {
     expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
-    expect(screen.getByText("⏳ Waiting for test task to complete...")).toBeInTheDocument();
-    expect(screen.getByText("✓ Test task completed · 17.8s")).toBeInTheDocument();
-    expect(screen.getByText("node --test scripts/release-tests.cjs && vitest run src/App.test.tsx")).toBeInTheDocument();
-    expect(screen.queryByText("50000")).not.toBeInTheDocument();
     const writeStdinCallButton = screen.getByRole("button", { name: /write_stdin · completed/ });
     const writeStdinCall = writeStdinCallButton.parentElement!;
     expect(writeStdinCall).toHaveTextContent("Process session82101");

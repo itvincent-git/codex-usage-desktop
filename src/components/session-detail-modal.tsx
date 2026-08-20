@@ -589,7 +589,13 @@ function parseExecOutput(value: string | null): ExecOutput | null {
 }
 
 function cleanExecOutput(text: string) {
-  return text.replace(/^Script completed\r?\n(?:Wall|Wait) time [^\r\n]+\r?\nOutput:\r?\n/, "");
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !/^Script (?:running with cell ID .+|completed)$/.test(line)
+      && !/^(?:Wall|Wait) time [^\r\n]+$/.test(line)
+      && line !== "Output:")
+    .join("\n")
+    .trim();
 }
 
 function isEmptyExecOutput(text: string | null) {
@@ -605,19 +611,23 @@ type UserInputQuestion = {
   options: Array<{ label: string; description: string }>;
 };
 
-type WaitTaskResult = {
-  command: string;
-  duration: string;
-};
+function formatActivityDuration(ms: number | null) {
+  if (ms === null) return null;
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
+}
 
-function parseWaitTaskResult(value: string | null): WaitTaskResult | null {
-  const content = parseToolContentBlocks(value)?.text ?? value;
-  if (!content) return null;
+function commandActivityKey(command: string, status: "running" | "success" | "failed") {
+  const runsTests = /(?:^|\s|\/)(?:test(?::[\w-]+)?|vitest|jest|pytest)(?:\s|$)/i.test(command);
+  const runsTypecheck = /(?:typecheck|tsc(?:\s|$))/i.test(command);
+  const task = runsTests && runsTypecheck ? "tests_and_typecheck" : runsTests ? "tests" : runsTypecheck ? "typecheck" : "command";
+  return `sessions.detail.command_activity.${task}.${status}`;
+}
 
-  const match = content.match(/^Script completed\r?\nWall time ([^\r\n]+) seconds\r?\nOutput:\r?\n\$\s+([^\r\n]+)\s*$/);
-  if (!match || !/(?:^|\s)(?:test|vitest|jest|pytest)(?:\s|$)/i.test(match[2])) return null;
-
-  return { duration: match[1], command: match[2] };
+function failedTestCount(output: string | null) {
+  const match = output?.match(/(?:Tests?\s+)?(\d+)\s+(?:tests?\s+)?failed\b/i);
+  return match ? Number(match[1]) : null;
 }
 
 function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
@@ -812,7 +822,6 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const rawOutputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
   const stderrText = execOutput?.stderr ?? item.stderr;
-  const waitTaskResult = outerToolName === "wait" ? parseWaitTaskResult(item.output) : null;
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} />;
@@ -822,41 +831,45 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
     return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} />;
   }
 
-  if (waitTaskResult) {
-    return (
-      <div className="rounded-lg border border-border/60 bg-muted/25 p-3 font-mono text-xs leading-relaxed">
-        <div className="text-muted-foreground">⏳ {t("sessions.detail.waiting_for_test_task")}</div>
-        <div className="mt-1 text-emerald-700 dark:text-emerald-300">
-          ✓ {t("sessions.detail.test_task_completed")} · {waitTaskResult.duration}s
-        </div>
-        <div className="mt-1 break-words pl-4 text-foreground">{waitTaskResult.command}</div>
-      </div>
-    );
-  }
-
   if (execArguments?.kind === "command") {
     const commandOutput = outputText ? cleanExecOutput(outputText) : null;
+    const activityStatus = item.isError ? "failed" : item.status === "running" ? "running" : "success";
+    const duration = formatActivityDuration(item.durationMs);
+    const failureCount = activityStatus === "failed" ? failedTestCount(commandOutput) : null;
+    const icon = activityStatus === "running" ? "⏳" : activityStatus === "failed" ? "✕" : "✓";
+    const titleTone = activityStatus === "failed"
+      ? "text-error"
+      : activityStatus === "success"
+        ? "text-emerald-700 dark:text-emerald-300"
+        : "text-foreground";
     return (
       <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
-        <button
-          type="button"
-          className={`flex w-full min-w-0 items-start justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
-          aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((value) => !value)}
-        >
-          <span className="flex min-w-0 gap-2">
-            <span className="shrink-0">• Ran</span>
-            <span className="min-w-0 whitespace-pre-wrap break-words">
-              {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
-            </span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
-          </span>
-        </button>
+        <div className={`font-sans text-sm font-semibold ${titleTone}`}>
+          {icon} {t(commandActivityKey(execArguments.command, activityStatus))}{duration ? ` · ${duration}` : ""}
+        </div>
+        <pre className="mt-1 whitespace-pre-wrap break-words pl-5 text-foreground">
+          {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
+        </pre>
+        {failureCount !== null ? (
+          <div className="mt-3 pl-5 font-sans text-sm font-medium text-error">
+            {t("sessions.detail.failed_test_count", { count: failureCount })}
+          </div>
+        ) : null}
         {commandOutput ? (
-          <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-muted-foreground">└ {isExpanded ? commandOutput : buildCollapsedPreview(commandOutput, 5)}</pre>
+          <div className="mt-3 pl-5">
+            <button
+              type="button"
+              className={`flex items-center gap-1 font-sans text-xs text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+              aria-expanded={isExpanded}
+              onClick={() => setIsExpanded((value) => !value)}
+            >
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {isExpanded
+                ? t("sessions.detail.hide_output")
+                : t(activityStatus === "running" ? "sessions.detail.view_live_output" : activityStatus === "failed" ? "sessions.detail.view_errors" : "sessions.detail.view_output")}
+            </button>
+            {isExpanded ? <pre className={`mt-2 whitespace-pre-wrap break-words ${activityStatus === "failed" ? "text-error" : "text-muted-foreground"}`}>{commandOutput}</pre> : null}
+          </div>
         ) : null}
         {stderrText ? (
           <pre className="mt-1 whitespace-pre-wrap break-words pl-2 text-error">└ {stderrText}</pre>

@@ -503,8 +503,18 @@
         "max_output_tokens": "Output token limit"
       },
       "output": "Output",
-      "waiting_for_test_task": "Waiting for test task to complete...",
-      "test_task_completed": "Test task completed",
+      "command_activity": {
+        "tests_and_typecheck": { "running": "Running tests and type check", "success": "Tests and type check passed", "failed": "Tests or type check failed" },
+        "tests": { "running": "Running tests", "success": "Tests passed", "failed": "Tests failed" },
+        "typecheck": { "running": "Running type check", "success": "Type check passed", "failed": "Type check failed" },
+        "command": { "running": "Running command", "success": "Command completed", "failed": "Command failed" }
+      },
+      "failed_test_count_one": "{{count}} test failed",
+      "failed_test_count_other": "{{count}} tests failed",
+      "view_live_output": "View live output",
+      "view_output": "View output",
+      "view_errors": "View errors",
+      "hide_output": "Hide output",
       "web_search": "Web search",
       "search_queries": "Search queries",
       "search_result": "Search result {{index}}",
