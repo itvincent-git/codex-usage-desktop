@@ -1206,6 +1206,16 @@ describe("App", () => {
                   isError: false,
                 },
                 {
+                  kind: "tokenUsage",
+                  timestamp: "2026-06-11T00:00:02.000Z",
+                  model: "gpt-5",
+                  inputTokens: 50_000,
+                  cachedInputTokens: 400,
+                  outputTokens: 384,
+                  reasoningOutputTokens: 0,
+                  totalTokens: 50_784,
+                },
+                {
                   kind: "toolCall",
                   callId: "call-running-tests",
                   name: "exec",
@@ -1299,16 +1309,6 @@ describe("App", () => {
                 },
                 { kind: "patch", callId: "patch-1", success: true, output: "PATCH_SUCCESS_OUTPUT", timestamp: "2026-06-11T00:00:01.600Z", isError: false },
                 { kind: "patch", callId: "patch-2", success: false, output: "PATCH_FAILURE_OUTPUT", timestamp: "2026-06-11T00:00:01.700Z", isError: true },
-                {
-                  kind: "tokenUsage",
-                  timestamp: "2026-06-11T00:00:02.000Z",
-                  model: "gpt-5",
-                  inputTokens: 100,
-                  cachedInputTokens: 20,
-                  outputTokens: 40,
-                  reasoningOutputTokens: 0,
-                  totalTokens: 140,
-                },
                 { kind: "error", timestamp: "2026-06-11T00:00:01.800Z", text: "Replay error fixture" },
                 { kind: "notice", timestamp: "2026-06-11T00:00:01.900Z", label: "Replay notice", text: "Notice fixture" },
               ],
@@ -1398,6 +1398,10 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
+    const tokenMetadata = within(toolCallButton).getByText("50.8k tokens");
+    expect(tokenMetadata).toHaveClass("text-violet-500/80");
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Model: gpt-5\nTokens: 50,784\nTime:"));
+    expect(toolCall).not.toHaveClass("border-fuchsia-300/70");
     await userEvent.click(toolCallButton);
     expect(toolCallButton).toHaveAttribute("aria-expanded", "true");
     expect(toolCallButton).toHaveTextContent("Collapse");
@@ -1489,7 +1493,7 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: /Patch result/ })).not.toBeInTheDocument();
     expect(failedPatchButton.parentElement).toHaveClass("border-error/40");
     expect(screen.queryByText("PATCH_SUCCESS_OUTPUT")).not.toBeInTheDocument();
-    expect(screen.getByText(/140 tokens/)).toHaveClass("border-fuchsia-300/70");
+    expect(screen.queryByText(/50,784 tokens/)).not.toBeInTheDocument();
     expect(screen.getByText("Replay error fixture")).toHaveClass("border-error/40");
     expect(screen.getByText(/Replay notice/)).toHaveClass("border-sky-300/70");
 

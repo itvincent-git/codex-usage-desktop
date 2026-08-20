@@ -28,7 +28,6 @@ const ITEM_TONES = {
   reasoning: "border-amber-300/70 bg-amber-50/70 dark:border-amber-800/70 dark:bg-amber-950/30",
   tool: "border-cyan-300/70 bg-cyan-50/70 dark:border-cyan-800/70 dark:bg-cyan-950/30",
   patch: "border-green-300/70 bg-green-50/70 dark:border-green-800/70 dark:bg-green-950/30",
-  token: "border-fuchsia-300/70 bg-fuchsia-50/70 dark:border-fuchsia-800/70 dark:bg-fuchsia-950/30",
   error: "border-error/40 bg-error/5",
   notice: "border-sky-300/70 bg-sky-50/70 dark:border-sky-800/70 dark:bg-sky-950/30",
 } as const;
@@ -41,7 +40,6 @@ const ITEM_TITLE_TONES = {
   reasoning: "text-amber-700 dark:text-amber-300",
   tool: "text-cyan-700 dark:text-cyan-300",
   patch: "text-green-700 dark:text-green-300",
-  token: "text-fuchsia-700 dark:text-fuchsia-300",
   error: "text-error",
   notice: "text-sky-700 dark:text-sky-300",
 } as const;
@@ -99,6 +97,12 @@ function firstUserPreview(turn: SessionReplayDetail["turns"][number]) {
 }
 
 type ReplayItem = SessionReplayDetail["turns"][number]["items"][number];
+type TokenUsageItem = Extract<ReplayItem, { kind: "tokenUsage" }>;
+
+type TimelineEntry = {
+  item: ReplayItem;
+  tokenUsage?: TokenUsageItem;
+};
 
 function orderedItems(turn: SessionReplayDetail["turns"][number]): ReplayItem[] {
   if (turn.items?.length) return turn.items;
@@ -112,6 +116,51 @@ function orderedItems(turn: SessionReplayDetail["turns"][number]): ReplayItem[] 
     ...turn.tokenEvents.map((usage) => ({ kind: "tokenUsage" as const, ...usage })),
     ...turn.errors.map((text) => ({ kind: "error" as const, timestamp: null, text })),
   ];
+}
+
+function isVisibleTimelineItem(item: ReplayItem) {
+  return item.kind !== "patch" || item.isError || item.success === false;
+}
+
+function timelineEntries(items: ReplayItem[]): TimelineEntry[] {
+  const entries: TimelineEntry[] = [];
+
+  for (const item of items) {
+    if (item.kind === "tokenUsage") {
+      const previousEntry = entries.findLast((entry) => isVisibleTimelineItem(entry.item));
+      if (previousEntry && !previousEntry.tokenUsage) {
+        previousEntry.tokenUsage = item;
+        continue;
+      }
+    }
+    entries.push({ item });
+  }
+
+  return entries;
+}
+
+function formatCompactTokenCount(value: number) {
+  if (Math.abs(value) < 1_000) return formatNumber(value);
+  if (Math.abs(value) < 1_000_000) return `${Number((value / 1_000).toFixed(1))}k`;
+  return `${Number((value / 1_000_000).toFixed(1))}m`;
+}
+
+function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
+  const { t } = useTranslation();
+  const tooltip = [
+    `${t("common.model")}: ${usage.model}`,
+    `${t("common.tokens")}: ${formatNumber(usage.totalTokens)}`,
+    `${t("common.time")}: ${formatTimestamp(usage.timestamp)}`,
+  ].join("\n");
+
+  return (
+    <span
+      className="shrink-0 font-sans text-[11px] font-medium tabular-nums text-violet-500/80 dark:text-violet-300/75"
+      title={tooltip}
+    >
+      {formatCompactTokenCount(usage.totalTokens)} tokens
+    </span>
+  );
 }
 
 const METRIC_TONES = {
@@ -171,7 +220,7 @@ function TextBlock({
   );
 }
 
-function MessageItem({ item }: { item: Extract<ReplayItem, { kind: "message" }> }) {
+function MessageItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "message" }>; tokenUsage?: TokenUsageItem }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const title = item.role === "user"
@@ -195,6 +244,7 @@ function MessageItem({ item }: { item: Extract<ReplayItem, { kind: "message" }> 
       >
         <span>{title}</span>
         <span className="flex shrink-0 items-center gap-3">
+          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
           <span className="font-mono normal-case tracking-normal text-muted-foreground">{formatTimestamp(item.timestamp)}</span>
           <span className="flex items-center gap-1 normal-case tracking-normal">
             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -681,15 +731,18 @@ function parseUserInputAnswers(outputJson: string | null): Record<string, string
   }
 }
 
-function UserInputItem({ item, questions }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[] }) {
+function UserInputItem({ item, questions, tokenUsage }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem }) {
   const { t } = useTranslation();
   const answers = parseUserInputAnswers(item.output);
 
   return (
     <div className={`rounded-lg border p-3 ${ITEM_TONES.tool}`}>
-      <div className={`flex items-center gap-1 text-xs font-semibold ${ITEM_TITLE_TONES.tool}`}>
-        <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-        <span>{t("sessions.detail.user_input_request")}</span>
+      <div className={`flex items-center justify-between gap-3 text-xs font-semibold ${ITEM_TITLE_TONES.tool}`}>
+        <span className="flex items-center gap-1">
+          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+          <span>{t("sessions.detail.user_input_request")}</span>
+        </span>
+        {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
       </div>
       <div className="mt-3 space-y-3">
         {questions.map((question) => {
@@ -742,10 +795,12 @@ function WebSearchItem({
   item,
   queries,
   structuredResults,
+  tokenUsage,
 }: {
   item: Extract<ReplayItem, { kind: "toolCall" }>;
   queries: string[];
   structuredResults: WebSearchResult[] | null;
+  tokenUsage?: TokenUsageItem;
 }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -765,9 +820,12 @@ function WebSearchItem({
           <Terminal className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{t("sessions.detail.web_search")} {item.status ? `· ${item.status}` : ""}</span>
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        <span className="flex shrink-0 items-center gap-3">
+          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+          <span className="flex items-center gap-1">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
         </span>
       </button>
       <div className="mt-3 space-y-2">
@@ -805,7 +863,7 @@ function WebSearchItem({
   );
 }
 
-function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }> }) {
+function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const outerToolName = baseToolName(item.name);
@@ -833,11 +891,11 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
-    return <UserInputItem item={item} questions={userInputQuestions} />;
+    return <UserInputItem item={item} questions={userInputQuestions} tokenUsage={tokenUsage} />;
   }
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
-    return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} />;
+    return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} />;
   }
 
   if (execArguments?.kind === "command") {
@@ -871,9 +929,12 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
               {isExpanded ? execArguments.command : buildCollapsedPreview(execArguments.command, 1)}
             </span>
           </span>
-          <span className="flex shrink-0 items-center gap-1 font-sans text-muted-foreground">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          <span className="flex shrink-0 items-center gap-3 font-sans text-muted-foreground">
+            {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+            <span className="flex items-center gap-1">
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+            </span>
           </span>
         </button>
         {commandOutput ? <ActivityOutput text={commandOutput} expanded={isExpanded} tone={outputTone} /> : null}
@@ -896,9 +957,12 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
           <Terminal className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{nestedWriteStdinArguments ? toolName : item.name} {item.status ? `· ${item.status}` : ""}</span>
         </span>
-        <span className="flex shrink-0 items-center gap-1">
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        <span className="flex shrink-0 items-center gap-3">
+          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+          <span className="flex items-center gap-1">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
         </span>
       </button>
       <div className="mt-3 space-y-2">
@@ -971,7 +1035,7 @@ function ToolCallItem({ item }: { item: Extract<ReplayItem, { kind: "toolCall" }
   );
 }
 
-function PatchItem({ item }: { item: Extract<ReplayItem, { kind: "patch" }> }) {
+function PatchItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "patch" }>; tokenUsage?: TokenUsageItem }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const isError = item.isError || item.success === false;
@@ -985,9 +1049,12 @@ function PatchItem({ item }: { item: Extract<ReplayItem, { kind: "patch" }> }) {
         onClick={() => setIsExpanded((value) => !value)}
       >
         <span>{item.success === false ? t("sessions.detail.patch_failed") : t("sessions.detail.patch_result")}</span>
-        <span className="flex shrink-0 items-center gap-1">
-          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+        <span className="flex shrink-0 items-center gap-3">
+          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+          <span className="flex items-center gap-1">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+          </span>
         </span>
       </button>
       {isExpanded && item.output ? <div className="mt-3"><TextBlock title={t("sessions.detail.patch_output")} text={item.output} /></div> : null}
@@ -995,44 +1062,46 @@ function PatchItem({ item }: { item: Extract<ReplayItem, { kind: "patch" }> }) {
   );
 }
 
-function TimelineItem({ item }: { item: ReplayItem }) {
+function TimelineItem({ item, tokenUsage }: TimelineEntry) {
   const { t } = useTranslation();
 
   if (item.kind === "message") {
-    return <MessageItem item={item} />;
+    return <MessageItem item={item} tokenUsage={tokenUsage} />;
   }
 
   if (item.kind === "reasoning") {
     return (
       <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
+        {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} titleClassName={ITEM_TITLE_TONES.reasoning} />
       </div>
     );
   }
 
   if (item.kind === "toolCall") {
-    return <ToolCallItem item={item} />;
+    return <ToolCallItem item={item} tokenUsage={tokenUsage} />;
   }
 
   if (item.kind === "patch") {
-    return item.isError || item.success === false ? <PatchItem item={item} /> : null;
+    return item.isError || item.success === false ? <PatchItem item={item} tokenUsage={tokenUsage} /> : null;
   }
 
   if (item.kind === "tokenUsage") {
     return (
-      <div className={`rounded-lg border px-3 py-2 font-mono text-[11px] ${ITEM_TONES.token} ${ITEM_TITLE_TONES.token}`}>
-        {formatTimestamp(item.timestamp)} · {item.model} · {t("sessions.detail.tokens_count", { value: formatNumber(item.totalTokens) })}
+      <div className="flex justify-end px-3 py-0.5">
+        <TokenMetadata usage={item} />
       </div>
     );
   }
 
   if (item.kind === "error") {
-    return <div className={`rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}>{item.text}</div>;
+    return <div className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}><span>{item.text}</span>{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}</div>;
   }
 
   return (
-    <div className={`rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
-      {item.label}{item.text ? ` · ${item.text}` : ""}
+    <div className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
+      <span>{item.label}{item.text ? ` · ${item.text}` : ""}</span>
+      {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
     </div>
   );
 }
@@ -1280,8 +1349,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   </button>
                   {isExpanded ? (
                   <div className="relative mt-2 ml-1 space-y-2 border-l-2 border-border/70 pl-4 before:absolute before:-left-[5px] before:top-1 before:h-2 before:w-2 before:rounded-full before:bg-primary">
-                    {orderedItems(turn).map((item, itemIndex) => (
-                      <TimelineItem key={`${item.kind}-${itemIndex}`} item={item} />
+                    {timelineEntries(orderedItems(turn)).map((entry, itemIndex) => (
+                      <TimelineItem key={`${entry.item.kind}-${itemIndex}`} {...entry} />
                     ))}
                   </div>
                   ) : null}
