@@ -68,6 +68,7 @@
     "title": "Codex Token Usage",
     "subtitle": "Local developer token tracking and cost estimator.",
     "last_updated": "Last updated {{time}}",
+    "updated_today": "Today at {{time}}",
     "last_updated_never": "Never updated",
     "rescan_duration": "Rescan completed in {{duration}}",
     "refresh": "Refresh",
