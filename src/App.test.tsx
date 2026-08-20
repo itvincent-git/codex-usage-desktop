@@ -1354,7 +1354,7 @@ describe("App", () => {
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
-    expect(turnButton).toHaveTextContent("7 tools");
+    expect(turnButton).toHaveTextContent("8 tools");
     expect(turnButton).toHaveTextContent("2 patches");
     expect(turnButton).toHaveTextContent("1 error");
     expect(turnButton).toHaveTextContent("1 token event");
@@ -1412,7 +1412,8 @@ describe("App", () => {
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
-    const webSearchButton = screen.getByRole("button", { name: /Web search · completed/ });
+    const webSearchButton = screen.getAllByRole("button", { name: /Web search · completed/ })
+      .find((button) => button.parentElement?.textContent?.includes("first search query"))!;
     const webSearchCall = webSearchButton.parentElement!;
     expect(webSearchCall).toHaveTextContent("first search query");
     expect(webSearchCall).toHaveTextContent("second search query");
@@ -1425,7 +1426,7 @@ describe("App", () => {
     expect(webSearchCall).toHaveTextContent("Search result 2");
     expect(webSearchCall).toHaveTextContent("Second result");
     expect(webSearchCall).toHaveTextContent("Search result 3");
-    expect(webSearchCall).toHaveTextContent('\n  "nested": {\n    "visible": true\n  }');
+    expect(screen.getByText("Search result 3").nextElementSibling?.textContent).toBe('{\n  "nested": {\n    "visible": true\n  }\n}');
     const directWebSearchLink = screen.getByRole("link", { name: "Codex Usage Desktop" });
     const directWebSearchCall = directWebSearchLink.closest("article")!.parentElement!.parentElement!;
     expect(directWebSearchLink).toHaveAttribute("href", "https://github.com/itvincent-git/codex-usage-desktop");
@@ -1449,7 +1450,7 @@ describe("App", () => {
     expect(within(waitCall).queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
-    expect(screen.getByText("Waiting for test task to complete...")).toBeInTheDocument();
+    expect(screen.getByText("⏳ Waiting for test task to complete...")).toBeInTheDocument();
     expect(screen.getByText("✓ Test task completed · 17.8s")).toBeInTheDocument();
     expect(screen.getByText("node --test scripts/release-tests.cjs && vitest run src/App.test.tsx")).toBeInTheDocument();
     expect(screen.queryByText("50000")).not.toBeInTheDocument();
