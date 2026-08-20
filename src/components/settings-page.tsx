@@ -174,6 +174,7 @@ export function SettingsPage({
                 <SelectContent>
                   <SelectItem value="en">{t("settings.lang_en")}</SelectItem>
                   <SelectItem value="zh">{t("settings.lang_zh")}</SelectItem>
+                  <SelectItem value="ja">{t("settings.lang_ja")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
