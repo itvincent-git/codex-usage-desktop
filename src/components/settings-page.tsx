@@ -139,7 +139,7 @@ export function SettingsPage({
           setActiveSection(section);
           document.getElementById(sectionId)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
         }}
-        className={`whitespace-nowrap rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background ${
+        className={`min-w-0 whitespace-normal break-words rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background ${
           selected
             ? "bg-indigo-600 text-white shadow-sm"
             : "text-muted-foreground hover:bg-muted hover:text-foreground"
