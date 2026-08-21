@@ -445,6 +445,7 @@
     "weekly": "Weekly",
     "approx": "Approx.",
     "usage_and_remaining": "{{usage}} · {{remaining}} left",
+    "used_and_remaining_change": "Used {{usage}} • {{remaining}}",
     "aria_label": "Estimated 5-hour and weekly quota usage and remaining quota",
     "usage_label": "{{window}} usage {{usage}}, remaining {{remaining}}",
     "resets": "Reset: {{value}}",

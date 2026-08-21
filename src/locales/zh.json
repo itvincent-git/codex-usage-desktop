@@ -445,6 +445,7 @@
     "weekly": "周",
     "approx": "约",
     "usage_and_remaining": "{{usage}} · 剩 {{remaining}}",
+    "used_and_remaining_change": "使用了 {{usage}} • {{remaining}}",
     "aria_label": "估算的 5 小时及每周限额使用度与剩余额度",
     "usage_label": "{{window}} 使用度 {{usage}}，剩余额度 {{remaining}}",
     "resets": "重置时间：{{value}}",

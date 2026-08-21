@@ -18,8 +18,14 @@ function formatUsage(window: SessionQuotaWindowUsage, approximate: string) {
     : `${approximate} ${Math.round(window.observedDeltaPercent)}%`;
 }
 
-function formatRange(window: SessionQuotaWindowUsage) {
-  return `${Math.round(window.observedStartPercent)}% → ${Math.round(window.observedEndPercent)}%`;
+function formatDetailedUsage(window: SessionQuotaWindowUsage) {
+  return window.belowResolution ? "<1%" : `${Math.round(window.observedDeltaPercent)}%`;
+}
+
+function formatRemainingRange(window: SessionQuotaWindowUsage) {
+  const start = Math.min(Math.max(100 - window.observedStartPercent, 0), 100);
+  const end = Math.min(Math.max(100 - window.observedEndPercent, 0), 100);
+  return `${Math.round(start)}% → ${Math.round(end)}%`;
 }
 
 function formatTime(value: string, locale: string) {
@@ -128,7 +134,12 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
               <div className="space-y-1.5">
                 {group.windows.map((window, index) => (
                   <div key={index} className="text-xs text-muted-foreground">
-                    <span className="font-bold text-foreground">{formatRange(window)}</span>
+                    <span className="font-bold text-foreground">
+                      {t("sessions.quota.used_and_remaining_change", {
+                        usage: formatDetailedUsage(window),
+                        remaining: formatRemainingRange(window),
+                      })}
+                    </span>
                     <span className="ml-2">{formatTime(window.observedStartAt, i18n.language)} – {formatTime(window.observedEndAt, i18n.language)}</span>
                     <div>{t("sessions.quota.resets", { value: window.resetsAt ? formatTime(window.resetsAt, i18n.language) : "--" })}</div>
                   </div>

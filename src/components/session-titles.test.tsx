@@ -667,8 +667,8 @@ describe("session titles", () => {
     expect(await screen.findByText("观测到的限额消耗")).toBeInTheDocument();
     expect(screen.getByText("5h")).toBeInTheDocument();
     expect(screen.getByText("周")).toBeInTheDocument();
-    expect(screen.getByText("10% → 14%")).toBeInTheDocument();
-    expect(screen.getByText("10% → 12%")).toBeInTheDocument();
+    expect(screen.getByText("使用了 4% • 90% → 86%")).toBeInTheDocument();
+    expect(screen.getByText("使用了 2% • 90% → 88%")).toBeInTheDocument();
     expect(screen.getByText(/取整及同时运行的其他 Codex 会话/)).toBeInTheDocument();
     await i18n.changeLanguage("en");
   });
