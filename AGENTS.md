@@ -62,10 +62,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Tauri UI Debugging
 
+**Use playwright-cli instead of the built-in Codex browser during debugging and testing.**
 **Use `playwright-cli` for UI inspection, but always start from the real Tauri startup path.**
 
 Recommended workflow in this repo:
 - Start the app with `pnpm tauri dev`, not just `pnpm dev`. The UI depends on Tauri commands backed by the native Rust usage pipeline.
+- Before starting `pnpm tauri dev`, check if the development server has already been started. If it has, please reuse it.
 - If the issue looks like loading, sync, or missing data, inspect the Tauri command path and Rust logs before blaming React.
 - Use `playwright-cli` against `http://localhost:5173` to inspect the rendered UI state:
   - `playwright-cli open http://localhost:5173`
