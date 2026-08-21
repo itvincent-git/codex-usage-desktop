@@ -8,10 +8,8 @@ type SessionQuotaUsageProps = {
   detailed?: boolean;
 };
 
-function formatDelta(window: SessionQuotaWindowUsage, approximate: string) {
-  return window.belowResolution
-    ? "<1%"
-    : `${approximate} ${Math.round(window.observedDeltaPercent)}%`;
+function remainingPercent(window: SessionQuotaWindowUsage) {
+  return Math.min(Math.max(100 - window.observedEndPercent, 0), 100);
 }
 
 function formatRange(window: SessionQuotaWindowUsage) {
@@ -22,19 +20,19 @@ function formatTime(value: string, locale: string) {
   return new Date(value).toLocaleString(locale);
 }
 
-function quotaTone(percent: number, belowResolution: boolean) {
-  if (percent <= 0 && !belowResolution) {
+function quotaTone(percent: number) {
+  if (percent <= 0) {
     return {
-      name: "zero",
-      className: "border-border/60 bg-muted/50 text-muted-foreground",
-      fillClassName: "bg-muted-foreground/10",
+      name: "empty",
+      className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
+      fillClassName: "bg-rose-500/20",
     };
   }
   if (percent <= 33) {
     return {
       name: "low",
-      className: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
-      fillClassName: "bg-emerald-500/20",
+      className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
+      fillClassName: "bg-rose-500/20",
     };
   }
   if (percent <= 66) {
@@ -46,8 +44,8 @@ function quotaTone(percent: number, belowResolution: boolean) {
   }
   return {
     name: "high",
-    className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
-    fillClassName: "bg-rose-500/20",
+    className: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+    fillClassName: "bg-emerald-500/20",
   };
 }
 
@@ -68,22 +66,23 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
             {group.windows.length > 0 ? (
               <span className="flex min-w-0 items-center justify-end gap-1 font-semibold">
                 {group.windows.map((window, index) => {
-                  const tone = quotaTone(window.observedDeltaPercent, window.belowResolution);
-                  const value = formatDelta(window, t("sessions.quota.approx"));
-                  const fillPercent = Math.min(Math.max(window.observedDeltaPercent, 0), 100);
+                  const fillPercent = remainingPercent(window);
+                  const tone = quotaTone(fillPercent);
+                  const percentValue = `${Math.round(fillPercent)}%`;
+                  const value = t("sessions.quota.remaining_value", { value: percentValue });
                   return (
                     <Fragment key={`${window.observedStartAt}-${index}`}>
                       {index > 0 ? <span className="text-muted-foreground">/</span> : null}
                       <span
                         role="img"
-                        aria-label={t("sessions.quota.usage_label", { window: group.label, value })}
+                        aria-label={t("sessions.quota.usage_label", { window: group.label, value: percentValue })}
                         data-quota-tone={tone.name}
                         className={`relative isolate inline-flex min-w-[3rem] justify-end overflow-hidden rounded border px-1 py-px ${tone.className}`}
                       >
                         <span
                           aria-hidden="true"
                           className={`absolute inset-y-0 left-0 -z-10 ${tone.fillClassName}`}
-                          style={{ width: `${fillPercent}%`, minWidth: window.belowResolution || fillPercent > 0 ? 2 : undefined }}
+                          style={{ width: `${fillPercent}%`, minWidth: fillPercent > 0 ? 2 : undefined }}
                         />
                         <span className="relative whitespace-nowrap">{value}</span>
                       </span>

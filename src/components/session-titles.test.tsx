@@ -77,13 +77,13 @@ describe("session daily usage", () => {
     })]} />);
 
     const card = screen.getByText("Quota session").closest("article")!;
-    expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. 2%/<1%");
-    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("Approx. 75%");
+    expect(within(card).getByText("5h").parentElement).toHaveTextContent("88% left/90% left");
+    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("15% left");
     expect(card).not.toHaveTextContent("99%");
-    expect(within(card).getByRole("img", { name: "5h usage Approx. 2%" })).toHaveAttribute("data-quota-tone", "low");
-    expect(within(card).getByRole("img", { name: "5h usage <1%" })).toHaveAttribute("data-quota-tone", "low");
-    expect(within(card).getByRole("img", { name: "Weekly usage Approx. 75%" })).toHaveAttribute("data-quota-tone", "high");
-    expect(within(card).getByLabelText("Estimated 5-hour and weekly quota usage")).toHaveAttribute("title", expect.stringContaining("concurrent"));
+    expect(within(card).getByRole("img", { name: "5h remaining 88%" })).toHaveAttribute("data-quota-tone", "high");
+    expect(within(card).getByRole("img", { name: "5h remaining 90%" })).toHaveAttribute("data-quota-tone", "high");
+    expect(within(card).getByRole("img", { name: "Weekly remaining 15%" })).toHaveAttribute("data-quota-tone", "low");
+    expect(within(card).getByLabelText("Estimated 5-hour and weekly quota remaining")).toHaveAttribute("title", expect.stringContaining("latest observed snapshot"));
   });
 
   it("splits resumed usage by rollup date and opens the complete session", async () => {
