@@ -310,7 +310,7 @@ fn load_session_file_with_quota(
         };
 
         let info = payload.get("info").unwrap_or(&Value::Null);
-        extract_quota_snapshots(info, timestamp, &mut quota_snapshots);
+        extract_quota_snapshots(payload, timestamp, &mut quota_snapshots);
         let last_usage = normalize_raw_usage(info.get("last_token_usage"));
         let total_usage = normalize_raw_usage(info.get("total_token_usage"));
         let raw = last_usage.or_else(|| {
@@ -395,11 +395,17 @@ fn backfill_session_metadata(path: &Path, timezone: &str, rollup: &mut SessionFi
 }
 
 fn extract_quota_snapshots(
-    info: &Value,
+    payload: &Value,
     timestamp: DateTime<Utc>,
     output: &mut Vec<QuotaSnapshot>,
 ) {
-    let limits = info.get("rate_limits").or_else(|| info.get("rateLimits"));
+    let limits = payload
+        .get("rate_limits")
+        .or_else(|| payload.get("rateLimits"))
+        .or_else(|| {
+            let info = payload.get("info")?;
+            info.get("rate_limits").or_else(|| info.get("rateLimits"))
+        });
     let Some(limits) = limits else { return };
 
     for key in ["primary", "secondary"] {
@@ -1533,18 +1539,17 @@ mod tests {
             "type": "event_msg",
             "payload": {
                 "type": "token_count",
-                "info": {
-                    "rate_limits": {
-                        "primary": {
-                            "used_percent": five_hour,
-                            "window_minutes": 300,
-                            "resets_at": resets_at
-                        },
-                        "secondary": {
-                            "used_percent": weekly,
-                            "window_minutes": 10080,
-                            "resets_at": resets_at + 100
-                        }
+                "info": {},
+                "rate_limits": {
+                    "primary": {
+                        "used_percent": five_hour,
+                        "window_minutes": 300,
+                        "resets_at": resets_at
+                    },
+                    "secondary": {
+                        "used_percent": weekly,
+                        "window_minutes": 10080,
+                        "resets_at": resets_at + 100
                     }
                 }
             }
