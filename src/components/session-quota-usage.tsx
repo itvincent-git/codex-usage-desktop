@@ -27,18 +27,17 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
 
   if (!detailed) {
     return (
-      <div className="flex flex-wrap items-center gap-1" aria-label={t("sessions.quota.aria_label")} title={caveat}>
-        {groups.flatMap((group) => group.windows.length > 0
-          ? group.windows.map((window, index) => (
-              <span key={`${group.key}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold tabular-nums text-amber-700 dark:text-amber-300">
-                {group.label} {formatDelta(window, t("sessions.quota.approx"))}
-              </span>
-            ))
-          : [(
-              <span key={`${group.key}-unavailable`} className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/50 px-1.5 py-0.5 text-[8px] font-semibold text-muted-foreground">
-                {group.label} --
-              </span>
-            )])}
+      <div className="space-y-1 text-[10px] tabular-nums" aria-label={t("sessions.quota.aria_label")} title={caveat}>
+        {groups.map((group) => (
+          <div key={group.key} className="grid grid-cols-[auto_1fr] gap-x-2">
+            <span className="font-semibold text-muted-foreground">{group.label}</span>
+            <span className="min-w-0 text-right font-semibold text-foreground">
+              {group.windows.length > 0
+                ? group.windows.map((window) => formatDelta(window, t("sessions.quota.approx"))).join(" / ")
+                : "--"}
+            </span>
+          </div>
+        ))}
       </div>
     );
   }
