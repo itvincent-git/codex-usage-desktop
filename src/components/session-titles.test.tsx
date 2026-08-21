@@ -669,7 +669,7 @@ describe("session titles", () => {
     expect(screen.getByText("周")).toBeInTheDocument();
     expect(screen.getByText("使用了 4% • 90% → 86%")).toBeInTheDocument();
     expect(screen.getByText("使用了 2% • 90% → 88%")).toBeInTheDocument();
-    expect(screen.getByText(/取整及同时运行的其他 Codex 会话/)).toBeInTheDocument();
+    expect(screen.getByText(/列表显示最近一次观测快照时的剩余额度/)).toBeInTheDocument();
     await i18n.changeLanguage("en");
   });
 });
