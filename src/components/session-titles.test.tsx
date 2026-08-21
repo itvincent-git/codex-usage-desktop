@@ -77,7 +77,9 @@ describe("session daily usage", () => {
     })]} />);
 
     const card = screen.getByText("Quota session").closest("article")!;
-    expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. 2% · 88% left/<1% · 90% left");
+    const fiveHourValues = within(card).getByText("5h").nextElementSibling;
+    expect(fiveHourValues).toHaveClass("flex-col");
+    expect(fiveHourValues).toHaveTextContent("Approx. 2% · 88% left<1% · 90% left");
     expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("Approx. 75% · 15% left");
     expect(card).not.toHaveTextContent("99%");
     expect(within(card).getByRole("img", { name: "5h usage Approx. 2%, remaining 88%" })).toHaveAttribute("data-quota-tone", "high");

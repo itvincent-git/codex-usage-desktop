@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { Clock3 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { SessionQuotaUsage, SessionQuotaWindowUsage } from "@/lib/api";
@@ -76,7 +75,7 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
           <div key={group.key} className="grid grid-cols-[auto_1fr] gap-x-2">
             <span className="font-semibold text-muted-foreground">{group.label}</span>
             {group.windows.length > 0 ? (
-              <span className="flex min-w-0 items-center justify-end gap-1 font-semibold">
+              <span className="flex min-w-0 flex-col items-end justify-center gap-1 font-semibold">
                 {group.windows.map((window, index) => {
                   const fillPercent = remainingPercent(window);
                   const tone = quotaTone(fillPercent);
@@ -87,26 +86,24 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
                     remaining: percentValue,
                   });
                   return (
-                    <Fragment key={`${window.observedStartAt}-${index}`}>
-                      {index > 0 ? <span className="text-muted-foreground">/</span> : null}
+                    <span
+                      key={`${window.observedStartAt}-${index}`}
+                      role="img"
+                      aria-label={t("sessions.quota.usage_label", {
+                        window: group.label,
+                        usage: usageValue,
+                        remaining: percentValue,
+                      })}
+                      data-quota-tone={tone.name}
+                      className={`relative isolate inline-flex min-w-[3rem] justify-end overflow-hidden rounded border px-1 py-px ${tone.className}`}
+                    >
                       <span
-                        role="img"
-                        aria-label={t("sessions.quota.usage_label", {
-                          window: group.label,
-                          usage: usageValue,
-                          remaining: percentValue,
-                        })}
-                        data-quota-tone={tone.name}
-                        className={`relative isolate inline-flex min-w-[3rem] justify-end overflow-hidden rounded border px-1 py-px ${tone.className}`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`absolute inset-y-0 left-0 -z-10 ${tone.fillClassName}`}
-                          style={{ width: `${fillPercent}%`, minWidth: fillPercent > 0 ? 2 : undefined }}
-                        />
-                        <span className="relative whitespace-nowrap">{value}</span>
-                      </span>
-                    </Fragment>
+                        aria-hidden="true"
+                        className={`absolute inset-y-0 left-0 -z-10 ${tone.fillClassName}`}
+                        style={{ width: `${fillPercent}%`, minWidth: fillPercent > 0 ? 2 : undefined }}
+                      />
+                      <span className="relative whitespace-nowrap">{value}</span>
+                    </span>
                   );
                 })}
               </span>
