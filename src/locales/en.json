@@ -444,9 +444,9 @@
     "five_hour": "5h",
     "weekly": "Weekly",
     "approx": "Approx.",
-    "remaining_value": "{{value}} left",
-    "aria_label": "Estimated 5-hour and weekly quota remaining",
-    "usage_label": "{{window}} remaining {{value}}",
+    "usage_and_remaining": "{{usage}} · {{remaining}} left",
+    "aria_label": "Estimated 5-hour and weekly quota usage and remaining quota",
+    "usage_label": "{{window}} usage {{usage}}, remaining {{remaining}}",
     "resets": "Reset: {{value}}",
     "caveat": "The list shows quota remaining at the latest observed snapshot. Values are estimated from integer log snapshots; each reset window is shown separately."
   },

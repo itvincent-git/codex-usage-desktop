@@ -12,6 +12,12 @@ function remainingPercent(window: SessionQuotaWindowUsage) {
   return Math.min(Math.max(100 - window.observedEndPercent, 0), 100);
 }
 
+function formatUsage(window: SessionQuotaWindowUsage, approximate: string) {
+  return window.belowResolution
+    ? "<1%"
+    : `${approximate} ${Math.round(window.observedDeltaPercent)}%`;
+}
+
 function formatRange(window: SessionQuotaWindowUsage) {
   return `${Math.round(window.observedStartPercent)}% → ${Math.round(window.observedEndPercent)}%`;
 }
@@ -68,14 +74,22 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
                 {group.windows.map((window, index) => {
                   const fillPercent = remainingPercent(window);
                   const tone = quotaTone(fillPercent);
+                  const usageValue = formatUsage(window, t("sessions.quota.approx"));
                   const percentValue = `${Math.round(fillPercent)}%`;
-                  const value = t("sessions.quota.remaining_value", { value: percentValue });
+                  const value = t("sessions.quota.usage_and_remaining", {
+                    usage: usageValue,
+                    remaining: percentValue,
+                  });
                   return (
                     <Fragment key={`${window.observedStartAt}-${index}`}>
                       {index > 0 ? <span className="text-muted-foreground">/</span> : null}
                       <span
                         role="img"
-                        aria-label={t("sessions.quota.usage_label", { window: group.label, value: percentValue })}
+                        aria-label={t("sessions.quota.usage_label", {
+                          window: group.label,
+                          usage: usageValue,
+                          remaining: percentValue,
+                        })}
                         data-quota-tone={tone.name}
                         className={`relative isolate inline-flex min-w-[3rem] justify-end overflow-hidden rounded border px-1 py-px ${tone.className}`}
                       >
