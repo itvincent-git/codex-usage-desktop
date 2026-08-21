@@ -77,12 +77,12 @@ describe("session daily usage", () => {
     })]} />);
 
     const card = screen.getByText("Quota session").closest("article")!;
-    expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. +2%/<1%");
-    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("Approx. +75%");
+    expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. 2%/<1%");
+    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("Approx. 75%");
     expect(card).not.toHaveTextContent("99%");
-    expect(within(card).getByRole("img", { name: "5h usage Approx. +2%" })).toHaveAttribute("data-quota-tone", "low");
+    expect(within(card).getByRole("img", { name: "5h usage Approx. 2%" })).toHaveAttribute("data-quota-tone", "low");
     expect(within(card).getByRole("img", { name: "5h usage <1%" })).toHaveAttribute("data-quota-tone", "low");
-    expect(within(card).getByRole("img", { name: "Weekly usage Approx. +75%" })).toHaveAttribute("data-quota-tone", "high");
+    expect(within(card).getByRole("img", { name: "Weekly usage Approx. 75%" })).toHaveAttribute("data-quota-tone", "high");
     expect(within(card).getByLabelText("Estimated 5-hour and weekly quota usage")).toHaveAttribute("title", expect.stringContaining("concurrent"));
   });
 

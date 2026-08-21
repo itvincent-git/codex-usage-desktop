@@ -11,7 +11,7 @@ type SessionQuotaUsageProps = {
 function formatDelta(window: SessionQuotaWindowUsage, approximate: string) {
   return window.belowResolution
     ? "<1%"
-    : `${approximate} +${Math.round(window.observedDeltaPercent)}%`;
+    : `${approximate} ${Math.round(window.observedDeltaPercent)}%`;
 }
 
 function formatRange(window: SessionQuotaWindowUsage) {
