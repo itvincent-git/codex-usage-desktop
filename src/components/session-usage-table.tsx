@@ -86,7 +86,7 @@ export function SessionUsageTable({
   onClearProjectFilter,
   onSessionClick,
 }: SessionUsageTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
 
@@ -412,6 +412,7 @@ export function SessionUsageTable({
                         role={onSessionClick ? "button" : undefined}
                         aria-label={onSessionClick ? t("sessions.open_session", { title }) : undefined}
                         data-testid="session-card"
+                        data-language={i18n.language.startsWith("zh") ? "zh" : "en"}
                         onClick={() => onSessionClick?.(session.originalSession)}
                         onKeyDown={(event) => {
                           if (!onSessionClick) return;
