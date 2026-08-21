@@ -253,6 +253,8 @@ export type SessionQuotaWindowUsage = {
   resetsAt: string | null;
   observedStartAt: string;
   observedEndAt: string;
+  observedStartPercent: number;
+  observedEndPercent: number;
   observedDeltaPercent: number;
   belowResolution: boolean;
 };

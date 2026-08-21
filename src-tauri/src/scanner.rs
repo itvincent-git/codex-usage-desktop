@@ -535,6 +535,8 @@ fn quota_window_usage(snapshots: &[QuotaSnapshot]) -> SessionQuotaWindowUsage {
         observed_end_at: last
             .timestamp
             .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        observed_start_percent: first.used_percent,
+        observed_end_percent: last.used_percent,
         observed_delta_percent,
         below_resolution: observed_delta_percent.round() == 0.0,
     }
@@ -1369,6 +1371,10 @@ mod tests {
         assert_eq!(quota.session.weekly.len(), 1);
         assert_eq!(quota.session.five_hour[0].observed_delta_percent, 3.0);
         assert_eq!(quota.session.weekly[0].observed_delta_percent, 1.0);
+        assert_eq!(quota.session.five_hour[0].observed_start_percent, 10.0);
+        assert_eq!(quota.session.five_hour[0].observed_end_percent, 13.0);
+        assert_eq!(quota.session.weekly[0].observed_start_percent, 20.0);
+        assert_eq!(quota.session.weekly[0].observed_end_percent, 21.0);
         assert_eq!(quota.session.five_hour[0].window_minutes, 300);
     }
 

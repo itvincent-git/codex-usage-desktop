@@ -54,6 +54,8 @@ describe("session daily usage", () => {
       resetsAt: "2026-07-15T13:00:00Z",
       observedStartAt: "2026-07-15T08:00:00Z",
       observedEndAt: "2026-07-15T09:00:00Z",
+      observedStartPercent: 10,
+      observedEndPercent: 10 + delta,
       observedDeltaPercent: delta,
       belowResolution,
     });
@@ -654,17 +656,19 @@ describe("session titles", () => {
       resetsAt: "2026-07-15T13:00:00Z",
       observedStartAt: "2026-07-15T08:00:00Z",
       observedEndAt: "2026-07-15T09:00:00Z",
+      observedStartPercent: 10,
+      observedEndPercent: 14,
       observedDeltaPercent: 4,
       belowResolution: false,
     };
 
-    render(<SessionDetailModal session={session({ quotaUsage: { fiveHour: [quotaWindow, { ...quotaWindow, observedDeltaPercent: 2 }], weekly: [] } })} onClose={vi.fn()} />);
+    render(<SessionDetailModal session={session({ quotaUsage: { fiveHour: [quotaWindow, { ...quotaWindow, observedEndPercent: 12, observedDeltaPercent: 2 }], weekly: [] } })} onClose={vi.fn()} />);
 
     expect(await screen.findByText("观测到的限额消耗")).toBeInTheDocument();
     expect(screen.getByText("5h")).toBeInTheDocument();
     expect(screen.getByText("周")).toBeInTheDocument();
-    expect(screen.getByText("约 +4%")).toBeInTheDocument();
-    expect(screen.getByText("约 +2%")).toBeInTheDocument();
+    expect(screen.getByText("10% → 14%")).toBeInTheDocument();
+    expect(screen.getByText("10% → 12%")).toBeInTheDocument();
     expect(screen.getByText(/取整及同时运行的其他 Codex 会话/)).toBeInTheDocument();
     await i18n.changeLanguage("en");
   });
