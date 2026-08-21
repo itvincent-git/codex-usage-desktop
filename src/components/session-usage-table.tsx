@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Bot, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
+import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
+import { Bot, Terminal, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -33,6 +33,12 @@ function formatBytes(bytes: number) {
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+function formatSessionTokenCount(value: number) {
+  if (Math.abs(value) < 1_000) return formatNumber(value);
+  if (Math.abs(value) < 1_000_000) return `${Number((value / 1_000).toFixed(1))}K`;
+  return formatCompactNumber(value);
 }
 
 function cleanSessionId(sessionId: string) {
@@ -89,12 +95,12 @@ function formatDateHeader(dateStr: string) {
   }
 }
 
-function costTone(cost: number, maxCost: number, isInactive: boolean) {
-  if (isInactive || cost <= 0 || maxCost <= 0) {
+function costTone(cost: number, maxCost: number) {
+  if (cost <= 0 || maxCost <= 0) {
     return {
       name: "zero",
-      className: "border-border/60 bg-muted/60 text-muted-foreground",
-      fillClassName: "bg-muted-foreground/15",
+      className: "border-border/60 bg-muted/50 text-muted-foreground",
+      fillClassName: "bg-muted-foreground/10",
     };
   }
 
@@ -102,20 +108,20 @@ function costTone(cost: number, maxCost: number, isInactive: boolean) {
   if (relativeCost <= 1 / 3) {
     return {
       name: "low",
-      className: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      className: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
       fillClassName: "bg-emerald-500/20",
     };
   }
   if (relativeCost <= 2 / 3) {
     return {
       name: "medium",
-      className: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      className: "border-amber-500/25 bg-amber-500/5 text-amber-700 dark:text-amber-300",
       fillClassName: "bg-amber-500/20",
     };
   }
   return {
     name: "high",
-    className: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
     fillClassName: "bg-rose-500/20",
   };
 }
@@ -127,7 +133,7 @@ export function SessionUsageTable({
   onClearProjectFilter,
   onSessionClick,
 }: SessionUsageTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
   const [expandedAgentGroups, setExpandedAgentGroups] = useState<Record<string, boolean>>({});
@@ -234,7 +240,6 @@ export function SessionUsageTable({
     ),
     [groups],
   );
-
   const toggleDate = (date: string) => {
     setCollapsedDates((prev) => ({
       ...prev,
@@ -443,7 +448,6 @@ export function SessionUsageTable({
                   }).map(({ session, isSubagent, childCount, groupKey, expanded }) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
-                    const cacheHitRate = session.inputTokens > 0 ? session.cachedInputTokens / session.inputTokens : 0;
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
                     const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
                       hour: "2-digit",
@@ -462,7 +466,7 @@ export function SessionUsageTable({
                     const modelOverflow = session.models.length - shownModels.length;
                     const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
                     const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
-                    const cost = costTone(session.costUSD, sessionScale.cost, isInactive);
+                    const cost = costTone(session.costUSD, sessionScale.cost);
                     const tokenLabel = isInactive
                       ? t("sessions.token_bar_empty")
                       : t("sessions.token_bar_label", {
@@ -491,6 +495,7 @@ export function SessionUsageTable({
                         role={onSessionClick ? "button" : undefined}
                         aria-label={onSessionClick ? t("sessions.open_session", { title }) : undefined}
                         data-testid="session-card"
+                        data-language={i18n.language.startsWith("zh") ? "zh" : "en"}
                         onClick={() => onSessionClick?.(session.originalSession)}
                         onKeyDown={(event) => {
                           if (!onSessionClick) return;
@@ -501,18 +506,9 @@ export function SessionUsageTable({
                         }}
                         className={`session-usage-card rounded-lg border px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${isSubagent ? "border-primary/20 bg-primary/[0.035]" : "border-border/50 bg-card/70"} ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
-                        <div className="session-card-time border-r border-border/40 pr-3" title={fullTime}>
-                          <div className="text-base font-bold tabular-nums tracking-tight text-foreground">{formattedTime}</div>
-                          <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                            {t("sessions.recorded_time")}
-                          </div>
-                        </div>
-
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
-                            {isSubagent
-                              ? <Bot className="h-3.5 w-3.5 flex-none text-primary" />
-                              : <FileText className="h-3.5 w-3.5 flex-none text-muted-foreground" />}
+                            {isSubagent ? <Bot className="h-3.5 w-3.5 flex-none text-primary" /> : null}
                             <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
                             {isSubagent ? (
                               <span className="flex-none rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-primary">
@@ -532,50 +528,90 @@ export function SessionUsageTable({
                               {agentRole ? <span className="truncate">{agentRole}</span> : null}
                             </div>
                           ) : null}
-                          <div className="flex min-w-0 flex-wrap items-center gap-1" title={session.projects.join("\n")}>
-                            {shownProjects.length > 0 ? shownProjects.map((project) => (
-                              <span key={project} className="inline-flex max-w-[120px] items-center gap-0.5 rounded border border-border/40 bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground" title={project}>
-                                <Folder className="h-2.5 w-2.5 flex-none opacity-60" />
-                                <span className="truncate">{project.split("/").pop() || project}</span>
+                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground" title={session.projects.join("\n")}>
+                            <Folder className="h-3 w-3 flex-none opacity-70" />
+                            {shownProjects.length > 0 ? (
+                              <span className="flex min-w-0 items-center gap-1 truncate font-medium">
+                                {shownProjects.map((project) => (
+                                  <span key={project} title={project}>
+                                    {project.split("/").pop() || project}
+                                  </span>
+                                ))}
+                                {projectOverflow > 0 ? <span title={session.projects.join("\n")}>+{projectOverflow}</span> : null}
                               </span>
-                            )) : (
-                              <span className="text-[9px] italic text-muted-foreground/70">{t("sessions.no_workspace")}</span>
-                            )}
-                            {projectOverflow > 0 ? <span className="text-[9px] font-semibold text-muted-foreground" title={session.projects.join("\n")}>+{projectOverflow}</span> : null}
-                          </div>
-                          <div className="flex min-w-0 items-center gap-1 text-[9px] text-muted-foreground/70" title={session.path}>
-                            {session.threadName ? <span className="max-w-[160px] truncate font-mono">{cleanSessionId(session.sessionId)}</span> : null}
+                            ) : <span className="italic">{t("sessions.no_workspace")}</span>}
                             {session.threadName ? <span aria-hidden="true">·</span> : null}
-                            <span className="whitespace-nowrap" title={session.path}>{formatBytes(session.sizeBytes)}</span>
+                            {session.threadName ? <span className="min-w-0 truncate font-mono" title={session.path}>{cleanSessionId(session.sessionId)}</span> : null}
+                          </div>
+                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground/80">
+                            <span className="font-semibold tabular-nums text-foreground" title={fullTime}>{formattedTime}</span>
+                            {shownModels.length > 0 ? <span aria-hidden="true">·</span> : null}
+                            {shownModels.length > 0 ? (
+                              <span className="flex min-w-0 items-center gap-1 overflow-hidden" title={session.models.join(", ")}>
+                                {shownModels.map((model) => {
+                                  const tone = modelTone(model);
+                                  return (
+                                    <span
+                                      key={model}
+                                      data-model={model}
+                                      data-model-tone={tone.index}
+                                      className={`whitespace-nowrap rounded-full border px-1.5 py-px text-[9px] font-semibold ${tone.className}`}
+                                    >
+                                      {model}
+                                    </span>
+                                  );
+                                })}
+                                {modelOverflow > 0 ? <span className="whitespace-nowrap">+{modelOverflow}</span> : null}
+                              </span>
+                            ) : null}
+                            <span aria-hidden="true">·</span>
+                            <span className="shrink-0" title={session.path}>{formatBytes(session.sizeBytes)}</span>
                           </div>
                         </div>
 
                         <div className="session-card-tokens min-w-0 space-y-1.5">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{t("sessions.total_tokens")}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-medium text-muted-foreground">{t("sessions.total_tokens")}</span>
                             <span
-                              className="relative isolate inline-flex w-24 flex-none overflow-hidden rounded-full border border-primary/15 bg-primary/5 px-2.5 py-0.5 text-right text-sm font-bold tabular-nums text-foreground"
+                              className="relative isolate inline-flex min-w-[6.5rem] overflow-hidden rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-sm font-bold tabular-nums tracking-tight text-foreground"
                               role="img"
                               aria-label={tokenTotalLabel}
-                              data-testid="token-total-pill"
+                              data-testid="token-total"
                             >
-                              {session.totalTokens > 0 && sessionScale.tokens > 0 ? (
+                              {tokenRatio > 0 ? (
                                 <span
                                   aria-hidden="true"
-                                  className="absolute inset-y-0 left-0 -z-10 bg-primary/15"
+                                  className="absolute inset-y-0 left-0 -z-10 bg-primary/20"
                                   style={{ width: `${tokenRatio * 100}%`, minWidth: 2 }}
                                 />
                               ) : null}
-                              <span className="relative ml-auto">{formatNumber(session.totalTokens)}</span>
+                              <span className="relative ml-auto">{formatSessionTokenCount(session.totalTokens)}</span>
                             </span>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-[9px] tabular-nums text-muted-foreground">
-                            <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatNumber(session.inputTokens)}</strong></span>
-                            <span>
-                              {t("sessions.cached")} <strong className="font-semibold text-foreground">{formatNumber(session.cachedInputTokens)}</strong>{" "}
-                              <span className="whitespace-nowrap text-muted-foreground">({formatPercent(cacheHitRate)})</span>
+                          <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
+                            <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.inputTokens)}</strong></span>
+                            <span aria-hidden="true">·</span>
+                            <span>{t("sessions.cached")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.cachedInputTokens)}</strong></span>
+                          </div>
+                          <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
+                            <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.outputTokens)}</strong></span>
+                            <span aria-hidden="true">·</span>
+                            <span
+                              role="img"
+                              aria-label={costLabel}
+                              data-cost-tone={cost.name}
+                              data-testid="session-cost"
+                              className={`relative isolate inline-flex min-w-[4.5rem] overflow-hidden rounded-full border px-1.5 py-px font-semibold ${cost.className}`}
+                            >
+                              {costRatio > 0 ? (
+                                <span
+                                  aria-hidden="true"
+                                  className={`absolute inset-y-0 left-0 -z-10 ${cost.fillClassName}`}
+                                  style={{ width: `${costRatio * 100}%`, minWidth: 2 }}
+                                />
+                              ) : null}
+                              <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
                             </span>
-                            <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatNumber(session.outputTokens)}</strong></span>
                           </div>
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (
@@ -586,38 +622,11 @@ export function SessionUsageTable({
                               </>
                             )}
                           </div>
-                          <SessionQuotaUsageView usage={session.quotaUsage} />
                           {isInactive ? <div className="text-[9px] italic text-muted-foreground">{t("daily.no_activity")}</div> : null}
                         </div>
 
-                        <div className="session-card-cost flex min-w-0 flex-col items-end justify-center gap-2">
-                          <span
-                            data-cost-tone={cost.name}
-                            className={`relative isolate inline-flex w-full max-w-full overflow-hidden rounded-full border px-2.5 py-1 text-xs font-bold tabular-nums ${cost.className}`}
-                            role="img"
-                            aria-label={costLabel}
-                            data-testid="cost-pill"
-                          >
-                            {!isInactive && session.costUSD > 0 && sessionScale.cost > 0 ? (
-                              <span
-                                aria-hidden="true"
-                                className={`absolute inset-y-0 left-0 -z-10 ${cost.fillClassName}`}
-                                style={{ width: `${costRatio * 100}%`, minWidth: 2 }}
-                              />
-                            ) : null}
-                            <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
-                          </span>
-                          <div className="flex w-full min-w-0 flex-wrap justify-end gap-0.5" title={session.models.join(", ")}>
-                            {shownModels.length > 0 ? shownModels.map((model) => {
-                              const tone = modelTone(model);
-                              return (
-                                <span key={model} data-model={model} data-model-tone={tone.index} className={`inline-flex whitespace-nowrap rounded-full border px-1 py-0.5 text-[8px] font-semibold ${tone.className}`} title={model}>
-                                  {model}
-                                </span>
-                              );
-                            }) : <span className="text-[9px] italic text-muted-foreground/70">{t("project_modal.no_models")}</span>}
-                            {modelOverflow > 0 ? <span className="text-[9px] font-semibold text-muted-foreground" title={session.models.join(", ")}>+{modelOverflow}</span> : null}
-                          </div>
+                        <div className="session-card-quota min-w-0">
+                          <SessionQuotaUsageView usage={session.quotaUsage} />
                         </div>
                       </article>
                       {childCount > 0 ? (

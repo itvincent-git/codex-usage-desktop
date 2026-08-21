@@ -1,4 +1,16 @@
 {
+  "2.3.2": {
+    "zh": "- fix(sessions): prevent quota usage truncation\n- fix(sessions): adapt quota width by language\n- fix(sessions): stack multiple quota windows",
+    "en": "- fix(sessions): prevent quota usage truncation\n- fix(sessions): adapt quota width by language\n- fix(sessions): stack multiple quota windows"
+  },
+  "2.3.1": {
+    "zh": "- test: update quota guidance assertion",
+    "en": "- test: update quota guidance assertion"
+  },
+  "2.3.0": {
+    "zh": "- feat: merge long-running command activities\n- feat(session): refine command activity display\n- feat(session): compact replay token metadata\n- feat(sessions): show quota usage per session\n- fix: merge process polling into activities\n- fix(sessions): parse quota limits from payload\n- feat(sessions): refine session detail card layout\n- feat(sessions): add usage color scales\n- feat: show session quota usage ranges\n- doc: playwright-cli spec\n- fix: invalidate incompatible quota cache\n- fix(sessions): remove plus signs from quota usage\n- feat(sessions): show remaining quota in usage list\n- fix(sessions): show usage with remaining quota\n- fix: show session quota balance changes",
+    "en": "- feat: merge long-running command activities\n- feat(session): refine command activity display\n- feat(session): compact replay token metadata\n- feat(sessions): show quota usage per session\n- fix: merge process polling into activities\n- fix(sessions): parse quota limits from payload\n- feat(sessions): refine session detail card layout\n- feat(sessions): add usage color scales\n- feat: show session quota usage ranges\n- doc: playwright-cli spec\n- fix: invalidate incompatible quota cache\n- fix(sessions): remove plus signs from quota usage\n- feat(sessions): show remaining quota in usage list\n- fix(sessions): show usage with remaining quota\n- fix: show session quota balance changes"
+  },
   "2.2.1": {
     "zh": "- test: fix session replay assertions",
     "en": "- test: fix session replay assertions"

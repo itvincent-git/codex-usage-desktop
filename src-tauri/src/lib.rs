@@ -59,7 +59,10 @@ where
     L: FnOnce() -> Result<CodexLimitsResponse, String>,
 {
     log::info!("Background rescan started. force_limits={force_limits}");
-    let scan = scan_fn()?;
+    let scan = scan_fn().map_err(|error| {
+        log::warn!("Background rescan failed: {error}");
+        error
+    })?;
     let files_scanned = scan.metrics.files_scanned;
     let files_parsed = scan.metrics.files_parsed;
     let files_reused = scan.metrics.files_reused;

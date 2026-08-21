@@ -318,7 +318,7 @@ fn load_session_file_with_quota(
         };
 
         let info = payload.get("info").unwrap_or(&Value::Null);
-        extract_quota_snapshots(info, timestamp, &mut quota_snapshots);
+        extract_quota_snapshots(payload, timestamp, &mut quota_snapshots);
         let last_usage = normalize_raw_usage(info.get("last_token_usage"));
         let total_usage = normalize_raw_usage(info.get("total_token_usage"));
         let raw = last_usage.or_else(|| {
@@ -407,11 +407,17 @@ fn backfill_session_metadata(path: &Path, timezone: &str, rollup: &mut SessionFi
 }
 
 fn extract_quota_snapshots(
-    info: &Value,
+    payload: &Value,
     timestamp: DateTime<Utc>,
     output: &mut Vec<QuotaSnapshot>,
 ) {
-    let limits = info.get("rate_limits").or_else(|| info.get("rateLimits"));
+    let limits = payload
+        .get("rate_limits")
+        .or_else(|| payload.get("rateLimits"))
+        .or_else(|| {
+            let info = payload.get("info")?;
+            info.get("rate_limits").or_else(|| info.get("rateLimits"))
+        });
     let Some(limits) = limits else { return };
 
     for key in ["primary", "secondary"] {
@@ -541,6 +547,8 @@ fn quota_window_usage(snapshots: &[QuotaSnapshot]) -> SessionQuotaWindowUsage {
         observed_end_at: last
             .timestamp
             .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        observed_start_percent: first.used_percent,
+        observed_end_percent: last.used_percent,
         observed_delta_percent,
         below_resolution: observed_delta_percent.round() == 0.0,
     }
@@ -1432,6 +1440,10 @@ mod tests {
         assert_eq!(quota.session.weekly.len(), 1);
         assert_eq!(quota.session.five_hour[0].observed_delta_percent, 3.0);
         assert_eq!(quota.session.weekly[0].observed_delta_percent, 1.0);
+        assert_eq!(quota.session.five_hour[0].observed_start_percent, 10.0);
+        assert_eq!(quota.session.five_hour[0].observed_end_percent, 13.0);
+        assert_eq!(quota.session.weekly[0].observed_start_percent, 20.0);
+        assert_eq!(quota.session.weekly[0].observed_end_percent, 21.0);
         assert_eq!(quota.session.five_hour[0].window_minutes, 300);
     }
 
@@ -1602,18 +1614,17 @@ mod tests {
             "type": "event_msg",
             "payload": {
                 "type": "token_count",
-                "info": {
-                    "rate_limits": {
-                        "primary": {
-                            "used_percent": five_hour,
-                            "window_minutes": 300,
-                            "resets_at": resets_at
-                        },
-                        "secondary": {
-                            "used_percent": weekly,
-                            "window_minutes": 10080,
-                            "resets_at": resets_at + 100
-                        }
+                "info": {},
+                "rate_limits": {
+                    "primary": {
+                        "used_percent": five_hour,
+                        "window_minutes": 300,
+                        "resets_at": resets_at
+                    },
+                    "secondary": {
+                        "used_percent": weekly,
+                        "window_minutes": 10080,
+                        "resets_at": resets_at + 100
                     }
                 }
             }

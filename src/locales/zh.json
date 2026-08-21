@@ -449,9 +449,12 @@
     "five_hour": "5h",
     "weekly": "周",
     "approx": "约",
-    "aria_label": "估算的 5 小时及每周限额消耗",
+    "usage_and_remaining": "{{usage}} · 剩 {{remaining}}",
+    "used_and_remaining_change": "使用了 {{usage}} • {{remaining}}",
+    "aria_label": "估算的 5 小时及每周限额使用度与剩余额度",
+    "usage_label": "{{window}} 使用度 {{usage}}，剩余额度 {{remaining}}",
     "resets": "重置时间：{{value}}",
-    "caveat": "根据日志中的整数快照估算。取整及同时运行的其他 Codex 会话可能影响归因；跨重置周期分别展示。"
+    "caveat": "列表显示最近一次观测快照时的剩余额度。数值根据日志中的整数快照估算；跨重置周期分别展示。"
   },
   "detail": {
       "modal_title": "会话详情",

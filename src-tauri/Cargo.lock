@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "codex-usage-desktop"
-version = "2.2.1"
+version = "2.3.2"
 dependencies = [
  "chrono",
  "chrono-tz",

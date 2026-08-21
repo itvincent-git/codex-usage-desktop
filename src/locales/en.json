@@ -449,9 +449,12 @@
     "five_hour": "5h",
     "weekly": "Weekly",
     "approx": "Approx.",
-    "aria_label": "Estimated 5-hour and weekly quota usage",
+    "usage_and_remaining": "{{usage}} · {{remaining}} left",
+    "used_and_remaining_change": "Used {{usage}} • {{remaining}}",
+    "aria_label": "Estimated 5-hour and weekly quota usage and remaining quota",
+    "usage_label": "{{window}} usage {{usage}}, remaining {{remaining}}",
     "resets": "Reset: {{value}}",
-    "caveat": "Estimated from integer log snapshots. Rounding and other concurrent Codex sessions can affect attribution. Each reset window is shown separately."
+    "caveat": "The list shows quota remaining at the latest observed snapshot. Values are estimated from integer log snapshots; each reset window is shown separately."
   },
   "detail": {
       "modal_title": "Session Details",
