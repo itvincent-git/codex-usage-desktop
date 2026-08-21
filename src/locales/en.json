@@ -445,6 +445,7 @@
     "weekly": "Weekly",
     "approx": "Approx.",
     "aria_label": "Estimated 5-hour and weekly quota usage",
+    "usage_label": "{{window}} usage {{value}}",
     "resets": "Reset: {{value}}",
     "caveat": "Estimated from integer log snapshots. Rounding and other concurrent Codex sessions can affect attribution. Each reset window is shown separately."
   },

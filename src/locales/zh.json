@@ -445,6 +445,7 @@
     "weekly": "周",
     "approx": "约",
     "aria_label": "估算的 5 小时及每周限额消耗",
+    "usage_label": "{{window}} 使用度 {{value}}",
     "resets": "重置时间：{{value}}",
     "caveat": "根据日志中的整数快照估算。取整及同时运行的其他 Codex 会话可能影响归因；跨重置周期分别展示。"
   },

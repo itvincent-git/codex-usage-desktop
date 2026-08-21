@@ -48,7 +48,7 @@ function session(overrides: Partial<SessionDetailRow>): SessionDetailRow {
 }
 
 describe("session daily usage", () => {
-  it("shows daily quota windows, low-resolution values, multiple resets, and unavailable data", () => {
+  it("shows quota color scales, low-resolution values, and multiple resets", () => {
     const window = (delta: number, belowResolution = false) => ({
       windowMinutes: 300,
       resetsAt: "2026-07-15T13:00:00Z",
@@ -70,14 +70,17 @@ describe("session daily usage", () => {
         costUSD: 0.001,
         models: ["gpt-5"],
         projects: ["/repo/app"],
-        quotaUsage: { fiveHour: [window(2), window(0, true)], weekly: [] },
+        quotaUsage: { fiveHour: [window(2), window(0, true)], weekly: [window(75)] },
       }],
     })]} />);
 
     const card = screen.getByText("Quota session").closest("article")!;
     expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. +2% / <1%");
-    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("--");
+    expect(within(card).getByText("Weekly").parentElement).toHaveTextContent("Approx. +75%");
     expect(card).not.toHaveTextContent("99%");
+    expect(within(card).getByRole("img", { name: "5h usage Approx. +2%" })).toHaveAttribute("data-quota-tone", "low");
+    expect(within(card).getByRole("img", { name: "5h usage <1%" })).toHaveAttribute("data-quota-tone", "low");
+    expect(within(card).getByRole("img", { name: "Weekly usage Approx. +75%" })).toHaveAttribute("data-quota-tone", "high");
     expect(within(card).getByLabelText("Estimated 5-hour and weekly quota usage")).toHaveAttribute("title", expect.stringContaining("concurrent"));
   });
 
@@ -312,6 +315,10 @@ describe("session titles", () => {
     expect(within(larger).getByTestId("token-total")).toHaveTextContent("200");
     expect(within(smaller).getByTestId("session-cost")).toHaveTextContent("$0.001");
     expect(within(larger).getByTestId("session-cost")).toHaveTextContent("$0.004");
+    expect(within(smaller).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "50%" });
+    expect(within(larger).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "100%" });
+    expect(within(smaller).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "low");
+    expect(within(larger).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "high");
     expect(within(smaller).getByRole("img", { name: /Token breakdown: 40 non-cached input, 20 cached input, 40 output, 100 total$/ })).toBeInTheDocument();
   });
 
@@ -504,7 +511,7 @@ describe("session titles", () => {
     expect(within(card).getByText("No activity")).toBeInTheDocument();
   });
 
-  it("keeps model names and costs visible without decorative badges", () => {
+  it("adds stable model colors and relative cost tones", () => {
     const costSession = (threadName: string, path: string, costUSD: number, model: string) => session({
       threadName,
       path,
@@ -525,7 +532,14 @@ describe("session titles", () => {
     expect(within(card("Low")).getByTestId("session-cost")).toHaveTextContent("$0.001");
     expect(within(card("Medium")).getByTestId("session-cost")).toHaveTextContent("$0.002");
     expect(within(card("High")).getByTestId("session-cost")).toHaveTextContent("$0.003");
-    expect(screen.getAllByText("shared-model", { selector: "article span" })).toHaveLength(2);
+    expect(within(card("Zero")).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "zero");
+    expect(within(card("Low")).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "low");
+    expect(within(card("Medium")).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "medium");
+    expect(within(card("High")).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "high");
+    const sharedModels = screen.getAllByText("shared-model", { selector: "article span" });
+    expect(sharedModels).toHaveLength(2);
+    expect(sharedModels[0]).toHaveAttribute("data-model-tone", sharedModels[1].getAttribute("data-model-tone"));
+    expect(sharedModels[0]).toHaveClass("rounded-full", "border");
   });
 
   it("filters project sessions by summary name", async () => {

@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
-import { formatCompactNumber, formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Terminal, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { modelTone } from "@/lib/model-tone";
 import { SessionQuotaUsageView } from "./session-quota-usage";
 
 type SessionDisplayRow = SessionDetailRow & {
@@ -45,6 +46,37 @@ function formatDateHeader(dateStr: string) {
   } catch (e) {
     return dateStr;
   }
+}
+
+function costTone(cost: number, maxCost: number) {
+  if (cost <= 0 || maxCost <= 0) {
+    return {
+      name: "zero",
+      className: "border-border/60 bg-muted/50 text-muted-foreground",
+      fillClassName: "bg-muted-foreground/10",
+    };
+  }
+
+  const relativeCost = cost / maxCost;
+  if (relativeCost <= 1 / 3) {
+    return {
+      name: "low",
+      className: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+      fillClassName: "bg-emerald-500/20",
+    };
+  }
+  if (relativeCost <= 2 / 3) {
+    return {
+      name: "medium",
+      className: "border-amber-500/25 bg-amber-500/5 text-amber-700 dark:text-amber-300",
+      fillClassName: "bg-amber-500/20",
+    };
+  }
+  return {
+    name: "high",
+    className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
+    fillClassName: "bg-rose-500/20",
+  };
 }
 
 export function SessionUsageTable({
@@ -141,6 +173,19 @@ export function SessionUsageTable({
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
+  const sessionScale = useMemo(
+    () => groups.reduce(
+      (maxima, group) => group.sessions.reduce(
+        (groupMaxima, session) => ({
+          tokens: Math.max(groupMaxima.tokens, session.totalTokens),
+          cost: Math.max(groupMaxima.cost, session.costUSD),
+        }),
+        maxima,
+      ),
+      { tokens: 0, cost: 0 },
+    ),
+    [groups],
+  );
   const toggleDate = (date: string) => {
     setCollapsedDates((prev) => ({
       ...prev,
@@ -340,6 +385,9 @@ export function SessionUsageTable({
                     const shownModels = session.models.slice(0, 3);
                     const projectOverflow = session.projects.length - shownProjects.length;
                     const modelOverflow = session.models.length - shownModels.length;
+                    const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
+                    const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
+                    const cost = costTone(session.costUSD, sessionScale.cost);
                     const tokenLabel = isInactive
                       ? t("sessions.token_bar_empty")
                       : t("sessions.token_bar_label", {
@@ -348,6 +396,14 @@ export function SessionUsageTable({
                           output: formatNumber(session.outputTokens),
                           total: formatNumber(session.totalTokens),
                         });
+                    const tokenTotalLabel = t("sessions.token_total_label", {
+                      total: formatNumber(session.totalTokens),
+                      percent: formatPercent(tokenRatio),
+                    });
+                    const costLabel = t("sessions.cost_pill_label", {
+                      cost: formatCurrency(session.costUSD),
+                      percent: formatPercent(costRatio),
+                    });
 
                     return (
                       <article
@@ -388,11 +444,19 @@ export function SessionUsageTable({
                             {shownModels.length > 0 ? <span aria-hidden="true">·</span> : null}
                             {shownModels.length > 0 ? (
                               <span className="flex min-w-0 items-center gap-1 overflow-hidden" title={session.models.join(", ")}>
-                                {shownModels.map((model) => (
-                                  <span key={model} className="whitespace-nowrap">
-                                    {model}
-                                  </span>
-                                ))}
+                                {shownModels.map((model) => {
+                                  const tone = modelTone(model);
+                                  return (
+                                    <span
+                                      key={model}
+                                      data-model={model}
+                                      data-model-tone={tone.index}
+                                      className={`whitespace-nowrap rounded-full border px-1.5 py-px text-[9px] font-semibold ${tone.className}`}
+                                    >
+                                      {model}
+                                    </span>
+                                  );
+                                })}
                                 {modelOverflow > 0 ? <span className="whitespace-nowrap">+{modelOverflow}</span> : null}
                               </span>
                             ) : null}
@@ -402,11 +466,23 @@ export function SessionUsageTable({
                         </div>
 
                         <div className="session-card-tokens min-w-0 space-y-1.5">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-base font-bold tabular-nums tracking-tight text-foreground" data-testid="token-total">
-                              {formatSessionTokenCount(session.totalTokens)}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-medium text-muted-foreground">{t("sessions.total_tokens")}</span>
+                            <span
+                              className="relative isolate inline-flex min-w-[6.5rem] overflow-hidden rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-sm font-bold tabular-nums tracking-tight text-foreground"
+                              role="img"
+                              aria-label={tokenTotalLabel}
+                              data-testid="token-total"
+                            >
+                              {tokenRatio > 0 ? (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-0 left-0 -z-10 bg-primary/20"
+                                  style={{ width: `${tokenRatio * 100}%`, minWidth: 2 }}
+                                />
+                              ) : null}
+                              <span className="relative ml-auto">{formatSessionTokenCount(session.totalTokens)}</span>
                             </span>
-                            <span className="text-[10px] font-medium text-muted-foreground">{t("common.tokens")}</span>
                           </div>
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.input_including_cache")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.inputTokens)}</strong></span>
@@ -416,7 +492,22 @@ export function SessionUsageTable({
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.outputTokens)}</strong></span>
                             <span aria-hidden="true">·</span>
-                            <span className="font-semibold text-foreground" data-testid="session-cost">{formatCurrency(session.costUSD)}</span>
+                            <span
+                              role="img"
+                              aria-label={costLabel}
+                              data-cost-tone={cost.name}
+                              data-testid="session-cost"
+                              className={`relative isolate inline-flex min-w-[4.5rem] overflow-hidden rounded-full border px-1.5 py-px font-semibold ${cost.className}`}
+                            >
+                              {costRatio > 0 ? (
+                                <span
+                                  aria-hidden="true"
+                                  className={`absolute inset-y-0 left-0 -z-10 ${cost.fillClassName}`}
+                                  style={{ width: `${costRatio * 100}%`, minWidth: 2 }}
+                                />
+                              ) : null}
+                              <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
+                            </span>
                           </div>
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (

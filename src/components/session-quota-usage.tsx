@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Clock3 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { SessionQuotaUsage, SessionQuotaWindowUsage } from "@/lib/api";
@@ -17,6 +18,35 @@ function formatTime(value: string, locale: string) {
   return new Date(value).toLocaleString(locale);
 }
 
+function quotaTone(percent: number, belowResolution: boolean) {
+  if (percent <= 0 && !belowResolution) {
+    return {
+      name: "zero",
+      className: "border-border/60 bg-muted/50 text-muted-foreground",
+      fillClassName: "bg-muted-foreground/10",
+    };
+  }
+  if (percent <= 33) {
+    return {
+      name: "low",
+      className: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+      fillClassName: "bg-emerald-500/20",
+    };
+  }
+  if (percent <= 66) {
+    return {
+      name: "medium",
+      className: "border-amber-500/25 bg-amber-500/5 text-amber-700 dark:text-amber-300",
+      fillClassName: "bg-amber-500/20",
+    };
+  }
+  return {
+    name: "high",
+    className: "border-rose-500/25 bg-rose-500/5 text-rose-700 dark:text-rose-300",
+    fillClassName: "bg-rose-500/20",
+  };
+}
+
 export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaUsageProps) {
   const { t, i18n } = useTranslation();
   const groups = [
@@ -31,11 +61,33 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
         {groups.map((group) => (
           <div key={group.key} className="grid grid-cols-[auto_1fr] gap-x-2">
             <span className="font-semibold text-muted-foreground">{group.label}</span>
-            <span className="min-w-0 text-right font-semibold text-foreground">
-              {group.windows.length > 0
-                ? group.windows.map((window) => formatDelta(window, t("sessions.quota.approx"))).join(" / ")
-                : "--"}
-            </span>
+            {group.windows.length > 0 ? (
+              <span className="flex min-w-0 items-center justify-end gap-1 font-semibold">
+                {group.windows.map((window, index) => {
+                  const tone = quotaTone(window.observedDeltaPercent, window.belowResolution);
+                  const value = formatDelta(window, t("sessions.quota.approx"));
+                  const fillPercent = Math.min(Math.max(window.observedDeltaPercent, 0), 100);
+                  return (
+                    <Fragment key={`${window.observedStartAt}-${index}`}>
+                      {index > 0 ? <span className="text-muted-foreground">/</span> : null}
+                      <span
+                        role="img"
+                        aria-label={t("sessions.quota.usage_label", { window: group.label, value })}
+                        data-quota-tone={tone.name}
+                        className={`relative isolate inline-flex min-w-[3rem] justify-end overflow-hidden rounded border px-1 py-px ${tone.className}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`absolute inset-y-0 left-0 -z-10 ${tone.fillClassName}`}
+                          style={{ width: `${fillPercent}%`, minWidth: window.belowResolution || fillPercent > 0 ? 2 : undefined }}
+                        />
+                        <span className="relative whitespace-nowrap">{value}</span>
+                      </span>
+                    </Fragment>
+                  );
+                })}
+              </span>
+            ) : <span className="min-w-0 text-right font-semibold text-muted-foreground">--</span>}
           </div>
         ))}
       </div>
