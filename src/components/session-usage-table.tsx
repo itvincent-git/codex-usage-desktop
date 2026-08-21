@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
+import { Bot, Terminal, FileText, Folder, ChevronDown, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,11 @@ import { SessionQuotaUsageView } from "./session-quota-usage";
 type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
   originalSession: SessionDetailRow;
+};
+
+type SessionFamily = {
+  parent: SessionDisplayRow;
+  children: SessionDisplayRow[];
 };
 
 type SessionUsageTableProps = {
@@ -32,6 +37,48 @@ function formatBytes(bytes: number) {
 
 function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
+}
+
+function humanizeAgentValue(value: string) {
+  return value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function agentSessionTitle(session: SessionDisplayRow) {
+  const pathName = session.agentPath?.split("/").filter(Boolean).at(-1);
+  return pathName ? humanizeAgentValue(pathName) : session.threadName || cleanSessionId(session.sessionId);
+}
+
+function groupSessionFamilies(
+  rows: SessionDisplayRow[],
+  sessionsByThreadId: Map<string, SessionDetailRow>,
+): SessionFamily[] {
+  const rowsByThreadId = new Map(
+    rows.flatMap((session) => session.threadId ? [[session.threadId, session] as const] : []),
+  );
+  const childrenByParentPath = new Map<string, SessionDisplayRow[]>();
+  const childPaths = new Set<string>();
+
+  for (const session of rows) {
+    let parentThreadId = session.parentThreadId;
+    let visibleParent: SessionDisplayRow | undefined;
+    const visited = new Set<string>();
+
+    while (parentThreadId && !visited.has(parentThreadId)) {
+      visited.add(parentThreadId);
+      visibleParent = rowsByThreadId.get(parentThreadId) ?? visibleParent;
+      parentThreadId = sessionsByThreadId.get(parentThreadId)?.parentThreadId;
+    }
+
+    if (!visibleParent || visibleParent.path === session.path) continue;
+    const children = childrenByParentPath.get(visibleParent.path) ?? [];
+    children.push(session);
+    childrenByParentPath.set(visibleParent.path, children);
+    childPaths.add(session.path);
+  }
+
+  return rows
+    .filter((session) => !childPaths.has(session.path))
+    .map((parent) => ({ parent, children: childrenByParentPath.get(parent.path) ?? [] }));
 }
 
 function formatDateHeader(dateStr: string) {
@@ -83,6 +130,7 @@ export function SessionUsageTable({
   const { t } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+  const [expandedAgentGroups, setExpandedAgentGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (initialExpandedDate) {
@@ -118,6 +166,11 @@ export function SessionUsageTable({
     }));
   }), [sessions]);
 
+  const sessionsByThreadId = useMemo(
+    () => new Map(sessions.flatMap((session) => session.threadId ? [[session.threadId, session] as const] : [])),
+    [sessions],
+  );
+
   // Group and sort session-day rows using the scanner's application-timezone dates.
   const groups = useMemo(() => {
     const map: Record<string, SessionDisplayRow[]> = {};
@@ -149,6 +202,7 @@ export function SessionUsageTable({
         return {
           date,
           sessions: sortedItems,
+          sessionFamilies: groupSessionFamilies(sortedItems, sessionsByThreadId),
           totalTokens,
           inputTokens,
           cachedInputTokens,
@@ -158,7 +212,7 @@ export function SessionUsageTable({
           projects,
         };
       });
-  }, [displaySessions, selectedProject]);
+  }, [displaySessions, selectedProject, sessionsByThreadId]);
 
   const filteredCount = useMemo(() => {
     if (!selectedProject) return displaySessions.length;
@@ -367,7 +421,26 @@ export function SessionUsageTable({
               {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
                 <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
-                  {group.sessions.map((session) => {
+                  {group.sessionFamilies.flatMap(({ parent, children }) => {
+                    const groupKey = `${group.date}:${parent.path}`;
+                    const expanded = expandedAgentGroups[groupKey] ?? false;
+                    return [
+                      {
+                        session: parent,
+                        isSubagent: Boolean(parent.parentThreadId),
+                        childCount: children.length,
+                        groupKey,
+                        expanded,
+                      },
+                      ...(expanded ? children.map((session) => ({
+                        session,
+                        isSubagent: true,
+                        childCount: 0,
+                        groupKey,
+                        expanded: false,
+                      })) : []),
+                    ];
+                  }).map(({ session, isSubagent, childCount, groupKey, expanded }) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
                     const cacheHitRate = session.inputTokens > 0 ? session.cachedInputTokens / session.inputTokens : 0;
@@ -376,7 +449,13 @@ export function SessionUsageTable({
                       hour: "2-digit",
                       minute: "2-digit",
                     });
-                    const title = session.threadName || cleanSessionId(session.sessionId);
+                    const title = isSubagent
+                      ? agentSessionTitle(session)
+                      : session.threadName || cleanSessionId(session.sessionId);
+                    const subagentSummary = isSubagent && session.threadName !== title
+                      ? session.threadName
+                      : null;
+                    const agentRole = session.agentRole ? humanizeAgentValue(session.agentRole) : null;
                     const shownProjects = session.projects.slice(0, 2);
                     const shownModels = session.models.slice(0, 3);
                     const projectOverflow = session.projects.length - shownProjects.length;
@@ -402,8 +481,12 @@ export function SessionUsageTable({
                     });
 
                     return (
-                      <article
+                      <div
                         key={session.path}
+                        className={isSubagent ? "relative ml-5 border-l border-primary/25 pl-4 sm:ml-7" : "space-y-1.5"}
+                        data-testid={isSubagent ? "subagent-session-row" : undefined}
+                      >
+                      <article
                         tabIndex={onSessionClick ? 0 : undefined}
                         role={onSessionClick ? "button" : undefined}
                         aria-label={onSessionClick ? t("sessions.open_session", { title }) : undefined}
@@ -416,7 +499,7 @@ export function SessionUsageTable({
                             onSessionClick(session.originalSession);
                           }
                         }}
-                        className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
+                        className={`session-usage-card rounded-lg border px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${isSubagent ? "border-primary/20 bg-primary/[0.035]" : "border-border/50 bg-card/70"} ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
                         <div className="session-card-time border-r border-border/40 pr-3" title={fullTime}>
                           <div className="text-base font-bold tabular-nums tracking-tight text-foreground">{formattedTime}</div>
@@ -427,9 +510,28 @@ export function SessionUsageTable({
 
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
-                            <FileText className="h-3.5 w-3.5 flex-none text-muted-foreground" />
+                            {isSubagent
+                              ? <Bot className="h-3.5 w-3.5 flex-none text-primary" />
+                              : <FileText className="h-3.5 w-3.5 flex-none text-muted-foreground" />}
                             <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
+                            {isSubagent ? (
+                              <span className="flex-none rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-primary">
+                                {t("sessions.subagent")}
+                              </span>
+                            ) : null}
                           </div>
+                          {subagentSummary ? (
+                            <p className="truncate text-[10px] leading-tight text-muted-foreground" title={subagentSummary}>
+                              {subagentSummary}
+                            </p>
+                          ) : null}
+                          {isSubagent && (session.agentNickname || agentRole) ? (
+                            <div className="flex min-w-0 items-center gap-1 text-[9px] text-muted-foreground">
+                              {session.agentNickname ? <span className="truncate font-semibold text-foreground/80">{session.agentNickname}</span> : null}
+                              {session.agentNickname && agentRole ? <span aria-hidden="true">·</span> : null}
+                              {agentRole ? <span className="truncate">{agentRole}</span> : null}
+                            </div>
+                          ) : null}
                           <div className="flex min-w-0 flex-wrap items-center gap-1" title={session.projects.join("\n")}>
                             {shownProjects.length > 0 ? shownProjects.map((project) => (
                               <span key={project} className="inline-flex max-w-[120px] items-center gap-0.5 rounded border border-border/40 bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground" title={project}>
@@ -518,6 +620,23 @@ export function SessionUsageTable({
                           </div>
                         </div>
                       </article>
+                      {childCount > 0 ? (
+                        <button
+                          type="button"
+                          className="flex min-h-11 w-full items-center gap-2 rounded-md border border-transparent px-3 text-left text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:border-primary/20 hover:bg-primary/5 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70"
+                          aria-expanded={expanded}
+                          aria-label={t(expanded ? "sessions.collapse_subagents" : "sessions.expand_subagents", { count: childCount, title })}
+                          onClick={() => setExpandedAgentGroups((current) => ({
+                            ...current,
+                            [groupKey]: !expanded,
+                          }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 flex-none transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-0" : "-rotate-90"}`} />
+                          <Bot className="h-4 w-4 flex-none text-primary" />
+                          <span>{t("sessions.subagent_sessions", { count: childCount })}</span>
+                        </button>
+                      ) : null}
+                      </div>
                     );
                   })}
                 </div>

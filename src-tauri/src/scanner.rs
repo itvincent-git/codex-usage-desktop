@@ -3,8 +3,8 @@ use crate::{
     date::{date_key_in_timezone, resolve_app_timezone},
     db::{
         delete_missing_daily_rows, delete_missing_session_file_rollups, query_session_file_rollup,
-        record_scan_run, upsert_daily_rows, upsert_session_file_rollups, SessionFileRollup,
-        SessionQuotaRollup,
+        record_scan_run, upsert_daily_rows, upsert_session_file_rollups, SessionAgentMetadata,
+        SessionFileRollup, SessionQuotaRollup,
     },
     pricing::{calculate_cost_usd, PricingSource},
     types::{
@@ -159,7 +159,10 @@ fn load_daily_rows(
             query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
         {
             metrics.files_reused += 1;
-            if rollup.prompt_title.is_none() || rollup.quota_usage.is_none() {
+            if rollup.prompt_title.is_none()
+                || rollup.quota_usage.is_none()
+                || rollup.agent_metadata.is_none()
+            {
                 if backfill_session_metadata(&file.path, timezone, &mut rollup) {
                     changed_rollups.push(rollup.clone());
                 }
@@ -169,7 +172,7 @@ fn load_daily_rows(
         }
 
         let mut events = Vec::new();
-        let (prompt_title, quota_usage) =
+        let (prompt_title, quota_usage, agent_metadata) =
             load_session_file_with_quota(&file.path, &mut events, timezone)?;
         let rows = build_daily_rows(&events, timezone, updated_at, pricing_source);
         metrics.files_parsed += 1;
@@ -181,6 +184,7 @@ fn load_daily_rows(
             rows: rows.clone(),
             prompt_title: Some(prompt_title),
             quota_usage: Some(quota_usage),
+            agent_metadata: Some(agent_metadata),
         });
         all_rows.extend(rows);
     }
@@ -242,20 +246,21 @@ fn modified_at_ms(metadata: &fs::Metadata) -> i64 {
 
 #[cfg(test)]
 fn load_session_file(path: &Path, events: &mut Vec<UsageEvent>) -> Result<String, String> {
-    load_session_file_with_quota(path, events, "UTC").map(|(title, _)| title)
+    load_session_file_with_quota(path, events, "UTC").map(|(title, _, _)| title)
 }
 
 fn load_session_file_with_quota(
     path: &Path,
     events: &mut Vec<UsageEvent>,
     timezone: &str,
-) -> Result<(String, SessionQuotaRollup), String> {
+) -> Result<(String, SessionQuotaRollup, SessionAgentMetadata), String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
     let mut previous_totals: Option<RawUsage> = None;
     let mut current_model: Option<String> = None;
     let mut current_model_is_fallback = false;
     let mut current_project_path: Option<String> = None;
     let mut prompt_title = None;
+    let mut agent_metadata = None;
     let mut quota_snapshots = Vec::new();
 
     for line in content.lines() {
@@ -274,6 +279,9 @@ fn load_session_file_with_quota(
 
         let entry_type = entry.get("type").and_then(Value::as_str);
         if entry_type == Some("session_meta") {
+            if agent_metadata.is_none() {
+                agent_metadata = Some(session_agent_metadata_from_entry(&entry));
+            }
             current_project_path =
                 extract_project_path(entry.get("payload").unwrap_or(&Value::Null));
             continue;
@@ -370,17 +378,21 @@ fn load_session_file_with_quota(
     Ok((
         prompt_title.unwrap_or_default(),
         build_quota_rollup(&quota_snapshots, timezone),
+        agent_metadata.unwrap_or_default(),
     ))
 }
 
 fn backfill_session_metadata(path: &Path, timezone: &str, rollup: &mut SessionFileRollup) -> bool {
     match load_session_file_with_quota(path, &mut Vec::new(), timezone) {
-        Ok((title, quota_usage)) => {
+        Ok((title, quota_usage, agent_metadata)) => {
             if rollup.prompt_title.is_none() {
                 rollup.prompt_title = Some(title);
             }
             if rollup.quota_usage.is_none() {
                 rollup.quota_usage = Some(quota_usage);
+            }
+            if rollup.agent_metadata.is_none() {
+                rollup.agent_metadata = Some(agent_metadata);
             }
             true
         }
@@ -568,6 +580,22 @@ fn prompt_title_from_entry(entry: &Value) -> Option<String> {
             .and_then(Value::as_str)
             .and_then(normalize_prompt_title)
     })
+}
+
+fn session_agent_metadata_from_entry(entry: &Value) -> SessionAgentMetadata {
+    let payload = entry.get("payload").unwrap_or(&Value::Null);
+    let thread_spawn = payload
+        .get("source")
+        .and_then(|source| source.get("subagent"))
+        .and_then(|subagent| subagent.get("thread_spawn"));
+
+    SessionAgentMetadata {
+        thread_id: string_field(payload, "id"),
+        parent_thread_id: thread_spawn.and_then(|spawn| string_field(spawn, "parent_thread_id")),
+        agent_path: thread_spawn.and_then(|spawn| string_field(spawn, "agent_path")),
+        agent_nickname: thread_spawn.and_then(|spawn| string_field(spawn, "agent_nickname")),
+        agent_role: thread_spawn.and_then(|spawn| string_field(spawn, "agent_role")),
+    }
 }
 
 fn normalize_prompt_title(message: &str) -> Option<String> {
@@ -1064,6 +1092,37 @@ mod tests {
     }
 
     #[test]
+    fn extracts_subagent_parentage_from_session_metadata() {
+        let entry = serde_json::json!({
+            "type": "session_meta",
+            "payload": {
+                "id": "child-thread",
+                "source": {
+                    "subagent": {
+                        "thread_spawn": {
+                            "parent_thread_id": "parent-thread",
+                            "agent_path": "/root/inspect_sidebar",
+                            "agent_nickname": "Ada",
+                            "agent_role": "explorer"
+                        }
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            session_agent_metadata_from_entry(&entry),
+            SessionAgentMetadata {
+                thread_id: Some("child-thread".to_string()),
+                parent_thread_id: Some("parent-thread".to_string()),
+                agent_path: Some("/root/inspect_sidebar".to_string()),
+                agent_nickname: Some("Ada".to_string()),
+                agent_role: Some("explorer".to_string()),
+            }
+        );
+    }
+
+    #[test]
     fn normalizes_truncates_and_marks_missing_prompt_titles() {
         assert_eq!(
             normalize_prompt_title("  first\n\tsecond   third  ").as_deref(),
@@ -1129,7 +1188,7 @@ mod tests {
         )
         .unwrap();
         db.execute(
-            "UPDATE session_file_rollups SET prompt_title = NULL, quota_usage_json = NULL, updated_at = 'legacy'",
+            "UPDATE session_file_rollups SET prompt_title = NULL, quota_usage_json = NULL, agent_metadata_json = NULL, updated_at = 'legacy'",
             [],
         )
         .unwrap();
@@ -1156,6 +1215,14 @@ mod tests {
             )
             .unwrap();
         assert!(has_quota_usage);
+        let has_agent_metadata: bool = db
+            .query_row(
+                "SELECT agent_metadata_json IS NOT NULL FROM session_file_rollups WHERE path = ?",
+                [&session_path.to_string_lossy().as_ref()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(has_agent_metadata);
         assert_eq!(record.rows[0].total_tokens, 1300);
 
         let unchanged = load_daily_rows(
@@ -1232,6 +1299,7 @@ mod tests {
                     rows: vec![cached_row],
                     prompt_title: None,
                     quota_usage: None,
+                    agent_metadata: None,
                 },
                 SessionFileRollup {
                     path: valid_path.to_string_lossy().to_string(),
@@ -1240,6 +1308,7 @@ mod tests {
                     rows: vec![],
                     prompt_title: None,
                     quota_usage: None,
+                    agent_metadata: None,
                 },
             ],
             "legacy",
@@ -1357,7 +1426,7 @@ mod tests {
         )
         .unwrap();
 
-        let (_, quota) = load_session_file_with_quota(&path, &mut Vec::new(), "UTC").unwrap();
+        let (_, quota, _) = load_session_file_with_quota(&path, &mut Vec::new(), "UTC").unwrap();
 
         assert_eq!(quota.session.five_hour.len(), 1);
         assert_eq!(quota.session.weekly.len(), 1);

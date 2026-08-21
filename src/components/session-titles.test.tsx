@@ -188,6 +188,63 @@ describe("session daily usage", () => {
 });
 
 describe("session titles", () => {
+  it("keeps nested subagent sessions collapsed under their main session and shows distinct agent identities", async () => {
+    const user = userEvent.setup();
+    const onSessionClick = vi.fn();
+    const main = session({
+      path: "/tmp/main.jsonl",
+      sessionId: "main.jsonl",
+      threadId: "main-thread",
+      threadName: "Main session",
+    });
+    const explorer = session({
+      path: "/tmp/explorer.jsonl",
+      sessionId: "explorer.jsonl",
+      threadId: "explorer-thread",
+      parentThreadId: "main-thread",
+      threadName: "Inspect how titles are rendered",
+      agentPath: "/root/investigate_titles",
+      agentNickname: "Ada",
+      agentRole: "code_explorer",
+    });
+    const worker = session({
+      path: "/tmp/worker.jsonl",
+      sessionId: "worker.jsonl",
+      threadId: "worker-thread",
+      parentThreadId: "explorer-thread",
+      threadName: "Implement the session grouping",
+      agentPath: "/root/fix_sidebar",
+      agentNickname: "Grace",
+      agentRole: "worker",
+    });
+
+    render(
+      <SessionUsageTable
+        sessions={[main, explorer, worker]}
+        onSessionClick={onSessionClick}
+      />,
+    );
+
+    expect(screen.getByText("Main session")).toBeInTheDocument();
+    expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Expand 2 subagent sessions under Main session" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("investigate titles")).toBeInTheDocument();
+    expect(screen.getByText("fix sidebar")).toBeInTheDocument();
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+    expect(screen.getByText("code explorer")).toBeInTheDocument();
+    expect(screen.getAllByText("Subagent")).toHaveLength(2);
+    await user.click(screen.getByText("fix sidebar").closest("article")!);
+    expect(onSessionClick).toHaveBeenCalledWith(worker);
+
+    await user.click(toggle);
+    expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
+  });
+
   it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {
     render(
       <SessionUsageTable

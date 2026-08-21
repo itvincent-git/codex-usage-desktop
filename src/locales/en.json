@@ -438,6 +438,11 @@
     "token_total_label": "Total tokens {{total}}; {{percent}} of the highest visible session",
     "cost_pill_label": "Cost {{cost}}; {{percent}} of the highest visible session",
   "open_session": "Open session {{title}}",
+  "subagent": "Subagent",
+  "subagent_sessions_one": "1 subagent session",
+  "subagent_sessions_other": "{{count}} subagent sessions",
+  "expand_subagents": "Expand {{count}} subagent sessions under {{title}}",
+  "collapse_subagents": "Collapse {{count}} subagent sessions under {{title}}",
   "quota": {
     "title": "Observed quota usage",
     "estimated": "Estimated",

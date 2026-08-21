@@ -41,6 +41,7 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           rows_json TEXT NOT NULL,
           prompt_title TEXT,
           quota_usage_json TEXT,
+          agent_metadata_json TEXT,
           updated_at TEXT NOT NULL
         );
         "#,
@@ -64,7 +65,23 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "prompt_title",
         "ALTER TABLE session_file_rollups ADD COLUMN prompt_title TEXT",
     )?;
+    ensure_column(
+        &db,
+        "session_file_rollups",
+        "agent_metadata_json",
+        "ALTER TABLE session_file_rollups ADD COLUMN agent_metadata_json TEXT",
+    )?;
     Ok(db)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionAgentMetadata {
+    pub thread_id: Option<String>,
+    pub parent_thread_id: Option<String>,
+    pub agent_path: Option<String>,
+    pub agent_nickname: Option<String>,
+    pub agent_role: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +92,7 @@ pub struct SessionFileRollup {
     pub rows: Vec<DailyUsageRow>,
     pub prompt_title: Option<String>,
     pub quota_usage: Option<SessionQuotaRollup>,
+    pub agent_metadata: Option<SessionAgentMetadata>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -234,7 +252,7 @@ pub fn query_session_file_rollup(
 ) -> Result<Option<SessionFileRollup>, String> {
     let result = db.query_row(
         r#"
-        SELECT rows_json, prompt_title, quota_usage_json
+        SELECT rows_json, prompt_title, quota_usage_json, agent_metadata_json
         FROM session_file_rollups
         WHERE path = ? AND modified_at_ms = ? AND size_bytes = ?
         "#,
@@ -244,14 +262,18 @@ pub fn query_session_file_rollup(
                 row.get::<_, String>(0)?,
                 row.get::<_, Option<String>>(1)?,
                 row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
             ))
         },
     );
 
     match result {
-        Ok((rows_json, prompt_title, quota_usage_json)) => {
+        Ok((rows_json, prompt_title, quota_usage_json, agent_metadata_json)) => {
             let rows = serde_json::from_str(&rows_json).map_err(|error| error.to_string())?;
             let quota_usage = quota_usage_json
+                .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
+                .transpose()?;
+            let agent_metadata = agent_metadata_json
                 .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
                 .transpose()?;
             Ok(Some(SessionFileRollup {
@@ -261,6 +283,7 @@ pub fn query_session_file_rollup(
                 rows,
                 prompt_title,
                 quota_usage,
+                agent_metadata,
             }))
         }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -317,14 +340,16 @@ pub fn upsert_session_file_rollups(
                   rows_json,
                   prompt_title,
                   quota_usage_json,
+                  agent_metadata_json,
                   updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                   modified_at_ms = excluded.modified_at_ms,
                   size_bytes = excluded.size_bytes,
                   rows_json = excluded.rows_json,
                   prompt_title = excluded.prompt_title,
                   quota_usage_json = excluded.quota_usage_json,
+                  agent_metadata_json = excluded.agent_metadata_json,
                   updated_at = excluded.updated_at
                 "#,
             )
@@ -339,6 +364,12 @@ pub fn upsert_session_file_rollups(
                 .map(serde_json::to_string)
                 .transpose()
                 .map_err(|error| error.to_string())?;
+            let agent_metadata_json = rollup
+                .agent_metadata
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .map_err(|error| error.to_string())?;
             statement
                 .execute(params![
                     rollup.path,
@@ -347,6 +378,7 @@ pub fn upsert_session_file_rollups(
                     rows_json,
                     rollup.prompt_title,
                     quota_usage_json,
+                    agent_metadata_json,
                     updated_at
                 ])
                 .map_err(|error| error.to_string())?;
@@ -460,7 +492,8 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
               size_bytes,
               rows_json,
               prompt_title,
-              quota_usage_json
+              quota_usage_json,
+              agent_metadata_json
             FROM session_file_rollups
             ORDER BY modified_at_ms DESC
             "#,
@@ -477,6 +510,10 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
             let quota_usage = row
                 .get::<_, Option<String>>(5)?
                 .and_then(|json| serde_json::from_str::<SessionQuotaRollup>(&json).ok());
+            let agent_metadata = row
+                .get::<_, Option<String>>(6)?
+                .and_then(|json| serde_json::from_str::<SessionAgentMetadata>(&json).ok())
+                .unwrap_or_default();
 
             let daily_rows =
                 serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
@@ -531,6 +568,11 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 path,
                 session_id,
                 thread_name: prompt_title.filter(|title| !title.is_empty()),
+                thread_id: agent_metadata.thread_id,
+                parent_thread_id: agent_metadata.parent_thread_id,
+                agent_path: agent_metadata.agent_path,
+                agent_nickname: agent_metadata.agent_nickname,
+                agent_role: agent_metadata.agent_role,
                 modified_at_ms,
                 size_bytes,
                 input_tokens,
@@ -623,6 +665,16 @@ mod tests {
             .iter()
             .any(|column| column == "quota_usage_json");
         assert!(has_quota_usage_json);
+        let has_agent_metadata_json = db
+            .prepare("PRAGMA table_info(session_file_rollups)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .iter()
+            .any(|column| column == "agent_metadata_json");
+        assert!(has_agent_metadata_json);
         let _ = std::fs::remove_file(path);
     }
 
@@ -643,6 +695,13 @@ mod tests {
                     rows: vec![],
                     prompt_title: Some("First real request".to_string()),
                     quota_usage: None,
+                    agent_metadata: Some(SessionAgentMetadata {
+                        thread_id: Some("child-thread".to_string()),
+                        parent_thread_id: Some("parent-thread".to_string()),
+                        agent_path: Some("/root/inspect_sidebar".to_string()),
+                        agent_nickname: Some("Ada".to_string()),
+                        agent_role: Some("explorer".to_string()),
+                    }),
                 },
                 SessionFileRollup {
                     path: "/tmp/untitled.jsonl".to_string(),
@@ -651,6 +710,7 @@ mod tests {
                     rows: vec![],
                     prompt_title: Some(String::new()),
                     quota_usage: None,
+                    agent_metadata: None,
                 },
             ],
             "2026-07-16T00:00:00.000Z",
@@ -663,6 +723,17 @@ mod tests {
             sessions[0].thread_name.as_deref(),
             Some("First real request")
         );
+        assert_eq!(sessions[0].thread_id.as_deref(), Some("child-thread"));
+        assert_eq!(
+            sessions[0].parent_thread_id.as_deref(),
+            Some("parent-thread")
+        );
+        assert_eq!(
+            sessions[0].agent_path.as_deref(),
+            Some("/root/inspect_sidebar")
+        );
+        assert_eq!(sessions[0].agent_nickname.as_deref(), Some("Ada"));
+        assert_eq!(sessions[0].agent_role.as_deref(), Some("explorer"));
         assert_eq!(sessions[1].thread_name, None);
         let _ = std::fs::remove_file(path);
     }
@@ -708,6 +779,7 @@ mod tests {
                 rows: vec![daily_row("2026-07-01", 1), daily_row("2026-07-02", 2)],
                 prompt_title: None,
                 quota_usage: None,
+                agent_metadata: None,
             }],
             "2026-07-02T00:00:00.000Z",
         )
