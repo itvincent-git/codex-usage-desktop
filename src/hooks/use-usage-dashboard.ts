@@ -362,7 +362,7 @@ export function useUsageDashboard() {
     try {
       await scanAndReloadOverview(startedAt, { force: hasExpiredCodexLimitWindow(codexLimits) });
     } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
+      setError(errorMessage(scanError, "Background refresh failed."));
     }
   });
 
@@ -513,7 +513,7 @@ export function useUsageDashboard() {
 
     const startedAt = performance.now();
     void scanAndReloadOverview(startedAt).catch((scanError: unknown) => {
-      setError(scanError instanceof Error ? scanError.message : "Background refresh failed.");
+      setError(errorMessage(scanError, "Background refresh failed."));
     });
 
     void runBackgroundUpdateCheck();
@@ -807,7 +807,7 @@ export function useUsageDashboard() {
       await scanAndReloadOverview(startedAt, { force: true });
       await loadCodexQuotaForecast();
     } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : "Refresh failed.");
+      setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
       setIsRefreshing(false);
     }

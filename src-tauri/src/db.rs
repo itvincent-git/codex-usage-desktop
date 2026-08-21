@@ -6,7 +6,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 
-const QUOTA_PARSER_VERSION: i64 = 1;
+const QUOTA_PARSER_VERSION: i64 = 2;
 
 pub fn open_database(database_path: &Path) -> Result<Connection, String> {
     let db = Connection::open(database_path).map_err(|error| error.to_string())?;
@@ -655,8 +655,9 @@ mod tests {
               rows_json,
               prompt_title,
               quota_usage_json,
+              quota_parser_version,
               updated_at
-            ) VALUES ('/tmp/legacy-quota.jsonl', 1, 2, '[]', '', '{}', '2026-08-21T00:00:00.000Z')
+            ) VALUES ('/tmp/legacy-quota.jsonl', 1, 2, '[]', '', '{}', 1, '2026-08-21T00:00:00.000Z')
             "#,
             [],
         )
