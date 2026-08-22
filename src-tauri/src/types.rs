@@ -319,6 +319,8 @@ pub struct SessionQuotaWindowUsage {
     pub resets_at: Option<String>,
     pub observed_start_at: String,
     pub observed_end_at: String,
+    pub observed_start_percent: f64,
+    pub observed_end_percent: f64,
     pub observed_delta_percent: f64,
     pub below_resolution: bool,
 }

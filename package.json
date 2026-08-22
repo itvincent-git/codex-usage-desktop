@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-desktop",
-  "version": "2.2.1",
+  "version": "2.3.2",
   "private": true,
   "type": "module",
   "description": "Local-first desktop dashboard for Codex CLI token usage and cost estimates.",
