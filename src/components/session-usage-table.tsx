@@ -17,6 +17,7 @@ type SessionDisplayRow = SessionDetailRow & {
 type SessionFamily = {
   parent: SessionDisplayRow;
   children: SessionDisplayRow[];
+  totalCostUSD: number;
 };
 
 type SessionUsageTableProps = {
@@ -84,7 +85,14 @@ function groupSessionFamilies(
 
   return rows
     .filter((session) => !childPaths.has(session.path))
-    .map((parent) => ({ parent, children: childrenByParentPath.get(parent.path) ?? [] }));
+    .map((parent) => {
+      const children = childrenByParentPath.get(parent.path) ?? [];
+      return {
+        parent,
+        children,
+        totalCostUSD: children.reduce((sum, child) => sum + child.costUSD, parent.costUSD),
+      };
+    });
 }
 
 function formatDateHeader(dateStr: string) {
@@ -237,6 +245,18 @@ export function SessionUsageTable({
         maxima,
       ),
       { tokens: 0, cost: 0 },
+    ),
+    [groups],
+  );
+  const maxFamilyCost = useMemo(
+    () => groups.reduce(
+      (maxCost, group) => group.sessionFamilies.reduce(
+        (familyMax, family) => family.children.length > 0
+          ? Math.max(familyMax, family.totalCostUSD)
+          : familyMax,
+        maxCost,
+      ),
+      0,
     ),
     [groups],
   );
@@ -426,7 +446,7 @@ export function SessionUsageTable({
               {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
                 <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
-                  {group.sessionFamilies.flatMap(({ parent, children }) => {
+                  {group.sessionFamilies.flatMap(({ parent, children, totalCostUSD }) => {
                     const groupKey = `${group.date}:${parent.path}`;
                     const expanded = expandedAgentGroups[groupKey] ?? false;
                     return [
@@ -434,6 +454,7 @@ export function SessionUsageTable({
                         session: parent,
                         isSubagent: Boolean(parent.parentThreadId),
                         childCount: children.length,
+                        familyCostUSD: children.length > 0 ? totalCostUSD : null,
                         groupKey,
                         expanded,
                       },
@@ -441,11 +462,12 @@ export function SessionUsageTable({
                         session,
                         isSubagent: true,
                         childCount: 0,
+                        familyCostUSD: null,
                         groupKey,
                         expanded: false,
                       })) : []),
                     ];
-                  }).map(({ session, isSubagent, childCount, groupKey, expanded }) => {
+                  }).map(({ session, isSubagent, childCount, familyCostUSD, groupKey, expanded }) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
@@ -467,6 +489,10 @@ export function SessionUsageTable({
                     const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
                     const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
                     const cost = costTone(session.costUSD, sessionScale.cost);
+                    const familyCostRatio = familyCostUSD !== null && maxFamilyCost > 0
+                      ? familyCostUSD / maxFamilyCost
+                      : 0;
+                    const familyCost = costTone(familyCostUSD ?? 0, maxFamilyCost);
                     const tokenLabel = isInactive
                       ? t("sessions.token_bar_empty")
                       : t("sessions.token_bar_label", {
@@ -483,6 +509,9 @@ export function SessionUsageTable({
                       cost: formatCurrency(session.costUSD),
                       percent: formatPercent(costRatio),
                     });
+                    const familyCostLabel = familyCostUSD !== null
+                      ? t("sessions.family_cost_pill_label", { cost: formatCurrency(familyCostUSD) })
+                      : "";
 
                     return (
                       <div
@@ -612,6 +641,30 @@ export function SessionUsageTable({
                               ) : null}
                               <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
                             </span>
+                            {familyCostUSD !== null ? (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                  <span className="font-medium text-muted-foreground">{t("sessions.family_cost_prefix")}</span>
+                                  <span
+                                    role="img"
+                                    aria-label={familyCostLabel}
+                                    data-cost-tone={familyCost.name}
+                                    data-testid="session-family-cost"
+                                    className={`relative isolate inline-flex min-w-[4.5rem] overflow-hidden rounded-full border px-1.5 py-px font-semibold ${familyCost.className}`}
+                                  >
+                                    {familyCostRatio > 0 ? (
+                                      <span
+                                        aria-hidden="true"
+                                        className={`absolute inset-y-0 left-0 -z-10 ${familyCost.fillClassName}`}
+                                        style={{ width: `${familyCostRatio * 100}%`, minWidth: 2 }}
+                                      />
+                                    ) : null}
+                                    <span className="relative ml-auto">{formatCurrency(familyCostUSD)}</span>
+                                  </span>
+                                </span>
+                              </>
+                            ) : null}
                           </div>
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (

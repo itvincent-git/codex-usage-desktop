@@ -231,7 +231,13 @@ describe("session titles", () => {
       />,
     );
 
-    expect(screen.getByText("Main session")).toBeInTheDocument();
+    expect(i18n.t("sessions.family_cost_prefix", { lng: "en" })).toBe("All:");
+    expect(i18n.t("sessions.family_cost_prefix", { lng: "zh" })).toBe("总:");
+    const mainCard = screen.getByText("Main session").closest("article")!;
+    expect(within(mainCard).getByTestId("session-cost")).toHaveTextContent("$0.001");
+    expect(within(mainCard).getByText("All:")).toBeInTheDocument();
+    expect(within(mainCard).getByTestId("session-family-cost")).toHaveTextContent("$0.003");
+    expect(within(mainCard).getByRole("img", { name: "Main and subagent session total cost $0.003" })).toBeInTheDocument();
     expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: "Expand 2 subagent sessions under Main session" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -244,6 +250,8 @@ describe("session titles", () => {
     expect(screen.getByText("Ada")).toBeInTheDocument();
     expect(screen.getByText("code explorer")).toBeInTheDocument();
     expect(screen.getAllByText("Subagent")).toHaveLength(2);
+    expect(within(screen.getByText("investigate titles").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
+    expect(within(screen.getByText("fix sidebar").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
     await user.click(screen.getByText("fix sidebar").closest("article")!);
     expect(onSessionClick).toHaveBeenCalledWith(worker);
 

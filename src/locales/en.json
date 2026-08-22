@@ -437,6 +437,8 @@
     "token_bar_empty": "No token activity",
     "token_total_label": "Total tokens {{total}}; {{percent}} of the highest visible session",
     "cost_pill_label": "Cost {{cost}}; {{percent}} of the highest visible session",
+    "family_cost_prefix": "All:",
+    "family_cost_pill_label": "Main and subagent session total cost {{cost}}",
   "open_session": "Open session {{title}}",
   "subagent": "Subagent",
   "subagent_sessions_one": "1 subagent session",

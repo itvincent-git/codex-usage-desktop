@@ -437,6 +437,8 @@
     "token_bar_empty": "无 Token 活动",
     "token_total_label": "Token 总数 {{total}}；相当于当前可见会话最高值的 {{percent}}",
     "cost_pill_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
+    "family_cost_prefix": "总:",
+    "family_cost_pill_label": "主会话及其所有子会话总花费 {{cost}}",
   "open_session": "打开会话 {{title}}",
   "subagent": "子智能体",
   "subagent_sessions_one": "1 个子智能体会话",
