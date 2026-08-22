@@ -486,7 +486,10 @@
       "five_hour": "5時間",
       "weekly": "週間",
       "approx": "概算",
+      "usage_and_remaining": "{{usage}} · 残り {{remaining}}",
+      "used_and_remaining_change": "使用 {{usage}} • 残り {{remaining}}",
       "aria_label": "推定 5 時間および週ごとの割り当て使用量",
+      "usage_label": "{{window}}の使用量 {{usage}}、残り {{remaining}}",
       "resets": "リセット: {{value}}",
       "caveat": "整数ログのスナップショットから推定しています。丸めや同時実行中の他のCodexセッションにより、計上結果が変わる場合があります。リセット期間ごとに個別表示します。"
     },
