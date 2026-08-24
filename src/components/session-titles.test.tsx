@@ -69,17 +69,23 @@ function replayDetail(overrides: Partial<SessionReplayDetail>): SessionReplayDet
 
 describe("session daily usage", () => {
   it("summarizes the 5-hour and weekly quota consumed by every session in a day", () => {
-    const quotaWindow = (delta: number) => ({
+    const quotaWindow = (delta: number, startPercent: number, hour: number) => ({
       windowMinutes: 300,
       resetsAt: "2026-07-15T13:00:00Z",
-      observedStartAt: "2026-07-15T08:00:00Z",
-      observedEndAt: "2026-07-15T09:00:00Z",
-      observedStartPercent: 10,
-      observedEndPercent: 10 + delta,
+      observedStartAt: `2026-07-15T${String(hour).padStart(2, "0")}:00:00Z`,
+      observedEndAt: `2026-07-15T${String(hour + 1).padStart(2, "0")}:00:00Z`,
+      observedStartPercent: startPercent,
+      observedEndPercent: startPercent + delta,
       observedDeltaPercent: delta,
       belowResolution: false,
     });
-    const dailyUsage = (fiveHour: number, weekly: number) => [{
+    const dailyUsage = (
+      fiveHour: number,
+      weekly: number,
+      fiveHourStartPercent: number,
+      weeklyStartPercent: number,
+      hour: number,
+    ) => [{
       date: "2026-07-15",
       inputTokens: 100,
       cachedInputTokens: 20,
@@ -90,20 +96,20 @@ describe("session daily usage", () => {
       models: ["gpt-5"],
       projects: ["/repo/app"],
       quotaUsage: {
-        fiveHour: [quotaWindow(fiveHour)],
-        weekly: [{ ...quotaWindow(weekly), windowMinutes: 10_080 }],
+        fiveHour: [quotaWindow(fiveHour, fiveHourStartPercent, hour)],
+        weekly: [{ ...quotaWindow(weekly, weeklyStartPercent, hour), windowMinutes: 10_080 }],
       },
     }];
 
     render(<SessionUsageTable sessions={[
-      session({ path: "/tmp/first.jsonl", dailyUsage: dailyUsage(2, 1) }),
-      session({ path: "/tmp/second.jsonl", dailyUsage: dailyUsage(3, 4) }),
+      session({ path: "/tmp/first.jsonl", dailyUsage: dailyUsage(2, 1, 10, 30, 8) }),
+      session({ path: "/tmp/second.jsonl", dailyUsage: dailyUsage(3, 4, 12, 31, 9) }),
     ]} />);
 
     const day = document.getElementById("date-group-2026-07-15")!;
     const summary = within(day).getByTestId("day-quota-summary");
-    expect(summary).toHaveTextContent("5h Approx. 5%");
-    expect(summary).toHaveTextContent("Weekly Approx. 5%");
+    expect(summary).toHaveTextContent("5h Used Approx. 5% • 90% → 85%");
+    expect(summary).toHaveTextContent("Weekly Used Approx. 5% • 70% → 65%");
   });
 
   it("shows quota color scales, low-resolution values, and multiple resets", () => {

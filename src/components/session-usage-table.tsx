@@ -83,16 +83,34 @@ function summarizeQuotaUsage(sessions: SessionDisplayRow[], key: "fiveHour" | "w
   let observedDeltaPercent = 0;
   let hasBelowResolutionUsage = false;
   let hasUsage = false;
+  let firstObservedAt: string | null = null;
+  let lastObservedAt: string | null = null;
+  let observedStartPercent: number | null = null;
+  let observedEndPercent: number | null = null;
 
   for (const session of sessions) {
     for (const window of session.quotaUsage?.[key] ?? []) {
       hasUsage = true;
       observedDeltaPercent += window.observedDeltaPercent;
       hasBelowResolutionUsage ||= window.belowResolution;
+      if (firstObservedAt === null || window.observedStartAt < firstObservedAt) {
+        firstObservedAt = window.observedStartAt;
+        observedStartPercent = window.observedStartPercent;
+      }
+      if (lastObservedAt === null || window.observedEndAt > lastObservedAt) {
+        lastObservedAt = window.observedEndAt;
+        observedEndPercent = window.observedEndPercent;
+      }
     }
   }
 
-  return { observedDeltaPercent, hasBelowResolutionUsage, hasUsage };
+  return {
+    observedDeltaPercent,
+    observedStartPercent,
+    observedEndPercent,
+    hasBelowResolutionUsage,
+    hasUsage,
+  };
 }
 
 function formatQuotaTotal(
@@ -102,6 +120,13 @@ function formatQuotaTotal(
   if (!total.hasUsage) return "--";
   if (total.observedDeltaPercent === 0 && total.hasBelowResolutionUsage) return "<1%";
   return `${approximate} ${Math.round(total.observedDeltaPercent)}%`;
+}
+
+function formatQuotaRemainingRange(total: ReturnType<typeof summarizeQuotaUsage>) {
+  if (total.observedStartPercent === null || total.observedEndPercent === null) return "--";
+  const start = Math.min(Math.max(100 - total.observedStartPercent, 0), 100);
+  const end = Math.min(Math.max(100 - total.observedEndPercent, 0), 100);
+  return `${Math.round(start)}% → ${Math.round(end)}%`;
 }
 
 function costTone(cost: number, maxCost: number) {
@@ -343,8 +368,18 @@ export function SessionUsageTable({
           const groupTokenBarWidth = `${Math.max((group.totalTokens / maxGroupTokens) * 100, 6)}%`;
           const groupCostHeat = maxGroupCost > 0 ? group.costUSD / maxGroupCost : 0;
           const groupCostHeatAlpha = 0.08 + groupCostHeat * 0.22;
-          const fiveHourQuota = formatQuotaTotal(group.fiveHourQuota, t("sessions.quota.approx"));
-          const weeklyQuota = formatQuotaTotal(group.weeklyQuota, t("sessions.quota.approx"));
+          const fiveHourQuota = group.fiveHourQuota.hasUsage
+            ? t("sessions.quota.used_and_remaining_change", {
+                usage: formatQuotaTotal(group.fiveHourQuota, t("sessions.quota.approx")),
+                remaining: formatQuotaRemainingRange(group.fiveHourQuota),
+              })
+            : "--";
+          const weeklyQuota = group.weeklyQuota.hasUsage
+            ? t("sessions.quota.used_and_remaining_change", {
+                usage: formatQuotaTotal(group.weeklyQuota, t("sessions.quota.approx")),
+                remaining: formatQuotaRemainingRange(group.weeklyQuota),
+              })
+            : "--";
           const hasQuotaUsage = group.fiveHourQuota.hasUsage || group.weeklyQuota.hasUsage;
 
           return (

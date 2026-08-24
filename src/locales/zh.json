@@ -448,7 +448,7 @@
     "approx": "约",
     "day_consumed": "当天额度消耗",
     "day_usage_label": "当天额度消耗：5 小时 {{fiveHour}}，每周 {{weekly}}",
-    "day_caveat": "汇总当天所有会话中观测到的额度消耗估算值。",
+    "day_caveat": "使用量汇总当天所有会话；余额显示当天最早至最晚的观测快照，期间可能跨额度重置。",
     "usage_and_remaining": "{{usage}} · 剩 {{remaining}}",
     "used_and_remaining_change": "使用了 {{usage}} • {{remaining}}",
     "aria_label": "估算的 5 小时及每周限额使用度与剩余额度",

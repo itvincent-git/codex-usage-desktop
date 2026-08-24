@@ -489,7 +489,7 @@
       "approx": "概算",
       "day_consumed": "1日のクォータ使用量",
       "day_usage_label": "1日のクォータ使用量：5時間 {{fiveHour}}、週間 {{weekly}}",
-      "day_caveat": "この日にすべてのセッションで観測された推定クォータ使用量の合計です。",
+      "day_caveat": "使用量はこの日の全セッションの合計です。残りクォータは最初と最後の観測スナップショットで、リセットをまたぐ場合があります。",
       "usage_and_remaining": "{{usage}} · 残り {{remaining}}",
       "used_and_remaining_change": "使用 {{usage}} • 残り {{remaining}}",
       "aria_label": "推定 5 時間および週ごとの割り当て使用量",

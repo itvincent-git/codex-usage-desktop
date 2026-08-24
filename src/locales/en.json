@@ -448,7 +448,7 @@
     "approx": "Approx.",
     "day_consumed": "Day quota used",
     "day_usage_label": "Day quota used: 5-hour {{fiveHour}}, weekly {{weekly}}",
-    "day_caveat": "Sum of estimated quota use observed across all sessions on this day.",
+    "day_caveat": "Usage is summed across all sessions on this day. Remaining quota shows the earliest and latest observed snapshots and may span a reset.",
     "usage_and_remaining": "{{usage}} · {{remaining}} left",
     "used_and_remaining_change": "Used {{usage}} • {{remaining}}",
     "aria_label": "Estimated 5-hour and weekly quota usage and remaining quota",
