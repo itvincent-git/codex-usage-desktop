@@ -159,7 +159,13 @@ fn load_daily_rows(
             query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
         {
             metrics.files_reused += 1;
-            if rollup.prompt_title.is_none() || rollup.quota_usage.is_none() {
+            if rollup
+                .prompt_title
+                .as_deref()
+                .unwrap_or_default()
+                .is_empty()
+                || rollup.quota_usage.is_none()
+            {
                 if backfill_session_metadata(&file.path, timezone, &mut rollup) {
                     changed_rollups.push(rollup.clone());
                 }
@@ -256,6 +262,7 @@ fn load_session_file_with_quota(
     let mut current_model_is_fallback = false;
     let mut current_project_path: Option<String> = None;
     let mut prompt_title = None;
+    let mut has_turn_context = false;
     let mut quota_snapshots = Vec::new();
 
     for line in content.lines() {
@@ -268,11 +275,14 @@ fn load_session_file_with_quota(
             continue;
         };
 
+        let entry_type = entry.get("type").and_then(Value::as_str);
+        if entry_type == Some("turn_context") {
+            has_turn_context = true;
+        }
         if prompt_title.is_none() {
-            prompt_title = prompt_title_from_entry(&entry);
+            prompt_title = prompt_title_from_entry(&entry, has_turn_context);
         }
 
-        let entry_type = entry.get("type").and_then(Value::as_str);
         if entry_type == Some("session_meta") {
             current_project_path =
                 extract_project_path(entry.get("payload").unwrap_or(&Value::Null));
@@ -376,7 +386,12 @@ fn load_session_file_with_quota(
 fn backfill_session_metadata(path: &Path, timezone: &str, rollup: &mut SessionFileRollup) -> bool {
     match load_session_file_with_quota(path, &mut Vec::new(), timezone) {
         Ok((title, quota_usage)) => {
-            if rollup.prompt_title.is_none() {
+            if rollup
+                .prompt_title
+                .as_deref()
+                .unwrap_or_default()
+                .is_empty()
+            {
                 rollup.prompt_title = Some(title);
             }
             if rollup.quota_usage.is_none() {
@@ -545,6 +560,7 @@ fn quota_window_usage(snapshots: &[QuotaSnapshot]) -> SessionQuotaWindowUsage {
 #[cfg(test)]
 fn load_prompt_title(path: &Path) -> Result<String, String> {
     let file = fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut has_turn_context = false;
     for line in BufReader::new(file).lines() {
         let line = line.map_err(|error| error.to_string())?;
         let trimmed = line.trim();
@@ -554,28 +570,49 @@ fn load_prompt_title(path: &Path) -> Result<String, String> {
         let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
             continue;
         };
-        if let Some(title) = prompt_title_from_entry(&entry) {
+        if entry.get("type").and_then(Value::as_str) == Some("turn_context") {
+            has_turn_context = true;
+        }
+        if let Some(title) = prompt_title_from_entry(&entry, has_turn_context) {
             return Ok(title);
         }
     }
     Ok(String::new())
 }
 
-fn prompt_title_from_entry(entry: &Value) -> Option<String> {
-    if entry.get("type").and_then(Value::as_str) != Some("event_msg") {
-        return None;
-    }
+fn prompt_title_from_entry(entry: &Value, has_turn_context: bool) -> Option<String> {
+    let entry_type = entry.get("type").and_then(Value::as_str)?;
     let payload = entry.get("payload")?;
-    if payload.get("type").and_then(Value::as_str) != Some("user_message") {
+
+    if entry_type == "event_msg"
+        && payload.get("type").and_then(Value::as_str) == Some("user_message")
+    {
+        return ["message", "text"].into_iter().find_map(|field| {
+            payload
+                .get(field)
+                .and_then(Value::as_str)
+                .and_then(normalize_prompt_title)
+        });
+    }
+
+    if entry_type != "response_item"
+        || !has_turn_context
+        || payload.get("type").and_then(Value::as_str) != Some("message")
+        || payload.get("role").and_then(Value::as_str) != Some("user")
+    {
         return None;
     }
 
-    ["message", "text"].into_iter().find_map(|field| {
-        payload
-            .get(field)
-            .and_then(Value::as_str)
-            .and_then(normalize_prompt_title)
-    })
+    payload
+        .get("content")?
+        .as_array()?
+        .iter()
+        .filter(|item| item.get("type").and_then(Value::as_str) == Some("input_text"))
+        .find_map(|item| {
+            item.get("text")
+                .and_then(Value::as_str)
+                .and_then(normalize_prompt_title)
+        })
 }
 
 fn normalize_prompt_title(message: &str) -> Option<String> {
@@ -1066,8 +1103,42 @@ mod tests {
 
         assert_eq!(title, "Build the dashboard 🙂");
         assert_eq!(
-            prompt_title_from_entry(&legacy_text_entry).as_deref(),
+            prompt_title_from_entry(&legacy_text_entry, false).as_deref(),
             Some("Legacy text field")
+        );
+    }
+
+    #[test]
+    fn extracts_response_item_title_after_turn_context() {
+        let temp_dir = tempfile_dir();
+        let path = temp_dir.join("session.jsonl");
+        let raw = [
+            serde_json::json!({
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "AGENTS and environment injection" }]
+                }
+            })
+            .to_string(),
+            serde_json::json!({ "type": "turn_context", "payload": {} }).to_string(),
+            serde_json::json!({
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "  Fix\n the session titles  " }]
+                }
+            })
+            .to_string(),
+        ]
+        .join("\n");
+        fs::write(&path, raw).unwrap();
+
+        assert_eq!(
+            load_session_file(&path, &mut Vec::new()).unwrap(),
+            "Fix the session titles"
         );
     }
 
@@ -1098,7 +1169,7 @@ mod tests {
     }
 
     #[test]
-    fn backfills_legacy_prompt_title_without_reparsing_usage() {
+    fn backfills_empty_prompt_title_without_reparsing_usage() {
         let temp_dir = tempfile_dir();
         let db_path = temp_dir.join("usage.sqlite");
         let mut db = crate::db::open_database(&db_path).unwrap();
@@ -1137,7 +1208,7 @@ mod tests {
         )
         .unwrap();
         db.execute(
-            "UPDATE session_file_rollups SET prompt_title = NULL, quota_usage_json = NULL, updated_at = 'legacy'",
+            "UPDATE session_file_rollups SET prompt_title = '', updated_at = 'legacy'",
             [],
         )
         .unwrap();
