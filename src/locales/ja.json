@@ -479,6 +479,7 @@
     "token_bar_empty": "トークンアクティビティはありません",
     "token_total_label": "合計トークン数 {{total}}。表示中セッションの最大値に対して{{percent}}",
     "cost_pill_label": "コスト {{cost}}。表示中セッションの最大値に対して{{percent}}",
+    "subagent": "サブエージェント",
     "open_session": "セッションを開く {{title}}",
     "quota": {
       "title": "観察されたクォータ使用量",

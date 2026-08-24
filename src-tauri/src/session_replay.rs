@@ -141,10 +141,7 @@ fn build_agent_hierarchy(
     db: &Connection,
     selected_path: &str,
 ) -> Result<Vec<SessionReplayAgent>, String> {
-    let mut agents = query_session_hierarchy_records(db)?
-        .into_iter()
-        .filter_map(read_session_agent)
-        .collect::<Vec<_>>();
+    let mut agents = load_session_agents(db)?;
     let Some(selected) = agents.iter().find(|agent| agent.path == selected_path) else {
         return Ok(Vec::new());
     };
@@ -188,6 +185,13 @@ fn build_agent_hierarchy(
     }
     agents.sort_by(|left, right| left.agent_path.split('/').cmp(right.agent_path.split('/')));
     Ok(agents)
+}
+
+pub fn load_session_agents(db: &Connection) -> Result<Vec<SessionReplayAgent>, String> {
+    Ok(query_session_hierarchy_records(db)?
+        .into_iter()
+        .filter_map(read_session_agent)
+        .collect())
 }
 
 fn read_session_agent(record: SessionHierarchyRecord) -> Option<SessionReplayAgent> {

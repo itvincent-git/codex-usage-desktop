@@ -214,6 +214,42 @@ describe("session daily usage", () => {
 });
 
 describe("session titles", () => {
+  it("orders subagents beneath their parent and shows their hierarchy metadata", () => {
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/child.jsonl",
+        sessionId: "child.jsonl",
+        threadName: "Child task",
+        agentSessionId: "child-id",
+        parentSessionId: "root-id",
+        agentDepth: 1,
+        agentPath: "/root/researcher",
+        agentNickname: "researcher",
+        agentRole: "Research",
+        modifiedAtMs: new Date("2026-07-15T09:00:00Z").getTime(),
+      }),
+      session({
+        path: "/tmp/root.jsonl",
+        sessionId: "root.jsonl",
+        threadName: "Parent task",
+        agentSessionId: "root-id",
+        agentDepth: 0,
+        agentPath: "/root",
+        modifiedAtMs: new Date("2026-07-15T08:00:00Z").getTime(),
+      }),
+    ]} />);
+
+    const cards = screen.getAllByTestId("session-card");
+    expect(cards[0]).toHaveTextContent("Parent task");
+    expect(cards[1]).toHaveTextContent("Child task");
+    expect(cards[1].parentElement).toHaveAttribute("data-agent-depth", "1");
+    expect(within(cards[1]).getByText("Subagent · researcher · Research")).toHaveAttribute(
+      "title",
+      "/root/researcher",
+    );
+    expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
+  });
+
   it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {
     render(
       <SessionUsageTable

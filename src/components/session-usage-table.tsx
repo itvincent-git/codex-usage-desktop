@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Terminal, Folder, ChevronDown, Calendar } from "lucide-react";
+import { Terminal, Folder, ChevronDown, Calendar, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -38,6 +38,37 @@ function formatSessionTokenCount(value: number) {
 
 function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
+}
+
+function orderSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
+  const chronological = [...sessions].sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
+  const byAgentId = new Map(
+    chronological.flatMap((session) => session.agentSessionId ? [[session.agentSessionId, session] as const] : []),
+  );
+  const children = new Map<string, SessionDisplayRow[]>();
+
+  for (const session of chronological) {
+    if (!session.parentSessionId || !byAgentId.has(session.parentSessionId)) continue;
+    const siblings = children.get(session.parentSessionId) ?? [];
+    siblings.push(session);
+    children.set(session.parentSessionId, siblings);
+  }
+
+  const ordered: SessionDisplayRow[] = [];
+  const visited = new Set<SessionDisplayRow>();
+  const visit = (session: SessionDisplayRow) => {
+    if (visited.has(session)) return;
+    visited.add(session);
+    ordered.push(session);
+    if (!session.agentSessionId) return;
+    for (const child of children.get(session.agentSessionId) ?? []) visit(child);
+  };
+
+  for (const session of chronological) {
+    if (!session.parentSessionId || !byAgentId.has(session.parentSessionId)) visit(session);
+  }
+  for (const session of chronological) visit(session);
+  return ordered;
 }
 
 function formatDateHeader(dateStr: string) {
@@ -141,7 +172,7 @@ export function SessionUsageTable({
     return Object.entries(map)
       .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
       .map(([date, items]) => {
-        const sortedItems = items.sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
+        const sortedItems = orderSessionsByAgentHierarchy(items);
         const totalTokens = sortedItems.reduce((sum, item) => sum + item.totalTokens, 0);
         const inputTokens = sortedItems.reduce((sum, item) => sum + item.inputTokens, 0);
         const cachedInputTokens = sortedItems.reduce((sum, item) => sum + item.cachedInputTokens, 0);
@@ -404,10 +435,27 @@ export function SessionUsageTable({
                       cost: formatCurrency(session.costUSD),
                       percent: formatPercent(costRatio),
                     });
+                    const isSubagent = Boolean(session.parentSessionId) || (session.agentDepth ?? 0) > 0;
+                    const hierarchyDepth = Math.min(session.agentDepth ?? (isSubagent ? 1 : 0), 6);
+                    const subagentLabel = [t("sessions.subagent"), session.agentNickname, session.agentRole]
+                      .filter(Boolean)
+                      .join(" · ");
 
                     return (
-                      <article
+                      <div
                         key={session.path}
+                        className="relative"
+                        data-agent-depth={session.agentDepth ?? 0}
+                        style={{ paddingInlineStart: hierarchyDepth ? `${hierarchyDepth * 20}px` : undefined }}
+                      >
+                      {isSubagent ? (
+                        <CornerDownRight
+                          aria-hidden="true"
+                          className="absolute top-3 h-4 w-4 text-indigo-400/70"
+                          style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20}px` }}
+                        />
+                      ) : null}
+                      <article
                         tabIndex={onSessionClick ? 0 : undefined}
                         role={onSessionClick ? "button" : undefined}
                         aria-label={onSessionClick ? t("sessions.open_session", { title }) : undefined}
@@ -424,7 +472,17 @@ export function SessionUsageTable({
                         className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
                         <div className="session-card-summary min-w-0 space-y-1.5">
-                          <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
+                            {isSubagent ? (
+                              <span
+                                className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-1.5 py-px text-[9px] font-semibold text-indigo-400"
+                                title={session.agentPath || subagentLabel}
+                              >
+                                {subagentLabel}
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground" title={session.projects.join("\n")}>
                             <Folder className="h-3 w-3 flex-none opacity-70" />
                             {shownProjects.length > 0 ? (
@@ -526,6 +584,7 @@ export function SessionUsageTable({
                           <SessionQuotaUsageView usage={session.quotaUsage} />
                         </div>
                       </article>
+                      </div>
                     );
                   })}
                 </div>

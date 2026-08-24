@@ -268,6 +268,12 @@ export type SessionDetailRow = {
   path: string;
   sessionId: string;
   threadName: string | null;
+  agentSessionId?: string | null;
+  parentSessionId?: string | null;
+  agentDepth?: number;
+  agentPath?: string | null;
+  agentNickname?: string | null;
+  agentRole?: string | null;
   modifiedAtMs: number;
   sizeBytes: number;
   inputTokens: number;
