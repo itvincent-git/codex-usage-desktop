@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
 import { SessionUsageTable } from "./session-usage-table";
-import type { SessionDetailRow } from "@/lib/api";
+import type { SessionDetailRow, SessionReplayDetail } from "@/lib/api";
 import i18n from "@/i18n";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -43,6 +43,26 @@ function session(overrides: Partial<SessionDetailRow>): SessionDetailRow {
         projects: ["/repo/app"],
       },
     ],
+    ...overrides,
+  };
+}
+
+function replayDetail(overrides: Partial<SessionReplayDetail>): SessionReplayDetail {
+  return {
+    path: "/tmp/root.jsonl",
+    sessionId: "root-id",
+    threadName: "Root session",
+    modifiedAtMs: 0,
+    sizeBytes: 0,
+    rawJsonl: "",
+    agents: [],
+    summary: {
+      startTime: null, endTime: null, durationMs: null, timeToFirstTokenMs: null,
+      cwd: null, projects: [], models: [], cliVersion: null, git: {}, inputTokens: 0,
+      cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0, totalTokens: 0,
+      costUSD: 0, turnCount: 0, messageCount: 0, toolCallCount: 0, patchCount: 0, errorCount: 0,
+    },
+    turns: [],
     ...overrides,
   };
 }
@@ -634,6 +654,38 @@ describe("session titles", () => {
     render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
 
     expect(await screen.findByRole("dialog", { name: "fallback-session" })).toBeInTheDocument();
+  });
+
+  it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
+    await i18n.changeLanguage("en");
+    const agents = [
+      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
+      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/research", nickname: "Curie", role: null, threadName: "Research task" },
+      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root/research/tests", nickname: null, role: null, threadName: "Test task" },
+    ];
+    invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
+      if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
+      return replayDetail({
+        path: args?.path ?? "/tmp/root.jsonl",
+        threadName: args?.path === "/tmp/child.jsonl" ? "Research task" : "Root task",
+        agents,
+      });
+    });
+
+    render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
+
+    const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
+    expect(within(hierarchy).getByText("3 agents")).toBeInTheDocument();
+    const rootButton = within(hierarchy).getByRole("button", { name: /root.*Root task.*Root.*Current/ });
+    const childButton = within(hierarchy).getByRole("button", { name: /research.*Curie.*Research task.*Subagent/ });
+    const grandchildButton = within(hierarchy).getByRole("button", { name: /tests.*Test task.*Subagent/ });
+    expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
+    expect(childButton).toHaveStyle({ paddingLeft: "32px" });
+    expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
+
+    await userEvent.click(childButton);
+    expect(await screen.findByRole("dialog", { name: "Research task" })).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenLastCalledWith("fetch_session_detail", { path: "/tmp/child.jsonl" });
   });
 
   it("shows complete quota windows and localized estimation guidance in session details", async () => {
