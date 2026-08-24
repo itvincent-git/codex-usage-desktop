@@ -79,6 +79,31 @@ function formatDateHeader(dateStr: string) {
   }
 }
 
+function summarizeQuotaUsage(sessions: SessionDisplayRow[], key: "fiveHour" | "weekly") {
+  let observedDeltaPercent = 0;
+  let hasBelowResolutionUsage = false;
+  let hasUsage = false;
+
+  for (const session of sessions) {
+    for (const window of session.quotaUsage?.[key] ?? []) {
+      hasUsage = true;
+      observedDeltaPercent += window.observedDeltaPercent;
+      hasBelowResolutionUsage ||= window.belowResolution;
+    }
+  }
+
+  return { observedDeltaPercent, hasBelowResolutionUsage, hasUsage };
+}
+
+function formatQuotaTotal(
+  total: ReturnType<typeof summarizeQuotaUsage>,
+  approximate: string,
+) {
+  if (!total.hasUsage) return "--";
+  if (total.observedDeltaPercent === 0 && total.hasBelowResolutionUsage) return "<1%";
+  return `${approximate} ${Math.round(total.observedDeltaPercent)}%`;
+}
+
 function costTone(cost: number, maxCost: number) {
   if (cost <= 0 || maxCost <= 0) {
     return {
@@ -178,6 +203,8 @@ export function SessionUsageTable({
         const cachedInputTokens = sortedItems.reduce((sum, item) => sum + item.cachedInputTokens, 0);
         const outputTokens = sortedItems.reduce((sum, item) => sum + item.outputTokens, 0);
         const costUSD = sortedItems.reduce((sum, item) => sum + item.costUSD, 0);
+        const fiveHourQuota = summarizeQuotaUsage(sortedItems, "fiveHour");
+        const weeklyQuota = summarizeQuotaUsage(sortedItems, "weekly");
         
         // Find all unique models and projects used on this date
         const models = Array.from(new Set(sortedItems.flatMap(item => item.models || [])));
@@ -191,6 +218,8 @@ export function SessionUsageTable({
           cachedInputTokens,
           outputTokens,
           costUSD,
+          fiveHourQuota,
+          weeklyQuota,
           models,
           projects,
         };
@@ -314,6 +343,9 @@ export function SessionUsageTable({
           const groupTokenBarWidth = `${Math.max((group.totalTokens / maxGroupTokens) * 100, 6)}%`;
           const groupCostHeat = maxGroupCost > 0 ? group.costUSD / maxGroupCost : 0;
           const groupCostHeatAlpha = 0.08 + groupCostHeat * 0.22;
+          const fiveHourQuota = formatQuotaTotal(group.fiveHourQuota, t("sessions.quota.approx"));
+          const weeklyQuota = formatQuotaTotal(group.weeklyQuota, t("sessions.quota.approx"));
+          const hasQuotaUsage = group.fiveHourQuota.hasUsage || group.weeklyQuota.hasUsage;
 
           return (
             <div
@@ -364,6 +396,24 @@ export function SessionUsageTable({
 
                 {/* Right Section: Day summary totals */}
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                  {hasQuotaUsage ? (
+                    <div
+                      data-testid="day-quota-summary"
+                      className="space-y-1 text-right text-xs tabular-nums"
+                      aria-label={t("sessions.quota.day_usage_label", {
+                        fiveHour: fiveHourQuota,
+                        weekly: weeklyQuota,
+                      })}
+                      title={t("sessions.quota.day_caveat")}
+                    >
+                      <div className="text-muted-foreground">{t("sessions.quota.day_consumed")}</div>
+                      <div className="flex items-center justify-end gap-3 font-semibold text-foreground">
+                        <span><span className="text-muted-foreground">{t("sessions.quota.five_hour")}</span> {fiveHourQuota}</span>
+                        <span><span className="text-muted-foreground">{t("sessions.quota.weekly")}</span> {weeklyQuota}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* Day total tokens indicator */}
                   {group.totalTokens > 0 ? (
                     <div className="space-y-1.5 min-w-[120px] text-right">
