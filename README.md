@@ -27,7 +27,8 @@ Codex Usage Desktop turns the Codex CLI logs already on your computer into a cle
 | **Usage at a glance**        | Token totals, estimated cost, cache hit rate, daily averages, and trends across preset or custom date ranges.             |
 | **Know what drives cost**    | Breakdowns by project, model, day, month, and individual Codex session.                                                   |
 | **Stay ahead of limits**     | Live 5-hour, weekly, or monthly limits, reset times, available reset credits, and quota-reset forecasting when available. |
-| **Inspect session activity** | Search session titles, projects, and models, then open a session for its usage and activity details.                      |
+| **Track official resets**    | See the latest official token-reset announcement time on the dashboard, then click it to browse the last 30 days.         |
+| **Inspect session activity** | Search and inspect sessions, with estimated 5-hour and weekly limit consumption shown in both the list and details.       |
 | **Keep it close**            | Optional menu bar or system tray metrics, launch at login, English and Chinese UI, and in-app updates.                   |
 | **Take your data with you**  | Export the selected dashboard range to Excel (`.xlsx`) or Markdown (`.md`).                                               |
 
