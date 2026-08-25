@@ -146,6 +146,17 @@ export type CodexQuotaForecastResponse = {
   nextRefreshAt: string;
 };
 
+export type CodexResetAnnouncement = {
+  id: string;
+  resetType: "regular" | "banked";
+  announcedAt: string;
+  text: string;
+  source: {
+    author: string;
+    url: string;
+  };
+};
+
 export type UsageRefreshResponse = {
   scan: ScanResponse;
   limits: CodexLimitsResponse | null;
@@ -184,6 +195,14 @@ export async function fetchCodexLimits(): Promise<CodexLimitsResponse> {
 
 export async function fetchCodexQuotaForecast(): Promise<CodexQuotaForecastResponse> {
   return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast");
+}
+
+export async function fetchLatestCodexReset(): Promise<CodexResetAnnouncement | null> {
+  return invoke<CodexResetAnnouncement | null>("fetch_latest_codex_reset");
+}
+
+export async function fetchCodexResetHistory(days: number): Promise<CodexResetAnnouncement[]> {
+  return invoke<CodexResetAnnouncement[]>("fetch_codex_reset_history", { days });
 }
 
 export async function resetUsageState(): Promise<void> {

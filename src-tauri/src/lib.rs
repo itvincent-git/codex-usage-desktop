@@ -1,5 +1,6 @@
 mod codex_environment;
 mod codex_limits;
+mod codex_resets;
 mod date;
 mod db;
 mod exporter;
@@ -22,10 +23,10 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
-    CodexLimitsResponse, CodexQuotaForecastResponse, ExportResponse, ModelPricingCatalogResponse,
-    MonthlyUsageResponse, OverviewResponse, ProjectAnalyticsResponse, ScanResponse,
-    SessionDetailRow, SessionReplayDetail, UpdateCheckResponse, UpdateDownloadProgress,
-    UpdateInstallResponse, UsageRefreshResponse,
+    CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, ExportResponse,
+    ModelPricingCatalogResponse, MonthlyUsageResponse, OverviewResponse, ProjectAnalyticsResponse,
+    ScanResponse, SessionDetailRow, SessionReplayDetail, UpdateCheckResponse,
+    UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
 };
 
 const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -206,6 +207,20 @@ async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
 #[tauri::command]
 async fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
     tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_quota_forecast)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_latest_codex_reset() -> Result<Option<CodexResetAnnouncement>, String> {
+    tauri::async_runtime::spawn_blocking(codex_resets::fetch_latest_reset)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn fetch_codex_reset_history(days: u32) -> Result<Vec<CodexResetAnnouncement>, String> {
+    tauri::async_runtime::spawn_blocking(move || codex_resets::fetch_reset_history(days))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -838,6 +853,8 @@ pub fn run() {
             fetch_monthly_usage,
             fetch_codex_limits,
             fetch_codex_quota_forecast,
+            fetch_latest_codex_reset,
+            fetch_codex_reset_history,
             reset_usage_state,
             export_usage,
             check_for_updates,

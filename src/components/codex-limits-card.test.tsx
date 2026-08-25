@@ -428,6 +428,43 @@ describe("CodexLimitsCard component", () => {
     expect(forecastButton).toHaveClass("border-error/30");
   });
 
+  it("renders the latest token reset to the left of the forecast and opens its history", () => {
+    const onOpenResetHistory = vi.fn();
+
+    render(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        onOpenResetHistory={onOpenResetHistory}
+        limits={null}
+        error={null}
+        latestReset={{
+          id: "2091688655828246890",
+          resetType: "regular",
+          announcedAt: "2026-08-24T00:46:51.000Z",
+          text: "Reset has been propagated.",
+          source: {
+            author: "thsottiaux",
+            url: "https://x.com/thsottiaux/status/2091688655828246890",
+          },
+        }}
+        quotaForecast={{
+          score: 73,
+          fetchedAt: "2026-08-25T09:00:19.499Z",
+          nextRefreshAt: "2026-08-25T09:30:19.499Z",
+        }}
+      />,
+    );
+
+    const latestResetButton = screen.getByRole("button", { name: "View token resets from the last 30 days" });
+    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
+
+    expect(latestResetButton).toHaveTextContent("Latest token reset");
+    expect(latestResetButton.compareDocumentPosition(forecastButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(latestResetButton);
+    expect(onOpenResetHistory).toHaveBeenCalledTimes(1);
+  });
+
   it("changes quota forecast color by probability", () => {
     const { rerender } = render(
       <CodexLimitsCard onOpenResetCredits={() => {}}

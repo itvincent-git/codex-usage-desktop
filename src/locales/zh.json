@@ -162,7 +162,17 @@
     "quota_forecast_likely_label": "48h 内可能重置",
     "quota_forecast_possible_label": "48h 内有机会",
     "quota_forecast_low_label": "48h 内概率较低",
-    "quota_forecast_open": "打开 Codex 额度重置预测"
+    "quota_forecast_open": "打开 Codex 额度重置预测",
+    "latest_reset": "最近一次 Token 重置",
+    "latest_reset_open": "查看最近 30 天的 Token 重置记录",
+    "reset_type_regular": "常规重置",
+    "reset_type_banked": "储存式重置",
+    "reset_history_title": "最近 30 天的 Token 重置",
+    "reset_history_description": "数据来自 Codex Resets 的公开重置公告，显示时间为公告发布时间。",
+    "reset_history_loading": "正在加载重置记录...",
+    "reset_history_error": "暂时无法加载重置记录。",
+    "reset_history_empty": "最近 30 天没有重置公告。",
+    "reset_history_source": "查看来源"
   },
   "daily": {
     "title": "按日使用明细",

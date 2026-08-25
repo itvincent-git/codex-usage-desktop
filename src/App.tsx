@@ -1,4 +1,5 @@
 import { CodexLimitsCard } from "@/components/codex-limits-card";
+import { CodexResetHistoryModal } from "@/components/codex-reset-history";
 import { DailyUsageTable } from "@/components/daily-usage-table";
 import { DashboardHeroCard } from "@/components/dashboard-hero-card";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -33,6 +34,7 @@ export default function App() {
   } | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionDetailRow | null>(null);
+  const [isResetHistoryOpen, setIsResetHistoryOpen] = useState(false);
   const {
     view,
     range,
@@ -41,6 +43,7 @@ export default function App() {
     codexLimits,
     codexLimitsError,
     codexQuotaForecast,
+    latestCodexReset,
     scanMessage,
     error,
     isLoading,
@@ -129,8 +132,8 @@ export default function App() {
     <div className="min-h-screen bg-background text-foreground">
       <div
         className="relative mx-auto flex min-h-screen w-full max-w-layout flex-col px-6 pb-8 pt-3 sm:px-8 lg:px-10"
-        aria-hidden={selectedSession ? "true" : undefined}
-        inert={selectedSession ? true : undefined}
+        aria-hidden={selectedSession || isResetHistoryOpen ? "true" : undefined}
+        inert={selectedSession || isResetHistoryOpen ? true : undefined}
       >
         <div
           aria-hidden="true"
@@ -311,7 +314,9 @@ export default function App() {
                   limits={codexLimits}
                   error={codexLimitsError}
                   quotaForecast={codexQuotaForecast}
+                  latestReset={latestCodexReset}
                   onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
+                  onOpenResetHistory={() => setIsResetHistoryOpen(true)}
                   onOpenResetCredits={() => void handleOpenResetCredits()}
                 />
               </div>
@@ -438,6 +443,9 @@ export default function App() {
           onClose={() => setSelectedSession(null)}
         />
       )}
+      {isResetHistoryOpen ? (
+        <CodexResetHistoryModal onClose={() => setIsResetHistoryOpen(false)} />
+      ) : null}
     </div>
   );
 }

@@ -7,11 +7,13 @@ import {
   exportUsage,
   fetchCodexLimits,
   fetchCodexQuotaForecast,
+  fetchLatestCodexReset,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
   type CodexLimitsResponse,
   type CodexQuotaForecastResponse,
+  type CodexResetAnnouncement,
   type ExportFormat,
   type MonthlyUsageResponse,
   type OverviewResponse,
@@ -136,6 +138,7 @@ export function useUsageDashboard() {
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
   const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
+  const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
   const [scanMessage, setScanMessage] = useState<ScanMessage>({ key: "hero.sync_logs_to_cache_desc" });
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -300,6 +303,15 @@ export function useUsageDashboard() {
       setCodexQuotaForecast(data);
     } catch (_) {
       setCodexQuotaForecast(null);
+    }
+  });
+
+  const loadLatestCodexReset = useEffectEvent(async () => {
+    try {
+      const data = await fetchLatestCodexReset();
+      setLatestCodexReset(data);
+    } catch (_) {
+      setLatestCodexReset(null);
     }
   });
 
@@ -509,6 +521,7 @@ export function useUsageDashboard() {
       // Do not block initial render on limits fetch
       void loadCodexLimits();
       void loadCodexQuotaForecast();
+      void loadLatestCodexReset();
       await loadOverview(range);
       setBootstrapped(true);
     } catch (loadError) {
@@ -812,7 +825,7 @@ export function useUsageDashboard() {
 
     try {
       await scanAndReloadOverview(startedAt, { force: true });
-      await loadCodexQuotaForecast();
+      await Promise.all([loadCodexQuotaForecast(), loadLatestCodexReset()]);
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
@@ -984,6 +997,7 @@ export function useUsageDashboard() {
     codexLimits,
     codexLimitsError,
     codexQuotaForecast,
+    latestCodexReset,
     scanMessage: t(scanMessage.key, scanMessage.values),
     error,
     isLoading,

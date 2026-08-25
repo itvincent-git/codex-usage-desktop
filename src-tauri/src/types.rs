@@ -251,6 +251,24 @@ pub struct CodexQuotaForecastResponse {
     pub next_refresh_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexResetSource {
+    pub author: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CodexResetAnnouncement {
+    pub id: String,
+    #[serde(rename(deserialize = "reset_type", serialize = "resetType"))]
+    pub reset_type: String,
+    #[serde(rename(deserialize = "announced_at", serialize = "announcedAt"))]
+    pub announced_at: String,
+    pub text: String,
+    pub source: CodexResetSource,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageRefreshResponse {
