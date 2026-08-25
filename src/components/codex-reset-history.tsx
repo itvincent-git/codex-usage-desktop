@@ -1,4 +1,5 @@
 import dayjs, { type Dayjs } from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { ChevronDown, ChevronUp, ExternalLink, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +7,8 @@ import { fetchCodexResetHistory, openUrl, type CodexResetAnnouncement } from "@/
 
 const HISTORY_DAYS = 30;
 const DEFAULT_VISIBLE_RESETS = 5;
+
+dayjs.extend(utc);
 
 type CalendarDay = {
   date: Dayjs;
@@ -31,12 +34,13 @@ export function buildResetHistorySummary(
   const intervals = sortedResets.slice(0, -1).map((reset, index) =>
     dayjs(reset.announcedAt).diff(sortedResets[index + 1].announcedAt, "minute", true) / (60 * 24),
   );
-  const startDate = now.startOf("day").subtract(HISTORY_DAYS - 1, "day");
-  const endDate = now.endOf("day");
+  const currentDate = now.utc();
+  const startDate = currentDate.startOf("day").subtract(HISTORY_DAYS - 1, "day");
+  const endDate = currentDate.endOf("day");
   const resetsByDate = new Map<string, CodexResetAnnouncement[]>();
 
   for (const reset of sortedResets) {
-    const key = dayjs(reset.announcedAt).format("YYYY-MM-DD");
+    const key = dayjs.utc(reset.announcedAt).format("YYYY-MM-DD");
     const existing = resetsByDate.get(key);
     if (existing) existing.push(reset);
     else resetsByDate.set(key, [reset]);
