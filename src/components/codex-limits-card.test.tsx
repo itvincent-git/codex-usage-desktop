@@ -407,7 +407,7 @@ describe("CodexLimitsCard component", () => {
     expect(onOpenResetCredits).toHaveBeenCalledTimes(1);
   });
 
-  it("renders only the percentage in the quota forecast badge", () => {
+  it("renders the forecast explanation below the percentage", () => {
     render(
       <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
@@ -424,7 +424,8 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByRole("img", { name: "73% reset probability" })).toBeInTheDocument();
     expect(forecastButton).toHaveTextContent("73");
-    expect(forecastButton).not.toHaveTextContent("Reset likely in 48h");
+    expect(forecastButton).toHaveTextContent("Reset likely in 48h");
+    expect(forecastButton).toHaveClass("flex-col");
     expect(forecastButton).toHaveClass("border-error/30");
   });
 
