@@ -270,6 +270,9 @@ export type SessionDetailRow = {
   threadName: string | null;
   threadId?: string | null;
   parentThreadId?: string | null;
+  agentSessionId?: string | null;
+  parentSessionId?: string | null;
+  agentDepth?: number;
   agentPath?: string | null;
   agentNickname?: string | null;
   agentRole?: string | null;
@@ -298,6 +301,16 @@ export type SessionReplayDetail = {
   modifiedAtMs: number;
   sizeBytes: number;
   rawJsonl: string;
+  agents: Array<{
+    path: string;
+    sessionId: string;
+    parentSessionId: string | null;
+    depth: number;
+    agentPath: string;
+    nickname: string | null;
+    role: string | null;
+    threadName: string | null;
+  }>;
   summary: {
     startTime: string | null;
     endTime: string | null;

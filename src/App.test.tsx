@@ -285,6 +285,19 @@ describe("App", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it("retranslates the completed scan message when the language changes", async () => {
+    mockLoadedDashboard();
+
+    render(<App />);
+    await screen.findByText("Synced 1 days (1 cached, 0 parsed)");
+
+    await act(async () => {
+      await i18n.changeLanguage("zh");
+    });
+
+    expect(screen.getByText("已同步 1 天数据 (1 个缓存，0 个解析)")).toBeInTheDocument();
+  });
+
   it("rescans after returning from the background but skips limits when files are unchanged", async () => {
     let now = 10_000;
     vi.spyOn(Date, "now").mockImplementation(() => now);

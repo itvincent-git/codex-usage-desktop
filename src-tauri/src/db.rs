@@ -120,6 +120,12 @@ pub struct SessionRollupRecord {
     pub prompt_title: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SessionHierarchyRecord {
+    pub path: String,
+    pub prompt_title: Option<String>,
+}
+
 fn ensure_column(
     db: &Connection,
     table: &str,
@@ -330,6 +336,30 @@ pub fn query_session_rollup_record(
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(error) => Err(error.to_string()),
     }
+}
+
+pub fn query_session_hierarchy_records(
+    db: &Connection,
+) -> Result<Vec<SessionHierarchyRecord>, String> {
+    let mut statement = db
+        .prepare(
+            r#"
+            SELECT path, prompt_title
+            FROM session_file_rollups
+            "#,
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(SessionHierarchyRecord {
+                path: row.get(0)?,
+                prompt_title: row.get(1)?,
+            })
+        })
+        .map_err(|error| error.to_string())?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())
 }
 
 pub fn upsert_session_file_rollups(
@@ -582,6 +612,9 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 thread_name: prompt_title.filter(|title| !title.is_empty()),
                 thread_id: agent_metadata.thread_id,
                 parent_thread_id: agent_metadata.parent_thread_id,
+                agent_session_id: None,
+                parent_session_id: None,
+                agent_depth: 0,
                 agent_path: agent_metadata.agent_path,
                 agent_nickname: agent_metadata.agent_nickname,
                 agent_role: agent_metadata.agent_role,

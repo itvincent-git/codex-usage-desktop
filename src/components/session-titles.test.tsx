@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
 import { SessionUsageTable } from "./session-usage-table";
-import type { SessionDetailRow } from "@/lib/api";
+import type { SessionDetailRow, SessionReplayDetail } from "@/lib/api";
 import i18n from "@/i18n";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -47,7 +47,71 @@ function session(overrides: Partial<SessionDetailRow>): SessionDetailRow {
   };
 }
 
+function replayDetail(overrides: Partial<SessionReplayDetail>): SessionReplayDetail {
+  return {
+    path: "/tmp/root.jsonl",
+    sessionId: "root-id",
+    threadName: "Root session",
+    modifiedAtMs: 0,
+    sizeBytes: 0,
+    rawJsonl: "",
+    agents: [],
+    summary: {
+      startTime: null, endTime: null, durationMs: null, timeToFirstTokenMs: null,
+      cwd: null, projects: [], models: [], cliVersion: null, git: {}, inputTokens: 0,
+      cachedInputTokens: 0, outputTokens: 0, reasoningOutputTokens: 0, totalTokens: 0,
+      costUSD: 0, turnCount: 0, messageCount: 0, toolCallCount: 0, patchCount: 0, errorCount: 0,
+    },
+    turns: [],
+    ...overrides,
+  };
+}
+
 describe("session daily usage", () => {
+  it("summarizes the 5-hour and weekly quota consumed by every session in a day", () => {
+    const quotaWindow = (delta: number, startPercent: number, hour: number) => ({
+      windowMinutes: 300,
+      resetsAt: "2026-07-15T13:00:00Z",
+      observedStartAt: `2026-07-15T${String(hour).padStart(2, "0")}:00:00Z`,
+      observedEndAt: `2026-07-15T${String(hour + 1).padStart(2, "0")}:00:00Z`,
+      observedStartPercent: startPercent,
+      observedEndPercent: startPercent + delta,
+      observedDeltaPercent: delta,
+      belowResolution: false,
+    });
+    const dailyUsage = (
+      fiveHour: number,
+      weekly: number,
+      fiveHourStartPercent: number,
+      weeklyStartPercent: number,
+      hour: number,
+    ) => [{
+      date: "2026-07-15",
+      inputTokens: 100,
+      cachedInputTokens: 20,
+      outputTokens: 40,
+      reasoningOutputTokens: 0,
+      totalTokens: 140,
+      costUSD: 0.001,
+      models: ["gpt-5"],
+      projects: ["/repo/app"],
+      quotaUsage: {
+        fiveHour: [quotaWindow(fiveHour, fiveHourStartPercent, hour)],
+        weekly: [{ ...quotaWindow(weekly, weeklyStartPercent, hour), windowMinutes: 10_080 }],
+      },
+    }];
+
+    render(<SessionUsageTable sessions={[
+      session({ path: "/tmp/first.jsonl", dailyUsage: dailyUsage(2, 1, 10, 30, 8) }),
+      session({ path: "/tmp/second.jsonl", dailyUsage: dailyUsage(3, 4, 12, 31, 9) }),
+    ]} />);
+
+    const day = document.getElementById("date-group-2026-07-15")!;
+    const summary = within(day).getByTestId("day-quota-summary");
+    expect(summary).toHaveTextContent("5h Used Approx. 5% • 90% → 85%");
+    expect(summary).toHaveTextContent("Weekly Used Approx. 5% • 70% → 65%");
+  });
+
   it("shows quota color scales, low-resolution values, and multiple resets", () => {
     const window = (delta: number, belowResolution = false) => ({
       windowMinutes: 300,
@@ -250,6 +314,9 @@ describe("session titles", () => {
     expect(screen.getByText("Ada")).toBeInTheDocument();
     expect(screen.getByText("code explorer")).toBeInTheDocument();
     expect(screen.getAllByText("Subagent")).toHaveLength(2);
+    const subagentRows = screen.getAllByTestId("subagent-session-row");
+    expect(subagentRows[0]).toHaveAttribute("data-agent-depth", "1");
+    expect(subagentRows[1]).toHaveAttribute("data-agent-depth", "2");
     expect(within(screen.getByText("investigate titles").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
     expect(within(screen.getByText("fix sidebar").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
     await user.click(screen.getByText("fix sidebar").closest("article")!);
@@ -257,6 +324,48 @@ describe("session titles", () => {
 
     await user.click(toggle);
     expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
+  });
+
+  it("uses upstream hierarchy metadata inside collapsed session families", async () => {
+    const user = userEvent.setup();
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/child.jsonl",
+        sessionId: "child.jsonl",
+        threadName: "Child task",
+        agentSessionId: "child-id",
+        parentSessionId: "root-id",
+        agentDepth: 0,
+        agentPath: "/root/researcher",
+        agentNickname: "researcher",
+        agentRole: "Research",
+        modifiedAtMs: new Date("2026-07-15T09:00:00Z").getTime(),
+      }),
+      session({
+        path: "/tmp/root.jsonl",
+        sessionId: "root.jsonl",
+        threadName: "Parent task",
+        agentSessionId: "root-id",
+        agentDepth: 0,
+        agentPath: "/root",
+        modifiedAtMs: new Date("2026-07-15T08:00:00Z").getTime(),
+      }),
+    ]} />);
+
+    expect(screen.getAllByTestId("session-card")).toHaveLength(1);
+    expect(screen.getByTestId("session-card")).toHaveTextContent("Parent task");
+    expect(screen.queryByText("Child task")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Expand 1 subagent sessions under Parent task" }));
+
+    const cards = screen.getAllByTestId("session-card");
+    expect(cards[0]).toHaveTextContent("Parent task");
+    expect(cards[1]).toHaveTextContent("Child task");
+    expect(cards[1].parentElement).toHaveAttribute("data-agent-depth", "1");
+    expect(within(cards[1]).getByRole("heading", { name: "researcher" })).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Subagent")).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Research")).toBeInTheDocument();
+    expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
   });
 
   it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {
@@ -699,6 +808,38 @@ describe("session titles", () => {
     render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
 
     expect(await screen.findByRole("dialog", { name: "fallback-session" })).toBeInTheDocument();
+  });
+
+  it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
+    await i18n.changeLanguage("en");
+    const agents = [
+      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
+      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/research", nickname: "Curie", role: null, threadName: "Research task" },
+      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root/research/tests", nickname: null, role: null, threadName: "Test task" },
+    ];
+    invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
+      if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
+      return replayDetail({
+        path: args?.path ?? "/tmp/root.jsonl",
+        threadName: args?.path === "/tmp/child.jsonl" ? "Research task" : "Root task",
+        agents,
+      });
+    });
+
+    render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
+
+    const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
+    expect(within(hierarchy).getByText("3 agents")).toBeInTheDocument();
+    const rootButton = within(hierarchy).getByRole("button", { name: /root.*Root task.*Root.*Current/ });
+    const childButton = within(hierarchy).getByRole("button", { name: /research.*Curie.*Research task.*Subagent/ });
+    const grandchildButton = within(hierarchy).getByRole("button", { name: /tests.*Test task.*Subagent/ });
+    expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
+    expect(childButton).toHaveStyle({ paddingLeft: "32px" });
+    expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
+
+    await userEvent.click(childButton);
+    expect(await screen.findByRole("dialog", { name: "Research task" })).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenLastCalledWith("fetch_session_detail", { path: "/tmp/child.jsonl" });
   });
 
   it("shows complete quota windows and localized estimation guidance in session details", async () => {

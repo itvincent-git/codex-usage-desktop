@@ -333,6 +333,9 @@ pub struct SessionDetailRow {
     pub thread_name: Option<String>,
     pub thread_id: Option<String>,
     pub parent_thread_id: Option<String>,
+    pub agent_session_id: Option<String>,
+    pub parent_session_id: Option<String>,
+    pub agent_depth: usize,
     pub agent_path: Option<String>,
     pub agent_nickname: Option<String>,
     pub agent_role: Option<String>,
@@ -478,6 +481,19 @@ pub struct SessionReplayTurn {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct SessionReplayAgent {
+    pub path: String,
+    pub session_id: String,
+    pub parent_session_id: Option<String>,
+    pub depth: usize,
+    pub agent_path: String,
+    pub nickname: Option<String>,
+    pub role: Option<String>,
+    pub thread_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionReplayDetail {
     pub path: String,
     pub session_id: String,
@@ -485,6 +501,7 @@ pub struct SessionReplayDetail {
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub raw_jsonl: String,
+    pub agents: Vec<SessionReplayAgent>,
     pub summary: SessionReplaySummary,
     pub turns: Vec<SessionReplayTurn>,
 }

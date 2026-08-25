@@ -1,4 +1,12 @@
 {
+  "2.5.0": {
+    "zh": "- fix(sessions): restore titles from response items\n- feat: show subagent hierarchy in session details\n- feat(sessions): show subagent hierarchy in list\n- feat: summarize daily session quota usage\n- feat: show daily quota balance changes",
+    "en": "- fix(sessions): restore titles from response items\n- feat: show subagent hierarchy in session details\n- feat(sessions): show subagent hierarchy in list\n- feat: summarize daily session quota usage\n- feat: show daily quota balance changes"
+  },
+  "2.4.0": {
+    "zh": "- feat(i18n): add Japanese localization (#2)\n- fix(i18n): retranslate scan status messages",
+    "en": "- feat(i18n): add Japanese localization (#2)\n- fix(i18n): retranslate scan status messages"
+  },
   "2.3.2": {
     "zh": "- fix(sessions): prevent quota usage truncation\n- fix(sessions): adapt quota width by language\n- fix(sessions): stack multiple quota windows",
     "en": "- fix(sessions): prevent quota usage truncation\n- fix(sessions): adapt quota width by language\n- fix(sessions): stack multiple quota windows"

@@ -220,12 +220,24 @@ async fn fetch_session_details(
         let db = db::open_database(&database_path)?;
         let mut sessions = db::query_session_details(&db)?;
         let names = session_index::load_thread_names();
+        let agents = session_replay::load_session_agents(&db)?
+            .into_iter()
+            .map(|agent| (agent.path.clone(), agent))
+            .collect::<std::collections::BTreeMap<_, _>>();
         for session in &mut sessions {
             session.thread_name = session_index::resolve_thread_name(
                 &session.path,
                 session.thread_name.take(),
                 &names,
             );
+            if let Some(agent) = agents.get(&session.path) {
+                session.agent_session_id = Some(agent.session_id.clone());
+                session.parent_session_id = agent.parent_session_id.clone();
+                session.agent_depth = agent.depth;
+                session.agent_path = Some(agent.agent_path.clone());
+                session.agent_nickname = agent.nickname.clone();
+                session.agent_role = agent.role.clone();
+            }
         }
         Ok(sessions)
     })

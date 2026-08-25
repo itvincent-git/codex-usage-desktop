@@ -1,9 +1,12 @@
 use crate::{
-    db::{query_session_rollup_record, SessionRollupRecord},
+    db::{
+        query_session_hierarchy_records, query_session_rollup_record, SessionHierarchyRecord,
+        SessionRollupRecord,
+    },
     types::{
-        DailyUsageRow, ModelUsage, SessionReplayDetail, SessionReplayItem, SessionReplayMessage,
-        SessionReplayPatchResult, SessionReplaySummary, SessionReplayTokenEvent,
-        SessionReplayToolCall, SessionReplayTurn,
+        DailyUsageRow, ModelUsage, SessionReplayAgent, SessionReplayDetail, SessionReplayItem,
+        SessionReplayMessage, SessionReplayPatchResult, SessionReplaySummary,
+        SessionReplayTokenEvent, SessionReplayToolCall, SessionReplayTurn,
     },
 };
 use chrono::{DateTime, Utc};
@@ -11,7 +14,8 @@ use rusqlite::Connection;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
+    fs::{self, File},
+    io::{BufRead, BufReader},
     path::Path,
 };
 
@@ -53,10 +57,20 @@ pub fn fetch_session_detail(db: &Connection, path: &str) -> Result<SessionReplay
     let record = query_session_rollup_record(db, path)?
         .ok_or_else(|| "Session file is not indexed".to_string())?;
     let raw_jsonl = fs::read_to_string(&record.path).map_err(|error| error.to_string())?;
-    Ok(parse_session_detail(record, raw_jsonl))
+    let agents = build_agent_hierarchy(db, path)?;
+    Ok(parse_session_detail_with_agents(record, raw_jsonl, agents))
 }
 
+#[cfg(test)]
 fn parse_session_detail(record: SessionRollupRecord, raw_jsonl: String) -> SessionReplayDetail {
+    parse_session_detail_with_agents(record, raw_jsonl, Vec::new())
+}
+
+fn parse_session_detail_with_agents(
+    record: SessionRollupRecord,
+    raw_jsonl: String,
+    agents: Vec<SessionReplayAgent>,
+) -> SessionReplayDetail {
     let session_id = Path::new(&record.path)
         .file_name()
         .and_then(|name| name.to_str())
@@ -117,9 +131,99 @@ fn parse_session_detail(record: SessionRollupRecord, raw_jsonl: String) -> Sessi
         modified_at_ms: record.modified_at_ms,
         size_bytes: record.size_bytes,
         raw_jsonl,
+        agents,
         summary,
         turns,
     }
+}
+
+fn build_agent_hierarchy(
+    db: &Connection,
+    selected_path: &str,
+) -> Result<Vec<SessionReplayAgent>, String> {
+    let mut agents = load_session_agents(db)?;
+    let Some(selected) = agents.iter().find(|agent| agent.path == selected_path) else {
+        return Ok(Vec::new());
+    };
+
+    let parents = agents
+        .iter()
+        .map(|agent| (agent.session_id.clone(), agent.parent_session_id.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut root_id = selected.session_id.clone();
+    let mut visited = BTreeSet::new();
+    while visited.insert(root_id.clone()) {
+        let Some(Some(parent_id)) = parents.get(&root_id) else {
+            break;
+        };
+        if !parents.contains_key(parent_id) {
+            break;
+        }
+        root_id = parent_id.clone();
+    }
+
+    let mut related_ids = BTreeSet::from([root_id.clone()]);
+    loop {
+        let previous_len = related_ids.len();
+        for agent in &agents {
+            if agent
+                .parent_session_id
+                .as_ref()
+                .is_some_and(|parent_id| related_ids.contains(parent_id))
+            {
+                related_ids.insert(agent.session_id.clone());
+            }
+        }
+        if related_ids.len() == previous_len {
+            break;
+        }
+    }
+    agents.retain(|agent| related_ids.contains(&agent.session_id));
+    let minimum_depth = agents.iter().map(|agent| agent.depth).min().unwrap_or(0);
+    for agent in &mut agents {
+        agent.depth = agent.depth.saturating_sub(minimum_depth);
+    }
+    agents.sort_by(|left, right| left.agent_path.split('/').cmp(right.agent_path.split('/')));
+    Ok(agents)
+}
+
+pub fn load_session_agents(db: &Connection) -> Result<Vec<SessionReplayAgent>, String> {
+    Ok(query_session_hierarchy_records(db)?
+        .into_iter()
+        .filter_map(read_session_agent)
+        .collect())
+}
+
+fn read_session_agent(record: SessionHierarchyRecord) -> Option<SessionReplayAgent> {
+    let file = File::open(&record.path).ok()?;
+    for line in BufReader::new(file).lines().map_while(Result::ok) {
+        let Ok(entry) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if entry.get("type").and_then(Value::as_str) != Some("session_meta") {
+            continue;
+        }
+        let payload = entry.get("payload")?;
+        let session_id =
+            string_field(payload, "id").or_else(|| string_field(payload, "session_id"))?;
+        let spawn = payload.pointer("/source/subagent/thread_spawn");
+        return Some(SessionReplayAgent {
+            path: record.path,
+            session_id,
+            parent_session_id: spawn.and_then(|value| string_field(value, "parent_thread_id")),
+            depth: spawn
+                .and_then(|value| value.get("depth"))
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as usize,
+            agent_path: spawn
+                .and_then(|value| string_field(value, "agent_path"))
+                .unwrap_or_else(|| "/root".to_string()),
+            nickname: spawn.and_then(|value| string_field(value, "agent_nickname")),
+            role: spawn.and_then(|value| string_field(value, "agent_role")),
+            thread_name: record.prompt_title.filter(|title| !title.is_empty()),
+        });
+    }
+    None
 }
 
 impl ReplayParseState {
@@ -1987,6 +2091,81 @@ mod tests {
         let detail = fetch_session_detail(&db, &session_path.to_string_lossy()).unwrap();
         assert_eq!(detail.path, session_path.to_string_lossy());
         assert_eq!(detail.raw_jsonl, raw);
+    }
+
+    #[test]
+    fn builds_agent_hierarchy_from_each_sessions_first_metadata_entry() {
+        let temp_dir = tempfile_dir();
+        let mut db = open_database(&temp_dir.join("usage.sqlite")).unwrap();
+        let root_path = temp_dir.join("root.jsonl");
+        let child_path = temp_dir.join("child.jsonl");
+        let grandchild_path = temp_dir.join("grandchild.jsonl");
+        let root_meta = serde_json::json!({
+            "type": "session_meta",
+            "payload": { "id": "root-id", "thread_source": "user", "source": "cli" }
+        })
+        .to_string();
+        let child_meta = serde_json::json!({
+            "type": "session_meta",
+            "payload": {
+                "id": "child-id",
+                "thread_source": "subagent",
+                "source": { "subagent": { "thread_spawn": {
+                    "parent_thread_id": "root-id", "depth": 1,
+                    "agent_path": "/root/research", "agent_nickname": "Curie"
+                } } }
+            }
+        })
+        .to_string();
+        let grandchild_meta = serde_json::json!({
+            "type": "session_meta",
+            "payload": {
+                "id": "grandchild-id",
+                "source": { "subagent": { "thread_spawn": {
+                    "parent_thread_id": "child-id", "depth": 2,
+                    "agent_path": "/root/research/tests"
+                } } }
+            }
+        })
+        .to_string();
+        fs::write(&root_path, &root_meta).unwrap();
+        fs::write(&child_path, format!("{child_meta}\n{root_meta}")).unwrap();
+        fs::write(
+            &grandchild_path,
+            format!("{grandchild_meta}\n{child_meta}\n{root_meta}"),
+        )
+        .unwrap();
+
+        let rollup = |path: &Path, modified_at_ms, prompt_title: &str| SessionFileRollup {
+            path: path.to_string_lossy().to_string(),
+            modified_at_ms,
+            size_bytes: fs::metadata(path).unwrap().len() as i64,
+            rows: vec![],
+            prompt_title: Some(prompt_title.to_string()),
+            quota_usage: None,
+            agent_metadata: None,
+        };
+        upsert_session_file_rollups(
+            &mut db,
+            &[
+                rollup(&root_path, 1, "Main task"),
+                rollup(&child_path, 2, "Research task"),
+                rollup(&grandchild_path, 3, "Test task"),
+            ],
+            "2026-06-01T00:00:00.000Z",
+        )
+        .unwrap();
+
+        let detail = fetch_session_detail(&db, &child_path.to_string_lossy()).unwrap();
+        assert_eq!(detail.agents.len(), 3);
+        assert_eq!(detail.agents[0].agent_path, "/root");
+        assert_eq!(detail.agents[1].session_id, "child-id");
+        assert_eq!(
+            detail.agents[1].parent_session_id.as_deref(),
+            Some("root-id")
+        );
+        assert_eq!(detail.agents[1].nickname.as_deref(), Some("Curie"));
+        assert_eq!(detail.agents[2].depth, 2);
     }
 
     fn tempfile_dir() -> std::path::PathBuf {

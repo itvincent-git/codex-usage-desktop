@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Bot, Terminal, Folder, ChevronDown, Calendar } from "lucide-react";
+import { Bot, Terminal, Folder, ChevronDown, Calendar, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -55,25 +55,74 @@ function agentSessionTitle(session: SessionDisplayRow) {
   return pathName ? humanizeAgentValue(pathName) : session.threadName || cleanSessionId(session.sessionId);
 }
 
+function sessionAgentId(session: SessionDetailRow) {
+  return session.agentSessionId ?? session.threadId;
+}
+
+function parentAgentId(session: SessionDetailRow) {
+  return session.parentSessionId ?? session.parentThreadId;
+}
+
+function orderSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
+  const chronological = [...sessions].sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
+  const byAgentId = new Map(
+    chronological.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    }),
+  );
+  const children = new Map<string, SessionDisplayRow[]>();
+
+  for (const session of chronological) {
+    const parentId = parentAgentId(session);
+    if (!parentId || !byAgentId.has(parentId)) continue;
+    const siblings = children.get(parentId) ?? [];
+    siblings.push(session);
+    children.set(parentId, siblings);
+  }
+
+  const ordered: SessionDisplayRow[] = [];
+  const visited = new Set<SessionDisplayRow>();
+  const visit = (session: SessionDisplayRow) => {
+    if (visited.has(session)) return;
+    visited.add(session);
+    ordered.push(session);
+    const agentId = sessionAgentId(session);
+    if (!agentId) return;
+    for (const child of children.get(agentId) ?? []) visit(child);
+  };
+
+  for (const session of chronological) {
+    const parentId = parentAgentId(session);
+    if (!parentId || !byAgentId.has(parentId)) visit(session);
+  }
+  for (const session of chronological) visit(session);
+  return ordered;
+}
+
 function groupSessionFamilies(
   rows: SessionDisplayRow[],
-  sessionsByThreadId: Map<string, SessionDetailRow>,
+  sessionsByAgentId: Map<string, SessionDetailRow>,
 ): SessionFamily[] {
-  const rowsByThreadId = new Map(
-    rows.flatMap((session) => session.threadId ? [[session.threadId, session] as const] : []),
+  const rowsByAgentId = new Map(
+    rows.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    }),
   );
   const childrenByParentPath = new Map<string, SessionDisplayRow[]>();
   const childPaths = new Set<string>();
 
   for (const session of rows) {
-    let parentThreadId = session.parentThreadId;
+    let parentId = parentAgentId(session);
     let visibleParent: SessionDisplayRow | undefined;
     const visited = new Set<string>();
 
-    while (parentThreadId && !visited.has(parentThreadId)) {
-      visited.add(parentThreadId);
-      visibleParent = rowsByThreadId.get(parentThreadId) ?? visibleParent;
-      parentThreadId = sessionsByThreadId.get(parentThreadId)?.parentThreadId;
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      visibleParent = rowsByAgentId.get(parentId) ?? visibleParent;
+      const parent = sessionsByAgentId.get(parentId);
+      parentId = parent ? parentAgentId(parent) : undefined;
     }
 
     if (!visibleParent || visibleParent.path === session.path) continue;
@@ -95,12 +144,78 @@ function groupSessionFamilies(
     });
 }
 
+function agentHierarchyDepth(
+  session: SessionDetailRow,
+  sessionsByAgentId: Map<string, SessionDetailRow>,
+) {
+  let inferredDepth = 0;
+  let parentId = parentAgentId(session);
+  const visited = new Set<string>();
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    inferredDepth += 1;
+    const parent = sessionsByAgentId.get(parentId);
+    parentId = parent ? parentAgentId(parent) : undefined;
+  }
+  return Math.min(Math.max(session.agentDepth ?? 0, inferredDepth), 6);
+}
+
 function formatDateHeader(dateStr: string) {
   try {
     return dayjs(dateStr).format("YYYY-MM-DD (dddd)");
   } catch (e) {
     return dateStr;
   }
+}
+
+function summarizeQuotaUsage(sessions: SessionDisplayRow[], key: "fiveHour" | "weekly") {
+  let observedDeltaPercent = 0;
+  let hasBelowResolutionUsage = false;
+  let hasUsage = false;
+  let firstObservedAt: string | null = null;
+  let lastObservedAt: string | null = null;
+  let observedStartPercent: number | null = null;
+  let observedEndPercent: number | null = null;
+
+  for (const session of sessions) {
+    for (const window of session.quotaUsage?.[key] ?? []) {
+      hasUsage = true;
+      observedDeltaPercent += window.observedDeltaPercent;
+      hasBelowResolutionUsage ||= window.belowResolution;
+      if (firstObservedAt === null || window.observedStartAt < firstObservedAt) {
+        firstObservedAt = window.observedStartAt;
+        observedStartPercent = window.observedStartPercent;
+      }
+      if (lastObservedAt === null || window.observedEndAt > lastObservedAt) {
+        lastObservedAt = window.observedEndAt;
+        observedEndPercent = window.observedEndPercent;
+      }
+    }
+  }
+
+  return {
+    observedDeltaPercent,
+    observedStartPercent,
+    observedEndPercent,
+    hasBelowResolutionUsage,
+    hasUsage,
+  };
+}
+
+function formatQuotaTotal(
+  total: ReturnType<typeof summarizeQuotaUsage>,
+  approximate: string,
+) {
+  if (!total.hasUsage) return "--";
+  if (total.observedDeltaPercent === 0 && total.hasBelowResolutionUsage) return "<1%";
+  return `${approximate} ${Math.round(total.observedDeltaPercent)}%`;
+}
+
+function formatQuotaRemainingRange(total: ReturnType<typeof summarizeQuotaUsage>) {
+  if (total.observedStartPercent === null || total.observedEndPercent === null) return "--";
+  const start = Math.min(Math.max(100 - total.observedStartPercent, 0), 100);
+  const end = Math.min(Math.max(100 - total.observedEndPercent, 0), 100);
+  return `${Math.round(start)}% → ${Math.round(end)}%`;
 }
 
 function costTone(cost: number, maxCost: number) {
@@ -180,8 +295,11 @@ export function SessionUsageTable({
     }));
   }), [sessions]);
 
-  const sessionsByThreadId = useMemo(
-    () => new Map(sessions.flatMap((session) => session.threadId ? [[session.threadId, session] as const] : [])),
+  const sessionsByAgentId = useMemo(
+    () => new Map(sessions.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    })),
     [sessions],
   );
 
@@ -202,12 +320,14 @@ export function SessionUsageTable({
     return Object.entries(map)
       .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
       .map(([date, items]) => {
-        const sortedItems = items.sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
+        const sortedItems = orderSessionsByAgentHierarchy(items);
         const totalTokens = sortedItems.reduce((sum, item) => sum + item.totalTokens, 0);
         const inputTokens = sortedItems.reduce((sum, item) => sum + item.inputTokens, 0);
         const cachedInputTokens = sortedItems.reduce((sum, item) => sum + item.cachedInputTokens, 0);
         const outputTokens = sortedItems.reduce((sum, item) => sum + item.outputTokens, 0);
         const costUSD = sortedItems.reduce((sum, item) => sum + item.costUSD, 0);
+        const fiveHourQuota = summarizeQuotaUsage(sortedItems, "fiveHour");
+        const weeklyQuota = summarizeQuotaUsage(sortedItems, "weekly");
         
         // Find all unique models and projects used on this date
         const models = Array.from(new Set(sortedItems.flatMap(item => item.models || [])));
@@ -216,17 +336,19 @@ export function SessionUsageTable({
         return {
           date,
           sessions: sortedItems,
-          sessionFamilies: groupSessionFamilies(sortedItems, sessionsByThreadId),
+          sessionFamilies: groupSessionFamilies(sortedItems, sessionsByAgentId),
           totalTokens,
           inputTokens,
           cachedInputTokens,
           outputTokens,
           costUSD,
+          fiveHourQuota,
+          weeklyQuota,
           models,
           projects,
         };
       });
-  }, [displaySessions, selectedProject, sessionsByThreadId]);
+  }, [displaySessions, selectedProject, sessionsByAgentId]);
 
   const filteredCount = useMemo(() => {
     if (!selectedProject) return displaySessions.length;
@@ -357,6 +479,19 @@ export function SessionUsageTable({
           const groupTokenBarWidth = `${Math.max((group.totalTokens / maxGroupTokens) * 100, 6)}%`;
           const groupCostHeat = maxGroupCost > 0 ? group.costUSD / maxGroupCost : 0;
           const groupCostHeatAlpha = 0.08 + groupCostHeat * 0.22;
+          const fiveHourQuota = group.fiveHourQuota.hasUsage
+            ? t("sessions.quota.used_and_remaining_change", {
+                usage: formatQuotaTotal(group.fiveHourQuota, t("sessions.quota.approx")),
+                remaining: formatQuotaRemainingRange(group.fiveHourQuota),
+              })
+            : "--";
+          const weeklyQuota = group.weeklyQuota.hasUsage
+            ? t("sessions.quota.used_and_remaining_change", {
+                usage: formatQuotaTotal(group.weeklyQuota, t("sessions.quota.approx")),
+                remaining: formatQuotaRemainingRange(group.weeklyQuota),
+              })
+            : "--";
+          const hasQuotaUsage = group.fiveHourQuota.hasUsage || group.weeklyQuota.hasUsage;
 
           return (
             <div
@@ -407,6 +542,24 @@ export function SessionUsageTable({
 
                 {/* Right Section: Day summary totals */}
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                  {hasQuotaUsage ? (
+                    <div
+                      data-testid="day-quota-summary"
+                      className="space-y-1 text-right text-xs tabular-nums"
+                      aria-label={t("sessions.quota.day_usage_label", {
+                        fiveHour: fiveHourQuota,
+                        weekly: weeklyQuota,
+                      })}
+                      title={t("sessions.quota.day_caveat")}
+                    >
+                      <div className="text-muted-foreground">{t("sessions.quota.day_consumed")}</div>
+                      <div className="flex items-center justify-end gap-3 font-semibold text-foreground">
+                        <span><span className="text-muted-foreground">{t("sessions.quota.five_hour")}</span> {fiveHourQuota}</span>
+                        <span><span className="text-muted-foreground">{t("sessions.quota.weekly")}</span> {weeklyQuota}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* Day total tokens indicator */}
                   {group.totalTokens > 0 ? (
                     <div className="space-y-1.5 min-w-[120px] text-right">
@@ -512,13 +665,25 @@ export function SessionUsageTable({
                     const familyCostLabel = familyCostUSD !== null
                       ? t("sessions.family_cost_pill_label", { cost: formatCurrency(familyCostUSD) })
                       : "";
+                    const hierarchyDepth = isSubagent
+                      ? agentHierarchyDepth(session, sessionsByAgentId)
+                      : 0;
 
                     return (
                       <div
                         key={session.path}
-                        className={isSubagent ? "relative ml-5 border-l border-primary/25 pl-4 sm:ml-7" : "space-y-1.5"}
+                        className="relative space-y-1.5"
                         data-testid={isSubagent ? "subagent-session-row" : undefined}
+                        data-agent-depth={hierarchyDepth}
+                        style={{ paddingInlineStart: hierarchyDepth ? `${hierarchyDepth * 20}px` : undefined }}
                       >
+                      {isSubagent ? (
+                        <CornerDownRight
+                          aria-hidden="true"
+                          className="absolute top-3 h-4 w-4 text-indigo-400/70"
+                          style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20}px` }}
+                        />
+                      ) : null}
                       <article
                         tabIndex={onSessionClick ? 0 : undefined}
                         role={onSessionClick ? "button" : undefined}

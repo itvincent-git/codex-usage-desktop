@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -181,6 +181,57 @@ function metric(label: string, value: string, icon: ReactNode, tone: keyof typeo
       <span className="text-[10px] font-medium opacity-75">{label}</span>
       <span className="font-mono text-xs font-bold tabular-nums">{value}</span>
     </div>
+  );
+}
+
+function AgentHierarchy({
+  agents,
+  activePath,
+  onSelect,
+}: {
+  agents: SessionReplayDetail["agents"];
+  activePath: string;
+  onSelect: (path: string) => void;
+}) {
+  const { t } = useTranslation();
+  if (agents.length <= 1) return null;
+
+  return (
+    <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.detail.agent_hierarchy")}>
+      <div className="mb-2 flex items-center gap-2 text-sm font-bold">
+        <GitBranch className="h-4 w-4 text-primary" />
+        {t("sessions.detail.agent_hierarchy")}
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          {t("sessions.detail.agent_count", { count: agents.length })}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {agents.map((agent) => {
+          const isActive = agent.path === activePath;
+          const name = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
+          return (
+            <button
+              key={agent.path}
+              type="button"
+              className={`relative flex w-full items-center gap-2 rounded-md border py-1.5 pr-2 text-left transition ${isActive ? "border-primary/50 bg-primary/10 text-foreground" : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground"}`}
+              style={{ paddingLeft: `${8 + agent.depth * 24}px` }}
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => onSelect(agent.path)}
+            >
+              {agent.depth > 0 ? <span className="absolute top-0 bottom-1/2 w-px bg-border" style={{ left: `${agent.depth * 24 - 5}px` }} /> : null}
+              <Bot className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : ""}`} />
+              <span className="font-mono text-xs font-semibold text-foreground">{name}</span>
+              {agent.nickname ? <span className="text-[10px]">· {agent.nickname}</span> : null}
+              {agent.threadName ? <span className="min-w-0 flex-1 truncate text-xs" title={agent.threadName}>{agent.threadName}</span> : <span className="flex-1" />}
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
+                {agent.parentSessionId ? t("sessions.detail.subagent") : t("sessions.detail.root_agent")}
+              </span>
+              {isActive ? <span className="shrink-0 text-[10px] font-bold text-primary">{t("sessions.detail.current_agent")}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1130,6 +1181,7 @@ function TimelineItem({ item, tokenUsage }: TimelineEntry) {
 export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
+  const [activePath, setActivePath] = useState(session.path);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
   const [copied, setCopied] = useState(false);
@@ -1140,6 +1192,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setActivePath(session.path);
+  }, [session.path]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1162,7 +1218,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setShowDetails(false);
     setIsScrolled(false);
 
-    void fetchSessionDetail(session.path)
+    void fetchSessionDetail(activePath)
       .then((data) => {
         if (!cancelled) {
           setDetail(data);
@@ -1176,7 +1232,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     return () => {
       cancelled = true;
     };
-  }, [session.path]);
+  }, [activePath]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -1332,7 +1388,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
             </div>
           ) : activeTab === "timeline" ? (
             <div className="mx-auto max-w-6xl space-y-2.5">
-              <SessionQuotaUsageView usage={session.quotaUsage} detailed />
+              <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={setActivePath} />
+              {activePath === session.path ? <SessionQuotaUsageView usage={session.quotaUsage} detailed /> : null}
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey);
