@@ -9,6 +9,9 @@
 
 **[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md)
 
+> [!IMPORTANT]
+> ⭐ Codex Usage Desktop を気に入っていただけたら、[GitHub でリポジトリに Star を付けて](https://github.com/itvincent-git/codex-usage-desktop)、プロジェクトを応援してください。
+
 ![トークンコスト、推移、アカウント利用上限を表示する Codex Usage Desktop ダッシュボード](docs/screen_shot.jpg)
 
 Codex Usage Desktop は、パソコン上にある Codex CLI のログを、わかりやすい使用状況ダッシュボードにまとめるアプリです。トークンとコストの推移、使用量の多いプロジェクトやモデル、個別セッションの詳細、アカウントの利用上限を、1 つのネイティブデスクトップアプリで確認できます。

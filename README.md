@@ -9,6 +9,9 @@
 
 **[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md)
 
+> [!IMPORTANT]
+> ⭐ Enjoying Codex Usage Desktop? [Star the repository on GitHub](https://github.com/itvincent-git/codex-usage-desktop) to support the project.
+
 ![Codex Usage Desktop dashboard showing token costs, trends, and account limits](docs/screen_shot.jpg)
 
 Codex Usage Desktop turns the Codex CLI logs already on your computer into a clear usage dashboard. Check token and cost trends, see which projects and models consume the most, inspect individual sessions, and keep an eye on live account limits — all from one native desktop app.

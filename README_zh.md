@@ -9,6 +9,9 @@
 
 **[下载 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 芯片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [日本語](README_ja.md)
 
+> [!IMPORTANT]
+> ⭐ 如果你喜欢 Codex Usage Desktop，欢迎[在 GitHub 上为仓库点亮 Star](https://github.com/itvincent-git/codex-usage-desktop)，支持项目持续发展。
+
 ![Codex Usage Desktop 仪表盘，展示 Token 成本、趋势与账户额度](docs/screen_shot.jpg)
 
 Codex Usage Desktop 将电脑上已有的 Codex CLI 日志整理成清晰的使用看板。你可以查看 Token 和成本趋势，找出消耗最多的项目与模型，深入检查单个会话，并随时关注账户实时额度——全部在一个原生桌面应用中完成。
