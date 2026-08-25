@@ -180,7 +180,11 @@
     "reset_calendar_title": "リセット履歴",
     "reset_calendar_legend": "リセット種類の凡例",
     "reset_calendar_day_label": "{{date}}：{{status}}",
-    "reset_type_none": "リセットなし"
+    "reset_type_none": "リセットなし",
+    "reset_announcements_title": "Codex Reset の原文",
+    "reset_announcements_count": "全{{total}}件中{{visible}}件を表示",
+    "reset_announcements_expand": "すべて表示",
+    "reset_announcements_collapse": "折りたたむ"
   },
   "daily": {
     "title": "日別使用量",

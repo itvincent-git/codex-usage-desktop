@@ -34,6 +34,34 @@ describe("CodexResetHistoryModal", () => {
           url: "https://x.com/thsottiaux/status/2",
         },
       },
+      {
+        id: "3",
+        resetType: "regular",
+        announcedAt: "2026-08-18T00:46:51.000Z",
+        text: "Third reset announcement.",
+        source: { author: "thsottiaux", url: "https://x.com/thsottiaux/status/3" },
+      },
+      {
+        id: "4",
+        resetType: "regular",
+        announcedAt: "2026-08-15T00:46:51.000Z",
+        text: "Fourth reset announcement.",
+        source: { author: "thsottiaux", url: "https://x.com/thsottiaux/status/4" },
+      },
+      {
+        id: "5",
+        resetType: "regular",
+        announcedAt: "2026-08-12T00:46:51.000Z",
+        text: "Fifth reset announcement.",
+        source: { author: "thsottiaux", url: "https://x.com/thsottiaux/status/5" },
+      },
+      {
+        id: "6",
+        resetType: "regular",
+        announcedAt: "2026-08-09T00:46:51.000Z",
+        text: "Oldest reset announcement.",
+        source: { author: "thsottiaux", url: "https://x.com/thsottiaux/status/6" },
+      },
     ]);
     vi.mocked(openUrl).mockResolvedValue();
   });
@@ -44,13 +72,23 @@ describe("CodexResetHistoryModal", () => {
     expect(await screen.findByText("1 day ago")).toBeInTheDocument();
     expect(fetchCodexResetHistory).toHaveBeenCalledWith(30);
     expect(fetchCodexResetHistory).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("2");
+    expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("6");
     expect(screen.getByText("Average interval").nextElementSibling).toHaveTextContent("3d");
     expect(screen.getAllByTestId("reset-history-day")).toHaveLength(30);
-    expect(document.querySelectorAll('[data-reset-type="regular"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-reset-type="regular"]').length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-reset-type="banked"]')).toHaveLength(1);
+    expect(screen.getByText("Reset has been propagated.")).toBeInTheDocument();
+    expect(screen.getByText("Fifth reset announcement.")).toBeInTheDocument();
+    expect(screen.queryByText("Oldest reset announcement.")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /@thsottiaux/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(screen.getByText("Oldest reset announcement.")).toBeInTheDocument();
+    expect(screen.getByText("Showing 6 of 6 announcements")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(screen.queryByText("Oldest reset announcement.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "@thsottiaux" }));
     expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux/status/2091688655828246890");
   });
 

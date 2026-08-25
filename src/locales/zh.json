@@ -180,7 +180,11 @@
     "reset_calendar_title": "重置记录",
     "reset_calendar_legend": "重置类型图例",
     "reset_calendar_day_label": "{{date}}：{{status}}",
-    "reset_type_none": "未重置"
+    "reset_type_none": "未重置",
+    "reset_announcements_title": "Codex Reset 原文",
+    "reset_announcements_count": "显示 {{visible}} 条，共 {{total}} 条",
+    "reset_announcements_expand": "展开全部",
+    "reset_announcements_collapse": "收起"
   },
   "daily": {
     "title": "按日使用明细",

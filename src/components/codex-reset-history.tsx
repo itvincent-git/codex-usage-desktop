@@ -1,10 +1,11 @@
 import dayjs, { type Dayjs } from "dayjs";
-import { ExternalLink, RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchCodexResetHistory, openUrl, type CodexResetAnnouncement } from "@/lib/api";
 
 const HISTORY_DAYS = 30;
+const DEFAULT_VISIBLE_RESETS = 5;
 
 type CalendarDay = {
   date: Dayjs;
@@ -197,6 +198,63 @@ function ResetCalendar({ summary }: { summary: ResetHistorySummary }) {
   );
 }
 
+function ResetAnnouncements({ resets }: { resets: CodexResetAnnouncement[] }) {
+  const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const visibleResets = isExpanded ? resets : resets.slice(0, DEFAULT_VISIBLE_RESETS);
+  const canExpand = resets.length > DEFAULT_VISIBLE_RESETS;
+
+  return (
+    <section className="mt-5" aria-labelledby="reset-announcements-title">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 id="reset-announcements-title" className="text-sm font-bold">
+            {t("limits.reset_announcements_title")}
+          </h4>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            {t("limits.reset_announcements_count", { visible: visibleResets.length, total: resets.length })}
+          </p>
+        </div>
+        {canExpand ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+          >
+            {isExpanded ? t("limits.reset_announcements_collapse") : t("limits.reset_announcements_expand")}
+            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+        ) : null}
+      </div>
+
+      <ol className="mt-3 space-y-2">
+        {visibleResets.map((reset) => (
+          <li key={reset.id} className="rounded-xl border border-border bg-background/35 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reset.resetType === "banked" ? "bg-sky-300/25 text-sky-700 dark:text-sky-300" : "bg-orange-500/10 text-orange-600 dark:text-orange-400"}`}>
+                {t(`limits.reset_type_${reset.resetType}`)}
+              </span>
+              <time className="text-[10px] tabular-nums text-muted-foreground" dateTime={reset.announcedAt}>
+                {dayjs(reset.announcedAt).format("YYYY-MM-DD HH:mm")}
+              </time>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-foreground/85">{reset.text}</p>
+            <button
+              type="button"
+              className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => void openUrl(reset.source.url)}
+            >
+              @{reset.source.author} · {t("limits.reset_history_source")}
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ResetHistoryContent({ resets }: { resets: CodexResetAnnouncement[] }) {
   const { t, i18n } = useTranslation();
   const summary = useMemo(() => buildResetHistorySummary(resets), [resets]);
@@ -232,6 +290,7 @@ function ResetHistoryContent({ resets }: { resets: CodexResetAnnouncement[] }) {
       </div>
 
       <ResetCalendar summary={summary} />
+      <ResetAnnouncements resets={summary.resets} />
     </>
   );
 }
