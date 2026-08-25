@@ -172,7 +172,15 @@
     "reset_history_loading": "Loading reset history...",
     "reset_history_error": "Unable to load reset history right now.",
     "reset_history_empty": "No reset announcements in the last 30 days.",
-    "reset_history_source": "View source"
+    "reset_history_source": "View source",
+    "reset_count": "Resets",
+    "reset_average_interval": "Average interval",
+    "reset_longest_wait": "Longest wait",
+    "reset_days_short": "{{value}}d",
+    "reset_calendar_title": "Reset history",
+    "reset_calendar_legend": "Reset type legend",
+    "reset_calendar_day_label": "{{date}}: {{status}}",
+    "reset_type_none": "No reset"
   },
   "daily": {
     "title": "Daily Usage",

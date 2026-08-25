@@ -172,7 +172,15 @@
     "reset_history_loading": "正在加载重置记录...",
     "reset_history_error": "暂时无法加载重置记录。",
     "reset_history_empty": "最近 30 天没有重置公告。",
-    "reset_history_source": "查看来源"
+    "reset_history_source": "查看来源",
+    "reset_count": "重置次数",
+    "reset_average_interval": "平均重置间隔",
+    "reset_longest_wait": "最长等待",
+    "reset_days_short": "{{value}} 天",
+    "reset_calendar_title": "重置记录",
+    "reset_calendar_legend": "重置类型图例",
+    "reset_calendar_day_label": "{{date}}：{{status}}",
+    "reset_type_none": "未重置"
   },
   "daily": {
     "title": "按日使用明细",
