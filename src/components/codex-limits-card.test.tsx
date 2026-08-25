@@ -407,7 +407,7 @@ describe("CodexLimitsCard component", () => {
     expect(onOpenResetCredits).toHaveBeenCalledTimes(1);
   });
 
-  it("renders a prominent quota forecast badge", () => {
+  it("renders only the percentage in the quota forecast badge", () => {
     render(
       <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={null}
@@ -424,7 +424,7 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByRole("img", { name: "73% reset probability" })).toBeInTheDocument();
     expect(forecastButton).toHaveTextContent("73");
-    expect(forecastButton).toHaveTextContent("Reset likely in 48h");
+    expect(forecastButton).not.toHaveTextContent("Reset likely in 48h");
     expect(forecastButton).toHaveClass("border-error/30");
   });
 
@@ -459,6 +459,7 @@ describe("CodexLimitsCard component", () => {
     const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
 
     expect(latestResetButton).toHaveTextContent("Latest token reset");
+    expect(latestResetButton.parentElement).toHaveClass("grid-cols-[minmax(0,1fr)_auto]");
     expect(latestResetButton.compareDocumentPosition(forecastButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fireEvent.click(latestResetButton);

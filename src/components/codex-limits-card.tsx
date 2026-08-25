@@ -23,7 +23,6 @@ type LimitRowProps = {
 };
 
 type QuotaForecastTone = {
-  label: string;
   className: string;
   scoreClassName: string;
   ringColor: string;
@@ -51,7 +50,7 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
 export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
   const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
-  const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
+  const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore);
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
@@ -123,10 +122,9 @@ function formatQuotaForecast(score: number, t: any) {
   return t("limits.quota_forecast_low", { score: roundedScore });
 }
 
-function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
+function getQuotaForecastTone(score: number): QuotaForecastTone {
   if (score >= 70) {
     return {
-      label: t("limits.quota_forecast_likely_label"),
       className: "border-error/30 bg-error/10 hover:border-error/45 hover:bg-error/15",
       scoreClassName: "text-error",
       ringColor: "rgb(var(--error))",
@@ -135,7 +133,6 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
 
   if (score >= 40) {
     return {
-      label: t("limits.quota_forecast_possible_label"),
       className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
       scoreClassName: "text-warning",
       ringColor: "rgb(var(--warning))",
@@ -143,7 +140,6 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
   }
 
   return {
-    label: t("limits.quota_forecast_low_label"),
     className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
     scoreClassName: "text-success",
     ringColor: "rgb(var(--success))",
@@ -210,7 +206,7 @@ function ResetArea({
       data-testid="reset-area"
       className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
     >
-      <div className={cn("grid gap-2", latestReset && showQuotaForecast ? "grid-cols-2" : "grid-cols-1")}>
+      <div className={cn("grid gap-2", latestReset && showQuotaForecast ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
         {latestReset ? (
           <LatestResetButton reset={latestReset} onOpen={() => onOpenResetHistory?.()} />
         ) : null}
@@ -218,19 +214,13 @@ function ResetArea({
           <button
             type="button"
             className={cn(
-              "group flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "flex items-center justify-center rounded-lg border px-2.5 py-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               quotaForecastTone.className,
             )}
             onClick={onOpenQuotaForecast}
             aria-label={t("limits.quota_forecast_open")}
           >
             <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
-            <span className="min-w-0">
-              <span className="mt-0.5 block text-[10px] font-semibold leading-none text-foreground/80">
-                {quotaForecastTone.label}
-              </span>
-            </span>
-            <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
           </button>
         ) : null}
       </div>
