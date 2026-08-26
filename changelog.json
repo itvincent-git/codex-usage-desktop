@@ -1,4 +1,8 @@
 {
+  "2.7.0": {
+    "zh": "- fix: keep subagents below their parents\n- feat(sessions): add JSONL reveal and ID copy actions\n- fix: label fallback subagents correctly\n- fix: keep replay root first\n- feat(sessions): collapse subagent groups\n- feat(sessions): embed subagent summary in parent card\n- fix(sessions): toggle subagents from summary row\n- feat: connect parent and child agents in session details\n- fix: end collapsed agent tree with a corner\n- feat: connect parent and child agent sessions\n- fix: keep agent hierarchy lines connected\n- fix: exclude root from agent count",
+    "en": "- fix: keep subagents below their parents\n- feat(sessions): add JSONL reveal and ID copy actions\n- fix: label fallback subagents correctly\n- fix: keep replay root first\n- feat(sessions): collapse subagent groups\n- feat(sessions): embed subagent summary in parent card\n- fix(sessions): toggle subagents from summary row\n- feat: connect parent and child agents in session details\n- fix: end collapsed agent tree with a corner\n- feat: connect parent and child agent sessions\n- fix: keep agent hierarchy lines connected\n- fix: exclude root from agent count"
+  },
   "2.6.1": {
     "zh": "- docs: highlight session quota usage and reset history\n- fix: handle reset sources without authors",
     "en": "- docs: highlight session quota usage and reset history\n- fix: handle reset sources without authors"
