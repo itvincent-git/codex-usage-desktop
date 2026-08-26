@@ -208,7 +208,11 @@ function AgentHierarchy({
       <div className="space-y-1">
         {agents.map((agent) => {
           const isActive = agent.path === activePath;
-          const name = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
+          const pathName = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
+          const name = agent.parentSessionId && pathName === "root"
+            ? agent.nickname || agent.role || t("sessions.detail.subagent")
+            : pathName;
+          const nickname = agent.nickname === name ? null : agent.nickname;
           return (
             <button
               key={agent.path}
@@ -221,7 +225,7 @@ function AgentHierarchy({
               {agent.depth > 0 ? <span className="absolute top-0 bottom-1/2 w-px bg-border" style={{ left: `${agent.depth * 24 - 5}px` }} /> : null}
               <Bot className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : ""}`} />
               <span className="font-mono text-xs font-semibold text-foreground">{name}</span>
-              {agent.nickname ? <span className="text-[10px]">· {agent.nickname}</span> : null}
+              {nickname ? <span className="text-[10px]">· {nickname}</span> : null}
               {agent.threadName ? <span className="min-w-0 flex-1 truncate text-xs" title={agent.threadName}>{agent.threadName}</span> : <span className="flex-1" />}
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold">
                 {agent.parentSessionId ? t("sessions.detail.subagent") : t("sessions.detail.root_agent")}

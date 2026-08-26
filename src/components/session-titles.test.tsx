@@ -748,8 +748,8 @@ describe("session titles", () => {
     await i18n.changeLanguage("en");
     const agents = [
       { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
-      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/research", nickname: "Curie", role: null, threadName: "Research task" },
-      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root/research/tests", nickname: null, role: null, threadName: "Test task" },
+      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", role: null, threadName: "Research task" },
+      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", nickname: null, role: "Tester", threadName: "Test task" },
     ];
     invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
       if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
@@ -765,8 +765,9 @@ describe("session titles", () => {
     const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
     expect(within(hierarchy).getByText("3 agents")).toBeInTheDocument();
     const rootButton = within(hierarchy).getByRole("button", { name: /root.*Root task.*Root.*Current/ });
-    const childButton = within(hierarchy).getByRole("button", { name: /research.*Curie.*Research task.*Subagent/ });
-    const grandchildButton = within(hierarchy).getByRole("button", { name: /tests.*Test task.*Subagent/ });
+    const childButton = within(hierarchy).getByRole("button", { name: /Curie.*Research task.*Subagent/ });
+    const grandchildButton = within(hierarchy).getByRole("button", { name: /Tester.*Test task.*Subagent/ });
+    expect(within(childButton).getAllByText("Curie")).toHaveLength(1);
     expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
     expect(childButton).toHaveStyle({ paddingLeft: "32px" });
     expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
