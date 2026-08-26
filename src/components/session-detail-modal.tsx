@@ -227,6 +227,12 @@ function AgentHierarchy({
   const visibleAgents = isExpanded ? orderedAgents : collapsedAgents;
   const totalCost = agents.reduce((sum, agent) => sum + agent.costUSD, 0);
 
+  const hasFollowingSibling = (agent: (typeof agents)[number]) => {
+    if (!agent.parentSessionId) return false;
+    const siblings = children.get(agent.parentSessionId) ?? [];
+    return siblings.indexOf(agent) < siblings.length - 1;
+  };
+
   return (
     <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.detail.agent_hierarchy")}>
       <button
@@ -245,7 +251,7 @@ function AgentHierarchy({
         <span className="text-xs tabular-nums text-foreground" data-testid="agent-group-cost">{formatCurrency(totalCost)}</span>
         <span className="text-xs font-semibold text-primary">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
       </button>
-      <div className="space-y-1">
+      <div className="overflow-hidden">
         {visibleAgents.map((agent) => {
           const isActive = agent.path === activePath;
           const pathName = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
@@ -253,16 +259,50 @@ function AgentHierarchy({
             ? agent.nickname || agent.role || t("sessions.detail.subagent")
             : pathName;
           const nickname = agent.nickname === name ? null : agent.nickname;
+          const lineage = [agent];
+          while (lineage[0].parentSessionId) {
+            const parent = bySessionId.get(lineage[0].parentSessionId);
+            if (!parent) break;
+            lineage.unshift(parent);
+          }
           return (
             <button
               key={agent.path}
               type="button"
-              className={`relative flex w-full items-center gap-2 rounded-md border py-1.5 pr-2 text-left transition ${isActive ? "border-primary/50 bg-primary/10 text-foreground" : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground"}`}
+              className={`relative flex w-full items-center gap-2 rounded-md border py-1.5 pr-2 text-left transition [&+&]:mt-1 ${isActive ? "border-primary/50 bg-primary/10 text-foreground" : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground"}`}
               style={{ paddingLeft: `${8 + agent.depth * 24}px` }}
               aria-current={isActive ? "true" : undefined}
               onClick={() => onSelect(agent.path)}
             >
-              {agent.depth > 0 ? <span className="absolute top-0 bottom-1/2 w-px bg-border" style={{ left: `${agent.depth * 24 - 5}px` }} /> : null}
+              {children.has(agent.sessionId) ? (
+                <span
+                  className="pointer-events-none absolute -bottom-0.5 top-1/2 w-px bg-primary/30"
+                  style={{ left: `${15 + agent.depth * 24}px` }}
+                  data-testid="agent-tree-trunk"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {Array.from({ length: agent.depth }, (_, levelIndex) => {
+                const level = levelIndex + 1;
+                const branchAgent = lineage[level];
+                const isCurrentLevel = level === agent.depth;
+                if (!branchAgent || (!isCurrentLevel && !hasFollowingSibling(branchAgent))) return null;
+                const left = 15 + levelIndex * 24;
+                const continuesToNextSibling = hasFollowingSibling(branchAgent);
+                return (
+                  <span
+                    key={level}
+                    className={`pointer-events-none absolute -top-0.5 w-px bg-primary/30 ${continuesToNextSibling ? "-bottom-0.5" : "bottom-1/2"}`}
+                    style={{ left: `${left}px` }}
+                    data-testid="agent-tree-connector"
+                    aria-hidden="true"
+                  >
+                    {isCurrentLevel ? (
+                      <span className={`absolute left-0 h-px w-[17px] -translate-y-px bg-primary/30 ${continuesToNextSibling ? "top-1/2" : "top-full"}`} />
+                    ) : null}
+                  </span>
+                );
+              })}
               <Bot className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : ""}`} />
               <span className="font-mono text-xs font-semibold text-foreground">{name}</span>
               {nickname ? <span className="text-[10px]">· {nickname}</span> : null}

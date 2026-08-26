@@ -807,6 +807,10 @@ describe("session titles", () => {
     expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
     expect(childButton).toHaveStyle({ paddingLeft: "32px" });
     expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
+    expect(within(rootButton).getByTestId("agent-tree-trunk")).toHaveStyle({ left: "15px" });
+    expect(within(childButton).getByTestId("agent-tree-connector")).toHaveStyle({ left: "15px" });
+    expect(within(grandchildButton).getAllByTestId("agent-tree-connector")).toHaveLength(2);
+    expect(within(grandchildButton).getAllByTestId("agent-tree-connector")[1]).toHaveStyle({ left: "39px" });
     expect(within(hierarchy).getAllByRole("button")).toHaveLength(4);
     expect(within(hierarchy).getAllByRole("button")[1]).toBe(rootButton);
     expect(within(hierarchy).getByTestId("agent-group-cost")).toHaveTextContent("$0.015");
