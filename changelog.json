@@ -1,4 +1,8 @@
 {
+  "2.6.1": {
+    "zh": "- docs: highlight session quota usage and reset history\n- fix: handle reset sources without authors",
+    "en": "- docs: highlight session quota usage and reset history\n- fix: handle reset sources without authors"
+  },
   "2.6.0": {
     "zh": "- docs: add Japanese README\n- docs: add star callout to readmes\n- feat: show recent Codex token resets\n- fix: simplify quota reset forecast card\n- fix: show quota forecast explanation below percentage\n- feat: add 30-day reset history overview\n- feat: show reset announcement text\n- fix: group reset history by UTC date",
     "en": "- docs: add Japanese README\n- docs: add star callout to readmes\n- feat: show recent Codex token resets\n- fix: simplify quota reset forecast card\n- fix: show quota forecast explanation below percentage\n- feat: add 30-day reset history overview\n- feat: show reset announcement text\n- fix: group reset history by UTC date"
