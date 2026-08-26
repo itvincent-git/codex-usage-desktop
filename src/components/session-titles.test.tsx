@@ -747,9 +747,9 @@ describe("session titles", () => {
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
     await i18n.changeLanguage("en");
     const agents = [
-      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
       { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", role: null, threadName: "Research task" },
       { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", nickname: null, role: "Tester", threadName: "Test task" },
+      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
     ];
     invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
       if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
@@ -771,6 +771,7 @@ describe("session titles", () => {
     expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
     expect(childButton).toHaveStyle({ paddingLeft: "32px" });
     expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
+    expect(within(hierarchy).getAllByRole("button")[0]).toBe(rootButton);
 
     await userEvent.click(childButton);
     expect(await screen.findByRole("dialog", { name: "Research task" })).toBeInTheDocument();

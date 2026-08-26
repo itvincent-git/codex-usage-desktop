@@ -2183,6 +2183,7 @@ mod tests {
 
         let detail = fetch_session_detail(&db, &child_path.to_string_lossy()).unwrap();
         assert_eq!(detail.agents.len(), 3);
+        assert_eq!(detail.agents[0].session_id, "root-id");
         assert_eq!(detail.agents[0].agent_path, "/root");
         assert_eq!(detail.agents[1].session_id, "child-id");
         assert_eq!(

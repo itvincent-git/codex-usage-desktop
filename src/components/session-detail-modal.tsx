@@ -196,6 +196,27 @@ function AgentHierarchy({
   const { t } = useTranslation();
   if (agents.length <= 1) return null;
 
+  const bySessionId = new Map(agents.map((agent) => [agent.sessionId, agent]));
+  const children = new Map<string, typeof agents>();
+  for (const agent of agents) {
+    if (!agent.parentSessionId || !bySessionId.has(agent.parentSessionId)) continue;
+    const siblings = children.get(agent.parentSessionId) ?? [];
+    siblings.push(agent);
+    children.set(agent.parentSessionId, siblings);
+  }
+  const orderedAgents: typeof agents = [];
+  const visited = new Set<string>();
+  const visit = (agent: (typeof agents)[number]) => {
+    if (visited.has(agent.sessionId)) return;
+    visited.add(agent.sessionId);
+    orderedAgents.push(agent);
+    for (const child of children.get(agent.sessionId) ?? []) visit(child);
+  };
+  for (const agent of agents) {
+    if (!agent.parentSessionId || !bySessionId.has(agent.parentSessionId)) visit(agent);
+  }
+  for (const agent of agents) visit(agent);
+
   return (
     <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.detail.agent_hierarchy")}>
       <div className="mb-2 flex items-center gap-2 text-sm font-bold">
@@ -206,7 +227,7 @@ function AgentHierarchy({
         </span>
       </div>
       <div className="space-y-1">
-        {agents.map((agent) => {
+        {orderedAgents.map((agent) => {
           const isActive = agent.path === activePath;
           const pathName = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
           const name = agent.parentSessionId && pathName === "root"
