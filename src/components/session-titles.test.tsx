@@ -292,6 +292,8 @@ describe("session titles", () => {
       "/root/researcher",
     );
     expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
+    expect(within(cards[0].parentElement!).getByTestId("agent-child-stem")).toBeInTheDocument();
+    expect(within(cards[1].parentElement!).getByTestId("agent-branch")).toBeInTheDocument();
   });
 
   it("shows the subagent summary inside the parent card and keeps one child visible when collapsed", async () => {
@@ -321,6 +323,10 @@ describe("session titles", () => {
     const summary = within(parentCard).getByTestId("subagent-summary");
     await userEvent.click(summary);
     expect(within(group).getAllByTestId("session-card")).toHaveLength(5);
+    const branches = within(group).getAllByTestId("agent-branch");
+    expect(branches).toHaveLength(4);
+    expect(branches.slice(0, -1).every((branch) => branch.classList.contains("continues"))).toBe(true);
+    expect(branches.at(-1)).not.toHaveClass("continues");
     expect(onSessionClick).not.toHaveBeenCalled();
 
     await userEvent.click(summary);

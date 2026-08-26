@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Terminal, Folder, ChevronDown, Calendar, CornerDownRight, GitBranch } from "lucide-react";
+import { Terminal, Folder, ChevronDown, Calendar, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -95,6 +95,44 @@ function groupSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
     key: root.path,
     sessions: members,
     costUSD: members.reduce((sum, session) => sum + session.costUSD, 0),
+  }));
+}
+
+function buildAgentConnectorMetadata(sessions: SessionDisplayRow[]) {
+  const byAgentId = new Map(
+    sessions.flatMap((session) => session.agentSessionId ? [[session.agentSessionId, session] as const] : []),
+  );
+  const children = new Map<string, SessionDisplayRow[]>();
+
+  for (const session of sessions) {
+    if (!session.parentSessionId || !byAgentId.has(session.parentSessionId)) continue;
+    const siblings = children.get(session.parentSessionId) ?? [];
+    siblings.push(session);
+    children.set(session.parentSessionId, siblings);
+  }
+
+  const hasFollowingSibling = (session: SessionDisplayRow) => {
+    if (!session.parentSessionId) return false;
+    const siblings = children.get(session.parentSessionId) ?? [];
+    return siblings.at(-1) !== session;
+  };
+
+  return new Map(sessions.map((session) => {
+    const continuingAncestorDepths: number[] = [];
+    let ancestor = session.parentSessionId ? byAgentId.get(session.parentSessionId) : undefined;
+
+    while (ancestor) {
+      if ((ancestor.agentDepth ?? 0) > 0 && hasFollowingSibling(ancestor)) {
+        continuingAncestorDepths.push(Math.min(ancestor.agentDepth ?? 0, 6));
+      }
+      ancestor = ancestor.parentSessionId ? byAgentId.get(ancestor.parentSessionId) : undefined;
+    }
+
+    return [session.path, {
+      hasVisibleChildren: Boolean(session.agentSessionId && children.get(session.agentSessionId)?.length),
+      hasFollowingVisibleSibling: hasFollowingSibling(session),
+      continuingAncestorDepths,
+    }] as const;
   }));
 }
 
@@ -528,6 +566,7 @@ export function SessionUsageTable({
                     const visibleSessions = hasSubagents && !isExpanded
                       ? [agentGroup.sessions[0], ...agentGroup.sessions.slice(1, COLLAPSED_SUBAGENT_LIMIT + 1)]
                       : agentGroup.sessions;
+                    const connectorMetadata = buildAgentConnectorMetadata(visibleSessions);
 
                     return (
                       <div key={agentGroup.key} className="space-y-2" data-testid={hasSubagents ? "subagent-group" : undefined}>
@@ -570,6 +609,7 @@ export function SessionUsageTable({
                       .filter(Boolean)
                       .join(" · ");
                     const isParentAgent = hasSubagents && session.path === agentGroup.key;
+                    const connector = connectorMetadata.get(session.path);
 
                     return (
                       <div
@@ -578,11 +618,28 @@ export function SessionUsageTable({
                         data-agent-depth={session.agentDepth ?? 0}
                         style={{ paddingInlineStart: hierarchyDepth ? `${hierarchyDepth * 20}px` : undefined }}
                       >
-                      {isSubagent ? (
-                        <CornerDownRight
+                      {connector?.continuingAncestorDepths.map((ancestorDepth) => (
+                        <span
+                          key={ancestorDepth}
                           aria-hidden="true"
-                          className="absolute top-3 h-4 w-4 text-indigo-400/70"
-                          style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20}px` }}
+                          className="session-agent-rail"
+                          style={{ insetInlineStart: `${(ancestorDepth - 1) * 20 + 8}px` }}
+                        />
+                      ))}
+                      {isSubagent ? (
+                        <span
+                          aria-hidden="true"
+                          className={`session-agent-branch ${connector?.hasFollowingVisibleSibling ? "continues" : ""}`}
+                          data-testid="agent-branch"
+                          style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20 + 8}px` }}
+                        />
+                      ) : null}
+                      {connector?.hasVisibleChildren ? (
+                        <span
+                          aria-hidden="true"
+                          className="session-agent-child-stem"
+                          data-testid="agent-child-stem"
+                          style={{ insetInlineStart: `${hierarchyDepth * 20 + 8}px` }}
                         />
                       ) : null}
                       <article

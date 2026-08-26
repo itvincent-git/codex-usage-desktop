@@ -80,6 +80,54 @@
     grid-row: 2;
   }
 
+  .session-agent-branch,
+  .session-agent-rail,
+  .session-agent-child-stem {
+    pointer-events: none;
+    position: absolute;
+    border-color: rgb(var(--primary) / 0.35);
+  }
+
+  .session-agent-branch {
+    top: -8px;
+    width: 12px;
+    height: calc(50% + 8px);
+    border-inline-start-width: 1px;
+    border-bottom-width: 1px;
+  }
+
+  .session-agent-branch::after {
+    position: absolute;
+    inset-inline-end: -3px;
+    bottom: -3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: rgb(var(--primary) / 0.6);
+    content: "";
+  }
+
+  .session-agent-branch.continues::before {
+    position: absolute;
+    inset-inline-start: -1px;
+    top: 100%;
+    height: calc(50% + 8px);
+    border-inline-start: 1px solid rgb(var(--primary) / 0.35);
+    content: "";
+  }
+
+  .session-agent-rail {
+    top: -8px;
+    bottom: -8px;
+    border-inline-start-width: 1px;
+  }
+
+  .session-agent-child-stem {
+    top: 100%;
+    height: 8px;
+    border-inline-start-width: 1px;
+  }
+
   @media (min-width: 901px) {
     .session-usage-card[data-language="en"] {
       grid-template-columns: minmax(240px, 1fr) minmax(250px, 0.65fr) 212px;
