@@ -461,7 +461,10 @@
     "token_total_label": "Total tokens {{total}}; {{percent}} of the highest visible session",
     "cost_pill_label": "Cost {{cost}}; {{percent}} of the highest visible session",
   "subagent": "Subagent",
+  "subagent_count_one": "{{count}} subagent",
+  "subagent_count_other": "{{count}} subagents",
   "subagent_group": "Subagent group",
+  "total_cost": "Total cost",
   "group_total_cost": "Parent + subagents",
   "open_session": "Open session {{title}}",
   "quota": {

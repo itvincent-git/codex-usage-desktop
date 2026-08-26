@@ -294,7 +294,8 @@ describe("session titles", () => {
     expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
   });
 
-  it("collapses subagent groups to three rows and shows the complete group cost", async () => {
+  it("shows the subagent summary inside the parent card and keeps one child visible when collapsed", async () => {
+    const onSessionClick = vi.fn();
     const members = [
       session({ path: "/tmp/root.jsonl", sessionId: "root.jsonl", threadName: "Parent", agentSessionId: "root-id", costUSD: 1, dailyUsage: [] }),
       ...Array.from({ length: 4 }, (_, index) => session({
@@ -309,14 +310,17 @@ describe("session titles", () => {
       })),
     ];
 
-    render(<SessionUsageTable sessions={members} />);
+    render(<SessionUsageTable sessions={members} onSessionClick={onSessionClick} />);
 
     const group = screen.getByTestId("subagent-group");
-    expect(within(group).getAllByTestId("session-card")).toHaveLength(3);
+    const parentCard = within(group).getByText("Parent").closest("article")!;
+    expect(within(group).getAllByTestId("session-card")).toHaveLength(2);
+    expect(within(parentCard).getByTestId("subagent-summary")).toHaveTextContent("4 subagents");
     expect(within(group).getByTestId("subagent-group-cost")).toHaveTextContent("$15.00");
 
-    await userEvent.click(within(group).getByRole("button", { name: /Subagent group/ }));
+    await userEvent.click(within(parentCard).getByRole("button", { name: "Expand" }));
     expect(within(group).getAllByTestId("session-card")).toHaveLength(5);
+    expect(onSessionClick).not.toHaveBeenCalled();
   });
 
   it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {

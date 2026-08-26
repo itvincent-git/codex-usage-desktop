@@ -502,7 +502,10 @@
     "token_total_label": "合計トークン数 {{total}}。表示中セッションの最大値に対して{{percent}}",
     "cost_pill_label": "コスト {{cost}}。表示中セッションの最大値に対して{{percent}}",
     "subagent": "サブエージェント",
+    "subagent_count_one": "{{count}} サブエージェント",
+    "subagent_count_other": "{{count}} サブエージェント",
     "subagent_group": "サブエージェントグループ",
+    "total_cost": "合計料金",
     "group_total_cost": "親子の合計料金",
     "open_session": "セッションを開く {{title}}",
     "quota": {

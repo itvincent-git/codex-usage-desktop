@@ -68,6 +68,18 @@
     align-items: center;
   }
 
+  .session-card-subagents {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin-bottom: 8px;
+  }
+
+  .session-usage-card.has-subagents .session-card-summary,
+  .session-usage-card.has-subagents .session-card-tokens,
+  .session-usage-card.has-subagents .session-card-quota {
+    grid-row: 2;
+  }
+
   @media (min-width: 901px) {
     .session-usage-card[data-language="en"] {
       grid-template-columns: minmax(240px, 1fr) minmax(250px, 0.65fr) 212px;
@@ -100,6 +112,10 @@
       margin: 8px 0 0;
       padding: 8px 0 0;
     }
+
+    .session-usage-card.has-subagents .session-card-quota {
+      grid-row: 3;
+    }
   }
 
   @media (max-width: 620px) {
@@ -115,6 +131,18 @@
       border-top: 1px solid rgb(var(--border) / 0.55);
       margin: 8px 0 0;
       padding: 8px 0 0;
+    }
+
+    .session-usage-card.has-subagents .session-card-summary {
+      grid-row: 2;
+    }
+
+    .session-usage-card.has-subagents .session-card-tokens {
+      grid-row: 3;
+    }
+
+    .session-usage-card.has-subagents .session-card-quota {
+      grid-row: 4;
     }
   }
 

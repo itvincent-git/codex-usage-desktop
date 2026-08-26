@@ -461,7 +461,11 @@
     "token_total_label": "Token 总数 {{total}}；相当于当前可见会话最高值的 {{percent}}",
     "cost_pill_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
   "subagent": "子 Agent",
+  "subagent_count": "{{count}} 个子 Agent",
+  "subagent_count_one": "{{count}} 个子 Agent",
+  "subagent_count_other": "{{count}} 个子 Agent",
   "subagent_group": "子 Agent 分组",
+  "total_cost": "总费用",
   "group_total_cost": "父子总费用",
   "open_session": "打开会话 {{title}}",
   "quota": {

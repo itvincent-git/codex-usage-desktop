@@ -14,7 +14,7 @@ type SessionDisplayRow = SessionDetailRow & {
   originalSession: SessionDetailRow;
 };
 
-const COLLAPSED_AGENT_LIMIT = 3;
+const COLLAPSED_SUBAGENT_LIMIT = 1;
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
@@ -526,29 +526,11 @@ export function SessionUsageTable({
                     const hasSubagents = agentGroup.sessions.length > 1;
                     const isExpanded = Boolean(expandedAgentGroups[groupKey]);
                     const visibleSessions = hasSubagents && !isExpanded
-                      ? agentGroup.sessions.slice(0, COLLAPSED_AGENT_LIMIT)
+                      ? [agentGroup.sessions[0], ...agentGroup.sessions.slice(1, COLLAPSED_SUBAGENT_LIMIT + 1)]
                       : agentGroup.sessions;
 
                     return (
                       <div key={agentGroup.key} className="space-y-2" data-testid={hasSubagents ? "subagent-group" : undefined}>
-                        {hasSubagents ? (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-left text-xs transition hover:bg-indigo-500/10"
-                            aria-expanded={isExpanded}
-                            onClick={() => toggleAgentGroup(groupKey)}
-                          >
-                            {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-indigo-400" /> : <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-indigo-400" />}
-                            <GitBranch className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
-                            <span className="font-semibold text-foreground">{t("sessions.subagent_group")}</span>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                              {t("sessions.detail.agent_count", { count: agentGroup.sessions.length })}
-                            </span>
-                            <span className="ml-auto text-muted-foreground">{t("sessions.group_total_cost")}</span>
-                            <span className="font-bold tabular-nums text-foreground" data-testid="subagent-group-cost">{formatCurrency(agentGroup.costUSD)}</span>
-                            <span className="font-semibold text-indigo-400">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
-                          </button>
-                        ) : null}
                         <div className="space-y-2">
                           {visibleSessions.map((session) => {
                     const isInactive = session.totalTokens === 0;
@@ -587,6 +569,7 @@ export function SessionUsageTable({
                     const subagentLabel = [t("sessions.subagent"), session.agentNickname, session.agentRole]
                       .filter(Boolean)
                       .join(" · ");
+                    const isParentAgent = hasSubagents && session.path === agentGroup.key;
 
                     return (
                       <div
@@ -616,8 +599,36 @@ export function SessionUsageTable({
                             onSessionClick(session.originalSession);
                           }
                         }}
-                        className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
+                        className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${isParentAgent ? "has-subagents" : ""} ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
+                        {isParentAgent ? (
+                          <div
+                            className="session-card-subagents flex min-w-0 items-center gap-2 border-b border-indigo-500/15 pb-2 text-xs"
+                            data-testid="subagent-summary"
+                          >
+                            <GitBranch className="h-3.5 w-3.5 shrink-0 text-indigo-400" aria-hidden="true" />
+                            <span className="font-semibold text-foreground">
+                              {t("sessions.subagent_count", { count: agentGroup.sessions.length - 1 })}
+                            </span>
+                            <span className="ml-auto text-muted-foreground">{t("sessions.total_cost")}</span>
+                            <span className="font-bold tabular-nums text-foreground" data-testid="subagent-group-cost">
+                              {formatCurrency(agentGroup.costUSD)}
+                            </span>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-indigo-400 transition hover:bg-indigo-500/10 focus-visible:ring-2 focus-visible:ring-indigo-400/50"
+                              aria-expanded={isExpanded}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleAgentGroup(groupKey);
+                              }}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+                              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "" : "-rotate-90"}`} aria-hidden="true" />
+                            </button>
+                          </div>
+                        ) : null}
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
                             <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
