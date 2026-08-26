@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Terminal, Folder, ChevronDown, Calendar, CornerDownRight } from "lucide-react";
+import { Bot, Terminal, Folder, ChevronDown, Calendar, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,12 @@ import { SessionQuotaUsageView } from "./session-quota-usage";
 type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
   originalSession: SessionDetailRow;
+};
+
+type SessionFamily = {
+  parent: SessionDisplayRow;
+  children: SessionDisplayRow[];
+  totalCostUSD: number;
 };
 
 type SessionUsageTableProps = {
@@ -40,18 +46,39 @@ function cleanSessionId(sessionId: string) {
   return sessionId.replace(/\.jsonl$/, "");
 }
 
+function humanizeAgentValue(value: string) {
+  return value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function agentSessionTitle(session: SessionDisplayRow) {
+  const pathName = session.agentPath?.split("/").filter(Boolean).at(-1);
+  return pathName ? humanizeAgentValue(pathName) : session.threadName || cleanSessionId(session.sessionId);
+}
+
+function sessionAgentId(session: SessionDetailRow) {
+  return session.agentSessionId ?? session.threadId;
+}
+
+function parentAgentId(session: SessionDetailRow) {
+  return session.parentSessionId ?? session.parentThreadId;
+}
+
 function orderSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
   const chronological = [...sessions].sort((a, b) => b.modifiedAtMs - a.modifiedAtMs);
   const byAgentId = new Map(
-    chronological.flatMap((session) => session.agentSessionId ? [[session.agentSessionId, session] as const] : []),
+    chronological.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    }),
   );
   const children = new Map<string, SessionDisplayRow[]>();
 
   for (const session of chronological) {
-    if (!session.parentSessionId || !byAgentId.has(session.parentSessionId)) continue;
-    const siblings = children.get(session.parentSessionId) ?? [];
+    const parentId = parentAgentId(session);
+    if (!parentId || !byAgentId.has(parentId)) continue;
+    const siblings = children.get(parentId) ?? [];
     siblings.push(session);
-    children.set(session.parentSessionId, siblings);
+    children.set(parentId, siblings);
   }
 
   const ordered: SessionDisplayRow[] = [];
@@ -60,15 +87,77 @@ function orderSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
     if (visited.has(session)) return;
     visited.add(session);
     ordered.push(session);
-    if (!session.agentSessionId) return;
-    for (const child of children.get(session.agentSessionId) ?? []) visit(child);
+    const agentId = sessionAgentId(session);
+    if (!agentId) return;
+    for (const child of children.get(agentId) ?? []) visit(child);
   };
 
   for (const session of chronological) {
-    if (!session.parentSessionId || !byAgentId.has(session.parentSessionId)) visit(session);
+    const parentId = parentAgentId(session);
+    if (!parentId || !byAgentId.has(parentId)) visit(session);
   }
   for (const session of chronological) visit(session);
   return ordered;
+}
+
+function groupSessionFamilies(
+  rows: SessionDisplayRow[],
+  sessionsByAgentId: Map<string, SessionDetailRow>,
+): SessionFamily[] {
+  const rowsByAgentId = new Map(
+    rows.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    }),
+  );
+  const childrenByParentPath = new Map<string, SessionDisplayRow[]>();
+  const childPaths = new Set<string>();
+
+  for (const session of rows) {
+    let parentId = parentAgentId(session);
+    let visibleParent: SessionDisplayRow | undefined;
+    const visited = new Set<string>();
+
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      visibleParent = rowsByAgentId.get(parentId) ?? visibleParent;
+      const parent = sessionsByAgentId.get(parentId);
+      parentId = parent ? parentAgentId(parent) : undefined;
+    }
+
+    if (!visibleParent || visibleParent.path === session.path) continue;
+    const children = childrenByParentPath.get(visibleParent.path) ?? [];
+    children.push(session);
+    childrenByParentPath.set(visibleParent.path, children);
+    childPaths.add(session.path);
+  }
+
+  return rows
+    .filter((session) => !childPaths.has(session.path))
+    .map((parent) => {
+      const children = childrenByParentPath.get(parent.path) ?? [];
+      return {
+        parent,
+        children,
+        totalCostUSD: children.reduce((sum, child) => sum + child.costUSD, parent.costUSD),
+      };
+    });
+}
+
+function agentHierarchyDepth(
+  session: SessionDetailRow,
+  sessionsByAgentId: Map<string, SessionDetailRow>,
+) {
+  let inferredDepth = 0;
+  let parentId = parentAgentId(session);
+  const visited = new Set<string>();
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    inferredDepth += 1;
+    const parent = sessionsByAgentId.get(parentId);
+    parentId = parent ? parentAgentId(parent) : undefined;
+  }
+  return Math.min(Math.max(session.agentDepth ?? 0, inferredDepth), 6);
 }
 
 function formatDateHeader(dateStr: string) {
@@ -170,6 +259,7 @@ export function SessionUsageTable({
   const { t, i18n } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+  const [expandedAgentGroups, setExpandedAgentGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (initialExpandedDate) {
@@ -205,6 +295,14 @@ export function SessionUsageTable({
     }));
   }), [sessions]);
 
+  const sessionsByAgentId = useMemo(
+    () => new Map(sessions.flatMap((session) => {
+      const agentId = sessionAgentId(session);
+      return agentId ? [[agentId, session] as const] : [];
+    })),
+    [sessions],
+  );
+
   // Group and sort session-day rows using the scanner's application-timezone dates.
   const groups = useMemo(() => {
     const map: Record<string, SessionDisplayRow[]> = {};
@@ -238,6 +336,7 @@ export function SessionUsageTable({
         return {
           date,
           sessions: sortedItems,
+          sessionFamilies: groupSessionFamilies(sortedItems, sessionsByAgentId),
           totalTokens,
           inputTokens,
           cachedInputTokens,
@@ -249,7 +348,7 @@ export function SessionUsageTable({
           projects,
         };
       });
-  }, [displaySessions, selectedProject]);
+  }, [displaySessions, selectedProject, sessionsByAgentId]);
 
   const filteredCount = useMemo(() => {
     if (!selectedProject) return displaySessions.length;
@@ -268,6 +367,18 @@ export function SessionUsageTable({
         maxima,
       ),
       { tokens: 0, cost: 0 },
+    ),
+    [groups],
+  );
+  const maxFamilyCost = useMemo(
+    () => groups.reduce(
+      (maxCost, group) => group.sessionFamilies.reduce(
+        (familyMax, family) => family.children.length > 0
+          ? Math.max(familyMax, family.totalCostUSD)
+          : familyMax,
+        maxCost,
+      ),
+      0,
     ),
     [groups],
   );
@@ -488,7 +599,28 @@ export function SessionUsageTable({
               {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
                 <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
-                  {group.sessions.map((session) => {
+                  {group.sessionFamilies.flatMap(({ parent, children, totalCostUSD }) => {
+                    const groupKey = `${group.date}:${parent.path}`;
+                    const expanded = expandedAgentGroups[groupKey] ?? false;
+                    return [
+                      {
+                        session: parent,
+                        isSubagent: Boolean(parent.parentThreadId),
+                        childCount: children.length,
+                        familyCostUSD: children.length > 0 ? totalCostUSD : null,
+                        groupKey,
+                        expanded,
+                      },
+                      ...(expanded ? children.map((session) => ({
+                        session,
+                        isSubagent: true,
+                        childCount: 0,
+                        familyCostUSD: null,
+                        groupKey,
+                        expanded: false,
+                      })) : []),
+                    ];
+                  }).map(({ session, isSubagent, childCount, familyCostUSD, groupKey, expanded }) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
@@ -496,7 +628,13 @@ export function SessionUsageTable({
                       hour: "2-digit",
                       minute: "2-digit",
                     });
-                    const title = session.threadName || cleanSessionId(session.sessionId);
+                    const title = isSubagent
+                      ? agentSessionTitle(session)
+                      : session.threadName || cleanSessionId(session.sessionId);
+                    const subagentSummary = isSubagent && session.threadName !== title
+                      ? session.threadName
+                      : null;
+                    const agentRole = session.agentRole ? humanizeAgentValue(session.agentRole) : null;
                     const shownProjects = session.projects.slice(0, 2);
                     const shownModels = session.models.slice(0, 3);
                     const projectOverflow = session.projects.length - shownProjects.length;
@@ -504,6 +642,10 @@ export function SessionUsageTable({
                     const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
                     const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
                     const cost = costTone(session.costUSD, sessionScale.cost);
+                    const familyCostRatio = familyCostUSD !== null && maxFamilyCost > 0
+                      ? familyCostUSD / maxFamilyCost
+                      : 0;
+                    const familyCost = costTone(familyCostUSD ?? 0, maxFamilyCost);
                     const tokenLabel = isInactive
                       ? t("sessions.token_bar_empty")
                       : t("sessions.token_bar_label", {
@@ -520,17 +662,19 @@ export function SessionUsageTable({
                       cost: formatCurrency(session.costUSD),
                       percent: formatPercent(costRatio),
                     });
-                    const isSubagent = Boolean(session.parentSessionId) || (session.agentDepth ?? 0) > 0;
-                    const hierarchyDepth = Math.min(session.agentDepth ?? (isSubagent ? 1 : 0), 6);
-                    const subagentLabel = [t("sessions.subagent"), session.agentNickname, session.agentRole]
-                      .filter(Boolean)
-                      .join(" · ");
+                    const familyCostLabel = familyCostUSD !== null
+                      ? t("sessions.family_cost_pill_label", { cost: formatCurrency(familyCostUSD) })
+                      : "";
+                    const hierarchyDepth = isSubagent
+                      ? agentHierarchyDepth(session, sessionsByAgentId)
+                      : 0;
 
                     return (
                       <div
                         key={session.path}
-                        className="relative"
-                        data-agent-depth={session.agentDepth ?? 0}
+                        className="relative space-y-1.5"
+                        data-testid={isSubagent ? "subagent-session-row" : undefined}
+                        data-agent-depth={hierarchyDepth}
                         style={{ paddingInlineStart: hierarchyDepth ? `${hierarchyDepth * 20}px` : undefined }}
                       >
                       {isSubagent ? (
@@ -554,20 +698,30 @@ export function SessionUsageTable({
                             onSessionClick(session.originalSession);
                           }
                         }}
-                        className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
+                        className={`session-usage-card rounded-lg border px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${isSubagent ? "border-primary/20 bg-primary/[0.035]" : "border-border/50 bg-card/70"} ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
+                            {isSubagent ? <Bot className="h-3.5 w-3.5 flex-none text-primary" /> : null}
                             <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
                             {isSubagent ? (
-                              <span
-                                className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-1.5 py-px text-[9px] font-semibold text-indigo-400"
-                                title={session.agentPath || subagentLabel}
-                              >
-                                {subagentLabel}
+                              <span className="flex-none rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-primary">
+                                {t("sessions.subagent")}
                               </span>
                             ) : null}
                           </div>
+                          {subagentSummary ? (
+                            <p className="truncate text-[10px] leading-tight text-muted-foreground" title={subagentSummary}>
+                              {subagentSummary}
+                            </p>
+                          ) : null}
+                          {isSubagent && (session.agentNickname || agentRole) ? (
+                            <div className="flex min-w-0 items-center gap-1 text-[9px] text-muted-foreground">
+                              {session.agentNickname ? <span className="truncate font-semibold text-foreground/80">{session.agentNickname}</span> : null}
+                              {session.agentNickname && agentRole ? <span aria-hidden="true">·</span> : null}
+                              {agentRole ? <span className="truncate">{agentRole}</span> : null}
+                            </div>
+                          ) : null}
                           <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground" title={session.projects.join("\n")}>
                             <Folder className="h-3 w-3 flex-none opacity-70" />
                             {shownProjects.length > 0 ? (
@@ -652,6 +806,30 @@ export function SessionUsageTable({
                               ) : null}
                               <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
                             </span>
+                            {familyCostUSD !== null ? (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                                  <span className="font-medium text-muted-foreground">{t("sessions.family_cost_prefix")}</span>
+                                  <span
+                                    role="img"
+                                    aria-label={familyCostLabel}
+                                    data-cost-tone={familyCost.name}
+                                    data-testid="session-family-cost"
+                                    className={`relative isolate inline-flex min-w-[4.5rem] overflow-hidden rounded-full border px-1.5 py-px font-semibold ${familyCost.className}`}
+                                  >
+                                    {familyCostRatio > 0 ? (
+                                      <span
+                                        aria-hidden="true"
+                                        className={`absolute inset-y-0 left-0 -z-10 ${familyCost.fillClassName}`}
+                                        style={{ width: `${familyCostRatio * 100}%`, minWidth: 2 }}
+                                      />
+                                    ) : null}
+                                    <span className="relative ml-auto">{formatCurrency(familyCostUSD)}</span>
+                                  </span>
+                                </span>
+                              </>
+                            ) : null}
                           </div>
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (
@@ -669,6 +847,22 @@ export function SessionUsageTable({
                           <SessionQuotaUsageView usage={session.quotaUsage} />
                         </div>
                       </article>
+                      {childCount > 0 ? (
+                        <button
+                          type="button"
+                          className="flex min-h-11 w-full items-center gap-2 rounded-md border border-transparent px-3 text-left text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:border-primary/20 hover:bg-primary/5 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70"
+                          aria-expanded={expanded}
+                          aria-label={t(expanded ? "sessions.collapse_subagents" : "sessions.expand_subagents", { count: childCount, title })}
+                          onClick={() => setExpandedAgentGroups((current) => ({
+                            ...current,
+                            [groupKey]: !expanded,
+                          }))}
+                        >
+                          <ChevronDown className={`h-4 w-4 flex-none transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-0" : "-rotate-90"}`} />
+                          <Bot className="h-4 w-4 flex-none text-primary" />
+                          <span>{t("sessions.subagent_sessions", { count: childCount })}</span>
+                        </button>
+                      ) : null}
                       </div>
                     );
                   })}

@@ -460,9 +460,15 @@
     "token_bar_empty": "无 Token 活动",
     "token_total_label": "Token 总数 {{total}}；相当于当前可见会话最高值的 {{percent}}",
     "cost_pill_label": "花费 {{cost}}；相当于当前可见会话最高值的 {{percent}}",
-  "subagent": "子 Agent",
-  "open_session": "打开会话 {{title}}",
-  "quota": {
+    "family_cost_prefix": "总:",
+    "family_cost_pill_label": "主会话及其所有子会话总花费 {{cost}}",
+    "open_session": "打开会话 {{title}}",
+    "subagent": "子智能体",
+    "subagent_sessions_one": "1 个子智能体会话",
+    "subagent_sessions_other": "{{count}} 个子智能体会话",
+    "expand_subagents": "展开主会话“{{title}}”下的 {{count}} 个子智能体会话",
+    "collapse_subagents": "收起主会话“{{title}}”下的 {{count}} 个子智能体会话",
+    "quota": {
     "title": "观测到的限额消耗",
     "estimated": "估算",
     "five_hour": "5h",

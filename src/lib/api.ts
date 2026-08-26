@@ -287,6 +287,8 @@ export type SessionDetailRow = {
   path: string;
   sessionId: string;
   threadName: string | null;
+  threadId?: string | null;
+  parentThreadId?: string | null;
   agentSessionId?: string | null;
   parentSessionId?: string | null;
   agentDepth?: number;

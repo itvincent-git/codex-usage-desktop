@@ -258,7 +258,76 @@ describe("session daily usage", () => {
 });
 
 describe("session titles", () => {
-  it("orders subagents beneath their parent and shows their hierarchy metadata", () => {
+  it("keeps nested subagent sessions collapsed under their main session and shows distinct agent identities", async () => {
+    const user = userEvent.setup();
+    const onSessionClick = vi.fn();
+    const main = session({
+      path: "/tmp/main.jsonl",
+      sessionId: "main.jsonl",
+      threadId: "main-thread",
+      threadName: "Main session",
+    });
+    const explorer = session({
+      path: "/tmp/explorer.jsonl",
+      sessionId: "explorer.jsonl",
+      threadId: "explorer-thread",
+      parentThreadId: "main-thread",
+      threadName: "Inspect how titles are rendered",
+      agentPath: "/root/investigate_titles",
+      agentNickname: "Ada",
+      agentRole: "code_explorer",
+    });
+    const worker = session({
+      path: "/tmp/worker.jsonl",
+      sessionId: "worker.jsonl",
+      threadId: "worker-thread",
+      parentThreadId: "explorer-thread",
+      threadName: "Implement the session grouping",
+      agentPath: "/root/fix_sidebar",
+      agentNickname: "Grace",
+      agentRole: "worker",
+    });
+
+    render(
+      <SessionUsageTable
+        sessions={[main, explorer, worker]}
+        onSessionClick={onSessionClick}
+      />,
+    );
+
+    expect(i18n.t("sessions.family_cost_prefix", { lng: "en" })).toBe("All:");
+    expect(i18n.t("sessions.family_cost_prefix", { lng: "zh" })).toBe("总:");
+    const mainCard = screen.getByText("Main session").closest("article")!;
+    expect(within(mainCard).getByTestId("session-cost")).toHaveTextContent("$0.001");
+    expect(within(mainCard).getByText("All:")).toBeInTheDocument();
+    expect(within(mainCard).getByTestId("session-family-cost")).toHaveTextContent("$0.003");
+    expect(within(mainCard).getByRole("img", { name: "Main and subagent session total cost $0.003" })).toBeInTheDocument();
+    expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Expand 2 subagent sessions under Main session" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("investigate titles")).toBeInTheDocument();
+    expect(screen.getByText("fix sidebar")).toBeInTheDocument();
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+    expect(screen.getByText("code explorer")).toBeInTheDocument();
+    expect(screen.getAllByText("Subagent")).toHaveLength(2);
+    const subagentRows = screen.getAllByTestId("subagent-session-row");
+    expect(subagentRows[0]).toHaveAttribute("data-agent-depth", "1");
+    expect(subagentRows[1]).toHaveAttribute("data-agent-depth", "2");
+    expect(within(screen.getByText("investigate titles").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
+    expect(within(screen.getByText("fix sidebar").closest("article")!).queryByTestId("session-family-cost")).not.toBeInTheDocument();
+    await user.click(screen.getByText("fix sidebar").closest("article")!);
+    expect(onSessionClick).toHaveBeenCalledWith(worker);
+
+    await user.click(toggle);
+    expect(screen.queryByText("investigate titles")).not.toBeInTheDocument();
+  });
+
+  it("uses upstream hierarchy metadata inside collapsed session families", async () => {
+    const user = userEvent.setup();
     render(<SessionUsageTable sessions={[
       session({
         path: "/tmp/child.jsonl",
@@ -266,7 +335,7 @@ describe("session titles", () => {
         threadName: "Child task",
         agentSessionId: "child-id",
         parentSessionId: "root-id",
-        agentDepth: 1,
+        agentDepth: 0,
         agentPath: "/root/researcher",
         agentNickname: "researcher",
         agentRole: "Research",
@@ -283,14 +352,19 @@ describe("session titles", () => {
       }),
     ]} />);
 
+    expect(screen.getAllByTestId("session-card")).toHaveLength(1);
+    expect(screen.getByTestId("session-card")).toHaveTextContent("Parent task");
+    expect(screen.queryByText("Child task")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Expand 1 subagent sessions under Parent task" }));
+
     const cards = screen.getAllByTestId("session-card");
     expect(cards[0]).toHaveTextContent("Parent task");
     expect(cards[1]).toHaveTextContent("Child task");
     expect(cards[1].parentElement).toHaveAttribute("data-agent-depth", "1");
-    expect(within(cards[1]).getByText("Subagent · researcher · Research")).toHaveAttribute(
-      "title",
-      "/root/researcher",
-    );
+    expect(within(cards[1]).getByRole("heading", { name: "researcher" })).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Subagent")).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Research")).toBeInTheDocument();
     expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
   });
 

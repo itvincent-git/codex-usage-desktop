@@ -349,6 +349,8 @@ pub struct SessionDetailRow {
     pub path: String,
     pub session_id: String,
     pub thread_name: Option<String>,
+    pub thread_id: Option<String>,
+    pub parent_thread_id: Option<String>,
     pub agent_session_id: Option<String>,
     pub parent_session_id: Option<String>,
     pub agent_depth: usize,

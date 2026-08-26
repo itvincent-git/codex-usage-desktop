@@ -2082,6 +2082,7 @@ mod tests {
                 rows: vec![],
                 prompt_title: Some("Replay this session".to_string()),
                 quota_usage: None,
+                agent_metadata: None,
             }],
             "2026-06-01T00:00:00.000Z",
         )
@@ -2142,6 +2143,7 @@ mod tests {
             rows: vec![],
             prompt_title: Some(prompt_title.to_string()),
             quota_usage: None,
+            agent_metadata: None,
         };
         upsert_session_file_rollups(
             &mut db,
