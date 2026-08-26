@@ -803,8 +803,8 @@ describe("session titles", () => {
 
     render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
 
-    const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
-    expect(within(hierarchy).getByText("5 agents")).toBeInTheDocument();
+    const hierarchy = await screen.findByRole("region", { name: "4 subagents" });
+    expect(within(hierarchy).getByText("4 subagents")).toBeInTheDocument();
     const rootButton = within(hierarchy).getByRole("button", { name: /root.*Root task.*Root.*Current/ });
     const childButton = within(hierarchy).getByRole("button", { name: /Curie.*Research task.*Subagent/ });
     const grandchildButton = within(hierarchy).getByRole("button", { name: /Tester.*Test task.*Subagent/ });
@@ -819,7 +819,7 @@ describe("session titles", () => {
     expect(within(hierarchy).getAllByRole("button")[1]).toBe(rootButton);
     expect(within(hierarchy).getByTestId("agent-group-cost")).toHaveTextContent("$0.015");
 
-    await userEvent.click(within(hierarchy).getByRole("button", { name: /Agent hierarchy.*5 agents/ }));
+    await userEvent.click(within(hierarchy).getByRole("button", { name: /4 subagents/ }));
     expect(within(hierarchy).getAllByRole("button")).toHaveLength(6);
 
     await userEvent.click(childButton);
@@ -847,7 +847,7 @@ describe("session titles", () => {
 
     render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
 
-    const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
+    const hierarchy = await screen.findByRole("region", { name: "4 subagents" });
     const firstChild = within(hierarchy).getByRole("button", { name: /child-0.*Child 0.*Subagent/ });
     const lastVisibleChild = within(hierarchy).getByRole("button", { name: /child-1.*Child 1.*Subagent/ });
     expect(within(firstChild).getByTestId("agent-tree-connector")).toHaveClass("-bottom-0.5");

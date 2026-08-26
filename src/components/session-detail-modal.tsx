@@ -226,6 +226,7 @@ function AgentHierarchy({
   }
   const visibleAgents = isExpanded ? orderedAgents : collapsedAgents;
   const visibleSessionIds = new Set(visibleAgents.map((agent) => agent.sessionId));
+  const subagentCount = agents.filter((agent) => agent.parentSessionId !== null).length;
   const totalCost = agents.reduce((sum, agent) => sum + agent.costUSD, 0);
 
   const hasFollowingVisibleSibling = (agent: (typeof agents)[number]) => {
@@ -235,7 +236,7 @@ function AgentHierarchy({
   };
 
   return (
-    <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.detail.agent_hierarchy")}>
+    <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.subagent_count", { count: subagentCount })}>
       <button
         type="button"
         className={`mb-2 flex w-full items-center gap-2 rounded-md text-left text-sm font-bold ${DISCLOSURE_BUTTON_CLASS}`}
@@ -244,9 +245,8 @@ function AgentHierarchy({
       >
         {isExpanded ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
         <GitBranch className="h-4 w-4 text-primary" />
-        {t("sessions.detail.agent_hierarchy")}
         <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-          {t("sessions.detail.agent_count", { count: agents.length })}
+          {t("sessions.subagent_count", { count: subagentCount })}
         </span>
         <span className="ml-auto text-xs font-medium text-muted-foreground">{t("sessions.group_total_cost")}</span>
         <span className="text-xs tabular-nums text-foreground" data-testid="agent-group-cost">{formatCurrency(totalCost)}</span>
