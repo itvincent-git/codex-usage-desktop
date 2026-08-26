@@ -105,7 +105,32 @@ mod tests {
         .unwrap();
 
         assert_eq!(reset.reset_type, "regular");
-        assert_eq!(reset.source.author, "thsottiaux");
+        assert_eq!(reset.source.author.as_deref(), Some("thsottiaux"));
+    }
+
+    #[test]
+    fn parses_observed_reset_without_author() {
+        let reset = parse_latest_reset(
+            r#"{
+                "data": {
+                    "latest_reset": {
+                        "id": "observed-20260825T143200Z",
+                        "reset_type": "regular",
+                        "announced_at": "2026-08-25T14:30:00.000Z",
+                        "text": "Observed reset.",
+                        "source": {
+                            "type": "observed",
+                            "url": "https://x.com/thsottiaux/status/2092311059197808936"
+                        }
+                    }
+                }
+            }"#,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(reset.id, "observed-20260825T143200Z");
+        assert_eq!(reset.source.author, None);
     }
 
     #[test]

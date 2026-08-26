@@ -152,7 +152,7 @@ export type CodexResetAnnouncement = {
   announcedAt: string;
   text: string;
   source: {
-    author: string;
+    author?: string | null;
     url: string;
   };
 };

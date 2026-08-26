@@ -249,7 +249,7 @@ function ResetAnnouncements({ resets }: { resets: CodexResetAnnouncement[] }) {
               className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => void openUrl(reset.source.url)}
             >
-              @{reset.source.author} · {t("limits.reset_history_source")}
+              {reset.source.author ? `@${reset.source.author} · ` : null}{t("limits.reset_history_source")}
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </button>
           </li>
@@ -281,7 +281,7 @@ function ResetHistoryContent({ resets }: { resets: CodexResetAnnouncement[] }) {
             className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500/40 bg-orange-500 px-3 py-1.5 text-[10px] font-semibold text-white shadow-sm hover:bg-orange-600 focus-visible:ring-2 focus-visible:ring-ring"
             onClick={() => void openUrl(latestReset.source.url)}
           >
-            @{latestReset.source.author}
+            {latestReset.source.author ? `@${latestReset.source.author}` : t("limits.reset_history_source")}
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </button>
         </div>

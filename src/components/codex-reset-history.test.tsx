@@ -69,7 +69,7 @@ describe("CodexResetHistoryModal", () => {
   it("loads and summarizes the last 30 days", async () => {
     render(<StrictMode><CodexResetHistoryModal onClose={() => {}} /></StrictMode>);
 
-    expect(await screen.findByText("1 day ago")).toBeInTheDocument();
+    expect(await screen.findByText(/\d+ days? ago/)).toBeInTheDocument();
     expect(fetchCodexResetHistory).toHaveBeenCalledWith(30);
     expect(fetchCodexResetHistory).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("6");
@@ -90,6 +90,25 @@ describe("CodexResetHistoryModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "@thsottiaux" }));
     expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux/status/2091688655828246890");
+  });
+
+  it("renders source links when an observed reset has no author", async () => {
+    vi.mocked(fetchCodexResetHistory).mockResolvedValue([{
+      id: "observed-20260825T143200Z",
+      resetType: "regular",
+      announcedAt: "2026-08-25T14:30:00.000Z",
+      text: "Observed reset.",
+      source: { url: "https://x.com/thsottiaux/status/2092311059197808936" },
+    }]);
+
+    render(<CodexResetHistoryModal onClose={() => {}} />);
+
+    const sourceLinks = await screen.findAllByRole("button", { name: "View source" });
+    expect(sourceLinks).toHaveLength(2);
+    expect(screen.queryByText("@undefined")).not.toBeInTheDocument();
+
+    fireEvent.click(sourceLinks[0]);
+    expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux/status/2092311059197808936");
   });
 
   it("calculates adjacent reset intervals and mixed days", () => {

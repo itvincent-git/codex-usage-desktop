@@ -254,7 +254,7 @@ pub struct CodexQuotaForecastResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexResetSource {
-    pub author: String,
+    pub author: Option<String>,
     pub url: String,
 }
 
