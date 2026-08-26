@@ -225,12 +225,13 @@ function AgentHierarchy({
     collapsedAgents[collapsedAgents.length - 1] = activeAgent;
   }
   const visibleAgents = isExpanded ? orderedAgents : collapsedAgents;
+  const visibleSessionIds = new Set(visibleAgents.map((agent) => agent.sessionId));
   const totalCost = agents.reduce((sum, agent) => sum + agent.costUSD, 0);
 
-  const hasFollowingSibling = (agent: (typeof agents)[number]) => {
+  const hasFollowingVisibleSibling = (agent: (typeof agents)[number]) => {
     if (!agent.parentSessionId) return false;
     const siblings = children.get(agent.parentSessionId) ?? [];
-    return siblings.indexOf(agent) < siblings.length - 1;
+    return siblings.slice(siblings.indexOf(agent) + 1).some((sibling) => visibleSessionIds.has(sibling.sessionId));
   };
 
   return (
@@ -274,7 +275,7 @@ function AgentHierarchy({
               aria-current={isActive ? "true" : undefined}
               onClick={() => onSelect(agent.path)}
             >
-              {children.has(agent.sessionId) ? (
+              {children.get(agent.sessionId)?.some((child) => visibleSessionIds.has(child.sessionId)) ? (
                 <span
                   className="pointer-events-none absolute -bottom-0.5 top-1/2 w-px bg-primary/30"
                   style={{ left: `${15 + agent.depth * 24}px` }}
@@ -286,9 +287,9 @@ function AgentHierarchy({
                 const level = levelIndex + 1;
                 const branchAgent = lineage[level];
                 const isCurrentLevel = level === agent.depth;
-                if (!branchAgent || (!isCurrentLevel && !hasFollowingSibling(branchAgent))) return null;
+                if (!branchAgent || (!isCurrentLevel && !hasFollowingVisibleSibling(branchAgent))) return null;
                 const left = 15 + levelIndex * 24;
-                const continuesToNextSibling = hasFollowingSibling(branchAgent);
+                const continuesToNextSibling = hasFollowingVisibleSibling(branchAgent);
                 return (
                   <span
                     key={level}

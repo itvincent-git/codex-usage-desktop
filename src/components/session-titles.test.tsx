@@ -809,8 +809,7 @@ describe("session titles", () => {
     expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
     expect(within(rootButton).getByTestId("agent-tree-trunk")).toHaveStyle({ left: "15px" });
     expect(within(childButton).getByTestId("agent-tree-connector")).toHaveStyle({ left: "15px" });
-    expect(within(grandchildButton).getAllByTestId("agent-tree-connector")).toHaveLength(2);
-    expect(within(grandchildButton).getAllByTestId("agent-tree-connector")[1]).toHaveStyle({ left: "39px" });
+    expect(within(grandchildButton).getByTestId("agent-tree-connector")).toHaveStyle({ left: "39px" });
     expect(within(hierarchy).getAllByRole("button")).toHaveLength(4);
     expect(within(hierarchy).getAllByRole("button")[1]).toBe(rootButton);
     expect(within(hierarchy).getByTestId("agent-group-cost")).toHaveTextContent("$0.015");
@@ -821,6 +820,34 @@ describe("session titles", () => {
     await userEvent.click(childButton);
     expect(await screen.findByRole("dialog", { name: "Research task" })).toBeInTheDocument();
     expect(invokeMock).toHaveBeenLastCalledWith("fetch_session_detail", { path: "/tmp/child.jsonl" });
+  });
+
+  it("ends the last visible agent connector with a corner when collapsed", async () => {
+    await i18n.changeLanguage("en");
+    const agents = [
+      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task", costUSD: 0.001 },
+      ...Array.from({ length: 4 }, (_, index) => ({
+        path: `/tmp/child-${index}.jsonl`,
+        sessionId: `child-${index}-id`,
+        parentSessionId: "root-id",
+        depth: 1,
+        agentPath: `/root/child-${index}`,
+        nickname: null,
+        role: null,
+        threadName: `Child ${index}`,
+        costUSD: 0.001,
+      })),
+    ];
+    invokeMock.mockResolvedValue(replayDetail({ agents }));
+
+    render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
+
+    const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
+    const firstChild = within(hierarchy).getByRole("button", { name: /child-0.*Child 0.*Subagent/ });
+    const lastVisibleChild = within(hierarchy).getByRole("button", { name: /child-1.*Child 1.*Subagent/ });
+    expect(within(firstChild).getByTestId("agent-tree-connector")).toHaveClass("-bottom-0.5");
+    expect(within(lastVisibleChild).getByTestId("agent-tree-connector")).toHaveClass("bottom-1/2");
+    expect(within(lastVisibleChild).getByTestId("agent-tree-connector")).not.toHaveClass("-bottom-0.5");
   });
 
   it("shows complete quota windows and localized estimation guidance in session details", async () => {
