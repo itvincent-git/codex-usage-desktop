@@ -575,7 +575,10 @@
       "raw_metadata": "{{size}} · {{lines}} lines",
       "show_full_raw": "Show full JSONL",
       "copy": "Copy",
-      "copied": "Copied"
+      "copied": "Copied",
+      "copy_session_id": "Copy session ID",
+      "session_id_copied": "Session ID copied",
+      "reveal_in_file_manager": "Show in File Manager"
     }
   },
   "settings": {

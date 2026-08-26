@@ -699,6 +699,11 @@ describe("session titles", () => {
   });
 
   it("falls back to the session ID in session details", async () => {
+    const writeText = vi.fn();
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     invokeMock.mockResolvedValue({
       path: "/tmp/fallback.jsonl",
       sessionId: "fallback-session.jsonl",
@@ -733,7 +738,10 @@ describe("session titles", () => {
 
     render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
 
-    expect(await screen.findByRole("dialog", { name: "fallback-session" })).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "fallback-session" });
+    const sessionIdButton = within(dialog).getByRole("button", { name: "Copy session ID" });
+    await userEvent.click(sessionIdButton);
+    expect(writeText).toHaveBeenCalledWith("fallback-session");
   });
 
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {

@@ -613,6 +613,34 @@ async fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn reveal_in_file_manager(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .args(["-R", &path])
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer")
+        .args(["/select,", &path])
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    {
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .ok_or_else(|| "Session file has no parent directory".to_string())?;
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
 #[derive(serde::Deserialize)]
 struct TrayMenuItemDto {
     id: String,
@@ -861,6 +889,7 @@ pub fn run() {
             download_and_install_update,
             restart_app,
             open_url,
+            reveal_in_file_manager,
             fetch_session_details,
             fetch_session_detail,
             update_tray

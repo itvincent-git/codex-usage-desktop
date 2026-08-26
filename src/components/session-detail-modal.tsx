@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { fetchSessionDetail, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
+import { fetchSessionDetail, revealInFileManager, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { SessionQuotaUsageView } from "./session-quota-usage";
 
@@ -1185,6 +1185,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
   const [copied, setCopied] = useState(false);
+  const [copiedSessionId, setCopiedSessionId] = useState(false);
   const [expandedTurns, setExpandedTurns] = useState<Set<string>>(() => new Set());
   const [showFullRaw, setShowFullRaw] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -1213,6 +1214,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setDetail(null);
     setError(null);
     setActiveTab("timeline");
+    setCopiedSessionId(false);
     setExpandedTurns(new Set());
     setShowFullRaw(false);
     setShowDetails(false);
@@ -1281,7 +1283,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const models = detail?.summary.models.length ? detail.summary.models : session.models;
   const projects = detail?.summary.projects.length ? detail.summary.projects : session.projects;
   const threadName = detail ? detail.threadName : session.threadName;
+  const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
+
+  async function copySessionId() {
+    await navigator.clipboard?.writeText(displayedSessionId);
+    setCopiedSessionId(true);
+    window.setTimeout(() => setCopiedSessionId(false), 1400);
+  }
 
   async function copyRawJsonl() {
     if (!detail) return;
@@ -1317,7 +1326,17 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <div className="flex min-w-0 items-center gap-1.5">
                 <FileJson className="h-4 w-4 text-primary" />
                 <h2 id="session-detail-title" className={`mr-1 min-w-0 truncate font-bold tracking-tight transition-[font-size] ${isScrolled ? "text-sm" : "text-base"}`}>
-                  {threadName || cleanSessionId(session.sessionId)}
+                  {threadName || (
+                    <button
+                      type="button"
+                      className={`max-w-full truncate hover:text-primary ${DISCLOSURE_BUTTON_CLASS}`}
+                      title={copiedSessionId ? t("sessions.detail.session_id_copied") : t("sessions.detail.copy_session_id")}
+                      aria-label={copiedSessionId ? t("sessions.detail.session_id_copied") : t("sessions.detail.copy_session_id")}
+                      onClick={() => void copySessionId()}
+                    >
+                      {displayedSessionId}
+                    </button>
+                  )}
                 </h2>
               </div>
             </div>
@@ -1354,7 +1373,18 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
           </div>
           {showDetails ? (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-1.5 text-[11px] text-muted-foreground">
-              {threadName ? <span className="max-w-[260px] truncate rounded border border-zinc-300/70 bg-zinc-100/80 px-2 py-0.5 font-mono text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300" title={session.sessionId}>{cleanSessionId(session.sessionId)}</span> : null}
+              {threadName ? (
+                <button
+                  type="button"
+                  className={`flex max-w-[260px] items-center gap-1 truncate rounded border border-zinc-300/70 bg-zinc-100/80 px-2 py-0.5 font-mono text-zinc-700 hover:bg-zinc-200/80 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 ${DISCLOSURE_BUTTON_CLASS}`}
+                  title={copiedSessionId ? t("sessions.detail.session_id_copied") : t("sessions.detail.copy_session_id")}
+                  aria-label={copiedSessionId ? t("sessions.detail.session_id_copied") : t("sessions.detail.copy_session_id")}
+                  onClick={() => void copySessionId()}
+                >
+                  {copiedSessionId ? <Check className="h-3 w-3 shrink-0" /> : null}
+                  <span className="truncate">{displayedSessionId}</span>
+                </button>
+              ) : null}
               {projects.map((project) => <span key={project} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project}>{project}</span>)}
               {models.map((model) => <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{model}</span>)}
               <span>{t("sessions.detail.started", { value: formatTimestamp(detail?.summary.startTime ?? null) })}</span>
@@ -1458,6 +1488,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   <Button variant="secondary" size="sm" onClick={() => void copyRawJsonl()}>
                     <Clipboard className="mr-2 h-4 w-4" />
                     {copied ? t("sessions.detail.copied") : t("sessions.detail.copy")}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => void revealInFileManager(detail.path)}>
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    {t("sessions.detail.reveal_in_file_manager")}
                   </Button>
                 </div>
               </div>

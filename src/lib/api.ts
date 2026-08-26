@@ -404,6 +404,10 @@ export async function fetchSessionDetail(path: string): Promise<SessionReplayDet
   return invoke<SessionReplayDetail>("fetch_session_detail", { path });
 }
 
+export async function revealInFileManager(path: string): Promise<void> {
+  return invoke<void>("reveal_in_file_manager", { path });
+}
+
 export type TrayMenuItemDto = {
   id: string;
   text: string;

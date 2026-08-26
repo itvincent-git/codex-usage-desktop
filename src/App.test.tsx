@@ -1347,6 +1347,7 @@ describe("App", () => {
           ],
         };
       }
+      if (command === "reveal_in_file_manager") return undefined;
 
       throw new Error(`Unexpected invoke: ${command}`);
     });
@@ -1370,7 +1371,11 @@ describe("App", () => {
     expect(within(detailHeader).queryByText("session-replay")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Details/ }));
     expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "true");
-    expect(within(detailHeader).getByText("session-replay")).toHaveClass("border-zinc-300/70");
+    const sessionIdButton = within(detailHeader).getByRole("button", { name: "Copy session ID" });
+    expect(sessionIdButton).toHaveClass("border-zinc-300/70");
+    await userEvent.click(sessionIdButton);
+    expect(writeTextMock).toHaveBeenCalledWith("session-replay");
+    expect(sessionIdButton).toHaveAccessibleName("Session ID copied");
     expect(within(detailHeader).getByText("/repo/app")).toHaveClass("border-blue-300/60");
     expect(within(detailHeader).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
     expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
@@ -1542,17 +1547,21 @@ describe("App", () => {
 
     const showFullButton = screen.getByRole("button", { name: "Show full JSONL" });
     const copyButton = screen.getByRole("button", { name: "Copy" });
+    const revealButton = screen.getByRole("button", { name: "Show in File Manager" });
     expect(showFullButton.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(copyButton.compareDocumentPosition(revealButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await userEvent.click(copyButton);
     expect(writeTextMock).toHaveBeenCalledWith(rawJsonl);
+    await userEvent.click(revealButton);
+    expect(invokeMock).toHaveBeenCalledWith("reveal_in_file_manager", { path: "/tmp/session-replay.jsonl" });
 
     await userEvent.click(showFullButton);
     expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
 
     screen.getByRole("button", { name: /Details/ }).focus();
     fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
-    expect(screen.getByRole("button", { name: /Copy|Copied/ })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Show in File Manager" })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Updated replay summary" })).not.toBeInTheDocument());
