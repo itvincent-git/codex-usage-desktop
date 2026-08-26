@@ -325,8 +325,7 @@ describe("session titles", () => {
     expect(within(group).getAllByTestId("session-card")).toHaveLength(5);
     const branches = within(group).getAllByTestId("agent-branch");
     expect(branches).toHaveLength(4);
-    expect(branches.slice(0, -1).every((branch) => branch.classList.contains("continues"))).toBe(true);
-    expect(branches.at(-1)).not.toHaveClass("continues");
+    expect(within(group).getAllByTestId("agent-sibling-stem")).toHaveLength(3);
     expect(onSessionClick).not.toHaveBeenCalled();
 
     await userEvent.click(summary);

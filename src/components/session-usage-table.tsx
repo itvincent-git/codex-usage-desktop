@@ -111,11 +111,21 @@ function buildAgentConnectorMetadata(sessions: SessionDisplayRow[]) {
     children.set(session.parentSessionId, siblings);
   }
 
-  const hasFollowingSibling = (session: SessionDisplayRow) => {
-    if (!session.parentSessionId) return false;
-    const siblings = children.get(session.parentSessionId) ?? [];
-    return siblings.at(-1) !== session;
-  };
+  const hasFollowingSiblingByPath = new Map<string, boolean>();
+  const followingSiblingDepths = new Set<number>();
+  for (let index = sessions.length - 1; index >= 0; index -= 1) {
+    const session = sessions[index];
+    const depth = Math.min(session.agentDepth ?? (session.parentSessionId ? 1 : 0), 6);
+    hasFollowingSiblingByPath.set(session.path, followingSiblingDepths.has(depth));
+    for (const trackedDepth of followingSiblingDepths) {
+      if (trackedDepth > depth) followingSiblingDepths.delete(trackedDepth);
+    }
+    followingSiblingDepths.add(depth);
+  }
+
+  const hasFollowingSibling = (session: SessionDisplayRow) => (
+    hasFollowingSiblingByPath.get(session.path) ?? false
+  );
 
   return new Map(sessions.map((session) => {
     const continuingAncestorDepths: number[] = [];
@@ -627,12 +637,22 @@ export function SessionUsageTable({
                         />
                       ))}
                       {isSubagent ? (
-                        <span
-                          aria-hidden="true"
-                          className={`session-agent-branch ${connector?.hasFollowingVisibleSibling ? "continues" : ""}`}
-                          data-testid="agent-branch"
-                          style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20 + 8}px` }}
-                        />
+                        <>
+                          <span
+                            aria-hidden="true"
+                            className="session-agent-branch"
+                            data-testid="agent-branch"
+                            style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20 + 8}px` }}
+                          />
+                          {connector?.hasFollowingVisibleSibling ? (
+                            <span
+                              aria-hidden="true"
+                              className="session-agent-sibling-stem"
+                              data-testid="agent-sibling-stem"
+                              style={{ insetInlineStart: `${Math.max(hierarchyDepth - 1, 0) * 20 + 8}px` }}
+                            />
+                          ) : null}
+                        </>
                       ) : null}
                       {connector?.hasVisibleChildren ? (
                         <span
