@@ -184,7 +184,34 @@ fn build_agent_hierarchy(
         agent.depth = agent.depth.saturating_sub(minimum_depth);
     }
     agents.sort_by(|left, right| left.agent_path.split('/').cmp(right.agent_path.split('/')));
-    Ok(agents)
+
+    fn visit_agent(
+        session_id: &str,
+        agents: &[SessionReplayAgent],
+        visited: &mut BTreeSet<String>,
+        ordered: &mut Vec<SessionReplayAgent>,
+    ) {
+        if !visited.insert(session_id.to_string()) {
+            return;
+        }
+        if let Some(agent) = agents.iter().find(|agent| agent.session_id == session_id) {
+            ordered.push(agent.clone());
+        }
+        for child in agents
+            .iter()
+            .filter(|agent| agent.parent_session_id.as_deref() == Some(session_id))
+        {
+            visit_agent(&child.session_id, agents, visited, ordered);
+        }
+    }
+
+    let mut ordered = Vec::new();
+    let mut ordered_ids = BTreeSet::new();
+    visit_agent(&root_id, &agents, &mut ordered_ids, &mut ordered);
+    for agent in &agents {
+        visit_agent(&agent.session_id, &agents, &mut ordered_ids, &mut ordered);
+    }
+    Ok(ordered)
 }
 
 pub fn load_session_agents(db: &Connection) -> Result<Vec<SessionReplayAgent>, String> {
@@ -2111,7 +2138,7 @@ mod tests {
                 "thread_source": "subagent",
                 "source": { "subagent": { "thread_spawn": {
                     "parent_thread_id": "root-id", "depth": 1,
-                    "agent_path": "/root/research", "agent_nickname": "Curie"
+                    "agent_path": "/root", "agent_nickname": "Curie"
                 } } }
             }
         })
@@ -2122,7 +2149,7 @@ mod tests {
                 "id": "grandchild-id",
                 "source": { "subagent": { "thread_spawn": {
                     "parent_thread_id": "child-id", "depth": 2,
-                    "agent_path": "/root/research/tests"
+                    "agent_path": "/root"
                 } } }
             }
         })
@@ -2146,8 +2173,8 @@ mod tests {
         upsert_session_file_rollups(
             &mut db,
             &[
-                rollup(&root_path, 1, "Main task"),
                 rollup(&child_path, 2, "Research task"),
+                rollup(&root_path, 1, "Main task"),
                 rollup(&grandchild_path, 3, "Test task"),
             ],
             "2026-06-01T00:00:00.000Z",
