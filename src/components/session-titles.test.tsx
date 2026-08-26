@@ -318,8 +318,13 @@ describe("session titles", () => {
     expect(within(parentCard).getByTestId("subagent-summary")).toHaveTextContent("4 subagents");
     expect(within(group).getByTestId("subagent-group-cost")).toHaveTextContent("$15.00");
 
-    await userEvent.click(within(parentCard).getByRole("button", { name: "Expand" }));
+    const summary = within(parentCard).getByTestId("subagent-summary");
+    await userEvent.click(summary);
     expect(within(group).getAllByTestId("session-card")).toHaveLength(5);
+    expect(onSessionClick).not.toHaveBeenCalled();
+
+    await userEvent.click(summary);
+    expect(within(group).getAllByTestId("session-card")).toHaveLength(2);
     expect(onSessionClick).not.toHaveBeenCalled();
   });
 

@@ -602,9 +602,16 @@ export function SessionUsageTable({
                         className={`session-usage-card rounded-lg border border-border/50 bg-card/70 px-3 py-2.5 shadow-sm transition-colors duration-150 hover:border-primary/35 hover:bg-card ${isParentAgent ? "has-subagents" : ""} ${onSessionClick ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/70" : ""}`}
                       >
                         {isParentAgent ? (
-                          <div
-                            className="session-card-subagents flex min-w-0 items-center gap-2 border-b border-indigo-500/15 pb-2 text-xs"
+                          <button
+                            type="button"
+                            className="session-card-subagents flex w-full min-w-0 items-center gap-2 border-b border-indigo-500/15 pb-2 text-left text-xs transition hover:bg-indigo-500/5 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-400/50"
                             data-testid="subagent-summary"
+                            aria-expanded={isExpanded}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleAgentGroup(groupKey);
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
                           >
                             <GitBranch className="h-3.5 w-3.5 shrink-0 text-indigo-400" aria-hidden="true" />
                             <span className="font-semibold text-foreground">
@@ -614,20 +621,11 @@ export function SessionUsageTable({
                             <span className="font-bold tabular-nums text-foreground" data-testid="subagent-group-cost">
                               {formatCurrency(agentGroup.costUSD)}
                             </span>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-indigo-400 transition hover:bg-indigo-500/10 focus-visible:ring-2 focus-visible:ring-indigo-400/50"
-                              aria-expanded={isExpanded}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleAgentGroup(groupKey);
-                              }}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            >
+                            <span className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-indigo-400">
                               {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
                               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "" : "-rotate-90"}`} aria-hidden="true" />
-                            </button>
-                          </div>
+                            </span>
+                          </button>
                         ) : null}
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
