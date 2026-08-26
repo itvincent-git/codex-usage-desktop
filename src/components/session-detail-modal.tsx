@@ -18,6 +18,7 @@ const TEXT_PREVIEW_LENGTH = 1200;
 const RAW_PREVIEW_LINES = 12;
 const RAW_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
+const COLLAPSED_AGENT_LIMIT = 3;
 const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 const EXEC_TOOL_NAMES = new Set(["exec", "exec_command"]);
 
@@ -194,6 +195,7 @@ function AgentHierarchy({
   onSelect: (path: string) => void;
 }) {
   const { t } = useTranslation();
+  const [isExpanded, setIsExpanded] = useState(false);
   if (agents.length <= 1) return null;
 
   const bySessionId = new Map(agents.map((agent) => [agent.sessionId, agent]));
@@ -217,17 +219,34 @@ function AgentHierarchy({
   }
   for (const agent of agents) visit(agent);
 
+  const collapsedAgents = orderedAgents.slice(0, COLLAPSED_AGENT_LIMIT);
+  const activeAgent = orderedAgents.find((agent) => agent.path === activePath);
+  if (activeAgent && !collapsedAgents.includes(activeAgent)) {
+    collapsedAgents[collapsedAgents.length - 1] = activeAgent;
+  }
+  const visibleAgents = isExpanded ? orderedAgents : collapsedAgents;
+  const totalCost = agents.reduce((sum, agent) => sum + agent.costUSD, 0);
+
   return (
     <section className="rounded-lg border border-border/60 bg-surface p-3" aria-label={t("sessions.detail.agent_hierarchy")}>
-      <div className="mb-2 flex items-center gap-2 text-sm font-bold">
+      <button
+        type="button"
+        className={`mb-2 flex w-full items-center gap-2 rounded-md text-left text-sm font-bold ${DISCLOSURE_BUTTON_CLASS}`}
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((value) => !value)}
+      >
+        {isExpanded ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
         <GitBranch className="h-4 w-4 text-primary" />
         {t("sessions.detail.agent_hierarchy")}
         <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {t("sessions.detail.agent_count", { count: agents.length })}
         </span>
-      </div>
+        <span className="ml-auto text-xs font-medium text-muted-foreground">{t("sessions.group_total_cost")}</span>
+        <span className="text-xs tabular-nums text-foreground" data-testid="agent-group-cost">{formatCurrency(totalCost)}</span>
+        <span className="text-xs font-semibold text-primary">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
+      </button>
       <div className="space-y-1">
-        {orderedAgents.map((agent) => {
+        {visibleAgents.map((agent) => {
           const isActive = agent.path === activePath;
           const pathName = agent.agentPath.split("/").filter(Boolean).at(-1) || "root";
           const name = agent.parentSessionId && pathName === "root"

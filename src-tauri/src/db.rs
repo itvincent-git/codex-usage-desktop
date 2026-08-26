@@ -106,6 +106,7 @@ pub struct SessionRollupRecord {
 pub struct SessionHierarchyRecord {
     pub path: String,
     pub prompt_title: Option<String>,
+    pub cost_usd: f64,
 }
 
 fn ensure_column(
@@ -321,16 +322,23 @@ pub fn query_session_hierarchy_records(
     let mut statement = db
         .prepare(
             r#"
-            SELECT path, prompt_title
+            SELECT path, prompt_title, rows_json
             FROM session_file_rollups
             "#,
         )
         .map_err(|error| error.to_string())?;
     let rows = statement
         .query_map([], |row| {
+            let rows_json: String = row.get(2)?;
+            let cost_usd = serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json)
+                .unwrap_or_default()
+                .iter()
+                .map(|usage| usage.cost_usd)
+                .sum();
             Ok(SessionHierarchyRecord {
                 path: row.get(0)?,
                 prompt_title: row.get(1)?,
+                cost_usd,
             })
         })
         .map_err(|error| error.to_string())?;

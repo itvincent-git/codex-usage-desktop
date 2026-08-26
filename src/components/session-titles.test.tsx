@@ -294,6 +294,31 @@ describe("session titles", () => {
     expect(within(cards[0]).queryByText("Subagent")).not.toBeInTheDocument();
   });
 
+  it("collapses subagent groups to three rows and shows the complete group cost", async () => {
+    const members = [
+      session({ path: "/tmp/root.jsonl", sessionId: "root.jsonl", threadName: "Parent", agentSessionId: "root-id", costUSD: 1, dailyUsage: [] }),
+      ...Array.from({ length: 4 }, (_, index) => session({
+        path: `/tmp/child-${index}.jsonl`,
+        sessionId: `child-${index}.jsonl`,
+        threadName: `Child ${index}`,
+        agentSessionId: `child-${index}`,
+        parentSessionId: "root-id",
+        agentDepth: 1,
+        costUSD: index + 2,
+        dailyUsage: [],
+      })),
+    ];
+
+    render(<SessionUsageTable sessions={members} />);
+
+    const group = screen.getByTestId("subagent-group");
+    expect(within(group).getAllByTestId("session-card")).toHaveLength(3);
+    expect(within(group).getByTestId("subagent-group-cost")).toHaveTextContent("$15.00");
+
+    await userEvent.click(within(group).getByRole("button", { name: /Subagent group/ }));
+    expect(within(group).getAllByTestId("session-card")).toHaveLength(5);
+  });
+
   it("shows the summary name with weak file metadata and avoids repeating a fallback ID", () => {
     render(
       <SessionUsageTable
@@ -747,9 +772,11 @@ describe("session titles", () => {
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
     await i18n.changeLanguage("en");
     const agents = [
-      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", role: null, threadName: "Research task" },
-      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", nickname: null, role: "Tester", threadName: "Test task" },
-      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task" },
+      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", role: null, threadName: "Research task", costUSD: 0.002 },
+      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", nickname: null, role: "Tester", threadName: "Test task", costUSD: 0.003 },
+      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task", costUSD: 0.001 },
+      { path: "/tmp/child-2.jsonl", sessionId: "child-2-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/reviewer", nickname: "Reviewer", role: null, threadName: "Review task", costUSD: 0.004 },
+      { path: "/tmp/child-3.jsonl", sessionId: "child-3-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/writer", nickname: "Writer", role: null, threadName: "Write task", costUSD: 0.005 },
     ];
     invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
       if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
@@ -763,7 +790,7 @@ describe("session titles", () => {
     render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadName: "Root task" })} onClose={vi.fn()} />);
 
     const hierarchy = await screen.findByRole("region", { name: "Agent hierarchy" });
-    expect(within(hierarchy).getByText("3 agents")).toBeInTheDocument();
+    expect(within(hierarchy).getByText("5 agents")).toBeInTheDocument();
     const rootButton = within(hierarchy).getByRole("button", { name: /root.*Root task.*Root.*Current/ });
     const childButton = within(hierarchy).getByRole("button", { name: /Curie.*Research task.*Subagent/ });
     const grandchildButton = within(hierarchy).getByRole("button", { name: /Tester.*Test task.*Subagent/ });
@@ -771,7 +798,12 @@ describe("session titles", () => {
     expect(rootButton).toHaveStyle({ paddingLeft: "8px" });
     expect(childButton).toHaveStyle({ paddingLeft: "32px" });
     expect(grandchildButton).toHaveStyle({ paddingLeft: "56px" });
-    expect(within(hierarchy).getAllByRole("button")[0]).toBe(rootButton);
+    expect(within(hierarchy).getAllByRole("button")).toHaveLength(4);
+    expect(within(hierarchy).getAllByRole("button")[1]).toBe(rootButton);
+    expect(within(hierarchy).getByTestId("agent-group-cost")).toHaveTextContent("$0.015");
+
+    await userEvent.click(within(hierarchy).getByRole("button", { name: /Agent hierarchy.*5 agents/ }));
+    expect(within(hierarchy).getAllByRole("button")).toHaveLength(6);
 
     await userEvent.click(childButton);
     expect(await screen.findByRole("dialog", { name: "Research task" })).toBeInTheDocument();

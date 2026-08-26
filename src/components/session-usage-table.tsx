@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
-import { Terminal, Folder, ChevronDown, Calendar, CornerDownRight } from "lucide-react";
+import { Terminal, Folder, ChevronDown, Calendar, CornerDownRight, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,8 @@ type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
   originalSession: SessionDetailRow;
 };
+
+const COLLAPSED_AGENT_LIMIT = 3;
 
 type SessionUsageTableProps = {
   sessions: SessionDetailRow[];
@@ -69,6 +71,31 @@ function orderSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
   }
   for (const session of chronological) visit(session);
   return ordered;
+}
+
+function groupSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
+  const byAgentId = new Map(
+    sessions.flatMap((session) => session.agentSessionId ? [[session.agentSessionId, session] as const] : []),
+  );
+  const groups = new Map<SessionDisplayRow, SessionDisplayRow[]>();
+
+  for (const session of sessions) {
+    let root = session;
+    const visited = new Set<string>();
+    while (root.parentSessionId && byAgentId.has(root.parentSessionId) && !visited.has(root.parentSessionId)) {
+      visited.add(root.parentSessionId);
+      root = byAgentId.get(root.parentSessionId)!;
+    }
+    const members = groups.get(root) ?? [];
+    members.push(session);
+    groups.set(root, members);
+  }
+
+  return Array.from(groups, ([root, members]) => ({
+    key: root.path,
+    sessions: members,
+    costUSD: members.reduce((sum, session) => sum + session.costUSD, 0),
+  }));
 }
 
 function formatDateHeader(dateStr: string) {
@@ -170,6 +197,7 @@ export function SessionUsageTable({
   const { t, i18n } = useTranslation();
   // Track which date groups are collapsed
   const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+  const [expandedAgentGroups, setExpandedAgentGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (initialExpandedDate) {
@@ -238,6 +266,7 @@ export function SessionUsageTable({
         return {
           date,
           sessions: sortedItems,
+          agentGroups: groupSessionsByAgentHierarchy(sortedItems),
           totalTokens,
           inputTokens,
           cachedInputTokens,
@@ -276,6 +305,10 @@ export function SessionUsageTable({
       ...prev,
       [date]: !isCollapsed(date),
     }));
+  };
+
+  const toggleAgentGroup = (key: string) => {
+    setExpandedAgentGroups((previous) => ({ ...previous, [key]: !previous[key] }));
   };
 
   const isCollapsed = (date: string) => {
@@ -488,7 +521,36 @@ export function SessionUsageTable({
               {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
                 <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
-                  {group.sessions.map((session) => {
+                  {group.agentGroups.map((agentGroup) => {
+                    const groupKey = `${group.date}:${agentGroup.key}`;
+                    const hasSubagents = agentGroup.sessions.length > 1;
+                    const isExpanded = Boolean(expandedAgentGroups[groupKey]);
+                    const visibleSessions = hasSubagents && !isExpanded
+                      ? agentGroup.sessions.slice(0, COLLAPSED_AGENT_LIMIT)
+                      : agentGroup.sessions;
+
+                    return (
+                      <div key={agentGroup.key} className="space-y-2" data-testid={hasSubagents ? "subagent-group" : undefined}>
+                        {hasSubagents ? (
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-left text-xs transition hover:bg-indigo-500/10"
+                            aria-expanded={isExpanded}
+                            onClick={() => toggleAgentGroup(groupKey)}
+                          >
+                            {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-indigo-400" /> : <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-indigo-400" />}
+                            <GitBranch className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                            <span className="font-semibold text-foreground">{t("sessions.subagent_group")}</span>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              {t("sessions.detail.agent_count", { count: agentGroup.sessions.length })}
+                            </span>
+                            <span className="ml-auto text-muted-foreground">{t("sessions.group_total_cost")}</span>
+                            <span className="font-bold tabular-nums text-foreground" data-testid="subagent-group-cost">{formatCurrency(agentGroup.costUSD)}</span>
+                            <span className="font-semibold text-indigo-400">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
+                          </button>
+                        ) : null}
+                        <div className="space-y-2">
+                          {visibleSessions.map((session) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
                     const fullTime = new Date(session.modifiedAtMs).toLocaleString();
@@ -669,6 +731,10 @@ export function SessionUsageTable({
                           <SessionQuotaUsageView usage={session.quotaUsage} />
                         </div>
                       </article>
+                      </div>
+                    );
+                          })}
+                        </div>
                       </div>
                     );
                   })}

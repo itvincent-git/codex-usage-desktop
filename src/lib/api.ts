@@ -327,6 +327,7 @@ export type SessionReplayDetail = {
     nickname: string | null;
     role: string | null;
     threadName: string | null;
+    costUSD: number;
   }>;
   summary: {
     startTime: string | null;

@@ -248,6 +248,7 @@ fn read_session_agent(record: SessionHierarchyRecord) -> Option<SessionReplayAge
             nickname: spawn.and_then(|value| string_field(value, "agent_nickname")),
             role: spawn.and_then(|value| string_field(value, "agent_role")),
             thread_name: record.prompt_title.filter(|title| !title.is_empty()),
+            cost_usd: record.cost_usd,
         });
     }
     None
@@ -2162,20 +2163,33 @@ mod tests {
         )
         .unwrap();
 
-        let rollup = |path: &Path, modified_at_ms, prompt_title: &str| SessionFileRollup {
-            path: path.to_string_lossy().to_string(),
-            modified_at_ms,
-            size_bytes: fs::metadata(path).unwrap().len() as i64,
-            rows: vec![],
-            prompt_title: Some(prompt_title.to_string()),
-            quota_usage: None,
+        let usage = |cost_usd| DailyUsageRow {
+            date: "2026-06-01".to_string(),
+            input_tokens: 0,
+            cached_input_tokens: 0,
+            output_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 0,
+            cost_usd,
+            models: BTreeMap::new(),
+            projects: BTreeMap::new(),
+            updated_at: "2026-06-01T00:00:00.000Z".to_string(),
         };
+        let rollup =
+            |path: &Path, modified_at_ms, prompt_title: &str, cost_usd| SessionFileRollup {
+                path: path.to_string_lossy().to_string(),
+                modified_at_ms,
+                size_bytes: fs::metadata(path).unwrap().len() as i64,
+                rows: vec![usage(cost_usd)],
+                prompt_title: Some(prompt_title.to_string()),
+                quota_usage: None,
+            };
         upsert_session_file_rollups(
             &mut db,
             &[
-                rollup(&child_path, 2, "Research task"),
-                rollup(&root_path, 1, "Main task"),
-                rollup(&grandchild_path, 3, "Test task"),
+                rollup(&child_path, 2, "Research task", 0.02),
+                rollup(&root_path, 1, "Main task", 0.01),
+                rollup(&grandchild_path, 3, "Test task", 0.03),
             ],
             "2026-06-01T00:00:00.000Z",
         )
@@ -2192,6 +2206,12 @@ mod tests {
         );
         assert_eq!(detail.agents[1].nickname.as_deref(), Some("Curie"));
         assert_eq!(detail.agents[2].depth, 2);
+        let total_cost = detail
+            .agents
+            .iter()
+            .map(|agent| agent.cost_usd)
+            .sum::<f64>();
+        assert!((total_cost - 0.06).abs() < 1e-9);
     }
 
     fn tempfile_dir() -> std::path::PathBuf {
