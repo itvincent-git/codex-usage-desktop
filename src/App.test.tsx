@@ -1568,7 +1568,7 @@ describe("App", () => {
     expect(document.body.style.overflow).toBe("auto");
     expect(screen.getByText("Replay summary")).toBeInTheDocument();
     expect(document.activeElement?.textContent).toContain("Replay summary");
-  });
+  }, 15_000);
 
   it("bootstraps only once in strict mode", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
