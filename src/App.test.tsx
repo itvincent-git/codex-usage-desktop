@@ -1185,7 +1185,7 @@ describe("App", () => {
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "system", source: "base_instructions", text: "system-1\nsystem-2\nsystem-3\nSYSTEM_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "developer", source: "developer_message", text: "developer-1\ndeveloper-2\ndeveloper-3\nDEVELOPER_TAIL" },
                 { kind: "message", timestamp: "2026-06-11T00:00:00.000Z", role: "user", source: "user_message", text: "Replay this session\nuser-2\nuser-3\nuser-4\nuser-5\nuser-6\nuser-7\nuser-8\nuser-9\nuser-10\nUSER_TAIL" },
-                { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\nASSISTANT_TAIL" },
+                { kind: "message", timestamp: "2026-06-11T00:00:01.000Z", role: "assistant", source: "assistant_message", text: "assistant-1\nassistant-2\nassistant-3\nassistant-4\nassistant-5\nassistant-6\nassistant-7\nassistant-8\nassistant-9\nassistant-10\n**ASSISTANT_TAIL**\n\n| Feature | Status |\n| --- | --- |\n| Markdown | Ready |\n\n```typescript\nconst answer = 42;\n```\n\n$$\nE = mc^2\n$$" },
                 { kind: "reasoning", timestamp: "2026-06-11T00:00:00.250Z", text: "Reasoning fixture" },
                 {
                   kind: "toolCall",
@@ -1419,6 +1419,14 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
+
+    await userEvent.click(assistantButton);
+    const assistantItem = assistantButton.parentElement!;
+    await waitFor(() => expect(assistantItem.querySelector(".session-markdown")).toBeInTheDocument());
+    expect(within(assistantItem).getByText("ASSISTANT_TAIL").tagName).toBe("STRONG");
+    expect(assistantItem.querySelector("table")).toBeInTheDocument();
+    expect(assistantItem.querySelector("code.language-typescript.hljs .hljs-keyword")).toHaveTextContent("const");
+    expect(assistantItem.querySelector(".katex-display")).toBeInTheDocument();
 
     const toolCallButton = screen.getByRole("button", { name: /Ran \(1s, exit 0\) first command/ });
     const toolCall = toolCallButton.parentElement!;

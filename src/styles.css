@@ -54,6 +54,198 @@
 }
 
 @layer utilities {
+  .session-markdown {
+    @apply break-words text-sm leading-relaxed text-foreground;
+  }
+
+  .session-markdown > :first-child {
+    margin-top: 0;
+  }
+
+  .session-markdown > :last-child {
+    margin-bottom: 0;
+  }
+
+  .session-markdown p,
+  .session-markdown ul,
+  .session-markdown ol,
+  .session-markdown blockquote,
+  .session-markdown pre,
+  .session-markdown-table,
+  .session-markdown .katex-display {
+    @apply my-3;
+  }
+
+  .session-markdown h1,
+  .session-markdown h2,
+  .session-markdown h3,
+  .session-markdown h4,
+  .session-markdown h5,
+  .session-markdown h6 {
+    @apply mb-2 mt-4 font-bold leading-tight;
+  }
+
+  .session-markdown h1 {
+    @apply text-xl;
+  }
+
+  .session-markdown h2 {
+    @apply text-lg;
+  }
+
+  .session-markdown h3 {
+    @apply text-base;
+  }
+
+  .session-markdown ul {
+    @apply list-disc pl-6;
+  }
+
+  .session-markdown ol {
+    @apply list-decimal pl-6;
+  }
+
+  .session-markdown li + li {
+    @apply mt-1;
+  }
+
+  .session-markdown li > ul,
+  .session-markdown li > ol {
+    @apply my-1;
+  }
+
+  .session-markdown blockquote {
+    @apply border-l-4 border-primary/40 pl-4 text-muted-foreground;
+  }
+
+  .session-markdown a {
+    @apply text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary;
+  }
+
+  .session-markdown strong {
+    @apply font-bold;
+  }
+
+  .session-markdown hr {
+    @apply my-4 border-border/70;
+  }
+
+  .session-markdown :not(pre) > code {
+    @apply rounded bg-background/70 px-1.5 py-0.5 font-mono text-[0.85em];
+  }
+
+  .session-markdown pre {
+    @apply overflow-x-auto rounded-md border border-border/60 bg-background/75 p-3;
+  }
+
+  .session-markdown pre code {
+    @apply font-mono text-xs leading-relaxed;
+  }
+
+  .session-markdown-table {
+    @apply overflow-x-auto rounded-md border border-border/60;
+  }
+
+  .session-markdown table {
+    @apply min-w-full border-collapse text-left text-xs;
+  }
+
+  .session-markdown th {
+    @apply bg-background/70 font-semibold;
+  }
+
+  .session-markdown th,
+  .session-markdown td {
+    @apply border-b border-r border-border/60 px-3 py-2 last:border-r-0;
+  }
+
+  .session-markdown tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .session-markdown input[type="checkbox"] {
+    @apply mr-2 align-middle accent-primary;
+  }
+
+  .session-markdown .katex-display {
+    @apply overflow-x-auto overflow-y-hidden py-1;
+  }
+
+  .session-markdown .hljs-comment,
+  .session-markdown .hljs-quote {
+    color: rgb(var(--muted-foreground));
+  }
+
+  .session-markdown .hljs-keyword,
+  .session-markdown .hljs-selector-tag,
+  .session-markdown .hljs-literal,
+  .session-markdown .hljs-section,
+  .session-markdown .hljs-link {
+    color: #8250df;
+  }
+
+  .session-markdown .hljs-string,
+  .session-markdown .hljs-title,
+  .session-markdown .hljs-name,
+  .session-markdown .hljs-type,
+  .session-markdown .hljs-attribute,
+  .session-markdown .hljs-symbol,
+  .session-markdown .hljs-bullet,
+  .session-markdown .hljs-addition,
+  .session-markdown .hljs-variable,
+  .session-markdown .hljs-template-tag,
+  .session-markdown .hljs-template-variable {
+    color: #116329;
+  }
+
+  .session-markdown .hljs-number,
+  .session-markdown .hljs-meta,
+  .session-markdown .hljs-built_in,
+  .session-markdown .hljs-builtin-name,
+  .session-markdown .hljs-params {
+    color: #0550ae;
+  }
+
+  .session-markdown .hljs-deletion {
+    color: #cf222e;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .session-markdown .hljs-keyword,
+    .session-markdown .hljs-selector-tag,
+    .session-markdown .hljs-literal,
+    .session-markdown .hljs-section,
+    .session-markdown .hljs-link {
+      color: #d2a8ff;
+    }
+
+    .session-markdown .hljs-string,
+    .session-markdown .hljs-title,
+    .session-markdown .hljs-name,
+    .session-markdown .hljs-type,
+    .session-markdown .hljs-attribute,
+    .session-markdown .hljs-symbol,
+    .session-markdown .hljs-bullet,
+    .session-markdown .hljs-addition,
+    .session-markdown .hljs-variable,
+    .session-markdown .hljs-template-tag,
+    .session-markdown .hljs-template-variable {
+      color: #7ee787;
+    }
+
+    .session-markdown .hljs-number,
+    .session-markdown .hljs-meta,
+    .session-markdown .hljs-built_in,
+    .session-markdown .hljs-builtin-name,
+    .session-markdown .hljs-params {
+      color: #79c0ff;
+    }
+
+    .session-markdown .hljs-deletion {
+      color: #ff7b72;
+    }
+  }
+
   .daily-usage-row {
     content-visibility: auto;
     contain-intrinsic-size: auto 112px;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_AGENT_LIMIT = 3;
 const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 const EXEC_TOOL_NAMES = new Set(["exec", "exec_command"]);
+const MarkdownContent = lazy(() => import("./markdown-content").then((module) => ({ default: module.MarkdownContent })));
 
 const ITEM_TONES = {
   system: "border-zinc-300/70 bg-zinc-100/60 dark:border-zinc-700/70 dark:bg-zinc-900/40",
@@ -324,11 +325,13 @@ function TextBlock({
   title,
   text,
   defaultCollapsed = false,
+  markdown = false,
   titleClassName = "text-muted-foreground",
 }: {
   title: string;
   text: string;
   defaultCollapsed?: boolean;
+  markdown?: boolean;
   titleClassName?: string;
 }) {
   const { t } = useTranslation();
@@ -339,9 +342,15 @@ function TextBlock({
   return (
     <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
       <div className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${titleClassName}`}>{title}</div>
-      <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
-        {isFullVisible ? text : preview}
-      </pre>
+      {isFullVisible && markdown ? (
+        <Suspense fallback={<pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{text}</pre>}>
+          <MarkdownContent content={text} />
+        </Suspense>
+      ) : (
+        <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+          {isFullVisible ? text : preview}
+        </pre>
+      )}
       {isLong ? (
         <Button
           type="button"
@@ -389,9 +398,17 @@ function MessageItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "
           </span>
         </span>
       </button>
-      <pre className={`${isExpanded ? "" : previewClass} rounded-md border border-border/50 bg-muted/35 p-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
-        {isExpanded ? item.text : buildCollapsedPreview(item.text, previewLines)}
-      </pre>
+      {isExpanded ? (
+        <div className="rounded-md border border-border/50 bg-muted/35 p-3">
+          <Suspense fallback={<pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{item.text}</pre>}>
+            <MarkdownContent content={item.text} />
+          </Suspense>
+        </div>
+      ) : (
+        <pre className={`${previewClass} rounded-md border border-border/50 bg-muted/35 p-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
+          {buildCollapsedPreview(item.text, previewLines)}
+        </pre>
+      )}
     </div>
   );
 }
@@ -1230,7 +1247,7 @@ function TimelineItem({ item, tokenUsage }: TimelineEntry) {
     return (
       <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
         {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
-        <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} titleClassName={ITEM_TITLE_TONES.reasoning} />
+        <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
       </div>
     );
   }
