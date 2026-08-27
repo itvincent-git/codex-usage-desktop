@@ -1,4 +1,8 @@
 {
+  "2.7.2": {
+    "zh": "- fix(ci): retry macOS release asset uploads",
+    "en": "- fix(ci): retry macOS release asset uploads"
+  },
   "2.7.1": {
     "zh": "- test: stabilize session replay test on Windows",
     "en": "- test: stabilize session replay test on Windows"
