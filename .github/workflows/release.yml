@@ -190,13 +190,33 @@ jobs:
           cp "${updater}" "release-assets/${{ matrix.updaterAsset }}"
           cp "${signature}" "release-assets/${{ matrix.updaterAsset }}.sig"
 
-      - name: Upload stable DMG asset
+      - name: Upload stable macOS assets
         if: runner.os == 'macOS'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          draft: true
-          files: release-assets/*
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          for asset in release-assets/*; do
+            for attempt in 1 2 3; do
+              if gh release upload "${RELEASE_TAG}" "${asset}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --clobber
+              then
+                break
+              fi
+
+              if [[ "${attempt}" -eq 3 ]]; then
+                echo "Failed to upload ${asset} after ${attempt} attempts."
+                exit 1
+              fi
+
+              delay=$((attempt * 15))
+              echo "Upload failed for ${asset}; retrying in ${delay} seconds."
+              sleep "${delay}"
+            done
+          done
 
       - name: Prepare and validate Windows assets
         if: runner.os == 'Windows'
