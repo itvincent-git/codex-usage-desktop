@@ -38,7 +38,7 @@ function cleanSessionId(sessionId: string) {
 function TrendTooltip({ active, payload, label, t }: any) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload as ProjectAnalyticsResponse["daily"][number] & { nonCachedInputTokens: number };
-  return <div className="min-w-[220px] select-none rounded-lg border border-border/70 bg-surface/95 p-3.5 text-xs shadow-xl backdrop-blur-md">
+  return <div className="min-w-[220px] select-none rounded-lg border border-border/70 bg-surface p-3.5 text-xs shadow-xl">
     <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     <div className="space-y-1.5">
       <p className="mb-1.5 flex items-center justify-between gap-4 border-b border-border/60 pb-1.5 font-semibold text-foreground"><span>{t("project_modal.total_tokens")}</span><span>{formatNumber(row.totalTokens)}</span></p>

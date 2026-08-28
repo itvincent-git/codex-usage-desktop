@@ -29,7 +29,7 @@ const chartLegend = [
   { labelKey: "common.cost", defaultLabel: "Cost", className: "bg-primary" },
 ];
 
-const CustomTooltip = ({ active, payload, label, t }: any) => {
+export const UsageTrendTooltip = ({ active, payload, label, t }: any) => {
   if (active && payload && payload.length) {
     const input = payload.find((p: any) => p.dataKey === "inputTokens")?.value ?? 0;
     const cached = payload.find((p: any) => p.dataKey === "cachedInputTokens")?.value ?? 0;
@@ -38,7 +38,7 @@ const CustomTooltip = ({ active, payload, label, t }: any) => {
     const total = input + cached + output;
 
     return (
-      <div className="min-w-[220px] select-none rounded-lg border border-border/70 bg-surface/95 p-3.5 shadow-xl backdrop-blur-md">
+      <div className="min-w-[220px] select-none rounded-lg border border-border/70 bg-surface p-3.5 shadow-xl">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
@@ -163,7 +163,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 tickFormatter={(value) => formatCurrencyShort(Number(value))}
               />
               <Tooltip
-                content={<CustomTooltip t={t} />}
+                content={<UsageTrendTooltip t={t} />}
                 cursor={{ stroke: "rgb(var(--primary) / 0.22)", strokeDasharray: "4 4", strokeWidth: 1 }}
               />
 
