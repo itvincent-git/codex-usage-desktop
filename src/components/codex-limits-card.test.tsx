@@ -489,8 +489,9 @@ describe("CodexLimitsCard component", () => {
     const latestResetButton = screen.getByRole("button", { name: "View token resets from the last 30 days" });
     expect(latestResetButton).toHaveTextContent("Token reset within 24h");
     expect(latestResetButton).toHaveTextContent("2 hours ago");
-    expect(latestResetButton).toHaveClass("border-warning/60", "bg-warning/15");
-    expect(screen.getByText("Token reset within 24h")).toHaveClass("text-xs", "font-bold", "text-warning");
+    expect(latestResetButton).toHaveClass("border-primary/35", "bg-primary/[0.07]");
+    expect(screen.getByText("Token reset within 24h")).toHaveClass("truncate");
+    expect(screen.getByTestId("recent-reset-indicator")).toHaveClass("bg-success");
     expect(screen.getByText(/2 hours ago/)).toHaveClass("text-[9px]", "font-normal", "text-muted-foreground");
 
     vi.useRealTimers();

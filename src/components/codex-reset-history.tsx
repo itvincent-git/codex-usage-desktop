@@ -155,16 +155,17 @@ export function LatestResetButton({
   return (
     <button
       type="button"
-      className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] content-center items-center gap-x-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-warning/60 bg-warning/15 hover:border-warning/80 hover:bg-warning/20" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
+      className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] content-center items-center gap-x-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-primary/35 bg-primary/[0.07] hover:border-primary/50 hover:bg-primary/10" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
       onClick={onOpen}
       aria-label={t("limits.latest_reset_open")}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isRecentReset ? "bg-warning/25 text-warning" : "bg-primary/10 text-primary"}`}>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary ${isRecentReset ? "bg-primary/15" : "bg-primary/10"}`}>
         <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
       </span>
       <span className="min-w-0">
-        <span className={`block truncate text-xs font-bold leading-none ${isRecentReset ? "text-warning" : "text-foreground/80"}`}>
-          {isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}
+        <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-none text-foreground/80">
+          {isRecentReset ? <span data-testid="recent-reset-indicator" className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" /> : null}
+          <span className="truncate">{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
         </span>
         <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
           {relativeResetTime} · {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
