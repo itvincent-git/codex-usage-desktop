@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { SessionDetailRow } from "@/lib/api";
+import type { SessionDetailRow, SessionQuotaWindowUsage } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { Terminal, Folder, ChevronDown, Calendar, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,58 @@ function formatDateHeader(dateStr: string) {
   }
 }
 
+function rebaseQuotaUsage(sessions: SessionDisplayRow[]) {
+  const windows = sessions.flatMap((session) =>
+    (["fiveHour", "weekly"] as const).flatMap((key) =>
+      (session.quotaUsage?.[key] ?? []).map((window) => ({ key, window })),
+    ),
+  );
+
+  const rebaseWindow = (key: "fiveHour" | "weekly", window: SessionQuotaWindowUsage) => {
+    const startAt = Date.parse(window.observedStartAt);
+    const endAt = Date.parse(window.observedEndAt);
+    const resetAt = window.resetsAt ? Date.parse(window.resetsAt) : null;
+    let baseline: SessionQuotaWindowUsage | null = null;
+    let baselineEndAt = Number.NEGATIVE_INFINITY;
+
+    for (const candidate of windows) {
+      if (candidate.key !== key || candidate.window === window) continue;
+      const candidateEndAt = Date.parse(candidate.window.observedEndAt);
+      const candidateResetAt = candidate.window.resetsAt ? Date.parse(candidate.window.resetsAt) : null;
+      const sameReset = resetAt === null && candidateResetAt === null
+        || resetAt !== null && candidateResetAt !== null && Math.abs(resetAt - candidateResetAt) <= 60_000;
+      if (
+        sameReset
+        && candidateEndAt > startAt
+        && candidateEndAt < endAt
+        && candidate.window.observedEndPercent <= window.observedEndPercent
+        && candidateEndAt > baselineEndAt
+      ) {
+        baseline = candidate.window;
+        baselineEndAt = candidateEndAt;
+      }
+    }
+
+    if (!baseline) return window;
+    const observedDeltaPercent = window.observedEndPercent - baseline.observedEndPercent;
+    return {
+      ...window,
+      observedStartAt: baseline.observedEndAt,
+      observedStartPercent: baseline.observedEndPercent,
+      observedDeltaPercent,
+      belowResolution: Math.round(observedDeltaPercent) === 0,
+    };
+  };
+
+  return sessions.map((session) => session.quotaUsage ? {
+    ...session,
+    quotaUsage: {
+      fiveHour: session.quotaUsage.fiveHour.map((window) => rebaseWindow("fiveHour", window)),
+      weekly: session.quotaUsage.weekly.map((window) => rebaseWindow("weekly", window)),
+    },
+  } : session);
+}
+
 function summarizeQuotaUsage(sessions: SessionDisplayRow[], key: "fiveHour" | "weekly") {
   let observedDeltaPercent = 0;
   let hasBelowResolutionUsage = false;
@@ -267,7 +319,7 @@ export function SessionUsageTable({
     }
   }, [initialExpandedDate]);
 
-  const displaySessions = useMemo<SessionDisplayRow[]>(() => sessions.flatMap((session) => {
+  const displaySessions = useMemo<SessionDisplayRow[]>(() => rebaseQuotaUsage(sessions.flatMap((session) => {
     if (session.totalTokens === 0 || session.dailyUsage.length === 0) {
       return [{
         ...session,
@@ -282,7 +334,7 @@ export function SessionUsageTable({
       usageDate: usage.date,
       originalSession: session,
     }));
-  }), [sessions]);
+  })), [sessions]);
 
   // Group and sort session-day rows using the scanner's application-timezone dates.
   const groups = useMemo(() => {

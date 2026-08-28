@@ -130,6 +130,59 @@ describe("session daily usage", () => {
     expect(summary).toHaveTextContent("Weekly Used Approx. 5% • 70% → 65%");
   });
 
+  it("uses the preceding session snapshot after a session resumes", () => {
+    const quotaWindow = (startAt: string, endAt: string, startPercent: number, endPercent: number) => ({
+      windowMinutes: 300,
+      resetsAt: "2026-08-28T09:14:31Z",
+      observedStartAt: startAt,
+      observedEndAt: endAt,
+      observedStartPercent: startPercent,
+      observedEndPercent: endPercent,
+      observedDeltaPercent: endPercent - startPercent,
+      belowResolution: false,
+    });
+    const dailyUsage = (quotaUsage: ReturnType<typeof quotaWindow>) => [{
+      date: "2026-08-28",
+      inputTokens: 100,
+      cachedInputTokens: 20,
+      outputTokens: 40,
+      reasoningOutputTokens: 0,
+      totalTokens: 140,
+      costUSD: 0.001,
+      models: ["gpt-5"],
+      projects: ["/repo/app"],
+      quotaUsage: { fiveHour: [quotaUsage], weekly: [] },
+    }];
+
+    render(<SessionUsageTable sessions={[
+      session({
+        path: "/tmp/resumed.jsonl",
+        threadName: "Resumed session",
+        modifiedAtMs: new Date("2026-08-28T08:55:38Z").getTime(),
+        dailyUsage: dailyUsage(quotaWindow(
+          "2026-08-28T05:34:31Z",
+          "2026-08-28T08:55:38Z",
+          0,
+          37,
+        )),
+      }),
+      session({
+        path: "/tmp/preceding.jsonl",
+        threadName: "Preceding session",
+        modifiedAtMs: new Date("2026-08-28T08:30:48Z").getTime(),
+        dailyUsage: dailyUsage(quotaWindow(
+          "2026-08-28T08:24:01Z",
+          "2026-08-28T08:30:48Z",
+          11,
+          31,
+        )),
+      }),
+    ]} />);
+
+    const card = screen.getByText("Resumed session").closest("article")!;
+    expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. 6% · 63% left");
+  });
+
   it("shows quota color scales, low-resolution values, and multiple resets", () => {
     const window = (delta: number, belowResolution = false) => ({
       windowMinutes: 300,
