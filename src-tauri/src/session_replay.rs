@@ -248,6 +248,9 @@ fn read_session_agent(record: SessionHierarchyRecord) -> Option<SessionReplayAge
             nickname: spawn.and_then(|value| string_field(value, "agent_nickname")),
             role: spawn.and_then(|value| string_field(value, "agent_role")),
             thread_name: record.prompt_title.filter(|title| !title.is_empty()),
+            input_tokens: record.input_tokens,
+            cached_input_tokens: record.cached_input_tokens,
+            output_tokens: record.output_tokens,
             cost_usd: record.cost_usd,
         });
     }
@@ -2165,11 +2168,11 @@ mod tests {
 
         let usage = |cost_usd| DailyUsageRow {
             date: "2026-06-01".to_string(),
-            input_tokens: 0,
-            cached_input_tokens: 0,
-            output_tokens: 0,
+            input_tokens: 100,
+            cached_input_tokens: 20,
+            output_tokens: 40,
             reasoning_output_tokens: 0,
-            total_tokens: 0,
+            total_tokens: 140,
             cost_usd,
             models: BTreeMap::new(),
             projects: BTreeMap::new(),
@@ -2211,6 +2214,30 @@ mod tests {
             .iter()
             .map(|agent| agent.cost_usd)
             .sum::<f64>();
+        assert_eq!(
+            detail
+                .agents
+                .iter()
+                .map(|agent| agent.input_tokens)
+                .sum::<i64>(),
+            300
+        );
+        assert_eq!(
+            detail
+                .agents
+                .iter()
+                .map(|agent| agent.cached_input_tokens)
+                .sum::<i64>(),
+            60
+        );
+        assert_eq!(
+            detail
+                .agents
+                .iter()
+                .map(|agent| agent.output_tokens)
+                .sum::<i64>(),
+            120
+        );
         assert!((total_cost - 0.06).abs() < 1e-9);
     }
 

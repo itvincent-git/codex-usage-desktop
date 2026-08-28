@@ -506,6 +506,9 @@ pub struct SessionReplayAgent {
     pub nickname: Option<String>,
     pub role: Option<String>,
     pub thread_name: Option<String>,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
     #[serde(rename = "costUSD")]
     pub cost_usd: f64,
 }

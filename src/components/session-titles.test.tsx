@@ -67,6 +67,24 @@ function replayDetail(overrides: Partial<SessionReplayDetail>): SessionReplayDet
   };
 }
 
+function replayAgent(overrides: Partial<SessionReplayDetail["agents"][number]>): SessionReplayDetail["agents"][number] {
+  return {
+    path: "/tmp/root.jsonl",
+    sessionId: "root-id",
+    parentSessionId: null,
+    depth: 0,
+    agentPath: "/root",
+    nickname: null,
+    role: null,
+    threadName: "Root task",
+    inputTokens: 100,
+    cachedInputTokens: 20,
+    outputTokens: 40,
+    costUSD: 0.001,
+    ...overrides,
+  };
+}
+
 describe("session daily usage", () => {
   it("summarizes the 5-hour and weekly quota consumed by every session in a day", () => {
     const quotaWindow = (delta: number, startPercent: number, hour: number) => ({
@@ -318,6 +336,9 @@ describe("session titles", () => {
     const parentCard = within(group).getByText("Parent").closest("article")!;
     expect(within(group).getAllByTestId("session-card")).toHaveLength(2);
     expect(within(parentCard).getByTestId("subagent-summary")).toHaveTextContent("4 subagents");
+    expect(within(group).getByTestId("subagent-group-input")).toHaveTextContent("500");
+    expect(within(group).getByTestId("subagent-group-cache")).toHaveTextContent("100");
+    expect(within(group).getByTestId("subagent-group-output")).toHaveTextContent("200");
     expect(within(group).getByTestId("subagent-group-cost")).toHaveTextContent("$15.00");
 
     const summary = within(parentCard).getByTestId("subagent-summary");
@@ -786,11 +807,11 @@ describe("session titles", () => {
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
     await i18n.changeLanguage("en");
     const agents = [
-      { path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", role: null, threadName: "Research task", costUSD: 0.002 },
-      { path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", nickname: null, role: "Tester", threadName: "Test task", costUSD: 0.003 },
-      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task", costUSD: 0.001 },
-      { path: "/tmp/child-2.jsonl", sessionId: "child-2-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/reviewer", nickname: "Reviewer", role: null, threadName: "Review task", costUSD: 0.004 },
-      { path: "/tmp/child-3.jsonl", sessionId: "child-3-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/writer", nickname: "Writer", role: null, threadName: "Write task", costUSD: 0.005 },
+      replayAgent({ path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, agentPath: "/root", nickname: "Curie", threadName: "Research task", costUSD: 0.002 }),
+      replayAgent({ path: "/tmp/grandchild.jsonl", sessionId: "grandchild-id", parentSessionId: "child-id", depth: 2, agentPath: "/root", role: "Tester", threadName: "Test task", costUSD: 0.003 }),
+      replayAgent({ path: "/tmp/root.jsonl", sessionId: "root-id" }),
+      replayAgent({ path: "/tmp/child-2.jsonl", sessionId: "child-2-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/reviewer", nickname: "Reviewer", threadName: "Review task", costUSD: 0.004 }),
+      replayAgent({ path: "/tmp/child-3.jsonl", sessionId: "child-3-id", parentSessionId: "root-id", depth: 1, agentPath: "/root/writer", nickname: "Writer", threadName: "Write task", costUSD: 0.005 }),
     ];
     invokeMock.mockImplementation(async (command: string, args?: { path?: string }) => {
       if (command !== "fetch_session_detail") throw new Error(`Unexpected invoke: ${command}`);
@@ -817,6 +838,9 @@ describe("session titles", () => {
     expect(within(grandchildButton).getByTestId("agent-tree-connector")).toHaveStyle({ left: "39px" });
     expect(within(hierarchy).getAllByRole("button")).toHaveLength(4);
     expect(within(hierarchy).getAllByRole("button")[1]).toBe(rootButton);
+    expect(within(hierarchy).getByTestId("agent-group-input")).toHaveTextContent("500");
+    expect(within(hierarchy).getByTestId("agent-group-cache")).toHaveTextContent("100");
+    expect(within(hierarchy).getByTestId("agent-group-output")).toHaveTextContent("200");
     expect(within(hierarchy).getByTestId("agent-group-cost")).toHaveTextContent("$0.015");
 
     await userEvent.click(within(hierarchy).getByRole("button", { name: /4 subagents/ }));
@@ -830,17 +854,16 @@ describe("session titles", () => {
   it("ends the last visible agent connector with a corner when collapsed", async () => {
     await i18n.changeLanguage("en");
     const agents = [
-      { path: "/tmp/root.jsonl", sessionId: "root-id", parentSessionId: null, depth: 0, agentPath: "/root", nickname: null, role: null, threadName: "Root task", costUSD: 0.001 },
+      replayAgent({ path: "/tmp/root.jsonl", sessionId: "root-id" }),
       ...Array.from({ length: 4 }, (_, index) => ({
-        path: `/tmp/child-${index}.jsonl`,
-        sessionId: `child-${index}-id`,
-        parentSessionId: "root-id",
-        depth: 1,
-        agentPath: `/root/child-${index}`,
-        nickname: null,
-        role: null,
-        threadName: `Child ${index}`,
-        costUSD: 0.001,
+        ...replayAgent({
+          path: `/tmp/child-${index}.jsonl`,
+          sessionId: `child-${index}-id`,
+          parentSessionId: "root-id",
+          depth: 1,
+          agentPath: `/root/child-${index}`,
+          threadName: `Child ${index}`,
+        }),
       })),
     ];
     invokeMock.mockResolvedValue(replayDetail({ agents }));

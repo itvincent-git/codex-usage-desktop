@@ -228,6 +228,9 @@ function AgentHierarchy({
   const visibleAgents = isExpanded ? orderedAgents : collapsedAgents;
   const visibleSessionIds = new Set(visibleAgents.map((agent) => agent.sessionId));
   const subagentCount = agents.filter((agent) => agent.parentSessionId !== null).length;
+  const totalInputTokens = agents.reduce((sum, agent) => sum + agent.inputTokens, 0);
+  const totalCachedInputTokens = agents.reduce((sum, agent) => sum + agent.cachedInputTokens, 0);
+  const totalOutputTokens = agents.reduce((sum, agent) => sum + agent.outputTokens, 0);
   const totalCost = agents.reduce((sum, agent) => sum + agent.costUSD, 0);
 
   const hasFollowingVisibleSibling = (agent: (typeof agents)[number]) => {
@@ -249,8 +252,12 @@ function AgentHierarchy({
         <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {t("sessions.subagent_count", { count: subagentCount })}
         </span>
-        <span className="ml-auto text-xs font-medium text-muted-foreground">{t("sessions.group_total_cost")}</span>
-        <span className="text-xs tabular-nums text-foreground" data-testid="agent-group-cost">{formatCurrency(totalCost)}</span>
+        <span className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs font-medium text-muted-foreground">
+          <span>{t("sessions.input_including_cache")} <strong className="tabular-nums text-foreground" data-testid="agent-group-input">{formatNumber(totalInputTokens)}</strong></span>
+          <span>{t("sessions.cached")} <strong className="tabular-nums text-foreground" data-testid="agent-group-cache">{formatNumber(totalCachedInputTokens)}</strong></span>
+          <span>{t("sessions.output")} <strong className="tabular-nums text-foreground" data-testid="agent-group-output">{formatNumber(totalOutputTokens)}</strong></span>
+          <span>{t("sessions.group_total_cost")} <strong className="tabular-nums text-foreground" data-testid="agent-group-cost">{formatCurrency(totalCost)}</strong></span>
+        </span>
         <span className="text-xs font-semibold text-primary">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
       </button>
       <div className="overflow-hidden">

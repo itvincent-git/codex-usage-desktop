@@ -94,6 +94,9 @@ function groupSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
   return Array.from(groups, ([root, members]) => ({
     key: root.path,
     sessions: members,
+    inputTokens: members.reduce((sum, session) => sum + session.inputTokens, 0),
+    cachedInputTokens: members.reduce((sum, session) => sum + session.cachedInputTokens, 0),
+    outputTokens: members.reduce((sum, session) => sum + session.outputTokens, 0),
     costUSD: members.reduce((sum, session) => sum + session.costUSD, 0),
   }));
 }
@@ -694,9 +697,11 @@ export function SessionUsageTable({
                             <span className="font-semibold text-foreground">
                               {t("sessions.subagent_count", { count: agentGroup.sessions.length - 1 })}
                             </span>
-                            <span className="ml-auto text-muted-foreground">{t("sessions.total_cost")}</span>
-                            <span className="font-bold tabular-nums text-foreground" data-testid="subagent-group-cost">
-                              {formatCurrency(agentGroup.costUSD)}
+                            <span className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-muted-foreground">
+                              <span>{t("sessions.input_including_cache")} <strong className="tabular-nums text-foreground" data-testid="subagent-group-input">{formatSessionTokenCount(agentGroup.inputTokens)}</strong></span>
+                              <span>{t("sessions.cached")} <strong className="tabular-nums text-foreground" data-testid="subagent-group-cache">{formatSessionTokenCount(agentGroup.cachedInputTokens)}</strong></span>
+                              <span>{t("sessions.output")} <strong className="tabular-nums text-foreground" data-testid="subagent-group-output">{formatSessionTokenCount(agentGroup.outputTokens)}</strong></span>
+                              <span>{t("sessions.total_cost")} <strong className="tabular-nums text-foreground" data-testid="subagent-group-cost">{formatCurrency(agentGroup.costUSD)}</strong></span>
                             </span>
                             <span className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-indigo-400">
                               {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}

@@ -106,6 +106,9 @@ pub struct SessionRollupRecord {
 pub struct SessionHierarchyRecord {
     pub path: String,
     pub prompt_title: Option<String>,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
     pub cost_usd: f64,
 }
 
@@ -330,15 +333,18 @@ pub fn query_session_hierarchy_records(
     let rows = statement
         .query_map([], |row| {
             let rows_json: String = row.get(2)?;
-            let cost_usd = serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json)
-                .unwrap_or_default()
-                .iter()
-                .map(|usage| usage.cost_usd)
-                .sum();
+            let usage_rows =
+                serde_json::from_str::<Vec<DailyUsageRow>>(&rows_json).unwrap_or_default();
             Ok(SessionHierarchyRecord {
                 path: row.get(0)?,
                 prompt_title: row.get(1)?,
-                cost_usd,
+                input_tokens: usage_rows.iter().map(|usage| usage.input_tokens).sum(),
+                cached_input_tokens: usage_rows
+                    .iter()
+                    .map(|usage| usage.cached_input_tokens)
+                    .sum(),
+                output_tokens: usage_rows.iter().map(|usage| usage.output_tokens).sum(),
+                cost_usd: usage_rows.iter().map(|usage| usage.cost_usd).sum(),
             })
         })
         .map_err(|error| error.to_string())?;

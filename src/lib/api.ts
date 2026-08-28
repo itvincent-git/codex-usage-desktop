@@ -327,6 +327,9 @@ export type SessionReplayDetail = {
     nickname: string | null;
     role: string | null;
     threadName: string | null;
+    inputTokens: number;
+    cachedInputTokens: number;
+    outputTokens: number;
     costUSD: number;
   }>;
   summary: {
