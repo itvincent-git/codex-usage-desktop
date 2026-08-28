@@ -1,4 +1,8 @@
 {
+  "2.9.0": {
+    "zh": "- feat(sessions): show subagent token totals\n- fix(sessions): rebase resumed quota usage\n- fix(ui): make chart tooltips opaque\n- feat(limits): show recent reset activity\n- style: soften recent token reset highlight",
+    "en": "- feat(sessions): show subagent token totals\n- fix(sessions): rebase resumed quota usage\n- fix(ui): make chart tooltips opaque\n- feat(limits): show recent reset activity\n- style: soften recent token reset highlight"
+  },
   "2.8.0": {
     "zh": "- feat(sessions): render markdown in session details\n- feat: highlight recent token resets\n- fix: clarify recent reset details",
     "en": "- feat(sessions): render markdown in session details\n- feat: highlight recent token resets\n- fix: clarify recent reset details"
