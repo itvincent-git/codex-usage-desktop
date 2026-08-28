@@ -7,6 +7,7 @@ import { fetchCodexResetHistory, openUrl, type CodexResetAnnouncement } from "@/
 
 const HISTORY_DAYS = 30;
 const DEFAULT_VISIBLE_RESETS = 5;
+const RECENT_RESET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 dayjs.extend(utc);
 
@@ -85,22 +86,27 @@ function formatRelativeTime(timestamp: string, locale: string, now = dayjs()) {
 
 export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnouncement; onOpen: () => void }) {
   const { t } = useTranslation();
+  const resetTime = dayjs(reset.announcedAt).valueOf();
+  const elapsedSinceReset = Date.now() - resetTime;
+  const isRecentReset = Number.isFinite(resetTime)
+    && elapsedSinceReset >= 0
+    && elapsedSinceReset <= RECENT_RESET_WINDOW_MS;
 
   return (
     <button
       type="button"
-      className="group flex min-w-0 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className={`group flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-warning/60 bg-warning/15 hover:border-warning/80 hover:bg-warning/20" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
       onClick={onOpen}
       aria-label={t("limits.latest_reset_open")}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isRecentReset ? "bg-warning/25 text-warning" : "bg-primary/10 text-primary"}`}>
         <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[10px] font-semibold leading-none text-foreground/80">
-          {t("limits.latest_reset")}
+        <span className={`block truncate text-[10px] leading-none ${isRecentReset ? "font-bold text-warning" : "font-semibold text-foreground/80"}`}>
+          {isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}
         </span>
-        <span className="mt-1 block truncate text-[9px] tabular-nums text-muted-foreground">
+        <span className={`mt-1 block truncate text-[9px] tabular-nums ${isRecentReset ? "font-semibold text-warning" : "text-muted-foreground"}`}>
           {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
         </span>
       </span>

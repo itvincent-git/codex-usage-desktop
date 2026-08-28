@@ -164,6 +164,7 @@
     "quota_forecast_low_label": "48h 内概率较低",
     "quota_forecast_open": "打开 Codex 额度重置预测",
     "latest_reset": "最近一次 Token 重置",
+    "latest_reset_recent": "24 小时内刚刚重置",
     "latest_reset_open": "查看最近 30 天的 Token 重置记录",
     "reset_type_regular": "常规重置",
     "reset_type_banked": "储存式重置",

@@ -164,6 +164,7 @@
     "quota_forecast_low_label": "Low chance in 48h",
     "quota_forecast_open": "Open Codex quota reset forecast",
     "latest_reset": "Latest token reset",
+    "latest_reset_recent": "Token reset within 24h",
     "latest_reset_open": "View token resets from the last 30 days",
     "reset_type_regular": "Regular reset",
     "reset_type_banked": "Banked reset",

@@ -467,6 +467,33 @@ describe("CodexLimitsCard component", () => {
     expect(onOpenResetHistory).toHaveBeenCalledTimes(1);
   });
 
+  it("highlights a token reset announced within the last 24 hours", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-25T12:00:00.000Z"));
+
+    render(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        limits={null}
+        error={null}
+        latestReset={{
+          id: "recent-reset",
+          resetType: "regular",
+          announcedAt: "2026-08-24T12:00:00.000Z",
+          text: "Reset has been propagated.",
+          source: { author: "thsottiaux", url: "https://example.com/reset" },
+        }}
+      />,
+    );
+
+    const latestResetButton = screen.getByRole("button", { name: "View token resets from the last 30 days" });
+    expect(latestResetButton).toHaveTextContent("Token reset within 24h");
+    expect(latestResetButton).toHaveClass("border-warning/60", "bg-warning/15");
+    expect(screen.getByText("Token reset within 24h")).toHaveClass("font-bold", "text-warning");
+
+    vi.useRealTimers();
+  });
+
   it("changes quota forecast color by probability", () => {
     const { rerender } = render(
       <CodexLimitsCard onOpenResetCredits={() => {}}
