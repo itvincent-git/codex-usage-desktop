@@ -496,6 +496,52 @@ describe("CodexLimitsCard component", () => {
     vi.useRealTimers();
   });
 
+  it("shows the reset status for the last 14 days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00.000Z"));
+
+    render(
+      <CodexLimitsCard
+        onOpenResetCredits={() => {}}
+        limits={null}
+        error={null}
+        latestReset={{
+          id: "latest-reset",
+          resetType: "regular",
+          announcedAt: "2026-08-28T00:35:00.000Z",
+          text: "Reset has been propagated.",
+          source: { url: "https://example.com/latest" },
+        }}
+        recentResets={[
+          {
+            id: "latest-reset",
+            resetType: "regular",
+            announcedAt: "2026-08-28T00:35:00.000Z",
+            text: "Reset has been propagated.",
+            source: { url: "https://example.com/latest" },
+          },
+          {
+            id: "banked-reset",
+            resetType: "banked",
+            announcedAt: "2026-08-25T05:00:00.000Z",
+            text: "A banked reset is available.",
+            source: { url: "https://example.com/banked" },
+          },
+        ]}
+      />,
+    );
+
+    const overview = screen.getByRole("list", { name: "Token resets over the last 14 days" });
+    const days = overview.querySelectorAll("[data-reset-overview-day]");
+    expect(days).toHaveLength(14);
+    expect(days[0]).toHaveAttribute("data-reset-type", "none");
+    expect(days[10]).toHaveAttribute("data-reset-type", "banked");
+    expect(days[13]).toHaveAttribute("data-reset-type", "regular");
+    expect(days[13]).toHaveAttribute("title", "2026-08-28: Regular reset");
+
+    vi.useRealTimers();
+  });
+
   it("changes quota forecast color by probability", () => {
     const { rerender } = render(
       <CodexLimitsCard onOpenResetCredits={() => {}}

@@ -8,6 +8,7 @@ import {
   fetchCodexLimits,
   fetchCodexQuotaForecast,
   fetchLatestCodexReset,
+  fetchCodexResetHistory,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
@@ -36,7 +37,7 @@ import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber 
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
-import { formatResetTime, hasSubscription } from "@/components/codex-limits-card";
+import { formatResetTime, hasSubscription, RECENT_RESET_OVERVIEW_DAYS } from "@/components/codex-limits-card";
 
 function isNewerVersion(current: string, target: string): boolean {
   const parse = (v: string) => {
@@ -139,6 +140,7 @@ export function useUsageDashboard() {
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
   const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
   const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
+  const [recentCodexResets, setRecentCodexResets] = useState<CodexResetAnnouncement[] | null>(null);
   const [scanMessage, setScanMessage] = useState<ScanMessage>({ key: "hero.sync_logs_to_cache_desc" });
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -312,6 +314,15 @@ export function useUsageDashboard() {
       setLatestCodexReset(data);
     } catch (_) {
       setLatestCodexReset(null);
+    }
+  });
+
+  const loadRecentCodexResets = useEffectEvent(async () => {
+    try {
+      const data = await fetchCodexResetHistory(RECENT_RESET_OVERVIEW_DAYS);
+      setRecentCodexResets(data);
+    } catch (_) {
+      setRecentCodexResets(null);
     }
   });
 
@@ -522,6 +533,7 @@ export function useUsageDashboard() {
       void loadCodexLimits();
       void loadCodexQuotaForecast();
       void loadLatestCodexReset();
+      void loadRecentCodexResets();
       await loadOverview(range);
       setBootstrapped(true);
     } catch (loadError) {
@@ -825,7 +837,7 @@ export function useUsageDashboard() {
 
     try {
       await scanAndReloadOverview(startedAt, { force: true });
-      await Promise.all([loadCodexQuotaForecast(), loadLatestCodexReset()]);
+      await Promise.all([loadCodexQuotaForecast(), loadLatestCodexReset(), loadRecentCodexResets()]);
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
@@ -998,6 +1010,7 @@ export function useUsageDashboard() {
     codexLimitsError,
     codexQuotaForecast,
     latestCodexReset,
+    recentCodexResets,
     scanMessage: t(scanMessage.key, scanMessage.values),
     error,
     isLoading,

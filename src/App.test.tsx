@@ -11,6 +11,7 @@ import tauriConfig from "../src-tauri/tauri.conf.json";
 const invokeMock = vi.hoisted(() => vi.fn());
 const forecastInvokeMock = vi.hoisted(() => vi.fn());
 const latestResetInvokeMock = vi.hoisted(() => vi.fn());
+const resetHistoryInvokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 const autostartEnableMock = vi.hoisted(() => vi.fn());
 const autostartDisableMock = vi.hoisted(() => vi.fn());
@@ -30,6 +31,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (command === "fetch_latest_codex_reset") {
       return latestResetInvokeMock();
+    }
+    if (command === "fetch_codex_reset_history") {
+      return resetHistoryInvokeMock(...args);
     }
     if (command === "refresh_usage_data") {
       return invokeMock("scan_usage").then(async (scan: any) => {
@@ -196,6 +200,8 @@ describe("App", () => {
     forecastInvokeMock.mockRejectedValue(new Error("Forecast unavailable"));
     latestResetInvokeMock.mockReset();
     latestResetInvokeMock.mockRejectedValue(new Error("Reset status unavailable"));
+    resetHistoryInvokeMock.mockReset();
+    resetHistoryInvokeMock.mockRejectedValue(new Error("Reset history unavailable"));
     saveMock.mockReset();
     autostartEnableMock.mockReset();
     autostartEnableMock.mockResolvedValue(undefined);
@@ -1653,6 +1659,8 @@ describe("App", () => {
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(latestResetInvokeMock).toHaveBeenCalledTimes(1);
+    expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 14 });
+    expect(resetHistoryInvokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
     expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");

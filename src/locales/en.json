@@ -166,6 +166,7 @@
     "latest_reset": "Latest token reset",
     "latest_reset_recent": "Token reset within 24h",
     "latest_reset_open": "View token resets from the last 30 days",
+    "reset_overview_label": "Token resets over the last {{days}} days",
     "reset_type_regular": "Regular reset",
     "reset_type_banked": "Banked reset",
     "reset_history_title": "Token resets in the last 30 days",

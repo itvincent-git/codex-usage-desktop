@@ -12,10 +12,13 @@ type CodexLimitsCardProps = {
   error: string | null;
   quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
+  recentResets?: CodexResetAnnouncement[] | null;
   onOpenQuotaForecast?: () => void;
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
 };
+
+export const RECENT_RESET_OVERVIEW_DAYS = 14;
 
 type LimitRowProps = {
   label: string;
@@ -48,7 +51,7 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "team", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
   const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
   const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
@@ -97,6 +100,7 @@ export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, onO
             <ResetArea
               quotaForecast={quotaForecast}
               latestReset={latestReset}
+              recentResets={recentResets}
               quotaForecastScore={quotaForecastScore}
               quotaForecastTone={quotaForecastTone}
               resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
@@ -183,6 +187,7 @@ function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecast
 function ResetArea({
   quotaForecast,
   latestReset,
+  recentResets,
   quotaForecastScore,
   quotaForecastTone,
   resetCreditsAvailableCount,
@@ -193,6 +198,7 @@ function ResetArea({
 }: {
   quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
+  recentResets?: CodexResetAnnouncement[] | null;
   quotaForecastScore: number | null;
   quotaForecastTone: QuotaForecastTone | null;
   resetCreditsAvailableCount?: number | null;
@@ -212,7 +218,12 @@ function ResetArea({
     >
       <div className={cn("grid gap-2", latestReset && showQuotaForecast ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
         {latestReset ? (
-          <LatestResetButton reset={latestReset} onOpen={() => onOpenResetHistory?.()} />
+          <LatestResetButton
+            reset={latestReset}
+            recentResets={recentResets}
+            recentDays={RECENT_RESET_OVERVIEW_DAYS}
+            onOpen={() => onOpenResetHistory?.()}
+          />
         ) : null}
         {showQuotaForecast ? (
           <button

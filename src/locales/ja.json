@@ -166,6 +166,7 @@
     "latest_reset": "最新のトークンリセット",
     "latest_reset_recent": "24時間以内にリセット済み",
     "latest_reset_open": "過去30日間のトークンリセットを表示",
+    "reset_overview_label": "過去{{days}}日間のトークンリセット状況",
     "reset_type_regular": "通常リセット",
     "reset_type_banked": "バンクリセット",
     "reset_history_title": "過去30日間のトークンリセット",

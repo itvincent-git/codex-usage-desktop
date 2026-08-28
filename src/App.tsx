@@ -44,6 +44,7 @@ export default function App() {
     codexLimitsError,
     codexQuotaForecast,
     latestCodexReset,
+    recentCodexResets,
     scanMessage,
     error,
     isLoading,
@@ -315,6 +316,7 @@ export default function App() {
                   error={codexLimitsError}
                   quotaForecast={codexQuotaForecast}
                   latestReset={latestCodexReset}
+                  recentResets={recentCodexResets}
                   onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
                   onOpenResetHistory={() => setIsResetHistoryOpen(true)}
                   onOpenResetCredits={() => void handleOpenResetCredits()}

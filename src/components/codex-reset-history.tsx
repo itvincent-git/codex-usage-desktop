@@ -84,7 +84,63 @@ function formatRelativeTime(timestamp: string, locale: string, now = dayjs()) {
   return formatter.format(-Math.floor(elapsedMinutes / (24 * 60)), "day");
 }
 
-export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnouncement; onOpen: () => void }) {
+function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[]; days: number }) {
+  const { t } = useTranslation();
+  const recentDays = buildResetHistorySummary(resets).calendarDays
+    .filter((day) => day.inRange)
+    .slice(-days);
+
+  return (
+    <span
+      role="list"
+      aria-label={t("limits.reset_overview_label", { days })}
+      className="col-span-3 mt-1.5 grid items-center"
+      style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
+    >
+      {recentDays.map((day) => {
+        const resetType = day.resetType;
+        const status = resetType === "mixed"
+          ? `${t("limits.reset_type_regular")}, ${t("limits.reset_type_banked")}`
+          : t(`limits.reset_type_${resetType ?? "none"}`);
+        const label = t("limits.reset_calendar_day_label", {
+          date: day.date.format("YYYY-MM-DD"),
+          status,
+        });
+        const color = resetType === "mixed"
+          ? "border-orange-500 bg-gradient-to-br from-orange-500 from-50% to-sky-300 to-50%"
+          : resetType === "regular"
+            ? "border-orange-500 bg-orange-500"
+            : resetType === "banked"
+              ? "border-sky-400 bg-sky-300"
+              : "border-muted-foreground/45 bg-transparent";
+
+        return (
+          <span
+            key={day.date.format("YYYY-MM-DD")}
+            role="listitem"
+            data-reset-overview-day
+            data-reset-type={resetType ?? "none"}
+            className={`h-1.5 w-1.5 justify-self-center rounded-full border ${color}`}
+            aria-label={label}
+            title={label}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+export function LatestResetButton({
+  reset,
+  recentResets,
+  recentDays,
+  onOpen,
+}: {
+  reset: CodexResetAnnouncement;
+  recentResets?: CodexResetAnnouncement[] | null;
+  recentDays: number;
+  onOpen: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const resetTime = dayjs(reset.announcedAt).valueOf();
   const elapsedSinceReset = Date.now() - resetTime;
@@ -99,7 +155,7 @@ export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnounce
   return (
     <button
       type="button"
-      className={`group flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-warning/60 bg-warning/15 hover:border-warning/80 hover:bg-warning/20" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
+      className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] content-center items-center gap-x-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-warning/60 bg-warning/15 hover:border-warning/80 hover:bg-warning/20" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
       onClick={onOpen}
       aria-label={t("limits.latest_reset_open")}
     >
@@ -114,7 +170,8 @@ export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnounce
           {relativeResetTime} · {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
         </span>
       </span>
-      <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
+      <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
+      {recentResets ? <RecentResetOverview resets={recentResets} days={recentDays} /> : null}
     </button>
   );
 }
