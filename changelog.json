@@ -1,4 +1,8 @@
 {
+  "2.8.0": {
+    "zh": "- feat(sessions): render markdown in session details\n- feat: highlight recent token resets\n- fix: clarify recent reset details",
+    "en": "- feat(sessions): render markdown in session details\n- feat: highlight recent token resets\n- fix: clarify recent reset details"
+  },
   "2.7.2": {
     "zh": "- fix(ci): retry macOS release asset uploads",
     "en": "- fix(ci): retry macOS release asset uploads"
