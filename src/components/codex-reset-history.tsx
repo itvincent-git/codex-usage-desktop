@@ -85,12 +85,16 @@ function formatRelativeTime(timestamp: string, locale: string, now = dayjs()) {
 }
 
 export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnouncement; onOpen: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const resetTime = dayjs(reset.announcedAt).valueOf();
   const elapsedSinceReset = Date.now() - resetTime;
   const isRecentReset = Number.isFinite(resetTime)
     && elapsedSinceReset >= 0
     && elapsedSinceReset <= RECENT_RESET_WINDOW_MS;
+  const relativeResetTime = formatRelativeTime(
+    reset.announcedAt,
+    i18n.resolvedLanguage ?? i18n.language ?? "en",
+  );
 
   return (
     <button
@@ -103,11 +107,11 @@ export function LatestResetButton({ reset, onOpen }: { reset: CodexResetAnnounce
         <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
       </span>
       <span className="min-w-0">
-        <span className={`block truncate text-[10px] leading-none ${isRecentReset ? "font-bold text-warning" : "font-semibold text-foreground/80"}`}>
+        <span className={`block truncate text-xs font-bold leading-none ${isRecentReset ? "text-warning" : "text-foreground/80"}`}>
           {isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}
         </span>
-        <span className={`mt-1 block truncate text-[9px] tabular-nums ${isRecentReset ? "font-semibold text-warning" : "text-muted-foreground"}`}>
-          {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
+        <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
+          {relativeResetTime} · {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
         </span>
       </span>
       <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
