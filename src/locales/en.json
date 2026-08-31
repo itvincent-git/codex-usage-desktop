@@ -661,7 +661,9 @@
     "description": "Total token and cost movement across the selected natural-day window.",
     "total_tokens": "Total Tokens",
     "total_token_trend": "Total Token Trend",
-    "cost_trend": "Cost Trend"
+    "cost_trend": "Cost Trend",
+    "enter_fullscreen": "Expand chart to full screen",
+    "exit_fullscreen": "Exit full screen"
   },
   "export": {
     "dialog_title_excel": "Export Codex usage to Excel",

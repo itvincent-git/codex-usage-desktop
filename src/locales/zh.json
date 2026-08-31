@@ -669,7 +669,9 @@
     "description": "所选自然日窗口内的 Token 消耗与成本变化趋势。",
     "total_tokens": "Tokens 总计",
     "total_token_trend": "Token 消耗趋势",
-    "cost_trend": "成本趋势"
+    "cost_trend": "成本趋势",
+    "enter_fullscreen": "全屏放大图表",
+    "exit_fullscreen": "退出全屏"
   },
   "export": {
     "dialog_title_excel": "导出 Codex 使用情况至 Excel",

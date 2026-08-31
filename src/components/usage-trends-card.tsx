@@ -1,4 +1,7 @@
 import { Bar, CartesianGrid, ComposedChart, Line, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Maximize2, Minimize2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { OverviewResponse } from "@/lib/api";
 import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/formatters";
@@ -89,6 +92,7 @@ export const UsageTrendTooltip = ({ active, payload, label, t }: any) => {
 
 export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className }: UsageTrendsCardProps) {
   const { t } = useTranslation();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const trendData = daily.map((day) => ({
     date: day.date,
     shortDate: formatTrendDateLabel(day.date),
@@ -104,12 +108,36 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatCompactNumber, 64);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
 
-  return (
-    <Card data-testid="usage-trends-card" className={cn("rounded-lg h-full flex flex-col", className)}>
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsFullscreen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen]);
+
+  const card = (
+    <Card
+      data-testid="usage-trends-card"
+      className={cn(
+        "rounded-lg h-full flex flex-col",
+        className,
+        isFullscreen && "w-full border-border bg-surface hover:translate-y-0 hover:shadow-none",
+      )}
+    >
       <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-2 sm:px-3 sm:py-1.5">
         <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
         <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {chartLegend.map((item) => (
             <span key={item.labelKey} className="inline-flex items-center gap-1.5">
               <span className={cn("h-2 w-2 rounded-full", item.className)} />
@@ -117,6 +145,15 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
             </span>
           ))}
         </div>
+        <button
+          type="button"
+          className="ml-2 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
+          aria-label={t(isFullscreen ? "trends.exit_fullscreen" : "trends.enter_fullscreen")}
+          title={t(isFullscreen ? "trends.exit_fullscreen" : "trends.enter_fullscreen")}
+          onClick={() => setIsFullscreen((fullscreen) => !fullscreen)}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between space-y-3 p-3 sm:p-3.5">
         <div
@@ -229,6 +266,20 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
       </CardContent>
     </Card>
   );
+
+  return isFullscreen
+    ? createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex bg-background p-3 sm:p-5"
+          role="dialog"
+          aria-label={t("trends.title")}
+          aria-modal="true"
+        >
+          {card}
+        </div>,
+        document.body,
+      )
+    : card;
 }
 
 function SummaryCell({

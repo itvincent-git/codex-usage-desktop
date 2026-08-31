@@ -1,8 +1,20 @@
 // @vitest-environment jsdom
 
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { UsageTrendTooltip } from "./usage-trends-card";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { UsageTrendsCard, UsageTrendTooltip } from "./usage-trends-card";
+
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
 
 describe("UsageTrendTooltip", () => {
   it("uses an opaque surface so dashboard content does not show through", () => {
@@ -22,5 +34,27 @@ describe("UsageTrendTooltip", () => {
 
     expect(container.firstElementChild).toHaveClass("bg-surface");
     expect(container.firstElementChild).not.toHaveClass("bg-surface/95", "backdrop-blur-md");
+  });
+
+  it("expands the whole chart card and exits with Escape", async () => {
+    const user = userEvent.setup();
+    render(<UsageTrendsCard daily={[]} metrics={[]} cacheHitRate={0} />);
+
+    await user.click(screen.getByRole("button", { name: "Expand chart to full screen" }));
+
+    expect(screen.getByRole("dialog", { name: "Usage Trends" })).toContainElement(screen.getByTestId("usage-trends-card"));
+    expect(document.body.style.overflow).toBe("hidden");
+    await user.click(screen.getByRole("button", { name: "Exit full screen" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("");
+
+    await user.click(screen.getByRole("button", { name: "Expand chart to full screen" }));
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("");
+    expect(screen.getByRole("button", { name: "Expand chart to full screen" })).toBeInTheDocument();
   });
 });

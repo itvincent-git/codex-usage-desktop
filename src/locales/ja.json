@@ -702,7 +702,9 @@
     "description": "選択した日付範囲におけるトークン数とコストの推移。",
     "total_tokens": "総トークン数",
     "total_token_trend": "総トークンの傾向",
-    "cost_trend": "コストの傾向"
+    "cost_trend": "コストの傾向",
+    "enter_fullscreen": "グラフを全画面表示",
+    "exit_fullscreen": "全画面表示を終了"
   },
   "export": {
     "dialog_title_excel": "Codex の使用状況を Excel にエクスポート",
