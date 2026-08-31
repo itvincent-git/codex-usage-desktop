@@ -1,6 +1,6 @@
 [package]
 name = "codex-usage-desktop"
-version = "2.9.0"
+version = "2.10.0"
 description = "Local-first desktop dashboard for Codex CLI token usage and cost estimates."
 authors = ["vincent"]
 license = "MIT"
