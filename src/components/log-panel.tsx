@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { attachLogger, LogLevel } from "@tauri-apps/plugin-log";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { Terminal, Trash2 } from "lucide-react";
+import { Check, Copy, Terminal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 
@@ -12,9 +12,14 @@ interface LogEntry {
   message: string;
 }
 
-export function LogPanel() {
+interface LogPanelProps {
+  isActive: boolean;
+}
+
+export function LogPanel({ isActive }: LogPanelProps) {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
 
@@ -24,6 +29,7 @@ export function LogPanel() {
     
     attachLogger((payload) => {
       if (!active) return;
+      setCopied(false);
       setLogs((prev) => {
         const newLogs = [...prev, {
           id: nextId.current++,
@@ -50,10 +56,18 @@ export function LogPanel() {
   }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (isActive && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [isActive, logs]);
+
+  async function copyLogs() {
+    const text = logs.map((log) => (
+      `[${log.time.toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 })}] ${getLevelName(log.level)} ${log.message}`
+    )).join("\n");
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+  }
 
   function getLevelColor(level: LogLevel) {
     switch (level) {
@@ -84,10 +98,18 @@ export function LogPanel() {
           <Terminal className="h-4 w-4" />
           {t("logs.title", { defaultValue: "Diagnostics Log" })}
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setLogs([])}>
-          <Trash2 className="mr-2 h-4 w-4" />
-          {t("logs.btn_clear", { defaultValue: "Clear" })}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={logs.length === 0} onClick={() => void copyLogs()}>
+            {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+            {copied
+              ? t("logs.btn_copied", { defaultValue: "Copied" })
+              : t("logs.btn_copy", { defaultValue: "Copy" })}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => { setLogs([]); setCopied(false); }}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("logs.btn_clear", { defaultValue: "Clear" })}
+          </Button>
+        </div>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
         {logs.length === 0 ? (

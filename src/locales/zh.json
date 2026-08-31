@@ -657,6 +657,8 @@
     "search_placeholder": "过滤日志内容...",
     "btn_pause": "暂停滚动",
     "btn_resume": "恢复滚动",
+    "btn_copy": "复制日志",
+    "btn_copied": "已复制",
     "btn_clear": "清空日志",
     "waiting": "正在等待系统日志输出..."
   },

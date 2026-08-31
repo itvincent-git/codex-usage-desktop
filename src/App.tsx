@@ -420,7 +420,7 @@ export default function App() {
           ) : null}
 
           <div className={!isLoading && view === "logs" ? "block" : "hidden"}>
-            <LogPanel />
+            <LogPanel isActive={!isLoading && view === "logs"} />
           </div>
 
           {selectedProjectForModal && (

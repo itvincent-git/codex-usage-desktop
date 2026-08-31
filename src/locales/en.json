@@ -649,6 +649,8 @@
     "search_placeholder": "Filter logs...",
     "btn_pause": "Pause",
     "btn_resume": "Resume",
+    "btn_copy": "Copy",
+    "btn_copied": "Copied",
     "btn_clear": "Clear",
     "waiting": "Waiting for logs..."
   },

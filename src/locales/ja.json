@@ -690,6 +690,8 @@
     "search_placeholder": "ログを絞り込み...",
     "btn_pause": "一時停止",
     "btn_resume": "再開する",
+    "btn_copy": "ログをコピー",
+    "btn_copied": "コピー済み",
     "btn_clear": "クリア",
     "waiting": "ログを待っています..."
   },
