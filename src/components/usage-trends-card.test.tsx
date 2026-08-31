@@ -57,4 +57,26 @@ describe("UsageTrendTooltip", () => {
     expect(document.body.style.overflow).toBe("");
     expect(screen.getByRole("button", { name: "Expand chart to full screen" })).toBeInTheDocument();
   });
+
+  it("toggles chart series from the legend", async () => {
+    const user = userEvent.setup();
+    render(<UsageTrendsCard daily={[]} metrics={[]} cacheHitRate={0} />);
+
+    const inputLegend = screen.getByRole("button", { name: "Input" });
+    const costLegend = screen.getByRole("button", { name: "Cost" });
+
+    expect(inputLegend).toHaveAttribute("aria-pressed", "true");
+    expect(costLegend).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(inputLegend);
+    await user.click(costLegend);
+
+    expect(inputLegend).toHaveAttribute("aria-pressed", "false");
+    expect(costLegend).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(inputLegend);
+
+    expect(inputLegend).toHaveAttribute("aria-pressed", "true");
+    expect(costLegend).toHaveAttribute("aria-pressed", "false");
+  });
 });

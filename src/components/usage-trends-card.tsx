@@ -26,11 +26,13 @@ const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
 };
 
 const chartLegend = [
-  { labelKey: "project_modal.input", defaultLabel: "Input", className: "bg-blue-600/75" },
-  { labelKey: "project_modal.cached", defaultLabel: "Cached", className: "bg-success/80" },
-  { labelKey: "project_modal.output", defaultLabel: "Output", className: "bg-violet-600/70" },
-  { labelKey: "common.cost", defaultLabel: "Cost", className: "bg-primary" },
-];
+  { dataKey: "inputTokens", labelKey: "project_modal.input", defaultLabel: "Input", className: "bg-blue-600/75" },
+  { dataKey: "cachedInputTokens", labelKey: "project_modal.cached", defaultLabel: "Cached", className: "bg-success/80" },
+  { dataKey: "outputTokens", labelKey: "project_modal.output", defaultLabel: "Output", className: "bg-violet-600/70" },
+  { dataKey: "costUSD", labelKey: "common.cost", defaultLabel: "Cost", className: "bg-primary" },
+] as const;
+
+type ChartSeriesKey = (typeof chartLegend)[number]["dataKey"];
 
 export const UsageTrendTooltip = ({ active, payload, label, t }: any) => {
   if (active && payload && payload.length) {
@@ -93,6 +95,7 @@ export const UsageTrendTooltip = ({ active, payload, label, t }: any) => {
 export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className }: UsageTrendsCardProps) {
   const { t } = useTranslation();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hiddenSeries, setHiddenSeries] = useState<Set<ChartSeriesKey>>(() => new Set());
   const trendData = daily.map((day) => ({
     date: day.date,
     shortDate: formatTrendDateLabel(day.date),
@@ -107,6 +110,15 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const maxDailyCost = Math.max(...daily.map((day) => day.costUSD), 0);
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatCompactNumber, 64);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
+
+  const toggleSeries = (dataKey: ChartSeriesKey) => {
+    setHiddenSeries((current) => {
+      const next = new Set(current);
+      if (next.has(dataKey)) next.delete(dataKey);
+      else next.add(dataKey);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -139,10 +151,19 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
         <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
         <div className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {chartLegend.map((item) => (
-            <span key={item.labelKey} className="inline-flex items-center gap-1.5">
+            <button
+              key={item.dataKey}
+              type="button"
+              aria-pressed={!hiddenSeries.has(item.dataKey)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-sm transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                hiddenSeries.has(item.dataKey) && "opacity-35",
+              )}
+              onClick={() => toggleSeries(item.dataKey)}
+            >
               <span className={cn("h-2 w-2 rounded-full", item.className)} />
               {t(item.labelKey, { defaultValue: item.defaultLabel })}
-            </span>
+            </button>
           ))}
         </div>
         <button
@@ -211,6 +232,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 fill="url(#costGradient)"
                 stroke="none"
                 activeDot={false}
+                hide={hiddenSeries.has("costUSD")}
                 isAnimationActive={false}
               />
 
@@ -221,6 +243,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 stackId="tokens"
                 fill="rgb(37 99 235 / 0.72)"
                 maxBarSize={24}
+                hide={hiddenSeries.has("inputTokens")}
                 isAnimationActive={false}
               />
               <Bar
@@ -230,6 +253,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 stackId="tokens"
                 fill="rgb(var(--success) / 0.78)"
                 maxBarSize={24}
+                hide={hiddenSeries.has("cachedInputTokens")}
                 isAnimationActive={false}
               />
               <Bar
@@ -240,6 +264,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 fill="rgb(124 58 237 / 0.72)"
                 maxBarSize={24}
                 radius={[5, 5, 0, 0]}
+                hide={hiddenSeries.has("outputTokens")}
                 isAnimationActive={false}
               />
 
@@ -252,6 +277,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 strokeWidth={2.75}
                 dot={{ r: 2.8, strokeWidth: 1.5, fill: "rgb(var(--surface))" }}
                 activeDot={{ r: 5.5, strokeWidth: 2.25, fill: "rgb(var(--surface))" }}
+                hide={hiddenSeries.has("costUSD")}
                 isAnimationActive={false}
               />
             </ComposedChart>
