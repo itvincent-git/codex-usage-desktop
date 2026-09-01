@@ -550,6 +550,7 @@ describe("session titles", () => {
     expect(within(larger).getByTestId("token-total")).toHaveTextContent("200");
     expect(within(smaller).getByTestId("session-cost")).toHaveTextContent("$0.001");
     expect(within(larger).getByTestId("session-cost")).toHaveTextContent("$0.004");
+    expect(within(smaller).getByText("Cost")).toBeInTheDocument();
     expect(within(smaller).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "50%" });
     expect(within(larger).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "100%" });
     expect(within(smaller).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "low");

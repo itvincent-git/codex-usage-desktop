@@ -827,7 +827,7 @@ export function SessionUsageTable({
                         </div>
 
                         <div className="session-card-tokens min-w-0 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
                             <span className="text-[10px] font-medium text-muted-foreground">{t("sessions.total_tokens")}</span>
                             <span
                               className="relative isolate inline-flex min-w-[6.5rem] overflow-hidden rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-sm font-bold tabular-nums tracking-tight text-foreground"
@@ -842,7 +842,7 @@ export function SessionUsageTable({
                                   style={{ width: `${tokenRatio * 100}%`, minWidth: 2 }}
                                 />
                               ) : null}
-                              <span className="relative ml-auto">{formatSessionTokenCount(session.totalTokens)}</span>
+                              <span className="relative">{formatSessionTokenCount(session.totalTokens)}</span>
                             </span>
                           </div>
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
@@ -853,6 +853,7 @@ export function SessionUsageTable({
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.outputTokens)}</strong></span>
                             <span aria-hidden="true">·</span>
+                            <span className="shrink-0">{t("sessions.cost")}</span>
                             <span
                               role="img"
                               aria-label={costLabel}

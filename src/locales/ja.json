@@ -497,6 +497,7 @@
     "no_workspace": "ワークスペースなし",
     "recorded_time": "記録日時",
     "total_tokens": "総トークン数",
+    "cost": "Cost",
     "input_including_cache": "入力 (キャッシュを含む)",
     "cached": "キャッシュされた",
     "output": "出力",

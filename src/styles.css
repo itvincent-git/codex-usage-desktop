@@ -253,7 +253,7 @@
 
   .session-usage-card {
     display: grid;
-    grid-template-columns: minmax(240px, 1fr) minmax(250px, 0.65fr) 156px;
+    grid-template-columns: minmax(280px, 1fr) minmax(210px, 0.48fr) 156px;
     min-height: 88px;
     content-visibility: auto;
     contain-intrinsic-size: auto 88px;
@@ -320,7 +320,7 @@
 
   @media (min-width: 901px) {
     .session-usage-card[data-language="en"] {
-      grid-template-columns: minmax(240px, 1fr) minmax(250px, 0.65fr) 212px;
+      grid-template-columns: minmax(280px, 1fr) minmax(210px, 0.48fr) 212px;
     }
   }
 
