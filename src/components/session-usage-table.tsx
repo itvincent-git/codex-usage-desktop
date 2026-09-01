@@ -853,7 +853,7 @@ export function SessionUsageTable({
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.outputTokens)}</strong></span>
                             <span aria-hidden="true">·</span>
-                            <span className="shrink-0">{t("sessions.cost")}</span>
+                            <span className="shrink-0">{t("sessions.cols.cost")}</span>
                             <span
                               role="img"
                               aria-label={costLabel}

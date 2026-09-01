@@ -456,7 +456,6 @@
     "no_workspace": "No workspace",
     "recorded_time": "Recorded",
     "total_tokens": "Total tokens",
-    "cost": "Cost",
     "input_including_cache": "Input (incl. cache)",
     "cached": "Cached",
     "output": "Output",

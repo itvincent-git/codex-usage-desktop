@@ -551,6 +551,8 @@ describe("session titles", () => {
     expect(within(smaller).getByTestId("session-cost")).toHaveTextContent("$0.001");
     expect(within(larger).getByTestId("session-cost")).toHaveTextContent("$0.004");
     expect(within(smaller).getByText("Cost")).toBeInTheDocument();
+    expect(i18n.t("sessions.cols.cost", { lng: "zh" })).toBe("成本");
+    expect(i18n.t("sessions.cols.cost", { lng: "ja" })).toBe("料金");
     expect(within(smaller).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "50%" });
     expect(within(larger).getByTestId("token-total").querySelector<HTMLElement>("[aria-hidden='true']")).toHaveStyle({ width: "100%" });
     expect(within(smaller).getByTestId("session-cost")).toHaveAttribute("data-cost-tone", "low");

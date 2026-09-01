@@ -456,7 +456,6 @@
     "no_workspace": "无工作区",
     "recorded_time": "记录时间",
     "total_tokens": "Token 总数",
-    "cost": "Cost",
     "input_including_cache": "输入（含缓存）",
     "cached": "缓存",
     "output": "输出",
