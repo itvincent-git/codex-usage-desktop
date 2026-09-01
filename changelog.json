@@ -1,4 +1,8 @@
 {
+  "2.11.0": {
+    "zh": "- feat(projects): add Codex project labels\n- feat(sessions): show project names in details\n- fix(sessions): refine usage card layout\n- fix(sessions): localize cost label",
+    "en": "- feat(projects): add Codex project labels\n- feat(sessions): show project names in details\n- fix(sessions): refine usage card layout\n- fix(sessions): localize cost label"
+  },
   "2.10.0": {
     "zh": "- feat(dashboard): add fullscreen usage chart\n- feat(dashboard): toggle chart series from legend\n- feat(logs): add copy and latest-scroll actions",
     "en": "- feat(dashboard): add fullscreen usage chart\n- feat(dashboard): toggle chart series from legend\n- feat(logs): add copy and latest-scroll actions"
