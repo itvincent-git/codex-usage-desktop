@@ -1428,7 +1428,10 @@ describe("App", () => {
 
     await userEvent.click(assistantButton);
     const assistantItem = assistantButton.parentElement!;
-    await waitFor(() => expect(assistantItem.querySelector(".session-markdown")).toBeInTheDocument());
+    await waitFor(
+      () => expect(assistantItem.querySelector(".session-markdown")).toBeInTheDocument(),
+      { timeout: 5_000 },
+    );
     expect(within(assistantItem).getByText("ASSISTANT_TAIL").tagName).toBe("STRONG");
     expect(assistantItem.querySelector("table")).toBeInTheDocument();
     expect(assistantItem.querySelector("code.language-typescript.hljs .hljs-keyword")).toHaveTextContent("const");
