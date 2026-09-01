@@ -1,4 +1,8 @@
 {
+  "2.11.1": {
+    "zh": "- test(sessions): stabilize markdown lazy-load assertion",
+    "en": "- test(sessions): stabilize markdown lazy-load assertion"
+  },
   "2.11.0": {
     "zh": "- feat(projects): add Codex project labels\n- feat(sessions): show project names in details\n- fix(sessions): refine usage card layout\n- fix(sessions): localize cost label",
     "en": "- feat(projects): add Codex project labels\n- feat(sessions): show project names in details\n- fix(sessions): refine usage card layout\n- fix(sessions): localize cost label"
