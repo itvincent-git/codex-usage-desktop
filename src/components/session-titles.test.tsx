@@ -861,6 +861,36 @@ describe("session titles", () => {
     expect(screen.getByPlaceholderText("Search title, session ID, model, or project...")).toBeEnabled();
   });
 
+  it("shows the Codex project name in session details while retaining the cwd", async () => {
+    await i18n.changeLanguage("en");
+    invokeMock.mockResolvedValue(replayDetail({
+      threadName: "Usage work",
+      summary: {
+        ...replayDetail({}).summary,
+        projects: ["/repo/codex-usage-desktop"],
+      },
+    }));
+
+    render(<SessionDetailModal session={session({
+      threadName: "Usage work",
+      projects: ["/repo/codex-usage-desktop"],
+      projectReferences: [{
+        path: "/repo/codex-usage-desktop",
+        displayName: "codex-usage-desktop",
+        codexProjectId: "local-app",
+        codexProjectName: "Codex Usage Desktop",
+        codexProjectRoot: "/repo/codex-usage-desktop",
+      }],
+    })} onClose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Details" }));
+    const project = screen.getByTitle("/repo/codex-usage-desktop");
+    expect(within(project).getByText("Codex Usage Desktop")).toBeInTheDocument();
+    expect(project).toHaveAttribute("title", "/repo/codex-usage-desktop");
+    expect(project).toHaveTextContent("/repo/codex-usage-desktop");
+    expect(within(project).getByText("Codex project")).toBeInTheDocument();
+  });
+
   it("falls back to the session ID in session details", async () => {
     const writeText = vi.fn();
     Object.defineProperty(navigator, "clipboard", {

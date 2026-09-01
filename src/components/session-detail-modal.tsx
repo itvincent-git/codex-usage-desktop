@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, revealInFileManager, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
+import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 import { SessionQuotaUsageView } from "./session-quota-usage";
 
 type SessionDetailModalProps = {
@@ -1391,6 +1392,11 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   const models = detail?.summary.models.length ? detail.summary.models : session.models;
   const projects = detail?.summary.projects.length ? detail.summary.projects : session.projects;
+  const sessionProjectsByPath = new Map(sessionProjectReferences(session).map((project) => [project.path, project]));
+  const displayedProjects = projects.map((path) => sessionProjectsByPath.get(path) ?? {
+    path,
+    displayName: path.split(/[\\/]/).filter(Boolean).pop() || path,
+  });
   const threadName = detail ? detail.threadName : session.threadName;
   const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
@@ -1494,7 +1500,9 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   <span className="truncate">{displayedSessionId}</span>
                 </button>
               ) : null}
-              {projects.map((project) => <span key={project} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project}>{project}</span>)}
+              {displayedProjects.map((project) => project.codexProjectName
+                ? <span key={project.path} className="inline-flex max-w-[480px] items-center gap-1.5 rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project.path}><span className="truncate">{projectLabel(project)}</span><span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1 py-px text-[8px] font-semibold text-indigo-500">{t("projects.codex_project")}</span><span aria-hidden="true">·</span><span className="truncate font-mono">{project.path}</span></span>
+                : <span key={project.path} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project.path}>{project.path}</span>)}
               {models.map((model) => <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{model}</span>)}
               <span>{t("sessions.detail.started", { value: formatTimestamp(detail?.summary.startTime ?? null) })}</span>
               <span>·</span>
