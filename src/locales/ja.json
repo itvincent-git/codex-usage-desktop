@@ -361,6 +361,7 @@
     }
   },
   "projects": {
+    "codex_project": "Codex プロジェクト",
     "title": "プロジェクトの使用状況の詳細",
     "subtitle": "プロジェクトディレクトリ別にトークンとコストの合計を分析します。",
     "card_title": "プロジェクト使用量",
@@ -419,7 +420,7 @@
     "active_files": "アクティブなファイル",
     "showing_filtered": "一致する{{filtered}}件のセッションを表示中",
     "subtitle_desc": "このディレクトリに記録された個々のセッション",
-    "search_placeholder": "タイトル、セッション ID、またはモデルを検索します...",
+    "search_placeholder": "タイトル、セッション ID、モデル、またはプロジェクトを検索します...",
     "no_matching_sessions": "検索クエリに一致するセッションはありません",
     "clear_search_hint": "検索クエリをクリアするか、別の用語を検索してみてください。",
     "session_id_file": "セッションタイトル/ID",

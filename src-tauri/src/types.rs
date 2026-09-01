@@ -115,12 +115,31 @@ pub struct ModelPricingCatalogResponse {
 pub struct OverviewProjectRow {
     pub project: String,
     pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_root: Option<String>,
     pub input_tokens: i64,
     pub cached_input_tokens: i64,
     pub output_tokens: i64,
     pub total_tokens: i64,
     #[serde(rename = "costUSD")]
     pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectReference {
+    pub path: String,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_root: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -135,6 +154,12 @@ pub struct ProjectAnalyticsModelRow {
 pub struct ProjectAnalyticsResponse {
     pub project: String,
     pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codex_project_root: Option<String>,
     pub range: String,
     pub start_date: String,
     pub end_date: String,
@@ -366,6 +391,8 @@ pub struct SessionDetailRow {
     pub cost_usd: f64,
     pub models: Vec<String>,
     pub projects: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub project_references: Vec<ProjectReference>,
     pub daily_usage: Vec<SessionDailyUsageRow>,
     pub quota_usage: Option<SessionQuotaUsage>,
 }

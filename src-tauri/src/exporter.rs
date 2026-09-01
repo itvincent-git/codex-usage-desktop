@@ -44,6 +44,7 @@ fn write_xlsx(overview: &OverviewResponse, path: &Path) -> Result<(), String> {
     write_summary_sheet(&mut workbook, overview, &header, &money)?;
     write_daily_sheet(&mut workbook, overview, &header, &money)?;
     write_models_sheet(&mut workbook, overview, &header, &money)?;
+    write_projects_sheet(&mut workbook, overview, &header, &money)?;
 
     workbook.save(path).map_err(|error| error.to_string())
 }
@@ -198,6 +199,63 @@ fn write_models_sheet(
     Ok(())
 }
 
+fn write_projects_sheet(
+    workbook: &mut Workbook,
+    overview: &OverviewResponse,
+    header: &Format,
+    money: &Format,
+) -> Result<(), String> {
+    let worksheet = workbook.add_worksheet();
+    worksheet
+        .set_name("Project Usage")
+        .map_err(|error| error.to_string())?;
+    write_headers(
+        worksheet,
+        &[
+            "Project / cwd",
+            "Directory Name",
+            "Codex Project Name",
+            "Total Tokens",
+            "Input Tokens",
+            "Cached Input Tokens",
+            "Output Tokens",
+            "Cost USD",
+        ],
+        header,
+    )?;
+
+    for (index, project) in overview.projects.iter().enumerate() {
+        let row = (index + 1) as u32;
+        worksheet
+            .write_string(row, 0, &project.project)
+            .map_err(|error| error.to_string())?;
+        worksheet
+            .write_string(row, 1, &project.display_name)
+            .map_err(|error| error.to_string())?;
+        worksheet
+            .write_string(row, 2, project.codex_project_name.as_deref().unwrap_or(""))
+            .map_err(|error| error.to_string())?;
+        for (column, value) in [
+            project.total_tokens,
+            project.input_tokens,
+            project.cached_input_tokens,
+            project.output_tokens,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            worksheet
+                .write_number(row, (column + 3) as u16, value as f64)
+                .map_err(|error| error.to_string())?;
+        }
+        worksheet
+            .write_with_format(row, 7, project.cost_usd, money)
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
 fn write_headers(
     worksheet: &mut Worksheet,
     labels: &[&str],
@@ -296,6 +354,23 @@ fn render_markdown(overview: &OverviewResponse) -> String {
         ));
     }
 
+    output.push_str("\n## Project Usage\n\n");
+    output.push_str("| Project / cwd | Directory Name | Codex Project Name | Total Tokens | Input | Cached Input | Output | Cost USD |\n");
+    output.push_str("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |\n");
+    for project in &overview.projects {
+        output.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} | {} | {:.6} |\n",
+            escape_markdown_cell(&project.project),
+            escape_markdown_cell(&project.display_name),
+            escape_markdown_cell(project.codex_project_name.as_deref().unwrap_or("")),
+            project.total_tokens,
+            project.input_tokens,
+            project.cached_input_tokens,
+            project.output_tokens,
+            project.cost_usd
+        ));
+    }
+
     output
 }
 
@@ -351,6 +426,11 @@ mod tests {
             projects: vec![OverviewProjectRow {
                 project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop".to_string(),
                 display_name: "codex-usage-desktop".to_string(),
+                codex_project_id: Some("local-project".to_string()),
+                codex_project_name: Some("Codex Usage Desktop".to_string()),
+                codex_project_root: Some(
+                    "/Users/vincent/Documents/Develop/github/codex-usage-desktop".to_string(),
+                ),
                 input_tokens: 1200,
                 cached_input_tokens: 200,
                 output_tokens: 400,
@@ -368,6 +448,8 @@ mod tests {
         assert!(markdown.contains("## Summary"));
         assert!(markdown.contains("## Daily Usage"));
         assert!(markdown.contains("## Model Usage"));
+        assert!(markdown.contains("## Project Usage"));
+        assert!(markdown.contains("Codex Usage Desktop"));
         assert!(markdown.contains("2026-04-30"));
         assert!(markdown.contains("gpt-5"));
     }

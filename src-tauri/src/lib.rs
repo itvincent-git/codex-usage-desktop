@@ -1,5 +1,6 @@
 mod codex_environment;
 mod codex_limits;
+mod codex_projects;
 mod codex_resets;
 mod date;
 mod db;
@@ -148,7 +149,10 @@ async fn fetch_overview(
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
         let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
-        overview::get_overview(&db, &range, None, &pricing_source)
+        let mut overview = overview::get_overview(&db, &range, None, &pricing_source)?;
+        codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
+            .enrich_overview(&mut overview);
+        Ok(overview)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -165,7 +169,11 @@ async fn fetch_project_analytics(
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
         let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
-        overview::get_project_analytics(&db, &project, &range, None, &pricing_source)
+        let mut analytics =
+            overview::get_project_analytics(&db, &project, &range, None, &pricing_source)?;
+        codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
+            .enrich_analytics(&mut analytics);
+        Ok(analytics)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -254,6 +262,8 @@ async fn fetch_session_details(
                 session.agent_role = agent.role.clone();
             }
         }
+        codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
+            .enrich_sessions(&mut sessions);
         Ok(sessions)
     })
     .await
@@ -306,7 +316,9 @@ async fn export_usage(
     tauri::async_runtime::spawn_blocking(move || {
         let db = db::open_database(&database_path)?;
         let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
-        let overview = overview::get_overview(&db, &range, None, &pricing_source)?;
+        let mut overview = overview::get_overview(&db, &range, None, &pricing_source)?;
+        codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
+            .enrich_overview(&mut overview);
         exporter::export_overview(&overview, &format, PathBuf::from(path).as_path())
     })
     .await

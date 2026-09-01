@@ -603,6 +603,7 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
                 cost_usd,
                 models: models.into_iter().collect(),
                 projects: projects.into_iter().collect(),
+                project_references: Vec::new(),
                 daily_usage,
                 quota_usage: quota_usage.map(|usage| usage.session),
             })

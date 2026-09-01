@@ -341,6 +341,7 @@
     "price_legend": { "label": "Relative price heat legend", "low": "Low price", "medium": "Mid price", "high": "High price", "equal": "Same price" }
   },
   "projects": {
+    "codex_project": "Codex project",
     "title": "Project Usage Details",
     "subtitle": "Analyze token and cost totals by project directory.",
     "card_title": "Project Usage",
@@ -378,7 +379,7 @@
     "active_files": "active files",
     "showing_filtered": "Showing {{filtered}} matching sessions",
     "subtitle_desc": "Individual sessions writing to this directory",
-    "search_placeholder": "Search title, session ID, or model...",
+    "search_placeholder": "Search title, session ID, model, or project...",
     "no_matching_sessions": "No sessions match your search query",
     "clear_search_hint": "Try clearing your search query or searching for another term.",
     "session_id_file": "Session Title / ID",

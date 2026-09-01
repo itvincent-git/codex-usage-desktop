@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { modelTone } from "@/lib/model-tone";
 import { SessionQuotaUsageView } from "./session-quota-usage";
+import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 
 type SessionDisplayRow = SessionDetailRow & {
   usageDate: string;
@@ -387,6 +388,12 @@ export function SessionUsageTable({
     if (!selectedProject) return displaySessions.length;
     return displaySessions.filter((session) => session.projects.includes(selectedProject)).length;
   }, [displaySessions, selectedProject]);
+  const selectedProjectReference = useMemo(() => {
+    if (!selectedProject) return null;
+    return sessions
+      .flatMap(sessionProjectReferences)
+      .find((project) => project.path === selectedProject) ?? null;
+  }, [selectedProject, sessions]);
 
   const maxGroupTokens = useMemo(() => Math.max(...groups.map(g => g.totalTokens), 1), [groups]);
   const maxGroupCost = useMemo(() => Math.max(...groups.map(g => g.costUSD), 0), [groups]);
@@ -467,7 +474,7 @@ export function SessionUsageTable({
             <div className="space-y-0.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-400">{t("sessions.filtering_by_project", { defaultValue: "Filtering by Project" })}</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                <span className="font-bold text-foreground text-sm">{selectedProject.split("/").pop() || selectedProject}</span>
+                <span className="inline-flex items-center gap-1.5 font-bold text-foreground text-sm">{selectedProjectReference ? projectLabel(selectedProjectReference) : selectedProject.split(/[\\/]/).pop() || selectedProject}{selectedProjectReference?.codexProjectName ? <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-indigo-500">{t("projects.codex_project")}</span> : null}</span>
                 <span className="text-[11px] font-mono text-muted-foreground truncate max-w-xs md:max-w-md">({selectedProject})</span>
               </div>
             </div>
@@ -645,9 +652,10 @@ export function SessionUsageTable({
                       minute: "2-digit",
                     });
                     const title = session.threadName || cleanSessionId(session.sessionId);
-                    const shownProjects = session.projects.slice(0, 2);
+                    const projectReferences = sessionProjectReferences(session);
+                    const shownProjects = projectReferences.slice(0, 2);
                     const shownModels = session.models.slice(0, 3);
-                    const projectOverflow = session.projects.length - shownProjects.length;
+                    const projectOverflow = projectReferences.length - shownProjects.length;
                     const modelOverflow = session.models.length - shownModels.length;
                     const tokenRatio = sessionScale.tokens > 0 ? session.totalTokens / sessionScale.tokens : 0;
                     const costRatio = sessionScale.cost > 0 ? session.costUSD / sessionScale.cost : 0;
@@ -773,16 +781,20 @@ export function SessionUsageTable({
                               </span>
                             ) : null}
                           </div>
-                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground" title={session.projects.join("\n")}>
+                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground" title={projectReferences.map((project) => project.path).join("\n")}>
                             <Folder className="h-3 w-3 flex-none opacity-70" />
                             {shownProjects.length > 0 ? (
                               <span className="flex min-w-0 items-center gap-1 truncate font-medium">
                                 {shownProjects.map((project) => (
-                                  <span key={project} title={project}>
-                                    {project.split("/").pop() || project}
+                                  <span key={project.path} className="inline-flex min-w-0 flex-col items-start" title={project.path}>
+                                    <span className="inline-flex min-w-0 items-center gap-1">
+                                      <span className="truncate">{projectLabel(project)}</span>
+                                      {project.codexProjectName ? <span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1 py-px text-[8px] font-semibold text-indigo-500">{t("projects.codex_project")}</span> : null}
+                                    </span>
+                                    {project.codexProjectName && project.codexProjectName !== project.displayName ? <span className="truncate font-mono text-[9px] opacity-80">{project.displayName}</span> : null}
                                   </span>
                                 ))}
-                                {projectOverflow > 0 ? <span title={session.projects.join("\n")}>+{projectOverflow}</span> : null}
+                                {projectOverflow > 0 ? <span title={projectReferences.map((project) => project.path).join("\n")}>+{projectOverflow}</span> : null}
                               </span>
                             ) : <span className="italic">{t("sessions.no_workspace")}</span>}
                             {session.threadName ? <span aria-hidden="true">·</span> : null}

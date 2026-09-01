@@ -32,6 +32,16 @@ describe("project analytics derivations", () => {
     expect(sortProjects(projects, "total", "asc").map((project) => project.project)).toEqual(["/repo/a", "/repo/z"]);
   });
 
+  it("sorts names by the displayed Codex project label", () => {
+    const projects = [
+      row("alpha", { codexProjectName: "Zulu" }),
+      row("bravo", { codexProjectName: "Able" }),
+    ];
+
+    expect(sortProjects(projects, "name", "asc").map((project) => project.codexProjectName))
+      .toEqual(["Able", "Zulu"]);
+  });
+
   it("marks tied positive peaks and never marks zero", () => {
     const peaks = positivePeaks([row("a", { totalTokens: 10, costUSD: 0 }), row("b", { totalTokens: 10, costUSD: 0 })]);
     expect(isPositivePeak(10, peaks.totalTokens)).toBe(true);

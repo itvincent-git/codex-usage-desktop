@@ -12,6 +12,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
+import { projectLabel } from "@/lib/project-reference";
 
 type DashboardHeroCardProps = {
   overview: OverviewResponse;
@@ -53,7 +54,7 @@ export function DashboardHeroCard({
       }));
 
   const topModels = buildCostDrivers(models.map((model) => ({ label: model.model, costUSD: model.costUSD })));
-  const topProjects = buildCostDrivers(projects.map((project) => ({ label: project.displayName, costUSD: project.costUSD })));
+  const topProjects = buildCostDrivers(projects.map((project) => ({ label: projectLabel(project), costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
   const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null, t);
 

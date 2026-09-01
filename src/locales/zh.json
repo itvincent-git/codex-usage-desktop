@@ -341,6 +341,7 @@
     "price_legend": { "label": "相对价格热度图例", "low": "低价", "medium": "中价", "high": "高价", "equal": "同价" }
   },
   "projects": {
+    "codex_project": "Codex 项目",
     "title": "项目使用详情",
     "subtitle": "分析各项目目录下的 Token 消耗和成本总计。",
     "card_title": "项目使用",
@@ -378,7 +379,7 @@
     "active_files": "个活动文件",
     "showing_filtered": "当前显示 {{filtered}} 个匹配会话",
     "subtitle_desc": "写入该目录的各个独立会话记录",
-    "search_placeholder": "搜索概要名、会话 ID 或模型...",
+    "search_placeholder": "搜索概要名、会话 ID、模型或项目...",
     "no_matching_sessions": "没有找到符合搜索条件的会话",
     "clear_search_hint": "尝试清空搜索框或搜索其他关键词。",
     "session_id_file": "概要名 / 会话 ID",

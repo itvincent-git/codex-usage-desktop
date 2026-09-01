@@ -17,6 +17,7 @@ import {
 } from "@/lib/project-analytics";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { projectLabel } from "@/lib/project-reference";
 
 type ProjectUsageCardProps = {
   projects: OverviewResponse["projects"];
@@ -96,10 +97,11 @@ export function ProjectUsageCard({ projects, onProjectClick }: ProjectUsageCardP
                 const costTone = projectCostTone(project.costUSD, peaks.costUSD);
                 const cacheHitRate = project.inputTokens > 0 ? project.cachedInputTokens / project.inputTokens : 0;
                 const activate = () => onProjectClick?.(project);
-                return <tr key={project.project} role={onProjectClick ? "button" : undefined} tabIndex={onProjectClick ? 0 : undefined} aria-label={onProjectClick ? t("projects.open_details", { project: project.displayName }) : undefined} onClick={activate} onKeyDown={(event) => {
+                const label = projectLabel(project);
+                return <tr key={project.project} role={onProjectClick ? "button" : undefined} tabIndex={onProjectClick ? 0 : undefined} aria-label={onProjectClick ? t("projects.open_details", { project: label }) : undefined} onClick={activate} onKeyDown={(event) => {
                   if (onProjectClick && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); activate(); }
                 }} className={cn("group align-top", onProjectClick && "cursor-pointer hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50")}>
-                  <td className="border-b border-border/70 py-4 pr-4"><p className="truncate font-medium text-foreground group-hover:text-primary">{project.displayName}</p><p className="mt-1 break-all font-mono text-xs leading-5 text-muted-foreground">{project.project}</p></td>
+                  <td className="border-b border-border/70 py-4 pr-4"><div className="flex min-w-0 items-center gap-2"><p className="truncate font-medium text-foreground group-hover:text-primary">{label}</p>{project.codexProjectName ? <span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-500">{t("projects.codex_project")}</span> : null}</div><p className="mt-1 break-all font-mono text-xs leading-5 text-muted-foreground">{project.project}</p></td>
                   <td className="border-b border-border/70 px-4 py-4">
                     <div className="mb-2.5 flex items-center justify-between gap-4"><span className="flex items-center gap-1.5 font-semibold tabular-nums">{formatNumber(project.totalTokens)}<Peak show={isPositivePeak(project.totalTokens, peaks.totalTokens)} label={t("projects.highest")} /></span><span className="text-xs text-muted-foreground">{t("projects.relative_peak", { percent: Math.round(width) })}</span></div>
                     <div className="h-2.5 w-full rounded-full bg-muted"><div className="flex h-full overflow-hidden rounded-full" style={{ width: `${width}%` }} role="img" aria-label={t("projects.bar_label", { total: formatNumber(project.totalTokens), input: formatNumber(project.inputTokens), cached: formatNumber(project.cachedInputTokens), output: formatNumber(project.outputTokens) })}><span className="bg-sky-500" style={{ width: `${parts.nonCachedInput / segmentTotal * 100}%` }} /><span className="bg-emerald-500" style={{ width: `${parts.cachedInput / segmentTotal * 100}%` }} /><span className="bg-violet-500" style={{ width: `${parts.output / segmentTotal * 100}%` }} /></div></div>

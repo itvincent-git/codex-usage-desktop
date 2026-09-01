@@ -45,6 +45,9 @@ export type OverviewResponse = {
   projects: Array<{
     project: string;
     displayName: string;
+    codexProjectId?: string;
+    codexProjectName?: string;
+    codexProjectRoot?: string;
     inputTokens: number;
     cachedInputTokens: number;
     outputTokens: number;
@@ -56,6 +59,9 @@ export type OverviewResponse = {
 export type ProjectAnalyticsResponse = {
   project: string;
   displayName: string;
+  codexProjectId?: string;
+  codexProjectName?: string;
+  codexProjectRoot?: string;
   range: RangeKey;
   startDate: string;
   endDate: string;
@@ -303,8 +309,17 @@ export type SessionDetailRow = {
   costUSD: number;
   models: string[];
   projects: string[];
+  projectReferences?: ProjectReference[];
   dailyUsage: SessionDailyUsageRow[];
   quotaUsage?: SessionQuotaUsage | null;
+};
+
+export type ProjectReference = {
+  path: string;
+  displayName: string;
+  codexProjectId?: string;
+  codexProjectName?: string;
+  codexProjectRoot?: string;
 };
 
 export async function fetchSessionDetails(): Promise<SessionDetailRow[]> {

@@ -86,6 +86,24 @@ function replayAgent(overrides: Partial<SessionReplayDetail["agents"][number]>):
 }
 
 describe("session daily usage", () => {
+  it("shows an optional Codex project label without changing the cwd", () => {
+    render(<SessionUsageTable sessions={[session({
+      projectReferences: [{
+        path: "/repo/codex-usage-desktop",
+        displayName: "codex-usage-desktop",
+        codexProjectId: "local-app",
+        codexProjectName: "Codex Usage Desktop",
+        codexProjectRoot: "/repo/codex-usage-desktop",
+      }],
+      projects: ["/repo/codex-usage-desktop"],
+    })]} />);
+
+    expect(screen.getByText("Codex Usage Desktop").closest("[title]"))
+      .toHaveAttribute("title", "/repo/codex-usage-desktop");
+    expect(screen.getByText("codex-usage-desktop")).toBeInTheDocument();
+    expect(screen.getByText("Codex project")).toBeInTheDocument();
+  });
+
   it("summarizes the 5-hour and weekly quota consumed by every session in a day", () => {
     const quotaWindow = (delta: number, startPercent: number, hour: number) => ({
       windowMinutes: 300,
@@ -790,11 +808,43 @@ describe("session titles", () => {
     expect(invokeMock).toHaveBeenCalledWith("fetch_project_analytics", { project: "/repo/app", range: "30d" });
     expect(screen.getByText("Other")).toBeInTheDocument();
     expect(screen.getByText("Daily token and cost trend")).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText("Search title, session ID, or model..."), "alpha launch");
+    await userEvent.type(screen.getByPlaceholderText("Search title, session ID, model, or project..."), "alpha launch");
 
     expect(screen.getByText("Alpha launch notes")).toBeInTheDocument();
     expect(screen.getByText(/alpha-id/)).toBeInTheDocument();
     expect(screen.queryByText("Beta cleanup")).not.toBeInTheDocument();
+  });
+
+  it("shows and searches Codex project labels while retaining cwd filtering", async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_session_details") return [session({
+        path: "/tmp/codex.jsonl",
+        sessionId: "codex-id.jsonl",
+        threadName: "Usage work",
+        projects: ["/repo/codex-usage-desktop"],
+        projectReferences: [{
+          path: "/repo/codex-usage-desktop",
+          displayName: "codex-usage-desktop",
+          codexProjectId: "local-app",
+          codexProjectName: "Codex Usage Desktop",
+          codexProjectRoot: "/repo/codex-usage-desktop",
+        }],
+      })];
+      if (command === "fetch_project_analytics") return {
+        project: "/repo/codex-usage-desktop", displayName: "codex-usage-desktop",
+        codexProjectName: "Codex Usage Desktop", range: "30d", startDate: "2026-07-01", endDate: "2026-07-30", timezone: "UTC",
+        summary: { project: "/repo/codex-usage-desktop", displayName: "codex-usage-desktop", codexProjectName: "Codex Usage Desktop", inputTokens: 1, cachedInputTokens: 0, outputTokens: 1, totalTokens: 2, costUSD: 0 },
+        models: [], daily: [],
+      };
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<ProjectSessionsModal project={{ project: "/repo/codex-usage-desktop", displayName: "codex-usage-desktop", codexProjectName: "Codex Usage Desktop", totalTokens: 2, costUSD: 0 }} range="30d" onClose={vi.fn()} onGoToSessions={vi.fn()} />);
+
+    expect(await screen.findByRole("dialog", { name: "Codex Usage Desktop" })).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText("Search title, session ID, model, or project..."), "Codex Usage");
+    expect(screen.getByText("Usage work")).toBeInTheDocument();
+    expect(invokeMock).toHaveBeenCalledWith("fetch_project_analytics", { project: "/repo/codex-usage-desktop", range: "30d" });
   });
 
   it("keeps sessions usable when project analytics fails", async () => {
@@ -808,7 +858,7 @@ describe("session titles", () => {
 
     expect(await screen.findByText("Available session")).toBeInTheDocument();
     expect(await screen.findByText(/analytics offline/)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Search title, session ID, or model...")).toBeEnabled();
+    expect(screen.getByPlaceholderText("Search title, session ID, model, or project...")).toBeEnabled();
   });
 
   it("falls back to the session ID in session details", async () => {

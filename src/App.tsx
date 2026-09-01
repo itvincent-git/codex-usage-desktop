@@ -29,6 +29,9 @@ export default function App() {
   const [selectedProjectForModal, setSelectedProjectForModal] = useState<{
     project: string;
     displayName: string;
+    codexProjectId?: string;
+    codexProjectName?: string;
+    codexProjectRoot?: string;
     totalTokens: number;
     costUSD: number;
   } | null>(null);

@@ -16,9 +16,10 @@ import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
+import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 
 type ProjectSessionsModalProps = {
-  project: Pick<OverviewResponse["projects"][number], "project" | "displayName" | "totalTokens" | "costUSD">;
+  project: Pick<OverviewResponse["projects"][number], "project" | "displayName" | "codexProjectId" | "codexProjectName" | "codexProjectRoot" | "totalTokens" | "costUSD">;
   range: RangeKey;
   onClose: () => void;
   onGoToSessions: (projectPath: string) => void;
@@ -95,7 +96,9 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions }
     if (!query) return sessions;
     return sessions.filter((session) => session.threadName?.toLowerCase().includes(query)
       || cleanSessionId(session.sessionId).toLowerCase().includes(query)
-      || session.models?.some((model) => model.toLowerCase().includes(query)));
+      || session.models?.some((model) => model.toLowerCase().includes(query))
+      || sessionProjectReferences(session).some((reference) => [reference.codexProjectName, reference.displayName, reference.path]
+        .some((value) => value?.toLowerCase().includes(query))));
   }, [searchQuery, sessions]);
 
   const modelData = useMemo(() => {
@@ -116,7 +119,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions }
   return <div onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="modal-project-title">
     <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/95 shadow-2xl">
       <div className="flex items-start justify-between border-b border-border/60 bg-muted/20 px-6 py-5">
-        <div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/10 bg-indigo-500/10 text-indigo-500"><Folder className="h-5 w-5" /></span><div className="min-w-0"><h3 id="modal-project-title" className="truncate text-lg font-bold text-foreground">{project.displayName}</h3><p className="truncate font-mono text-xs text-muted-foreground" title={project.project}>{project.project}</p>{analytics ? <p className="mt-1 text-[10px] text-muted-foreground">{analytics.startDate} – {analytics.endDate} · {analytics.timezone}</p> : null}</div></div>
+        <div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-500/10 bg-indigo-500/10 text-indigo-500"><Folder className="h-5 w-5" /></span><div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><h3 id="modal-project-title" className="truncate text-lg font-bold text-foreground">{projectLabel(analytics ?? project)}</h3>{(analytics?.codexProjectName ?? project.codexProjectName) ? <span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-500">{t("projects.codex_project")}</span> : null}</div><p className="truncate font-mono text-xs text-muted-foreground" title={project.project}>{project.project}</p>{analytics ? <p className="mt-1 text-[10px] text-muted-foreground">{analytics.startDate} – {analytics.endDate} · {analytics.timezone}</p> : null}</div></div>
         <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label={t("range_switcher.modal_close_aria")}><X className="h-5 w-5" /></button>
       </div>
 

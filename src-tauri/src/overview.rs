@@ -139,6 +139,9 @@ pub fn get_overview(
                 })
                 .sum(),
             display_name: project_display_name(&project),
+            codex_project_id: None,
+            codex_project_name: None,
+            codex_project_root: None,
             project,
             input_tokens: usage.input_tokens,
             cached_input_tokens: usage.cached_input_tokens,
@@ -266,6 +269,9 @@ pub fn get_project_analytics(
     Ok(ProjectAnalyticsResponse {
         project: project.to_string(),
         display_name: display_name.clone(),
+        codex_project_id: None,
+        codex_project_name: None,
+        codex_project_root: None,
         range: range.to_string(),
         start_date,
         end_date,
@@ -273,6 +279,9 @@ pub fn get_project_analytics(
         summary: OverviewProjectRow {
             project: project.to_string(),
             display_name,
+            codex_project_id: None,
+            codex_project_name: None,
+            codex_project_root: None,
             input_tokens: summary.input_tokens,
             cached_input_tokens: summary.cached_input_tokens,
             output_tokens: summary.output_tokens,

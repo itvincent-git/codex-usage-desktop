@@ -43,4 +43,18 @@ describe("ProjectUsageCard", () => {
     expect(within(row("Zero")).queryByText("Highest")).not.toBeInTheDocument();
     expect(within(row("High")).getAllByText("Highest").length).toBeGreaterThan(0);
   });
+
+  it("uses a Codex project name as an optional label without replacing the cwd", () => {
+    render(<ProjectUsageCard projects={[{
+      ...project("codex-usage-desktop", 100, 1),
+      codexProjectId: "local-app",
+      codexProjectName: "Codex Usage Desktop",
+      codexProjectRoot: "/repo/codex-usage-desktop",
+    }]} />);
+
+    expect(screen.getByText("Codex Usage Desktop")).toBeInTheDocument();
+    expect(screen.getByText("Codex project")).toBeInTheDocument();
+    expect(screen.getByText("/repo/codex-usage-desktop")).toBeInTheDocument();
+    expect(screen.queryByText("codex-usage-desktop", { selector: "p" })).not.toBeInTheDocument();
+  });
 });

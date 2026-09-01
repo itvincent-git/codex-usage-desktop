@@ -1,4 +1,5 @@
 import type { OverviewResponse } from "@/lib/api";
+import { projectLabel } from "@/lib/project-reference";
 
 export type ProjectRow = OverviewResponse["projects"][number];
 export type ProjectSort = "name" | "total" | "input" | "cached" | "output" | "cost";
@@ -29,9 +30,9 @@ export function sortProjects(projects: ProjectRow[], sort: ProjectSort, directio
   return projects.map((project, index) => ({ project, index })).sort((a, b) => {
     const difference = key
       ? (a.project[key] - b.project[key]) * multiplier
-      : a.project.displayName.localeCompare(b.project.displayName) * multiplier;
+      : projectLabel(a.project).localeCompare(projectLabel(b.project)) * multiplier;
     if (difference !== 0) return difference;
-    const nameDifference = a.project.displayName.localeCompare(b.project.displayName);
+    const nameDifference = projectLabel(a.project).localeCompare(projectLabel(b.project));
     if (nameDifference !== 0) return nameDifference;
     const pathDifference = a.project.project.localeCompare(b.project.project);
     return pathDifference !== 0 ? pathDifference : a.index - b.index;
