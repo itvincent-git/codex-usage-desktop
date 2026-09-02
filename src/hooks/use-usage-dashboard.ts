@@ -147,6 +147,7 @@ export function useUsageDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMonthlyLoading, setIsMonthlyLoading] = useState(false);
   const [sessions, setSessions] = useState<SessionDetailRow[]>([]);
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
   const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -278,6 +279,7 @@ export function useUsageDashboard() {
   const loadSessions = useEffectEvent(async () => {
     const data = await fetchSessionDetails();
     setSessions(data);
+    setHasLoadedSessions(true);
     setError(null);
   });
 
@@ -802,13 +804,17 @@ export function useUsageDashboard() {
     }
 
     if (nextView === "sessions" && bootstrapped) {
-      setIsSessionsLoading(true);
+      if (!hasLoadedSessions) {
+        setIsSessionsLoading(true);
+      }
       try {
         await loadSessions();
       } catch (sessionsError) {
         setError(sessionsError instanceof Error ? sessionsError.message : "Failed to load sessions.");
       } finally {
-        setIsSessionsLoading(false);
+        if (!hasLoadedSessions) {
+          setIsSessionsLoading(false);
+        }
       }
     }
   }

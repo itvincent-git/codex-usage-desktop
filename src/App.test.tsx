@@ -968,6 +968,41 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
   });
 
+  it("keeps loaded sessions visible when returning to the Sessions tab", async () => {
+    let sessionFetchCount = 0;
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "scan_usage") {
+        return scan(0);
+      }
+      if (command === "fetch_overview" && args?.range === "30d") {
+        return overview();
+      }
+      if (command === "fetch_session_details") {
+        sessionFetchCount += 1;
+        return sessionFetchCount === 1 ? [] : new Promise(() => {});
+      }
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("1,600").length).toBeGreaterThan(0));
+    await userEvent.click(screen.getByRole("tab", { name: "Sessions" }));
+    expect(await screen.findByText("No session logs match the current search filters.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Sessions" }));
+
+    expect(screen.queryByRole("status", { name: "Loading Session Details" })).not.toBeInTheDocument();
+    expect(screen.getByText("No session logs match the current search filters.")).toBeInTheDocument();
+    expect(sessionFetchCount).toBe(2);
+  });
+
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
