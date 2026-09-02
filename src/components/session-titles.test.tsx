@@ -201,6 +201,42 @@ describe("session daily usage", () => {
     expect(within(card).getByText("5h").parentElement).toHaveTextContent("Approx. 6% · 63% left");
   });
 
+  it("parses quota window timestamps once before rebasing many sessions", () => {
+    const parseSpy = vi.spyOn(Date, "parse");
+    const sessions = Array.from({ length: 40 }, (_, index) => {
+      const observedStartAt = new Date(Date.UTC(2026, 6, 1 + index, 8)).toISOString();
+      const observedEndAt = new Date(Date.UTC(2026, 6, 1 + index, 9)).toISOString();
+      const quotaWindow = (windowMinutes: number) => ({
+        windowMinutes,
+        resetsAt: new Date(Date.UTC(2026, 6, 1 + index, 13)).toISOString(),
+        observedStartAt,
+        observedEndAt,
+        observedStartPercent: index,
+        observedEndPercent: index + 1,
+        observedDeltaPercent: 1,
+        belowResolution: false,
+      });
+
+      return session({
+        path: `/tmp/quota-${index}.jsonl`,
+        modifiedAtMs: new Date(Date.UTC(2026, 6, 1 + index)).getTime(),
+        totalTokens: 0,
+        dailyUsage: [],
+        quotaUsage: {
+          fiveHour: [quotaWindow(300)],
+          weekly: [quotaWindow(10_080)],
+        },
+      });
+    });
+
+    try {
+      render(<SessionUsageTable sessions={sessions} />);
+      expect(parseSpy.mock.calls.length).toBeLessThan(500);
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
+
   it("shows quota color scales, low-resolution values, and multiple resets", () => {
     const window = (delta: number, belowResolution = false) => ({
       windowMinutes: 300,

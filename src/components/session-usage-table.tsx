@@ -159,34 +159,57 @@ function formatDateHeader(dateStr: string) {
 }
 
 function rebaseQuotaUsage(sessions: SessionDisplayRow[]) {
-  const windows = sessions.flatMap((session) =>
-    (["fiveHour", "weekly"] as const).flatMap((key) =>
-      (session.quotaUsage?.[key] ?? []).map((window) => ({ key, window })),
-    ),
-  );
+  const windowsByKey = {
+    fiveHour: [] as Array<{
+      window: SessionQuotaWindowUsage;
+      endAt: number;
+      resetAt: number | null;
+    }>,
+    weekly: [] as Array<{
+      window: SessionQuotaWindowUsage;
+      endAt: number;
+      resetAt: number | null;
+    }>,
+  };
+  const timingByWindow = new Map<SessionQuotaWindowUsage, {
+    startAt: number;
+    endAt: number;
+    resetAt: number | null;
+  }>();
+
+  for (const session of sessions) {
+    for (const key of ["fiveHour", "weekly"] as const) {
+      for (const window of session.quotaUsage?.[key] ?? []) {
+        const timing = {
+          startAt: Date.parse(window.observedStartAt),
+          endAt: Date.parse(window.observedEndAt),
+          resetAt: window.resetsAt ? Date.parse(window.resetsAt) : null,
+        };
+        timingByWindow.set(window, timing);
+        windowsByKey[key].push({ window, endAt: timing.endAt, resetAt: timing.resetAt });
+      }
+    }
+  }
 
   const rebaseWindow = (key: "fiveHour" | "weekly", window: SessionQuotaWindowUsage) => {
-    const startAt = Date.parse(window.observedStartAt);
-    const endAt = Date.parse(window.observedEndAt);
-    const resetAt = window.resetsAt ? Date.parse(window.resetsAt) : null;
+    const timing = timingByWindow.get(window)!;
+    const { startAt, endAt, resetAt } = timing;
     let baseline: SessionQuotaWindowUsage | null = null;
     let baselineEndAt = Number.NEGATIVE_INFINITY;
 
-    for (const candidate of windows) {
-      if (candidate.key !== key || candidate.window === window) continue;
-      const candidateEndAt = Date.parse(candidate.window.observedEndAt);
-      const candidateResetAt = candidate.window.resetsAt ? Date.parse(candidate.window.resetsAt) : null;
-      const sameReset = resetAt === null && candidateResetAt === null
-        || resetAt !== null && candidateResetAt !== null && Math.abs(resetAt - candidateResetAt) <= 60_000;
+    for (const candidate of windowsByKey[key]) {
+      if (candidate.window === window) continue;
+      const sameReset = resetAt === null && candidate.resetAt === null
+        || resetAt !== null && candidate.resetAt !== null && Math.abs(resetAt - candidate.resetAt) <= 60_000;
       if (
         sameReset
-        && candidateEndAt > startAt
-        && candidateEndAt < endAt
+        && candidate.endAt > startAt
+        && candidate.endAt < endAt
         && candidate.window.observedEndPercent <= window.observedEndPercent
-        && candidateEndAt > baselineEndAt
+        && candidate.endAt > baselineEndAt
       ) {
         baseline = candidate.window;
-        baselineEndAt = candidateEndAt;
+        baselineEndAt = candidate.endAt;
       }
     }
 
