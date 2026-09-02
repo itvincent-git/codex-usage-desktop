@@ -67,6 +67,7 @@ export function ProjectUsageCard({ projects, onProjectClick }: ProjectUsageCardP
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="total">{t("projects.sort.total")}</SelectItem>
+                <SelectItem value="recent">{t("projects.sort.recent")}</SelectItem>
                 <SelectItem value="name">{t("projects.sort.name")}</SelectItem>
                 <SelectItem value="input">{t("projects.sort.input")}</SelectItem>
                 <SelectItem value="cached">{t("projects.sort.cached")}</SelectItem>

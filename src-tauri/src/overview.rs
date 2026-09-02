@@ -92,6 +92,7 @@ pub fn get_overview(
     let cost_usd = daily.iter().map(|day| day.cost_usd).sum::<f64>();
     let mut models_by_name = BTreeMap::<String, ModelUsage>::new();
     let mut projects_by_path = BTreeMap::<String, ProjectUsage>::new();
+    let mut project_last_active_dates = BTreeMap::<String, String>::new();
     for row in rows_by_date.values() {
         for (model, usage) in &row.models {
             let summary = models_by_name.entry(model.clone()).or_default();
@@ -102,6 +103,7 @@ pub fn get_overview(
             summary.total_tokens += usage.total_tokens;
         }
         for (project, usage) in &row.projects {
+            project_last_active_dates.insert(project.clone(), row.date.clone());
             let summary = projects_by_path.entry(project.clone()).or_default();
             summary.input_tokens += usage.input_tokens;
             summary.cached_input_tokens += usage.cached_input_tokens;
@@ -139,6 +141,9 @@ pub fn get_overview(
                 })
                 .sum(),
             display_name: project_display_name(&project),
+            last_active_date: project_last_active_dates
+                .remove(&project)
+                .unwrap_or_else(|| start_date.clone()),
             codex_project_id: None,
             codex_project_name: None,
             codex_project_root: None,
@@ -265,6 +270,10 @@ pub fn get_project_analytics(
             .then_with(|| a.model.cmp(&b.model))
     });
     let display_name = project_display_name(project);
+    let last_active_date = usage_by_date
+        .last_key_value()
+        .map(|(date, _)| date.clone())
+        .unwrap_or_else(|| start_date.clone());
 
     Ok(ProjectAnalyticsResponse {
         project: project.to_string(),
@@ -279,6 +288,7 @@ pub fn get_project_analytics(
         summary: OverviewProjectRow {
             project: project.to_string(),
             display_name,
+            last_active_date,
             codex_project_id: None,
             codex_project_name: None,
             codex_project_root: None,
@@ -561,6 +571,21 @@ mod tests {
         )]);
         upsert_daily_rows(&mut db, &[outside, first, third]).unwrap();
 
+        let overview = get_overview(
+            &db,
+            "custom:2026-07-01_2026-07-03",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap();
+        let project_dates = overview
+            .projects
+            .iter()
+            .map(|project| (project.project.as_str(), project.last_active_date.as_str()))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(project_dates["/repo/app"], "2026-07-03");
+        assert_eq!(project_dates["/repo/other"], "2026-07-01");
+
         let response = get_project_analytics(
             &db,
             "/repo/app",
@@ -574,6 +599,7 @@ mod tests {
         assert_eq!(response.display_name, "app");
         assert_eq!(response.start_date, "2026-07-01");
         assert_eq!(response.end_date, "2026-07-03");
+        assert_eq!(response.summary.last_active_date, "2026-07-03");
         assert_eq!(response.summary.input_tokens, 1_500_000);
         assert_eq!(response.summary.cached_input_tokens, 300_000);
         assert_eq!(response.summary.output_tokens, 150_000);

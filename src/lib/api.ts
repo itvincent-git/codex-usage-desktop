@@ -45,6 +45,7 @@ export type OverviewResponse = {
   projects: Array<{
     project: string;
     displayName: string;
+    lastActiveDate?: string;
     codexProjectId?: string;
     codexProjectName?: string;
     codexProjectRoot?: string;

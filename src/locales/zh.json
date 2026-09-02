@@ -356,7 +356,7 @@
     },
     "token_legend": "Token 与成本图例",
     "legend": { "uncached": "非缓存输入", "cached": "缓存输入", "output": "输出", "low_cost": "低成本", "medium_cost": "中成本", "high_cost": "高成本" },
-    "sort": { "label": "排序字段", "name": "项目名称", "total": "总 Token", "input": "输入（含缓存）", "cached": "缓存输入", "output": "输出", "cost": "成本", "ascending": "升序排列", "descending": "降序排列" },
+    "sort": { "label": "排序字段", "name": "项目名称", "recent": "最近使用时间", "total": "总 Token", "input": "输入（含缓存）", "cached": "缓存输入", "output": "输出", "cost": "成本", "ascending": "升序排列", "descending": "降序排列" },
     "values": { "input": "输入", "cached": "缓存", "output": "输出" },
     "highest": "最高",
     "relative_peak": "峰值的 {{percent}}%",

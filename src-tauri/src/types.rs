@@ -115,6 +115,7 @@ pub struct ModelPricingCatalogResponse {
 pub struct OverviewProjectRow {
     pub project: String,
     pub display_name: String,
+    pub last_active_date: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub codex_project_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

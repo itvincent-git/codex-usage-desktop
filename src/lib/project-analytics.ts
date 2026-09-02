@@ -2,7 +2,7 @@ import type { OverviewResponse } from "@/lib/api";
 import { projectLabel } from "@/lib/project-reference";
 
 export type ProjectRow = OverviewResponse["projects"][number];
-export type ProjectSort = "name" | "total" | "input" | "cached" | "output" | "cost";
+export type ProjectSort = "name" | "recent" | "total" | "input" | "cached" | "output" | "cost";
 export type SortDirection = "asc" | "desc";
 export type CostTone = "zero" | "low" | "medium" | "high";
 
@@ -28,9 +28,11 @@ export function sortProjects(projects: ProjectRow[], sort: ProjectSort, directio
           : sort === "cost" ? "costUSD"
             : null;
   return projects.map((project, index) => ({ project, index })).sort((a, b) => {
-    const difference = key
-      ? (a.project[key] - b.project[key]) * multiplier
-      : projectLabel(a.project).localeCompare(projectLabel(b.project)) * multiplier;
+    const difference = sort === "recent"
+      ? (a.project.lastActiveDate ?? "").localeCompare(b.project.lastActiveDate ?? "") * multiplier
+      : key
+        ? (a.project[key] - b.project[key]) * multiplier
+        : projectLabel(a.project).localeCompare(projectLabel(b.project)) * multiplier;
     if (difference !== 0) return difference;
     const nameDifference = projectLabel(a.project).localeCompare(projectLabel(b.project));
     if (nameDifference !== 0) return nameDifference;

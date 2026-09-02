@@ -426,6 +426,7 @@ mod tests {
             projects: vec![OverviewProjectRow {
                 project: "/Users/vincent/Documents/Develop/github/codex-usage-desktop".to_string(),
                 display_name: "codex-usage-desktop".to_string(),
+                last_active_date: "2026-04-30".to_string(),
                 codex_project_id: Some("local-project".to_string()),
                 codex_project_name: Some("Codex Usage Desktop".to_string()),
                 codex_project_root: Some(

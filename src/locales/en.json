@@ -356,7 +356,7 @@
     },
     "token_legend": "Token and cost legend",
     "legend": { "uncached": "Non-cached input", "cached": "Cached input", "output": "Output", "low_cost": "Low cost", "medium_cost": "Medium cost", "high_cost": "High cost" },
-    "sort": { "label": "Sort by", "name": "Project name", "total": "Total tokens", "input": "Input (with cache)", "cached": "Cached input", "output": "Output", "cost": "Cost", "ascending": "Ascending order", "descending": "Descending order" },
+    "sort": { "label": "Sort by", "name": "Project name", "recent": "Recent activity", "total": "Total tokens", "input": "Input (with cache)", "cached": "Cached input", "output": "Output", "cost": "Cost", "ascending": "Ascending order", "descending": "Descending order" },
     "values": { "input": "Input", "cached": "Cached", "output": "Output" },
     "highest": "Highest",
     "relative_peak": "{{percent}}% of peak",

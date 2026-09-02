@@ -16,13 +16,14 @@ function row(name: string, values: Partial<ProjectRow> = {}): ProjectRow {
 
 describe("project analytics derivations", () => {
   it("sorts every field in both directions and applies field defaults", () => {
-    const projects = [row("bravo", { inputTokens: 2, cachedInputTokens: 6, outputTokens: 4, totalTokens: 8, costUSD: 10 }), row("alpha", { inputTokens: 1, cachedInputTokens: 5, outputTokens: 3, totalTokens: 7, costUSD: 9 })];
-    const fields: ProjectSort[] = ["name", "total", "input", "cached", "output", "cost"];
+    const projects = [row("bravo", { lastActiveDate: "2026-09-02", inputTokens: 2, cachedInputTokens: 6, outputTokens: 4, totalTokens: 8, costUSD: 10 }), row("alpha", { lastActiveDate: "2026-09-01", inputTokens: 1, cachedInputTokens: 5, outputTokens: 3, totalTokens: 7, costUSD: 9 })];
+    const fields: ProjectSort[] = ["name", "recent", "total", "input", "cached", "output", "cost"];
     for (const field of fields) {
       expect(sortProjects(projects, field, "asc")[0].displayName).toBe("alpha");
       expect(sortProjects(projects, field, "desc")[0].displayName).toBe("bravo");
     }
     expect(defaultProjectSortDirection("name")).toBe("asc");
+    expect(defaultProjectSortDirection("recent")).toBe("desc");
     expect(defaultProjectSortDirection("cost")).toBe("desc");
   });
 
