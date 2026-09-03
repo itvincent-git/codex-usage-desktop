@@ -1,7 +1,7 @@
 use crate::types::CodexResetAnnouncement;
 use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
 use serde::Deserialize;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const CODEX_RESETS_STATUS_URL: &str = "https://codex-resets.com/api/v1/status";
 const CODEX_RESETS_LIST_URL: &str = "https://codex-resets.com/api/v1/resets";
@@ -22,12 +22,37 @@ struct ResetListResponse {
 }
 
 pub fn fetch_latest_reset() -> Result<Option<CodexResetAnnouncement>, String> {
-    let body = send_request(CODEX_RESETS_STATUS_URL, &[])?;
-    parse_latest_reset(&body)
+    let started = Instant::now();
+    log::info!("Fetching latest Codex reset announcement.");
+
+    let result =
+        send_request(CODEX_RESETS_STATUS_URL, &[]).and_then(|body| parse_latest_reset(&body));
+
+    match &result {
+        Ok(Some(reset)) => log::info!(
+            "Latest Codex reset fetched. id={} type={} announcedAt={} elapsedMs={}",
+            reset.id,
+            reset.reset_type,
+            reset.announced_at,
+            started.elapsed().as_millis()
+        ),
+        Ok(None) => log::warn!(
+            "Codex Resets status returned no latest reset. elapsedMs={}",
+            started.elapsed().as_millis()
+        ),
+        Err(error) => log::warn!(
+            "Failed to fetch latest Codex reset. elapsedMs={} error={error}",
+            started.elapsed().as_millis()
+        ),
+    }
+
+    result
 }
 
 pub fn fetch_reset_history(days: u32) -> Result<Vec<CodexResetAnnouncement>, String> {
     let days = days.clamp(1, 365);
+    let started = Instant::now();
+    log::info!("Fetching Codex reset history. days={days}");
     let from = (Utc::now() - ChronoDuration::days(i64::from(days)))
         .to_rfc3339_opts(SecondsFormat::Millis, true);
     let query = [
@@ -35,8 +60,22 @@ pub fn fetch_reset_history(days: u32) -> Result<Vec<CodexResetAnnouncement>, Str
         ("from", from),
         ("order", "desc".to_string()),
     ];
-    let body = send_request(CODEX_RESETS_LIST_URL, &query)?;
-    parse_reset_history(&body)
+    let result =
+        send_request(CODEX_RESETS_LIST_URL, &query).and_then(|body| parse_reset_history(&body));
+
+    match &result {
+        Ok(resets) => log::info!(
+            "Codex reset history fetched. days={days} count={} elapsedMs={}",
+            resets.len(),
+            started.elapsed().as_millis()
+        ),
+        Err(error) => log::warn!(
+            "Failed to fetch Codex reset history. days={days} elapsedMs={} error={error}",
+            started.elapsed().as_millis()
+        ),
+    }
+
+    result
 }
 
 fn send_request(url: &str, query: &[(&str, String)]) -> Result<String, String> {
