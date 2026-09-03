@@ -2,7 +2,12 @@ import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw, Al
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UpdateCheckResponse, CodexLimitsResponse } from "@/lib/api";
-import type { UpdateInstallStatus, UpdateProgressState } from "@/hooks/use-usage-dashboard";
+import {
+  AUTO_REFRESH_INTERVAL_OPTIONS,
+  type AutoRefreshIntervalMinutes,
+  type UpdateInstallStatus,
+  type UpdateProgressState,
+} from "@/hooks/use-usage-dashboard";
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
@@ -34,6 +39,8 @@ type SettingsPageProps = {
   onLaunchAtLoginChange: (enabled: boolean) => void;
   showLogsTab: boolean;
   onShowLogsTabChange: (show: boolean) => void;
+  autoRefreshIntervalMinutes: AutoRefreshIntervalMinutes;
+  onAutoRefreshIntervalChange: (minutes: AutoRefreshIntervalMinutes) => void;
   trayTitleShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
   onTrayTitleShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
   trayMenuShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
@@ -71,6 +78,8 @@ export function SettingsPage({
   onLaunchAtLoginChange,
   showLogsTab,
   onShowLogsTabChange,
+  autoRefreshIntervalMinutes,
+  onAutoRefreshIntervalChange,
   trayTitleShow,
   onTrayTitleShowChange,
   trayMenuShow,
@@ -212,6 +221,30 @@ export function SettingsPage({
                 }`}
               />
             </button>
+          </div>
+          <div className="mt-5 flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-foreground">{t("settings.auto_refresh_title")}</h4>
+              <p className="max-w-lg text-sm leading-6 text-muted-foreground">
+                {t("settings.auto_refresh_desc")}
+              </p>
+            </div>
+            <Select
+              value={String(autoRefreshIntervalMinutes)}
+              onValueChange={(value) => onAutoRefreshIntervalChange(Number(value) as AutoRefreshIntervalMinutes)}
+              disabled={isDisabled}
+            >
+              <SelectTrigger className="w-[140px]" aria-label={t("settings.auto_refresh_title")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AUTO_REFRESH_INTERVAL_OPTIONS.map((minutes) => (
+                  <SelectItem key={minutes} value={String(minutes)}>
+                    {t("settings.auto_refresh_minutes", { count: minutes })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

@@ -68,6 +68,8 @@ export default function App() {
     isLaunchAtLoginUpdating,
     showLogsTab,
     setShowLogsTab,
+    autoRefreshIntervalMinutes,
+    setAutoRefreshIntervalMinutes,
     sessions,
     isSessionsLoading,
     handleViewChange,
@@ -414,6 +416,8 @@ export default function App() {
               onLaunchAtLoginChange={(enabled) => void handleLaunchAtLoginChange(enabled)}
               showLogsTab={showLogsTab}
               onShowLogsTabChange={setShowLogsTab}
+              autoRefreshIntervalMinutes={autoRefreshIntervalMinutes}
+              onAutoRefreshIntervalChange={setAutoRefreshIntervalMinutes}
               trayTitleShow={trayTitleShow}
               onTrayTitleShowChange={handleTrayTitleShowChange}
               trayMenuShow={trayMenuShow}

@@ -180,6 +180,10 @@ export async function refreshUsageData(forceLimits: boolean): Promise<UsageRefre
   return invoke<UsageRefreshResponse>("refresh_usage_data", { forceLimits });
 }
 
+export async function setBackgroundRefreshInterval(minutes: number): Promise<void> {
+  return invoke<void>("set_background_refresh_interval", { minutes });
+}
+
 export async function fetchOverview(range: RangeKey): Promise<OverviewResponse> {
   return invoke<OverviewResponse>("fetch_overview", { range });
 }

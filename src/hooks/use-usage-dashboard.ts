@@ -31,6 +31,7 @@ import {
   updateTray,
   type TrayMenuItemDto,
   refreshUsageData,
+  setBackgroundRefreshInterval,
   type UsageRefreshResponse,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
@@ -52,7 +53,9 @@ function isNewerVersion(current: string, target: string): boolean {
   return tPat > cPat;
 }
 
-const AUTO_RESCAN_MS = 5 * 60_000;
+export const AUTO_REFRESH_INTERVAL_OPTIONS = [1, 5, 15, 30, 60] as const;
+export type AutoRefreshIntervalMinutes = (typeof AUTO_REFRESH_INTERVAL_OPTIONS)[number];
+const DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES: AutoRefreshIntervalMinutes = 5;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
 const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
@@ -170,6 +173,13 @@ export function useUsageDashboard() {
     return localStorage.getItem("show_logs_tab") === "true";
   });
 
+  const [autoRefreshIntervalMinutes, setAutoRefreshIntervalMinutesState] = useState<AutoRefreshIntervalMinutes>(() => {
+    const saved = Number(localStorage.getItem("auto_refresh_interval_minutes"));
+    return AUTO_REFRESH_INTERVAL_OPTIONS.includes(saved as AutoRefreshIntervalMinutes)
+      ? saved as AutoRefreshIntervalMinutes
+      : DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES;
+  });
+
   const setShowLogsTab = (show: boolean) => {
     localStorage.setItem("show_logs_tab", show.toString());
     setShowLogsTabState(show);
@@ -177,6 +187,17 @@ export function useUsageDashboard() {
       setView("dashboard");
     }
   };
+
+  const setAutoRefreshIntervalMinutes = (minutes: AutoRefreshIntervalMinutes) => {
+    localStorage.setItem("auto_refresh_interval_minutes", String(minutes));
+    setAutoRefreshIntervalMinutesState(minutes);
+  };
+
+  useEffect(() => {
+    void setBackgroundRefreshInterval(autoRefreshIntervalMinutes).catch((err) => {
+      setError(errorMessage(err, "Failed to update the automatic refresh interval."));
+    });
+  }, [autoRefreshIntervalMinutes]);
 
   const [trayTitleShow, setTrayTitleShowState] = useState(() => {
     try {
@@ -385,7 +406,7 @@ export function useUsageDashboard() {
     }
 
     const now = Date.now();
-    if (now - lastAutoScanTimeRef.current < AUTO_RESCAN_MS) {
+    if (now - lastAutoScanTimeRef.current < autoRefreshIntervalMinutes * 60_000) {
       return;
     }
 
@@ -624,7 +645,7 @@ export function useUsageDashboard() {
     };
   }, [bootstrapped, runBackgroundUpdateCheck]);
 
-  // Re-fetch usage when the page/window regains focus after being inactive ≥5 min.
+  // Re-fetch usage when the page/window regains focus after the configured refresh interval.
   useEffect(() => {
     if (!bootstrapped) return;
 
@@ -640,7 +661,7 @@ export function useUsageDashboard() {
       if (document.visibilityState === "visible" && document.hasFocus()) {
         const inactiveDuration = hiddenSince;
         hiddenSince = null;
-        if (inactiveDuration !== null && Date.now() - inactiveDuration >= AUTO_RESCAN_MS) {
+        if (inactiveDuration !== null && Date.now() - inactiveDuration >= autoRefreshIntervalMinutes * 60_000) {
           void runAutoRescan();
         }
       }
@@ -1037,6 +1058,8 @@ export function useUsageDashboard() {
     isLaunchAtLoginUpdating,
     showLogsTab,
     setShowLogsTab,
+    autoRefreshIntervalMinutes,
+    setAutoRefreshIntervalMinutes,
     sessions,
     isSessionsLoading,
     handleViewChange,

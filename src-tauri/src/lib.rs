@@ -16,7 +16,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Condvar, Mutex,
 };
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem, MenuItemKind};
@@ -30,11 +30,36 @@ use types::{
     UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
 };
 
-const BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const DEFAULT_BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const ALLOWED_BACKGROUND_RESCAN_MINUTES: [u64; 5] = [1, 5, 15, 30, 60];
 
 struct AppState {
     database_path: PathBuf,
     pricing_cache_path: PathBuf,
+}
+
+struct BackgroundRefreshSchedule {
+    interval: Mutex<Duration>,
+    changed: Condvar,
+}
+
+impl BackgroundRefreshSchedule {
+    fn new() -> Self {
+        Self {
+            interval: Mutex::new(DEFAULT_BACKGROUND_RESCAN_INTERVAL),
+            changed: Condvar::new(),
+        }
+    }
+}
+
+fn background_refresh_interval(minutes: u64) -> Result<Duration, String> {
+    if ALLOWED_BACKGROUND_RESCAN_MINUTES.contains(&minutes) {
+        Ok(Duration::from_secs(minutes * 60))
+    } else {
+        Err(format!(
+            "Unsupported background refresh interval: {minutes} minutes"
+        ))
+    }
 }
 
 fn scan_usage_blocking(
@@ -136,6 +161,17 @@ async fn refresh_usage_data(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+fn set_background_refresh_interval(
+    state: tauri::State<'_, Arc<BackgroundRefreshSchedule>>,
+    minutes: u64,
+) -> Result<(), String> {
+    let interval = background_refresh_interval(minutes)?;
+    *state.interval.lock().map_err(|error| error.to_string())? = interval;
+    state.changed.notify_all();
+    Ok(())
 }
 
 #[tauri::command]
@@ -815,6 +851,8 @@ pub fn run() {
                 database_path: database_path.clone(),
                 pricing_cache_path: pricing_cache_path.clone(),
             });
+            let background_refresh_schedule = Arc::new(BackgroundRefreshSchedule::new());
+            app.manage(background_refresh_schedule.clone());
 
             // Set up system tray icon
             #[cfg(target_os = "macos")]
@@ -870,7 +908,16 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             tauri::async_runtime::spawn_blocking(move || loop {
-                std::thread::sleep(BACKGROUND_RESCAN_INTERVAL);
+                let interval = background_refresh_schedule.interval.lock().unwrap();
+                let interval_duration = *interval;
+                let (interval, wait_result) = background_refresh_schedule
+                    .changed
+                    .wait_timeout(interval, interval_duration)
+                    .unwrap();
+                if !wait_result.timed_out() {
+                    continue;
+                }
+                drop(interval);
 
                 match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
                     Ok(refresh_response) => {
@@ -887,6 +934,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_usage,
             refresh_usage_data,
+            set_background_refresh_interval,
             fetch_overview,
             fetch_project_analytics,
             fetch_model_pricing_catalog,
@@ -1069,5 +1117,15 @@ mod tests {
         assert!(response.limits.is_none());
         assert_eq!(response.limits_error.as_deref(), Some("limits unavailable"));
         assert!(!response.limits_skipped);
+    }
+
+    #[test]
+    fn background_refresh_interval_accepts_only_supported_values() {
+        assert_eq!(
+            background_refresh_interval(15).unwrap(),
+            Duration::from_secs(15 * 60)
+        );
+        assert!(background_refresh_interval(0).is_err());
+        assert!(background_refresh_interval(10).is_err());
     }
 }

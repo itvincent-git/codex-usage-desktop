@@ -17,6 +17,7 @@ const autostartEnableMock = vi.hoisted(() => vi.fn());
 const autostartDisableMock = vi.hoisted(() => vi.fn());
 const autostartIsEnabledMock = vi.hoisted(() => vi.fn());
 const updateTrayMock = vi.hoisted(() => vi.fn());
+const setBackgroundRefreshIntervalMock = vi.hoisted(() => vi.fn());
 const writeTextMock = vi.hoisted(() => vi.fn());
 const eventListeners = vi.hoisted(() => new Map<string, Array<(event: { payload: any }) => void>>());
 
@@ -24,6 +25,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (command: string, ...args: any[]) => {
     if (command === "update_tray") {
       updateTrayMock(...args);
+      return Promise.resolve();
+    }
+    if (command === "set_background_refresh_interval") {
+      setBackgroundRefreshIntervalMock(...args);
       return Promise.resolve();
     }
     if (command === "fetch_codex_quota_forecast") {
@@ -194,6 +199,10 @@ describe("App", () => {
   });
 
   beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+    Element.prototype.hasPointerCapture = vi.fn(() => false);
+    Element.prototype.setPointerCapture = vi.fn();
+    Element.prototype.releasePointerCapture = vi.fn();
     localStorage.clear();
     invokeMock.mockReset();
     forecastInvokeMock.mockReset();
@@ -210,6 +219,7 @@ describe("App", () => {
     autostartIsEnabledMock.mockReset();
     autostartIsEnabledMock.mockResolvedValue(false);
     updateTrayMock.mockReset();
+    setBackgroundRefreshIntervalMock.mockReset();
     eventListeners.clear();
     document.body.style.overflow = "";
     vi.unstubAllGlobals();
@@ -2451,6 +2461,26 @@ describe("App", () => {
     const toggle = await screen.findByRole("button", { name: "Toggle Launch at Login" });
     await waitFor(() => expect(autostartIsEnabledMock).toHaveBeenCalled());
     expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("persists and applies the dashboard auto-refresh interval", async () => {
+    localStorage.setItem("auto_refresh_interval_minutes", "15");
+    mockLoadedDashboard();
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "General" }));
+
+    const intervalSelect = screen.getByRole("combobox", { name: "Dashboard Auto-refresh" });
+    expect(intervalSelect).toHaveTextContent("Every 15 minutes");
+    await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenCalledWith({ minutes: 15 }));
+
+    await userEvent.click(intervalSelect);
+    await userEvent.click(await screen.findByRole("option", { name: "Every 30 minutes" }));
+
+    expect(localStorage.getItem("auto_refresh_interval_minutes")).toBe("30");
+    await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenLastCalledWith({ minutes: 30 }));
   });
 
   it("enables launch at login from Settings", async () => {
