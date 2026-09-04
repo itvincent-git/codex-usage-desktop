@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TRAY_COUNTDOWN_UNITS,
+  DEFAULT_TRAY_TITLE_FORMATS,
   formatCompactResetCountdown,
   formatTrayLimitTitle,
 } from "./tray-format";
@@ -8,7 +9,16 @@ import {
 const now = new Date("2026-09-04T00:00:00.000Z").getTime();
 
 describe("tray title formatting", () => {
-  it("keeps the default compact English format", () => {
+  it("uses the default emoji templates and separator", () => {
+    expect(DEFAULT_TRAY_TITLE_FORMATS).toEqual({
+      limit5h: "⏱️ {remaining}/{reset}",
+      limitWeekly: "🗓️ {remaining}/{reset}",
+      limitMonthly: "M: {remaining}/{reset}",
+      separator: "┃",
+    });
+  });
+
+  it("formats a compact title template", () => {
     expect(formatTrayLimitTitle("5h: {remaining}/{reset}", {
       usedPercent: 10,
       remainingPercent: 90,

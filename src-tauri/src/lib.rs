@@ -854,16 +854,14 @@ pub fn run() {
             let background_refresh_schedule = Arc::new(BackgroundRefreshSchedule::new());
             app.manage(background_refresh_schedule.clone());
 
-            // Set up system tray icon
-            #[cfg(target_os = "macos")]
-            let tray_icon_bytes = include_bytes!("../icons/tray_iconTemplate@2x.png");
+            // Set up the menu bar / system tray item
             #[cfg(not(target_os = "macos"))]
             let tray_icon_bytes = include_bytes!("../icons/tray_icon.png");
+            #[cfg(not(target_os = "macos"))]
             let tray_icon_image =
                 tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
 
             let tray_builder = TrayIconBuilder::with_id("main")
-                .icon(tray_icon_image)
                 .tooltip("Codex Usage")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show_main" => {
@@ -890,8 +888,8 @@ pub fn run() {
                         }
                     }
                 });
-            #[cfg(target_os = "macos")]
-            let tray_builder = tray_builder.icon_as_template(true);
+            #[cfg(not(target_os = "macos"))]
+            let tray_builder = tray_builder.icon(tray_icon_image);
             #[cfg(target_os = "windows")]
             let tray_builder = tray_builder.show_menu_on_left_click(false);
 

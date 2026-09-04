@@ -14,10 +14,10 @@ export type TrayCountdownUnits = {
 };
 
 export const DEFAULT_TRAY_TITLE_FORMATS: TrayTitleFormats = {
-  limit5h: "5h: {remaining}/{reset}",
-  limitWeekly: "W: {remaining}/{reset}",
+  limit5h: "⏱️ {remaining}/{reset}",
+  limitWeekly: "🗓️ {remaining}/{reset}",
   limitMonthly: "M: {remaining}/{reset}",
-  separator: " | ",
+  separator: "┃",
 };
 
 export const DEFAULT_TRAY_COUNTDOWN_UNITS: TrayCountdownUnits = {

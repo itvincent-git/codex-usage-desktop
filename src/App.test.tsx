@@ -1839,7 +1839,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5h: 80%/3h | W: 55%/4d",
+          title: "⏱️ 80%/3h┃🗓️ 55%/4d",
           items: expect.arrayContaining([
             expect.objectContaining({ id: "status_5h", text: expect.stringContaining("3 hours left") }),
             expect.objectContaining({ id: "status_weekly", text: expect.stringContaining("4 days left") }),
@@ -1937,7 +1937,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5h: 80%/3h | W: 55%/4d",
+          title: "⏱️ 80%/3h┃🗓️ 55%/4d",
         }),
       }));
     });
@@ -1989,7 +1989,7 @@ describe("App", () => {
       expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5h: 100%/soon",
+          title: "⏱️ 100%/soon",
           items: expect.arrayContaining([
             expect.objectContaining({ id: "status_5h", text: expect.stringContaining("100%") }),
           ]),
