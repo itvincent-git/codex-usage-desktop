@@ -1471,9 +1471,11 @@ describe("App", () => {
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/raw-only-marker/)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "View raw JSONL" }));
-    expect(screen.getByText(rawJsonl.split("\n")[0], { exact: true })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Hide raw JSONL" }));
+    const userItem = userButton.parentElement!;
+    const rawJsonlButton = within(userItem).getByRole("button", { name: "View raw JSONL" });
+    await userEvent.click(rawJsonlButton);
+    expect(within(userItem).getByText(rawJsonl.split("\n")[0], { exact: true })).toBeInTheDocument();
+    await userEvent.click(within(userItem).getByRole("button", { name: "Hide raw JSONL" }));
     expect(screen.queryByText(rawJsonl.split("\n")[0], { exact: true })).not.toBeInTheDocument();
 
     await userEvent.click(assistantButton);

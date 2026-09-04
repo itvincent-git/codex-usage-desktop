@@ -167,15 +167,14 @@ function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
   );
 }
 
-function TimelineEntryCard({ children, rawJsonl }: { children: ReactNode; rawJsonl: string[] }) {
+function RawJsonlDisclosure({ rawJsonl }: { rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isRawVisible, setIsRawVisible] = useState(false);
 
-  if (rawJsonl.length === 0) return <>{children}</>;
+  if (rawJsonl.length === 0) return null;
 
   return (
-    <div className="space-y-1">
-      {children}
+    <div className="mt-2 w-full space-y-1">
       <div className="flex justify-end">
         <button
           type="button"
@@ -403,7 +402,7 @@ function TextBlock({
   );
 }
 
-function MessageItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "message" }>; tokenUsage?: TokenUsageItem }) {
+function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "message" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const title = item.role === "user"
@@ -446,6 +445,7 @@ function MessageItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "
           {buildCollapsedPreview(item.text, previewLines)}
         </pre>
       )}
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
 }
@@ -927,7 +927,7 @@ function parseUserInputAnswers(outputJson: string | null): Record<string, string
   }
 }
 
-function UserInputItem({ item, questions, tokenUsage }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem }) {
+function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const answers = parseUserInputAnswers(item.output);
 
@@ -983,6 +983,7 @@ function UserInputItem({ item, questions, tokenUsage }: { item: Extract<ReplayIt
           );
         })}
       </div>
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
 }
@@ -992,11 +993,13 @@ function WebSearchItem({
   queries,
   structuredResults,
   tokenUsage,
+  rawJsonl,
 }: {
   item: Extract<ReplayItem, { kind: "toolCall" }>;
   queries: string[];
   structuredResults: WebSearchResult[] | null;
   tokenUsage?: TokenUsageItem;
+  rawJsonl: string[];
 }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1055,11 +1058,12 @@ function WebSearchItem({
           <ToolPreview title={t("sessions.detail.output")} text={results.join("\n\n")} lines={5} />
         ) : null}
       </div>
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
 }
 
-function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem }) {
+function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const outerToolName = baseToolName(item.name);
@@ -1087,11 +1091,11 @@ function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: 
   const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
-    return <UserInputItem item={item} questions={userInputQuestions} tokenUsage={tokenUsage} />;
+    return <UserInputItem item={item} questions={userInputQuestions} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   }
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
-    return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} />;
+    return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   }
 
   if (execArguments?.kind === "command") {
@@ -1152,6 +1156,7 @@ function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: 
         {stderrText ? (
           <ActivityOutput text={stderrText} expanded={isExpanded} tone="text-error" />
         ) : null}
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
     );
   }
@@ -1242,11 +1247,12 @@ function ToolCallItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: 
             : <ToolPreview title={t("sessions.detail.stderr")} text={stderrText} lines={5} />
         ) : null}
       </div>
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
 }
 
-function PatchItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "patch" }>; tokenUsage?: TokenUsageItem }) {
+function PatchItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "patch" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const isError = item.isError || item.success === false;
@@ -1269,6 +1275,7 @@ function PatchItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "pa
         </span>
       </button>
       {isExpanded && item.output ? <div className="mt-3"><TextBlock title={t("sessions.detail.patch_output")} text={item.output} /></div> : null}
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
 }
@@ -1280,41 +1287,40 @@ function TimelineItem({ item, tokenUsage, rawJsonlLines }: TimelineEntry & { raw
   let content: ReactNode;
 
   if (item.kind === "message") {
-    content = <MessageItem item={item} tokenUsage={tokenUsage} />;
+    content = <MessageItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "reasoning") {
     content = (
       <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
         {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
     );
   } else if (item.kind === "toolCall") {
-    content = <ToolCallItem item={item} tokenUsage={tokenUsage} />;
+    content = <ToolCallItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "patch") {
     if (!item.isError && item.success !== false) return null;
-    content = <PatchItem item={item} tokenUsage={tokenUsage} />;
+    content = <PatchItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "tokenUsage") {
     content = (
-      <div className="flex justify-end px-3 py-0.5">
-        <TokenMetadata usage={item} />
+      <div className="px-3 py-0.5">
+        <div className="flex justify-end"><TokenMetadata usage={item} /></div>
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
     );
   } else if (item.kind === "error") {
-    content = <div className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}><span>{item.text}</span>{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}</div>;
+    content = <div className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}><span>{item.text}</span>{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}<RawJsonlDisclosure rawJsonl={rawJsonl} /></div>;
   } else {
     content = (
-      <div className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
+      <div className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
         <span>{item.label}{item.text ? ` · ${item.text}` : ""}</span>
         {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
     );
   }
 
-  return (
-    <TimelineEntryCard rawJsonl={rawJsonl}>
-      {content}
-    </TimelineEntryCard>
-  );
+  return content;
 }
 
 export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
