@@ -141,19 +141,27 @@ describe("CodexResetHistoryModal", () => {
     expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-24")?.resetType).toBe("mixed");
   });
 
-  it("groups reset announcements by their UTC date", () => {
-    const summary = buildResetHistorySummary([
-      {
-        id: "1",
-        resetType: "banked",
-        announcedAt: "2026-08-21T23:40:12.000Z",
-        text: "A banked reset is available.",
-        source: { author: "source", url: "https://example.com/1" },
-      },
-    ], dayjs("2026-08-26T07:00:00.000+08:00"));
+  it("groups reset announcements by the same local date shown in the list", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
 
-    expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-21")?.resetType).toBe("banked");
-    expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-22")?.resetType).toBeNull();
-    expect([...summary.calendarDays].reverse().find((day) => day.inRange)?.date.format("YYYY-MM-DD")).toBe("2026-08-25");
+    try {
+      const summary = buildResetHistorySummary([
+        {
+          id: "1",
+          resetType: "banked",
+          announcedAt: "2026-08-21T23:40:12.000Z",
+          text: "A banked reset is available.",
+          source: { author: "source", url: "https://example.com/1" },
+        },
+      ], dayjs("2026-08-26T07:00:00.000+08:00"));
+
+      expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-21")?.resetType).toBeNull();
+      expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-22")?.resetType).toBe("banked");
+      expect([...summary.calendarDays].reverse().find((day) => day.inRange)?.date.format("YYYY-MM-DD")).toBe("2026-08-26");
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
   });
 });
