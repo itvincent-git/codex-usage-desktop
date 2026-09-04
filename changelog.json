@@ -1,4 +1,8 @@
 {
+  "2.14.0": {
+    "zh": "- feat: support custom tray title formats\n- feat: customize tray countdown units\n- feat(tray): simplify default menu bar title\n- feat(sessions): show raw JSONL for replay items\n- fix(sessions): expose raw JSONL item links\n- fix(sessions): move raw JSONL inside item cards",
+    "en": "- feat: support custom tray title formats\n- feat: customize tray countdown units\n- feat(tray): simplify default menu bar title\n- feat(sessions): show raw JSONL for replay items\n- fix(sessions): expose raw JSONL item links\n- fix(sessions): move raw JSONL inside item cards"
+  },
   "2.13.0": {
     "zh": "- feat(settings): configure dashboard auto-refresh interval\n- chore(resets): add fetch diagnostics\n- fix: align reset calendar with local dates",
     "en": "- feat(settings): configure dashboard auto-refresh interval\n- chore(resets): add fetch diagnostics\n- fix: align reset calendar with local dates"
