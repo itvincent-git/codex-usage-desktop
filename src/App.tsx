@@ -90,6 +90,8 @@ export default function App() {
     handleTrayMenuShowChange,
     trayTitleFormats,
     handleTrayTitleFormatChange,
+    trayCountdownUnits,
+    handleTrayCountdownUnitChange,
   } = useUsageDashboard();
 
   useEffect(() => {
@@ -426,6 +428,8 @@ export default function App() {
               onTrayMenuShowChange={handleTrayMenuShowChange}
               trayTitleFormats={trayTitleFormats}
               onTrayTitleFormatChange={handleTrayTitleFormatChange}
+              trayCountdownUnits={trayCountdownUnits}
+              onTrayCountdownUnitChange={handleTrayCountdownUnitChange}
               codexLimits={codexLimits}
             />
           ) : null}

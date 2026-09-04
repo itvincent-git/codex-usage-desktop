@@ -12,7 +12,7 @@ import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
-import type { TrayTitleFormats } from "@/lib/tray-format";
+import type { TrayCountdownUnits, TrayTitleFormats } from "@/lib/tray-format";
 import {
   Select,
   SelectContent,
@@ -48,6 +48,8 @@ type SettingsPageProps = {
   onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
   trayTitleFormats: TrayTitleFormats;
   onTrayTitleFormatChange: (key: keyof TrayTitleFormats, value: string) => void;
+  trayCountdownUnits: TrayCountdownUnits;
+  onTrayCountdownUnitChange: (key: keyof TrayCountdownUnits, value: string) => void;
   codexLimits: CodexLimitsResponse | null;
 };
 
@@ -89,6 +91,8 @@ export function SettingsPage({
   onTrayMenuShowChange,
   trayTitleFormats,
   onTrayTitleFormatChange,
+  trayCountdownUnits,
+  onTrayCountdownUnitChange,
   codexLimits,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
@@ -354,6 +358,26 @@ export function SettingsPage({
                 className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
+            <fieldset className="space-y-2">
+              <legend className="text-sm text-muted-foreground">{t("settings.menu_bar_countdown_units")}</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {(["minute", "hour", "day"] as const).map((unit) => (
+                  <label key={unit} className="space-y-2">
+                    <span className="block text-xs text-muted-foreground">
+                      {t(`settings.menu_bar_countdown_unit_${unit}`)}
+                    </span>
+                    <input
+                      type="text"
+                      value={trayCountdownUnits[unit]}
+                      onChange={(event) => onTrayCountdownUnitChange(unit, event.target.value)}
+                      disabled={isDisabled}
+                      aria-label={t(`settings.menu_bar_countdown_unit_${unit}`)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </div>
         </div>
 

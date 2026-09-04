@@ -1849,7 +1849,7 @@ describe("App", () => {
     });
   });
 
-  it("uses saved custom tray title templates and a localized countdown", async () => {
+  it("uses saved custom tray title templates and countdown units", async () => {
     const now = new Date().getTime();
     vi.spyOn(Date, "now").mockReturnValue(now);
     await i18n.changeLanguage("zh");
@@ -1858,6 +1858,11 @@ describe("App", () => {
       limit5h: "5小时:{remaining} {reset}后重置",
       limitWeekly: "周: {remaining} {reset}后重置",
       separator: "；",
+    }));
+    localStorage.setItem("tray_countdown_units", JSON.stringify({
+      minute: "min",
+      hour: "hr",
+      day: "days",
     }));
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
@@ -1893,7 +1898,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5小时:90% 4小时后重置；周: 50% 3天后重置",
+          title: "5小时:90% 4hr后重置；周: 50% 3days后重置",
         }),
       }));
     });
@@ -2531,6 +2536,21 @@ describe("App", () => {
 
     expect(localStorage.getItem("auto_refresh_interval_minutes")).toBe("30");
     await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenLastCalledWith({ minutes: 30 }));
+  });
+
+  it("persists custom reset countdown units", async () => {
+    mockLoadedDashboard();
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Settings" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Hour" }), { target: { value: " hours" } });
+
+    expect(localStorage.getItem("tray_countdown_units")).toBe(JSON.stringify({
+      minute: "m",
+      hour: " hours",
+      day: "d",
+    }));
   });
 
   it("enables launch at login from Settings", async () => {

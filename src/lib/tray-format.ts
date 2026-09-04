@@ -7,6 +7,12 @@ export type TrayTitleFormats = {
   separator: string;
 };
 
+export type TrayCountdownUnits = {
+  minute: string;
+  hour: string;
+  day: string;
+};
+
 export const DEFAULT_TRAY_TITLE_FORMATS: TrayTitleFormats = {
   limit5h: "5h: {remaining}/{reset}",
   limitWeekly: "W: {remaining}/{reset}",
@@ -14,19 +20,19 @@ export const DEFAULT_TRAY_TITLE_FORMATS: TrayTitleFormats = {
   separator: " | ",
 };
 
-function compactUnit(language: string, value: number, unit: "minute" | "hour" | "day"): string {
-  if (language.startsWith("zh")) {
-    return `${value}${unit === "minute" ? "分钟" : unit === "hour" ? "小时" : "天"}`;
-  }
-  if (language.startsWith("ja")) {
-    return `${value}${unit === "minute" ? "分" : unit === "hour" ? "時間" : "日"}`;
-  }
-  return `${value}${unit === "minute" ? "m" : unit === "hour" ? "h" : "d"}`;
+export const DEFAULT_TRAY_COUNTDOWN_UNITS: TrayCountdownUnits = {
+  minute: "m",
+  hour: "h",
+  day: "d",
+};
+
+function compactUnit(units: TrayCountdownUnits, value: number, unit: keyof TrayCountdownUnits): string {
+  return `${value}${units[unit]}`;
 }
 
 export function formatCompactResetCountdown(
   resetsAt: string | null,
-  language: string,
+  units: TrayCountdownUnits,
   now = Date.now(),
 ): string | null {
   if (!resetsAt) return null;
@@ -35,25 +41,21 @@ export function formatCompactResetCountdown(
   if (!Number.isFinite(resetTime)) return null;
 
   const diffMs = resetTime - now;
-  if (diffMs <= 0) {
-    if (language.startsWith("zh")) return "即将";
-    if (language.startsWith("ja")) return "まもなく";
-    return "soon";
-  }
+  if (diffMs <= 0) return "soon";
 
   const minutes = Math.ceil(diffMs / 60_000);
-  if (minutes < 60) return compactUnit(language, minutes, "minute");
+  if (minutes < 60) return compactUnit(units, minutes, "minute");
 
   const hours = Math.ceil(minutes / 60);
-  if (hours < 24) return compactUnit(language, hours, "hour");
+  if (hours < 24) return compactUnit(units, hours, "hour");
 
-  return compactUnit(language, Math.ceil(hours / 24), "day");
+  return compactUnit(units, Math.ceil(hours / 24), "day");
 }
 
 export function formatTrayLimitTitle(
   template: string,
   window: CodexLimitWindow | null | undefined,
-  language: string,
+  units: TrayCountdownUnits,
   now = Date.now(),
 ): string {
   const remainingTokenIndex = template.indexOf("{remaining}");
@@ -64,7 +66,7 @@ export function formatTrayLimitTitle(
   }
 
   const remaining = `${Math.round(window.remainingPercent)}%`;
-  const resetCountdown = formatCompactResetCountdown(window.resetsAt, language, now);
+  const resetCountdown = formatCompactResetCountdown(window.resetsAt, units, now);
   if (!resetCountdown) {
     const resetTokenIndex = template.indexOf("{reset}");
     const withoutReset = resetTokenIndex >= 0 ? template.slice(0, resetTokenIndex) : template;

@@ -40,8 +40,10 @@ import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { formatResetTime, hasSubscription, RECENT_RESET_OVERVIEW_DAYS } from "@/components/codex-limits-card";
 import {
+  DEFAULT_TRAY_COUNTDOWN_UNITS,
   DEFAULT_TRAY_TITLE_FORMATS,
   formatTrayLimitTitle,
+  type TrayCountdownUnits,
   type TrayTitleFormats,
 } from "@/lib/tray-format";
 
@@ -113,7 +115,7 @@ function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgress
 }
 
 export function useUsageDashboard() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -202,6 +204,14 @@ export function useUsageDashboard() {
     return DEFAULT_TRAY_TITLE_FORMATS;
   });
 
+  const [trayCountdownUnits, setTrayCountdownUnitsState] = useState<TrayCountdownUnits>(() => {
+    try {
+      const saved = localStorage.getItem("tray_countdown_units");
+      if (saved) return { ...DEFAULT_TRAY_COUNTDOWN_UNITS, ...JSON.parse(saved) };
+    } catch (_) {}
+    return DEFAULT_TRAY_COUNTDOWN_UNITS;
+  });
+
   const handleTrayTitleShowChange = (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => {
     const next = { ...trayTitleShow, [key]: value };
     localStorage.setItem("tray_title_show", JSON.stringify(next));
@@ -218,6 +228,12 @@ export function useUsageDashboard() {
     const next = { ...trayTitleFormats, [key]: value };
     localStorage.setItem("tray_title_formats", JSON.stringify(next));
     setTrayTitleFormatsState(next);
+  };
+
+  const handleTrayCountdownUnitChange = (key: keyof TrayCountdownUnits, value: string) => {
+    const next = { ...trayCountdownUnits, [key]: value };
+    localStorage.setItem("tray_countdown_units", JSON.stringify(next));
+    setTrayCountdownUnitsState(next);
   };
 
   useEffect(() => {
@@ -724,15 +740,15 @@ export function useUsageDashboard() {
     const titleParts: string[] = [];
     if (hasSub) {
       if (trayTitleShow.limit5h) {
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits?.session, i18n.language));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits?.session, trayCountdownUnits));
       }
       if (trayTitleShow.limitWeekly) {
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitWeekly, codexLimits?.weekly, i18n.language));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitWeekly, codexLimits?.weekly, trayCountdownUnits));
       }
     } else {
       if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
         const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitMonthly, activeWindow, i18n.language));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitMonthly, activeWindow, trayCountdownUnits));
       }
     }
 
@@ -799,9 +815,9 @@ export function useUsageDashboard() {
     trayTitleShow,
     trayMenuShow,
     trayTitleFormats,
+    trayCountdownUnits,
     trayClockMinute,
     t,
-    i18n.language,
   ]);
 
   async function handleViewChange(nextView: DashboardView) {
@@ -1074,6 +1090,8 @@ export function useUsageDashboard() {
     handleTrayMenuShowChange,
     trayTitleFormats,
     handleTrayTitleFormatChange,
+    trayCountdownUnits,
+    handleTrayCountdownUnitChange,
   };
 }
 
