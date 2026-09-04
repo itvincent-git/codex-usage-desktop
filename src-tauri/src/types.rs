@@ -472,7 +472,11 @@ pub struct SessionReplayTokenEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum SessionReplayItem {
     Message {
         timestamp: Option<String>,
@@ -569,4 +573,25 @@ pub struct SessionReplayDetail {
     pub agents: Vec<SessionReplayAgent>,
     pub summary: SessionReplaySummary,
     pub turns: Vec<SessionReplayTurn>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SessionReplayItem;
+
+    #[test]
+    fn serializes_replay_item_fields_as_camel_case() {
+        let item = SessionReplayItem::Message {
+            timestamp: None,
+            role: "user".to_string(),
+            source: "user_message".to_string(),
+            text: "Hello".to_string(),
+            raw_jsonl_line_numbers: vec![3],
+        };
+
+        let value = serde_json::to_value(item).expect("replay item should serialize");
+
+        assert_eq!(value["rawJsonlLineNumbers"], serde_json::json!([3]));
+        assert!(value.get("raw_jsonl_line_numbers").is_none());
+    }
 }
