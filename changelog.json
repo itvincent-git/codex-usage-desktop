@@ -1,4 +1,8 @@
 {
+  "2.13.0": {
+    "zh": "- feat(settings): configure dashboard auto-refresh interval\n- chore(resets): add fetch diagnostics\n- fix: align reset calendar with local dates",
+    "en": "- feat(settings): configure dashboard auto-refresh interval\n- chore(resets): add fetch diagnostics\n- fix: align reset calendar with local dates"
+  },
   "2.12.0": {
     "zh": "- fix(sessions): preserve content during tab refresh\n- perf(sessions): cache quota window timestamps\n- feat: add recent activity sorting to projects",
     "en": "- fix(sessions): preserve content during tab refresh\n- perf(sessions): cache quota window timestamps\n- feat: add recent activity sorting to projects"
