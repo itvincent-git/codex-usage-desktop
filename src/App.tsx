@@ -88,6 +88,8 @@ export default function App() {
     handleTrayTitleShowChange,
     trayMenuShow,
     handleTrayMenuShowChange,
+    trayTitleFormats,
+    handleTrayTitleFormatChange,
   } = useUsageDashboard();
 
   useEffect(() => {
@@ -422,6 +424,8 @@ export default function App() {
               onTrayTitleShowChange={handleTrayTitleShowChange}
               trayMenuShow={trayMenuShow}
               onTrayMenuShowChange={handleTrayMenuShowChange}
+              trayTitleFormats={trayTitleFormats}
+              onTrayTitleFormatChange={handleTrayTitleFormatChange}
               codexLimits={codexLimits}
             />
           ) : null}

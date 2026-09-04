@@ -39,6 +39,11 @@ import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { formatResetTime, hasSubscription, RECENT_RESET_OVERVIEW_DAYS } from "@/components/codex-limits-card";
+import {
+  DEFAULT_TRAY_TITLE_FORMATS,
+  formatTrayLimitTitle,
+  type TrayTitleFormats,
+} from "@/lib/tray-format";
 
 function isNewerVersion(current: string, target: string): boolean {
   const parse = (v: string) => {
@@ -60,32 +65,6 @@ const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
 const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
 const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
-
-function formatCompactResetCountdown(resetsAt: string | null): string | null {
-  if (!resetsAt) return null;
-
-  const resetTime = new Date(resetsAt).getTime();
-  if (!Number.isFinite(resetTime)) return null;
-
-  const diffMs = resetTime - Date.now();
-  if (diffMs <= 0) return "soon";
-
-  const minutes = Math.ceil(diffMs / 60_000);
-  if (minutes < 60) return `${minutes}m`;
-
-  const hours = Math.ceil(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-
-  return `${Math.ceil(hours / 24)}d`;
-}
-
-function formatTrayLimitTitle(prefix: string, window: CodexLimitWindow | null | undefined): string {
-  if (!window) return `${prefix}: -`;
-
-  const remaining = `${Math.round(window.remainingPercent)}%`;
-  const resetCountdown = formatCompactResetCountdown(window.resetsAt);
-  return resetCountdown ? `${prefix}: ${remaining}/${resetCountdown}` : `${prefix}: ${remaining}`;
-}
 
 function hasExpiredLimitWindow(window: CodexLimitWindow | null | undefined): boolean {
   if (!window?.resetsAt) return false;
@@ -215,6 +194,14 @@ export function useUsageDashboard() {
     return { limit5h: true, limitWeekly: true, tokens: true, cost: true };
   });
 
+  const [trayTitleFormats, setTrayTitleFormatsState] = useState<TrayTitleFormats>(() => {
+    try {
+      const saved = localStorage.getItem("tray_title_formats");
+      if (saved) return { ...DEFAULT_TRAY_TITLE_FORMATS, ...JSON.parse(saved) };
+    } catch (_) {}
+    return DEFAULT_TRAY_TITLE_FORMATS;
+  });
+
   const handleTrayTitleShowChange = (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => {
     const next = { ...trayTitleShow, [key]: value };
     localStorage.setItem("tray_title_show", JSON.stringify(next));
@@ -225,6 +212,12 @@ export function useUsageDashboard() {
     const next = { ...trayMenuShow, [key]: value };
     localStorage.setItem("tray_menu_show", JSON.stringify(next));
     setTrayMenuShowState(next);
+  };
+
+  const handleTrayTitleFormatChange = (key: keyof TrayTitleFormats, value: string) => {
+    const next = { ...trayTitleFormats, [key]: value };
+    localStorage.setItem("tray_title_formats", JSON.stringify(next));
+    setTrayTitleFormatsState(next);
   };
 
   useEffect(() => {
@@ -731,15 +724,15 @@ export function useUsageDashboard() {
     const titleParts: string[] = [];
     if (hasSub) {
       if (trayTitleShow.limit5h) {
-        titleParts.push(formatTrayLimitTitle("5h", codexLimits?.session));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits?.session, i18n.language));
       }
       if (trayTitleShow.limitWeekly) {
-        titleParts.push(formatTrayLimitTitle("W", codexLimits?.weekly));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitWeekly, codexLimits?.weekly, i18n.language));
       }
     } else {
       if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
         const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
-        titleParts.push(formatTrayLimitTitle("M", activeWindow));
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitMonthly, activeWindow, i18n.language));
       }
     }
 
@@ -749,7 +742,7 @@ export function useUsageDashboard() {
     if (trayTitleShow.cost) {
       titleParts.push(formatCurrencyShort(todayCost));
     }
-    const title = titleParts.join(" | ");
+    const title = titleParts.join(trayTitleFormats.separator);
 
     const items: TrayMenuItemDto[] = [];
 
@@ -805,6 +798,7 @@ export function useUsageDashboard() {
     overview,
     trayTitleShow,
     trayMenuShow,
+    trayTitleFormats,
     trayClockMinute,
     t,
     i18n.language,
@@ -1078,6 +1072,8 @@ export function useUsageDashboard() {
     handleTrayTitleShowChange,
     trayMenuShow,
     handleTrayMenuShowChange,
+    trayTitleFormats,
+    handleTrayTitleFormatChange,
   };
 }
 

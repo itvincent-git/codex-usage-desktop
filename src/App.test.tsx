@@ -1849,6 +1849,56 @@ describe("App", () => {
     });
   });
 
+  it("uses saved custom tray title templates and a localized countdown", async () => {
+    const now = new Date().getTime();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    await i18n.changeLanguage("zh");
+    localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: false, cost: false }));
+    localStorage.setItem("tray_title_formats", JSON.stringify({
+      limit5h: "5小时:{remaining} {reset}后重置",
+      limitWeekly: "周: {remaining} {reset}后重置",
+      separator: "；",
+    }));
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return {
+          session: {
+            usedPercent: 10,
+            remainingPercent: 90,
+            windowMinutes: 300,
+            resetsAt: new Date(now + 4 * 60 * 60_000).toISOString(),
+          },
+          weekly: {
+            usedPercent: 50,
+            remainingPercent: 50,
+            windowMinutes: 10080,
+            resetsAt: new Date(now + 3 * 24 * 60 * 60_000).toISOString(),
+          },
+          updatedAt: new Date().toISOString(),
+          source: "cli-rpc",
+          membershipLevel: "pro",
+        };
+      }
+      if (command === "scan_usage") return scan(0);
+      if (command === "fetch_overview" && args?.range === "30d") return overview();
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
+        payload: expect.objectContaining({
+          title: "5小时:90% 4小时后重置；周: 50% 3天后重置",
+        }),
+      }));
+    });
+  });
+
   it("defaults the tray title to 5-hour and weekly limits", async () => {
     const now = new Date().getTime();
     vi.spyOn(Date, "now").mockReturnValue(now);

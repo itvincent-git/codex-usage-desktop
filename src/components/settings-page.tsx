@@ -12,6 +12,7 @@ import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
+import type { TrayTitleFormats } from "@/lib/tray-format";
 import {
   Select,
   SelectContent,
@@ -45,6 +46,8 @@ type SettingsPageProps = {
   onTrayTitleShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
   trayMenuShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
   onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
+  trayTitleFormats: TrayTitleFormats;
+  onTrayTitleFormatChange: (key: keyof TrayTitleFormats, value: string) => void;
   codexLimits: CodexLimitsResponse | null;
 };
 
@@ -84,6 +87,8 @@ export function SettingsPage({
   onTrayTitleShowChange,
   trayMenuShow,
   onTrayMenuShowChange,
+  trayTitleFormats,
+  onTrayTitleFormatChange,
   codexLimits,
 }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
@@ -313,6 +318,42 @@ export function SettingsPage({
                 </span>
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-5 space-y-4">
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-foreground">{t("settings.menu_bar_format_title")}</h4>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {t("settings.menu_bar_format_desc")}
+            </p>
+          </div>
+          <div className="space-y-4">
+            {(hasSub
+              ? [["limit5h", "menu_bar_format_5h"], ["limitWeekly", "menu_bar_format_weekly"]]
+              : [["limitMonthly", "menu_bar_format_monthly"]]
+            ).map(([key, labelKey]) => (
+              <label key={key} className="block space-y-2">
+                <span className="text-sm text-muted-foreground">{t(`settings.${labelKey}`)}</span>
+                <input
+                  type="text"
+                  value={trayTitleFormats[key as keyof TrayTitleFormats]}
+                  onChange={(event) => onTrayTitleFormatChange(key as keyof TrayTitleFormats, event.target.value)}
+                  disabled={isDisabled}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </label>
+            ))}
+            <label className="block space-y-2">
+              <span className="text-sm text-muted-foreground">{t("settings.menu_bar_format_separator")}</span>
+              <input
+                type="text"
+                value={trayTitleFormats.separator}
+                onChange={(event) => onTrayTitleFormatChange("separator", event.target.value)}
+                disabled={isDisabled}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </label>
           </div>
         </div>
 
