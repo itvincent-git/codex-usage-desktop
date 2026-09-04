@@ -430,6 +430,8 @@ pub struct SessionReplayMessage {
     pub timestamp: Option<String>,
     pub kind: String,
     pub text: String,
+    #[serde(default)]
+    pub raw_jsonl_line_numbers: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -477,31 +479,45 @@ pub enum SessionReplayItem {
         role: String,
         source: String,
         text: String,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     Reasoning {
         timestamp: Option<String>,
         text: String,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     ToolCall {
         #[serde(flatten)]
         tool: SessionReplayToolCall,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     Patch {
         #[serde(flatten)]
         patch: SessionReplayPatchResult,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     TokenUsage {
         #[serde(flatten)]
         usage: SessionReplayTokenEvent,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     Error {
         timestamp: Option<String>,
         text: String,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
     Notice {
         timestamp: Option<String>,
         label: String,
         text: Option<String>,
+        #[serde(default)]
+        raw_jsonl_line_numbers: Vec<usize>,
     },
 }
 

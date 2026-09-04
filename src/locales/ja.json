@@ -621,6 +621,8 @@
       "error": "エラー",
       "show_full_text": "全文を表示",
       "hide_full_text": "全文を隠す",
+      "show_item_raw_jsonl": "生の JSONL を表示",
+      "hide_item_raw_jsonl": "生の JSONL を隠す",
       "raw_preview": "生の JSONL プレビュー",
       "raw_metadata": "{{size}} · {{lines}} 行",
       "show_full_raw": "JSONL を完全に表示",

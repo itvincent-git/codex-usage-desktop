@@ -587,6 +587,8 @@
       "error": "错误",
       "show_full_text": "显示全文",
       "hide_full_text": "收起全文",
+      "show_item_raw_jsonl": "查看原始 JSONL",
+      "hide_item_raw_jsonl": "收起原始 JSONL",
       "raw_preview": "原始 JSONL 预览",
       "raw_metadata": "{{size}} · {{lines}} 行",
       "show_full_raw": "显示完整 JSONL",

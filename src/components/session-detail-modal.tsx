@@ -167,6 +167,35 @@ function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
   );
 }
 
+function TimelineEntryCard({ children, rawJsonl }: { children: ReactNode; rawJsonl: string[] }) {
+  const { t } = useTranslation();
+  const [isRawVisible, setIsRawVisible] = useState(false);
+
+  if (rawJsonl.length === 0) return <>{children}</>;
+
+  return (
+    <div className="space-y-1">
+      {children}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+          aria-expanded={isRawVisible}
+          onClick={() => setIsRawVisible((value) => !value)}
+        >
+          <FileJson className="h-3 w-3" />
+          {isRawVisible ? t("sessions.detail.hide_item_raw_jsonl") : t("sessions.detail.show_item_raw_jsonl")}
+        </button>
+      </div>
+      {isRawVisible ? (
+        <pre className="max-h-80 overflow-auto rounded-lg border border-border/60 bg-surface p-3 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+          {rawJsonl.join("\n")}
+        </pre>
+      ) : null}
+    </div>
+  );
+}
+
 const METRIC_TONES = {
   blue: "border-blue-300/60 bg-blue-50/80 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
   violet: "border-violet-300/60 bg-violet-50/80 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
@@ -1244,47 +1273,47 @@ function PatchItem({ item, tokenUsage }: { item: Extract<ReplayItem, { kind: "pa
   );
 }
 
-function TimelineItem({ item, tokenUsage }: TimelineEntry) {
+function TimelineItem({ item, tokenUsage, rawJsonlLines }: TimelineEntry & { rawJsonlLines: string[] }) {
   const { t } = useTranslation();
+  const rawJsonl = [...(item.rawJsonlLineNumbers ?? []), ...(tokenUsage?.rawJsonlLineNumbers ?? [])]
+    .flatMap((lineNumber) => rawJsonlLines[lineNumber - 1] === undefined ? [] : [rawJsonlLines[lineNumber - 1]]);
+  let content: ReactNode;
 
   if (item.kind === "message") {
-    return <MessageItem item={item} tokenUsage={tokenUsage} />;
-  }
-
-  if (item.kind === "reasoning") {
-    return (
+    content = <MessageItem item={item} tokenUsage={tokenUsage} />;
+  } else if (item.kind === "reasoning") {
+    content = (
       <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
         {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
       </div>
     );
-  }
-
-  if (item.kind === "toolCall") {
-    return <ToolCallItem item={item} tokenUsage={tokenUsage} />;
-  }
-
-  if (item.kind === "patch") {
-    return item.isError || item.success === false ? <PatchItem item={item} tokenUsage={tokenUsage} /> : null;
-  }
-
-  if (item.kind === "tokenUsage") {
-    return (
+  } else if (item.kind === "toolCall") {
+    content = <ToolCallItem item={item} tokenUsage={tokenUsage} />;
+  } else if (item.kind === "patch") {
+    if (!item.isError && item.success !== false) return null;
+    content = <PatchItem item={item} tokenUsage={tokenUsage} />;
+  } else if (item.kind === "tokenUsage") {
+    content = (
       <div className="flex justify-end px-3 py-0.5">
         <TokenMetadata usage={item} />
       </div>
     );
-  }
-
-  if (item.kind === "error") {
-    return <div className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}><span>{item.text}</span>{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}</div>;
+  } else if (item.kind === "error") {
+    content = <div className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${ITEM_TONES.error} ${ITEM_TITLE_TONES.error}`}><span>{item.text}</span>{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}</div>;
+  } else {
+    content = (
+      <div className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
+        <span>{item.label}{item.text ? ` · ${item.text}` : ""}</span>
+        {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+      </div>
+    );
   }
 
   return (
-    <div className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${ITEM_TONES.notice} ${ITEM_TITLE_TONES.notice}`}>
-      <span>{item.label}{item.text ? ` · ${item.text}` : ""}</span>
-      {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
-    </div>
+    <TimelineEntryCard rawJsonl={rawJsonl}>
+      {content}
+    </TimelineEntryCard>
   );
 }
 
@@ -1400,6 +1429,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const threadName = detail ? detail.threadName : session.threadName;
   const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
+  const rawJsonlLines = useMemo(() => detail?.rawJsonl.split("\n") ?? [], [detail?.rawJsonl]);
 
   async function copySessionId() {
     await navigator.clipboard?.writeText(displayedSessionId);
@@ -1576,7 +1606,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   {isExpanded ? (
                   <div className="relative mt-2 ml-1 space-y-2 border-l-2 border-border/70 pl-4 before:absolute before:-left-[5px] before:top-1 before:h-2 before:w-2 before:rounded-full before:bg-primary">
                     {timelineEntries(orderedItems(turn)).map((entry, itemIndex) => (
-                      <TimelineItem key={`${entry.item.kind}-${itemIndex}`} {...entry} />
+                      <TimelineItem key={`${entry.item.kind}-${itemIndex}`} {...entry} rawJsonlLines={rawJsonlLines} />
                     ))}
                   </div>
                   ) : null}

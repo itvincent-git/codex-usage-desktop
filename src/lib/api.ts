@@ -412,7 +412,7 @@ export type SessionReplayDetail = {
       totalTokens: number;
     }>;
     errors: string[];
-    items: Array<
+    items: Array<(
       | { kind: "message"; timestamp: string | null; role: string; source: string; text: string }
       | { kind: "reasoning"; timestamp: string | null; text: string }
       | ({ kind: "toolCall" } & SessionReplayDetail["turns"][number]["toolCalls"][number])
@@ -420,7 +420,7 @@ export type SessionReplayDetail = {
       | ({ kind: "tokenUsage" } & SessionReplayDetail["turns"][number]["tokenEvents"][number])
       | { kind: "error"; timestamp: string | null; text: string }
       | { kind: "notice"; timestamp: string | null; label: string; text: string | null }
-    >;
+    ) & { rawJsonlLineNumbers?: number[] }>;
   }>;
 };
 

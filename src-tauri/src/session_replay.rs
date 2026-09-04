@@ -78,7 +78,7 @@ fn parse_session_detail_with_agents(
         .to_string();
 
     let mut state = ReplayParseState::default();
-    for line in raw_jsonl.lines() {
+    for (line_index, line) in raw_jsonl.lines().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
@@ -86,7 +86,7 @@ fn parse_session_detail_with_agents(
         let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
             continue;
         };
-        state.ingest(&entry);
+        state.ingest(&entry, line_index + 1);
     }
 
     let mut turns = state
@@ -258,7 +258,7 @@ fn read_session_agent(record: SessionHierarchyRecord) -> Option<SessionReplayAge
 }
 
 impl ReplayParseState {
-    fn ingest(&mut self, entry: &Value) {
+    fn ingest(&mut self, entry: &Value, line_number: usize) {
         let timestamp = entry
             .get("timestamp")
             .and_then(Value::as_str)
@@ -284,7 +284,7 @@ impl ReplayParseState {
 
         match entry_type {
             "session_meta" => {
-                self.capture_meta(payload, timestamp);
+                self.capture_meta(payload, timestamp, line_number);
                 return;
             }
             "turn_context" => {
@@ -316,7 +316,7 @@ impl ReplayParseState {
         }
 
         if event_type == "token_count" {
-            self.ingest_token_event(event, timestamp, parsed_time);
+            self.ingest_token_event(event, timestamp, parsed_time, line_number);
             return;
         }
 
@@ -343,6 +343,7 @@ impl ReplayParseState {
                             timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
                             text: text.clone(),
+                            raw_jsonl_line_numbers: vec![line_number],
                         },
                     ) {
                         turn.items.push(SessionReplayItem::Message {
@@ -350,7 +351,10 @@ impl ReplayParseState {
                             role: "user".to_string(),
                             source: event_type.to_string(),
                             text,
+                            raw_jsonl_line_numbers: vec![line_number],
                         });
+                    } else {
+                        append_message_raw_jsonl_line(turn, "user", &text, line_number);
                     }
                 }
             }
@@ -363,6 +367,7 @@ impl ReplayParseState {
                             timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
                             text: text.clone(),
+                            raw_jsonl_line_numbers: vec![line_number],
                         },
                     ) {
                         turn.items.push(SessionReplayItem::Message {
@@ -370,7 +375,10 @@ impl ReplayParseState {
                             role: "assistant".to_string(),
                             source: event_type.to_string(),
                             text,
+                            raw_jsonl_line_numbers: vec![line_number],
                         });
+                    } else {
+                        append_message_raw_jsonl_line(turn, "assistant", &text, line_number);
                     }
                 }
             }
@@ -384,6 +392,7 @@ impl ReplayParseState {
                             timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
                             text: text.clone(),
+                            raw_jsonl_line_numbers: vec![line_number],
                         },
                     ) {
                         turn.items.push(SessionReplayItem::Message {
@@ -391,7 +400,10 @@ impl ReplayParseState {
                             role,
                             source: event_type.to_string(),
                             text,
+                            raw_jsonl_line_numbers: vec![line_number],
                         });
+                    } else {
+                        append_message_raw_jsonl_line(turn, &role, &text, line_number);
                     }
                 }
             }
@@ -404,10 +416,14 @@ impl ReplayParseState {
                             timestamp: timestamp.clone(),
                             kind: event_type.to_string(),
                             text: text.clone(),
+                            raw_jsonl_line_numbers: vec![line_number],
                         },
                     ) {
-                        turn.items
-                            .push(SessionReplayItem::Reasoning { timestamp, text });
+                        turn.items.push(SessionReplayItem::Reasoning {
+                            timestamp,
+                            text,
+                            raw_jsonl_line_numbers: vec![line_number],
+                        });
                     }
                 }
             }
@@ -429,11 +445,17 @@ impl ReplayParseState {
                         {
                             self.pending_tools.insert(
                                 call_id.clone(),
-                                (target_turn_id, target_name, target_arguments),
+                                (target_turn_id.clone(), target_name, target_arguments),
                             );
-                            self.tool_aliases.insert(call_id.clone(), target_call_id);
+                            self.tool_aliases
+                                .insert(call_id.clone(), target_call_id.clone());
                             self.process_continuations
                                 .insert(call_id.clone(), continuation);
+                            self.append_tool_raw_jsonl_line(
+                                &target_turn_id,
+                                &target_call_id,
+                                line_number,
+                            );
                             return;
                         }
                     }
@@ -458,20 +480,26 @@ impl ReplayParseState {
                 };
                 let turn = self.turn_mut(&turn_id);
                 turn.tool_calls.push(tool.clone());
-                turn.items.push(SessionReplayItem::ToolCall { tool });
+                turn.items.push(SessionReplayItem::ToolCall {
+                    tool,
+                    raw_jsonl_line_numbers: vec![line_number],
+                });
             }
             _ if is_tool_output(event_type) => {
-                self.ingest_tool_output(&turn_id, event, timestamp);
+                self.ingest_tool_output(&turn_id, event, timestamp, line_number);
             }
             _ if is_patch_event(event_type) => {
-                self.ingest_patch_event(&turn_id, event, timestamp);
+                self.ingest_patch_event(&turn_id, event, timestamp, line_number);
             }
             _ if is_error_event(event_type, event) => {
                 let text = extract_error_text(event).unwrap_or_else(|| event_type.to_string());
                 let turn = self.turn_mut(&turn_id);
                 turn.errors.push(text.clone());
-                turn.items
-                    .push(SessionReplayItem::Error { timestamp, text });
+                turn.items.push(SessionReplayItem::Error {
+                    timestamp,
+                    text,
+                    raw_jsonl_line_numbers: vec![line_number],
+                });
             }
             "context_compacted" | "compacted" => {
                 self.turn_mut(&turn_id)
@@ -480,13 +508,14 @@ impl ReplayParseState {
                         timestamp,
                         label: "context_compacted".to_string(),
                         text: string_field(event, "message"),
+                        raw_jsonl_line_numbers: vec![line_number],
                     })
             }
             _ => {}
         }
     }
 
-    fn capture_meta(&mut self, payload: &Value, timestamp: Option<String>) {
+    fn capture_meta(&mut self, payload: &Value, timestamp: Option<String>, line_number: usize) {
         if let Some(cwd) = string_field(payload, "cwd") {
             self.cwd = Some(cwd.clone());
             self.current_project_path = Some(cwd);
@@ -514,6 +543,7 @@ impl ReplayParseState {
                     timestamp,
                     kind: "base_instructions".to_string(),
                     text,
+                    raw_jsonl_line_numbers: vec![line_number],
                 });
             }
         }
@@ -533,6 +563,7 @@ impl ReplayParseState {
         payload: &Value,
         timestamp: Option<String>,
         parsed_time: Option<DateTime<Utc>>,
+        line_number: usize,
     ) {
         let info = payload.get("info").unwrap_or(&Value::Null);
         let last_usage = normalize_raw_usage(info.get("last_token_usage"));
@@ -587,13 +618,16 @@ impl ReplayParseState {
         let token_target = self.token_target_tool.take();
         let turn = self.turn_mut(&turn_id);
         turn.token_events.push(usage.clone());
-        if let Some((target_turn_id, target_call_id)) =
+        if let Some((_target_turn_id, target_call_id)) =
             token_target.filter(|(target_turn_id, _)| target_turn_id == &turn_id)
         {
             if let Some(tool_index) = turn.items.iter().position(|item| {
-                matches!(item, SessionReplayItem::ToolCall { tool } if tool.call_id.as_ref() == Some(&target_call_id))
+                matches!(item, SessionReplayItem::ToolCall { tool, .. } if tool.call_id.as_ref() == Some(&target_call_id))
             }) {
-                let token_item = SessionReplayItem::TokenUsage { usage };
+                let token_item = SessionReplayItem::TokenUsage {
+                    usage,
+                    raw_jsonl_line_numbers: vec![line_number],
+                };
                 if matches!(turn.items.get(tool_index + 1), Some(SessionReplayItem::TokenUsage { .. })) {
                     turn.items[tool_index + 1] = token_item;
                 } else {
@@ -602,7 +636,10 @@ impl ReplayParseState {
                 return;
             }
         }
-        turn.items.push(SessionReplayItem::TokenUsage { usage });
+        turn.items.push(SessionReplayItem::TokenUsage {
+            usage,
+            raw_jsonl_line_numbers: vec![line_number],
+        });
     }
 
     fn ingest_tool_output(
@@ -610,6 +647,7 @@ impl ReplayParseState {
         fallback_turn_id: &str,
         event: &Value,
         timestamp: Option<String>,
+        line_number: usize,
     ) {
         let source_call_id = extract_call_id(event);
         let continuation = source_call_id
@@ -723,12 +761,13 @@ impl ReplayParseState {
                     .cell_id
                     .zip(tool.call_id.clone())
                     .map(|(cell_id, call_id)| (cell_id, (turn_id.clone(), call_id)));
-                if let Some(SessionReplayItem::ToolCall { tool: item_tool }) = turn
+                if let Some(SessionReplayItem::ToolCall { tool: item_tool, raw_jsonl_line_numbers }) = turn
                     .items
                     .iter_mut()
-                    .find(|item| matches!(item, SessionReplayItem::ToolCall { tool } if tool.call_id.as_ref() == Some(call_id)))
+                    .find(|item| matches!(item, SessionReplayItem::ToolCall { tool, .. } if tool.call_id.as_ref() == Some(call_id)))
                 {
                     *item_tool = tool.clone();
+                    raw_jsonl_line_numbers.push(line_number);
                 }
                 if let Some((cell_id, tool_ref)) = registered_cell {
                     self.cell_tools.insert(cell_id, tool_ref);
@@ -754,13 +793,14 @@ impl ReplayParseState {
             tool.duration_ms =
                 duration_between(tool.started_at.as_deref(), tool.completed_at.as_deref());
             tool.is_error = is_error;
-            if let Some(SessionReplayItem::ToolCall { tool: item_tool }) = turn
+            if let Some(SessionReplayItem::ToolCall { tool: item_tool, raw_jsonl_line_numbers }) = turn
                 .items
                 .iter_mut()
                 .rev()
-                .find(|item| matches!(item, SessionReplayItem::ToolCall { tool } if tool.completed_at.is_none() && tool.name == name))
+                .find(|item| matches!(item, SessionReplayItem::ToolCall { tool, .. } if tool.completed_at.is_none() && tool.name == name))
             {
                 *item_tool = tool.clone();
+                raw_jsonl_line_numbers.push(line_number);
             }
             return;
         }
@@ -778,7 +818,10 @@ impl ReplayParseState {
             is_error,
         };
         turn.tool_calls.push(tool.clone());
-        turn.items.push(SessionReplayItem::ToolCall { tool });
+        turn.items.push(SessionReplayItem::ToolCall {
+            tool,
+            raw_jsonl_line_numbers: vec![line_number],
+        });
     }
 
     fn ingest_patch_event(
@@ -786,6 +829,7 @@ impl ReplayParseState {
         fallback_turn_id: &str,
         event: &Value,
         timestamp: Option<String>,
+        line_number: usize,
     ) {
         let success = event.get("success").and_then(Value::as_bool).or_else(|| {
             event
@@ -804,7 +848,10 @@ impl ReplayParseState {
         };
         let turn = self.turn_mut(fallback_turn_id);
         turn.patch_results.push(patch.clone());
-        turn.items.push(SessionReplayItem::Patch { patch });
+        turn.items.push(SessionReplayItem::Patch {
+            patch,
+            raw_jsonl_line_numbers: vec![line_number],
+        });
     }
 
     fn turn_mut(&mut self, turn_id: &str) -> &mut SessionReplayTurn {
@@ -821,11 +868,28 @@ impl ReplayParseState {
                             role: "system".to_string(),
                             source: message.kind.clone(),
                             text: message.text.clone(),
+                            raw_jsonl_line_numbers: message.raw_jsonl_line_numbers.clone(),
                         }),
                 );
             self.turns.insert(turn_id.to_string(), turn);
         }
         self.turns.get_mut(turn_id).expect("turn exists")
+    }
+
+    fn append_tool_raw_jsonl_line(&mut self, turn_id: &str, call_id: &str, line_number: usize) {
+        let Some(turn) = self.turns.get_mut(turn_id) else {
+            return;
+        };
+        if let Some(SessionReplayItem::ToolCall {
+            raw_jsonl_line_numbers,
+            ..
+        }) = turn
+            .items
+            .iter_mut()
+            .find(|item| matches!(item, SessionReplayItem::ToolCall { tool, .. } if tool.call_id.as_deref() == Some(call_id)))
+        {
+            raw_jsonl_line_numbers.push(line_number);
+        }
     }
 }
 
@@ -860,6 +924,22 @@ fn push_unique_message(
     }
     messages.push(message);
     true
+}
+
+fn append_message_raw_jsonl_line(
+    turn: &mut SessionReplayTurn,
+    role: &str,
+    text: &str,
+    line_number: usize,
+) {
+    if let Some(SessionReplayItem::Message {
+        raw_jsonl_line_numbers,
+        ..
+    }) = turn.items.iter_mut().rev().find(|item| {
+        matches!(item, SessionReplayItem::Message { role: item_role, text: item_text, .. } if item_role == role && item_text == text)
+    }) {
+        raw_jsonl_line_numbers.push(line_number);
+    }
 }
 
 fn build_summary(
@@ -1671,6 +1751,16 @@ mod tests {
         assert_eq!(detail.turns[0].user_messages.len(), 1);
         assert_eq!(detail.turns[0].assistant_messages.len(), 1);
         assert_eq!(detail.summary.message_count, 2);
+        assert!(matches!(
+            detail.turns[0].items[0],
+            SessionReplayItem::Message { ref raw_jsonl_line_numbers, .. }
+                if raw_jsonl_line_numbers == &[2, 3]
+        ));
+        assert!(matches!(
+            detail.turns[0].items[1],
+            SessionReplayItem::Message { ref raw_jsonl_line_numbers, .. }
+                if raw_jsonl_line_numbers == &[4, 5]
+        ));
     }
 
     #[test]
@@ -1749,7 +1839,11 @@ mod tests {
             matches!(turn.items[1], SessionReplayItem::Message { ref role, .. } if role == "user")
         );
         assert!(matches!(turn.items[2], SessionReplayItem::Reasoning { .. }));
-        assert!(matches!(turn.items[3], SessionReplayItem::ToolCall { .. }));
+        assert!(matches!(
+            turn.items[3],
+            SessionReplayItem::ToolCall { ref raw_jsonl_line_numbers, .. }
+                if raw_jsonl_line_numbers == &[5, 6]
+        ));
         assert!(
             matches!(turn.items[4], SessionReplayItem::Message { ref role, .. } if role == "assistant")
         );
@@ -1970,7 +2064,7 @@ mod tests {
             .contains("all tests passed"));
         assert!(matches!(
             turn.items.get(1),
-            Some(SessionReplayItem::TokenUsage { usage }) if usage.total_tokens == 56_500
+            Some(SessionReplayItem::TokenUsage { usage, .. }) if usage.total_tokens == 56_500
         ));
         assert!(matches!(
             turn.items.get(2),
