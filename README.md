@@ -21,7 +21,7 @@ Codex Usage Desktop answers those questions by turning the Codex session data al
 
 **No API key. No separate account. No uploading your session logs. Just install and open.**
 
-![Codex Usage Desktop dashboard](docs/screen_shot.jpg)
+![Codex Usage Desktop dashboard](docs/dashboard.jpg)
 
 ## What you can do
 
@@ -57,6 +57,8 @@ You can also show limit information directly in the **macOS menu bar or Windows 
 
 Live limits use your existing local Codex login.
 
+![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
+
 ### 🔍 Find what is using your tokens
 
 Break usage down by:
@@ -69,11 +71,15 @@ Break usage down by:
 
 See **which project, model, or session consumed your tokens** and understand what drives your usage.
 
+![Project usage details with token composition and estimated costs](docs/project-usage-detail.jpg)
+
 ### 💬 Understand individual Codex sessions
 
 Go beyond aggregate charts and inspect the sessions behind the numbers.
 
 Search sessions by title, project, and model, then open any session to inspect its activity.
+
+![Session list with token usage, estimated costs, and quota consumption](docs/session-detail-list.jpg)
 
 Depending on what is recorded in the local logs, session views can show:
 
@@ -88,6 +94,8 @@ Depending on what is recorded in the local logs, session views can show:
 - Session replay timeline
 
 This makes it easier to understand both **what Codex did** and **how much usage that work consumed**.
+
+![Session detail timeline with commands, tool activity, and raw JSONL links](docs/session-detail.jpg)
 
 ### 🔄 Understand quota resets
 
