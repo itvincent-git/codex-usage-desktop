@@ -873,14 +873,10 @@ function processSignal(output: string | null) {
 }
 
 function ActivityOutput({ text, expanded, tone }: { text: string; expanded: boolean; tone: string }) {
-  const lines = (expanded ? text : buildCollapsedPreview(text, 5)).split("\n");
+  const output = expanded ? text : buildCollapsedPreview(text, 5);
   return (
     <pre className={`mt-1 whitespace-pre-wrap break-words pl-2 ${tone}`}>
-      {lines.map((line, index) => (
-        <span key={`${index}-${line}`} className="block">
-          {index === lines.length - 1 ? "└" : "│"} {line}
-        </span>
-      ))}
+      {`└ ${output}`}
     </pre>
   );
 }
