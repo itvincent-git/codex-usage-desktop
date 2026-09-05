@@ -2,7 +2,7 @@
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
 import { SessionUsageTable } from "./session-usage-table";
@@ -479,16 +479,22 @@ describe("session titles", () => {
     expect(within(fallbackCard).getByText("3 KB")).toHaveAttribute("title", "/tmp/fallback.jsonl");
   });
 
-  it("shows the modified time to the minute and keeps the complete time in a tooltip", () => {
+  it.each(["en", "zh", "ja"])("shows the modified time and complete tooltip in the %s interface language", async (language) => {
+    const previousLanguage = i18n.language;
+    onTestFinished(async () => {
+      unmount();
+      await i18n.changeLanguage(previousLanguage);
+    });
+    await i18n.changeLanguage(language);
     const modifiedAtMs = new Date("2026-07-15T08:23:47Z").getTime();
-    render(<SessionUsageTable sessions={[session({ modifiedAtMs })]} />);
+    const { unmount } = render(<SessionUsageTable sessions={[session({ modifiedAtMs })]} />);
 
-    const expectedTime = new Date(modifiedAtMs).toLocaleTimeString(undefined, {
+    const expectedTime = new Date(modifiedAtMs).toLocaleTimeString(language, {
       hour: "2-digit",
       minute: "2-digit",
     });
     const time = screen.getByText(expectedTime);
-    expect(time).toHaveAttribute("title", new Date(modifiedAtMs).toLocaleString());
+    expect(time).toHaveAttribute("title", new Date(modifiedAtMs).toLocaleString(language));
     expect(time).not.toHaveTextContent("47");
   });
 

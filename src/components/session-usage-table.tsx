@@ -669,8 +669,8 @@ export function SessionUsageTable({
                           {visibleSessions.map((session) => {
                     const isInactive = session.totalTokens === 0;
                     const nonCachedInputTokens = Math.max(session.inputTokens - session.cachedInputTokens, 0);
-                    const fullTime = new Date(session.modifiedAtMs).toLocaleString();
-                    const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(undefined, {
+                    const fullTime = new Date(session.modifiedAtMs).toLocaleString(i18n.resolvedLanguage ?? i18n.language);
+                    const formattedTime = new Date(session.modifiedAtMs).toLocaleTimeString(i18n.resolvedLanguage ?? i18n.language, {
                       hour: "2-digit",
                       minute: "2-digit",
                     });
