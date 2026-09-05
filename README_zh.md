@@ -21,7 +21,7 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 
 **无需 API Key，无需额外注册账号，不上传会话日志。安装并打开即可。**
 
-![Codex Usage Desktop 用量看板](docs/screen_shot.jpg)
+![Codex Usage Desktop 用量看板](docs/dashboard.jpg)
 
 ## 你可以做什么
 
@@ -57,6 +57,8 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 
 实时额度使用本机已有的 Codex 登录状态。
 
+![macOS 菜单栏中的 Codex 额度与重置倒计时](docs/menubar.jpg)
+
 ### 🔍 找出 Token 消耗来源
 
 按以下维度拆分用量：
@@ -69,11 +71,15 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 
 看清**具体是哪个项目、模型或会话消耗了 Token**，了解用量背后的原因。
 
+![展示 Token 构成与预估成本的项目用量详情](docs/project-usage-detail.jpg)
+
 ### 💬 看懂每一段 Codex 会话
 
 从汇总图表深入到具体会话，了解数字背后的活动。
 
 按标题、项目和模型搜索会话，打开即可查看详情。
+
+![展示 Token 用量、预估成本与额度消耗的会话列表](docs/session-detail-list.jpg)
 
 根据本地日志实际记录的内容，会话视图可以展示：
 
@@ -88,6 +94,8 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 - 会话回放时间线
 
 既能看懂 **Codex 做了什么**，也能了解**这些工作消耗了多少用量**。
+
+![包含命令、工具活动与原始 JSONL 链接的会话详情时间线](docs/session-detail.jpg)
 
 ### 🔄 了解额度重置情况
 
