@@ -1,36 +1,154 @@
 # Codex Usage Desktop
 
-> See where your Codex tokens, limits, and dollars go — without sending your session logs anywhere.
-
-[![Release](https://img.shields.io/github/v/release/itvincent-git/codex-usage-desktop?label=release)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
-[![Platforms: macOS and Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)](#install)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#privacy-and-network-access)
+> **Know where your Codex tokens go, how much quota you have left, and when your limits reset — all from one local desktop app.**
 
 **[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md)
 
-> [!IMPORTANT]
-> ⭐ Enjoying Codex Usage Desktop? [Star the repository on GitHub](https://github.com/itvincent-git/codex-usage-desktop) to support the project.
+⭐ If Codex Usage Desktop is useful to you, consider giving the project a [**Star**](https://github.com/itvincent-git/codex-usage-desktop).
 
-![Codex Usage Desktop dashboard showing token costs, trends, and account limits](docs/screen_shot.jpg)
+## Stop guessing where your Codex quota went
 
-Codex Usage Desktop turns the Codex CLI logs already on your computer into a clear usage dashboard. Check token and cost trends, see which projects and models consume the most, inspect individual sessions, and keep an eye on live account limits — all from one native desktop app.
+If you use Codex every day, you've probably wondered:
 
-- **Local by default:** session logs are read on your computer and never uploaded by the app.
-- **No API key setup:** install, open, and scan the Codex data you already have.
-- **Free and open source:** no separate app account, subscription, or hosted analytics service required.
+- **How much of my 5-hour or weekly limit is left?**
+- **When will my quota reset?**
+- **Which project or session used most of my tokens?**
+- **How much did I use today compared with yesterday?**
+- **Which models are consuming the most tokens and estimated cost?**
+- **What exactly happened inside a long Codex session?**
 
-## What you can see
+Codex Usage Desktop answers those questions by turning the Codex session data already on your computer into a clear native dashboard.
 
-|                              | Capability                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Usage at a glance**        | Token totals, estimated cost, cache hit rate, daily averages, and trends across preset or custom date ranges.             |
-| **Know what drives cost**    | Breakdowns by project, model, day, month, and individual Codex session.                                                   |
-| **Stay ahead of limits**     | Live 5-hour, weekly, or monthly limits, reset times, available reset credits, and quota-reset forecasting when available. |
-| **Track official resets**    | See the latest official token-reset announcement time on the dashboard, then click it to browse the last 30 days.         |
-| **Inspect session activity** | Search and inspect sessions, with estimated 5-hour and weekly limit consumption shown in both the list and details.       |
-| **Keep it close**            | Optional menu bar or system tray metrics, launch at login, English and Chinese UI, and in-app updates.                   |
-| **Take your data with you**  | Export the selected dashboard range to Excel (`.xlsx`) or Markdown (`.md`).                                               |
+**No API key. No separate account. No uploading your session logs. Just install and open.**
+
+![Codex Usage Desktop dashboard](docs/screen_shot.jpg)
+
+## What you can do
+
+### 📊 See your Codex usage at a glance
+
+Understand your usage without digging through JSONL logs.
+
+View:
+
+- Total tokens and estimated cost
+- Input, output, and cached token usage
+- Cache hit rate
+- Daily and monthly trends
+- Average daily usage
+- Custom date ranges
+
+Quickly see whether your Codex usage is increasing and where those tokens are going.
+
+### ⏱ Know your limits before you hit them
+
+Keep your current Codex quota visible while you work.
+
+Monitor:
+
+- Live **5-hour limits**
+- **Weekly or monthly limits**
+- Remaining quota
+- Reset times and countdowns
+- Available reset credits
+- Quota-reset forecasts when available
+
+You can also show limit information directly in the **macOS menu bar or Windows system tray**, with customizable text and countdown units, so you don't need to keep the dashboard open.
+
+Live limits use your existing local Codex login.
+
+### 🔍 Find what is using your tokens
+
+Break usage down by:
+
+- Project
+- Model
+- Day
+- Month
+- Session
+
+See **which project, model, or session consumed your tokens** and understand what drives your usage.
+
+### 💬 Understand individual Codex sessions
+
+Go beyond aggregate charts and inspect the sessions behind the numbers.
+
+Search sessions by title, project, and model, then open any session to inspect its activity.
+
+Depending on what is recorded in the local logs, session views can show:
+
+- Token and estimated cost usage
+- Estimated 5-hour and weekly quota consumption
+- Remaining quota changes
+- Commands and tool activity
+- Web searches and results
+- Patch and diff activity
+- Long-running commands
+- Subagent hierarchy
+- Session replay timeline
+
+This makes it easier to understand both **what Codex did** and **how much usage that work consumed**.
+
+### 🔄 Understand quota resets
+
+Codex quota behavior can change over time. Codex Usage Desktop helps make those changes visible.
+
+See:
+
+- Latest official token-reset announcement
+- Recent reset events
+- 30-day reset announcement history
+- Daily quota balance changes observed in session logs
+- Reset-credit details and expiration times when available
+
+### 💻 Built for daily desktop use
+
+Codex Usage Desktop is designed to stay out of your way:
+
+- Native macOS and Windows app
+- macOS menu bar / Windows system tray
+- Launch at login
+- Automatic update checks
+- English, 简体中文, and 日本語
+- Windows WSL Codex session detection
+- Light and dark themes
+
+### 📤 Export your usage data
+
+Need to analyze or share your usage elsewhere?
+
+Export the selected dashboard range to:
+
+- **Excel (`.xlsx`)**
+- **Markdown (`.md`)**
+
+## Private by default
+
+Your Codex sessions can contain sensitive prompts, code, commands, and project information.
+
+Codex Usage Desktop keeps that data on your computer.
+
+- Session logs are **read locally**
+- Session logs are **never uploaded by the app**
+- No OpenAI or LiteLLM API key is required
+- No Codex Usage Desktop account is required
+- Aggregated statistics are stored in a local SQLite database
+- The project is **free and open source**
+
+Your Codex data stays yours. See [Privacy and network access](#privacy-and-network-access) for details on live limits and other network requests.
+
+## Zero setup
+
+Already using Codex CLI? Then you're ready to explore your usage.
+
+1. Install Codex Usage Desktop.
+2. Open it.
+3. Your existing Codex sessions are detected and indexed automatically.
+4. Start exploring your tokens, limits, projects, models, and sessions.
+
+No analytics server to deploy. No database to configure. No API key to paste.
+
+**Just install and use it.**
 
 ## Install
 

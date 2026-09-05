@@ -1,36 +1,154 @@
 # Codex Usage Desktop
 
-> 看清 Codex 的 Token、额度和费用去向，不需要把会话日志发送到任何地方。
-
-[![Release](https://img.shields.io/github/v/release/itvincent-git/codex-usage-desktop?label=release)](https://github.com/itvincent-git/codex-usage-desktop/releases/latest)
-[![平台：macOS 与 Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)](#安装)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Local first](https://img.shields.io/badge/local--first-privacy-green.svg)](#隐私与网络访问)
+> **看清 Codex Token 用在哪里、额度还剩多少、何时重置——一个本地桌面应用就够了。**
 
 **[下载 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 芯片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [日本語](README_ja.md)
 
-> [!IMPORTANT]
-> ⭐ 如果你喜欢 Codex Usage Desktop，欢迎[在 GitHub 上为仓库点亮 Star](https://github.com/itvincent-git/codex-usage-desktop)，支持项目持续发展。
+⭐ 如果 Codex Usage Desktop 对你有帮助，欢迎[为项目点亮 **Star**](https://github.com/itvincent-git/codex-usage-desktop)。
 
-![Codex Usage Desktop 仪表盘，展示 Token 成本、趋势与账户额度](docs/screen_shot.jpg)
+## 不用再猜，Codex 额度去哪了
 
-Codex Usage Desktop 将电脑上已有的 Codex CLI 日志整理成清晰的使用看板。你可以查看 Token 和成本趋势，找出消耗最多的项目与模型，深入检查单个会话，并随时关注账户实时额度——全部在一个原生桌面应用中完成。
+如果你每天都在使用 Codex，你可能也想知道：
 
-- **默认本地运行：** 会话日志只在本机读取，应用不会上传日志。
-- **无需配置 API Key：** 安装并打开，即可扫描已有的 Codex 数据。
-- **免费开源：** 无需为本应用注册账号、购买订阅或接入托管分析服务。
+- **我的 5 小时或周额度还剩多少？**
+- **额度什么时候重置？**
+- **哪个项目或会话消耗了最多 Token？**
+- **今天的用量和昨天相比怎么样？**
+- **哪些模型消耗的 Token 最多、预估成本最高？**
+- **一段很长的 Codex 会话里，到底发生了什么？**
 
-## 你可以看到什么
+Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的原生看板，帮你回答这些问题。
 
-|            | 能力                                               |
-| ---------- | ------------------------------------------------ |
-| **快速掌握用量** | 查看 Token 总量、预估成本、缓存命中率、日均数据，以及预设或自定义时间范围内的趋势。    |
-| **找到成本来源** | 按项目、模型、日期、月份和单个 Codex 会话拆分用量。                    |
-| **提前关注额度** | 查看实时 5 小时、周度或月度额度、重置时间、可用重置次数，以及可用时的额度重置预测。      |
-| **跟踪官方重置** | 在看板查看最近一次官方 Token 重置公告的时间，点击即可浏览最近 30 天的重置记录。       |
-| **深入会话活动** | 搜索并检查会话，在会话列表和明细中查看该会话对 5 小时及周额度的估算消耗。           |
-| **常驻且省心**  | 可选菜单栏或系统托盘指标、开机启动、中英文界面和应用内更新。                  |
-| **随时导出数据** | 将当前看板时间范围导出为 Excel (`.xlsx`) 或 Markdown (`.md`)。 |
+**无需 API Key，无需额外注册账号，不上传会话日志。安装并打开即可。**
+
+![Codex Usage Desktop 用量看板](docs/screen_shot.jpg)
+
+## 你可以做什么
+
+### 📊 一眼看清 Codex 用量
+
+不用翻阅 JSONL 日志，就能了解自己的使用情况。
+
+查看：
+
+- Token 总量与预估成本
+- 输入、输出和缓存 Token 用量
+- 缓存命中率
+- 每日和每月趋势
+- 日均用量
+- 自定义日期范围
+
+快速判断用量是否在增长，以及 Token 都花在了哪里。
+
+### ⏱ 在触及上限前，掌握剩余额度
+
+工作时随时关注当前 Codex 额度。
+
+监控：
+
+- 实时 **5 小时额度**
+- **周度或月度额度**
+- 剩余额度
+- 重置时间与倒计时
+- 可用重置次数
+- 可用时的额度重置预测
+
+你还可以将额度信息直接显示在 **macOS 菜单栏或 Windows 系统托盘**，自定义显示文案和倒计时单位，不必一直打开看板。
+
+实时额度使用本机已有的 Codex 登录状态。
+
+### 🔍 找出 Token 消耗来源
+
+按以下维度拆分用量：
+
+- 项目
+- 模型
+- 日期
+- 月份
+- 会话
+
+看清**具体是哪个项目、模型或会话消耗了 Token**，了解用量背后的原因。
+
+### 💬 看懂每一段 Codex 会话
+
+从汇总图表深入到具体会话，了解数字背后的活动。
+
+按标题、项目和模型搜索会话，打开即可查看详情。
+
+根据本地日志实际记录的内容，会话视图可以展示：
+
+- Token 用量与预估成本
+- 对 5 小时和周额度的估算消耗
+- 剩余额度变化
+- 命令与工具活动
+- 网页搜索及结果
+- 补丁与代码差异
+- 长时间运行的命令
+- 子代理层级
+- 会话回放时间线
+
+既能看懂 **Codex 做了什么**，也能了解**这些工作消耗了多少用量**。
+
+### 🔄 了解额度重置情况
+
+Codex 的额度规则与重置情况可能随时间变化。Codex Usage Desktop 帮你看清这些变化。
+
+查看：
+
+- 最近一次官方 Token 重置公告
+- 近期重置事件
+- 最近 30 天的重置公告记录
+- 会话日志中观测到的每日剩余额度变化
+- 可用时的重置次数详情与到期时间
+
+### 💻 适合日常常驻使用
+
+Codex Usage Desktop 随时可用，尽量减少打扰：
+
+- 原生 macOS 与 Windows 应用
+- macOS 菜单栏 / Windows 系统托盘
+- 开机启动
+- 自动检查更新
+- English、简体中文和日本語
+- Windows WSL Codex 会话检测
+- 浅色与深色主题
+
+### 📤 导出你的用量数据
+
+需要在其他工具里分析或分享用量？
+
+将当前看板选定的时间范围导出为：
+
+- **Excel（`.xlsx`）**
+- **Markdown（`.md`）**
+
+## 默认保护隐私
+
+Codex 会话可能包含敏感的提示词、代码、命令和项目信息。
+
+Codex Usage Desktop 将这些数据留在你的电脑上。
+
+- 会话日志**只在本地读取**
+- 应用**绝不上传会话日志**
+- 无需 OpenAI 或 LiteLLM API Key
+- 无需注册 Codex Usage Desktop 账号
+- 聚合统计存储在本地 SQLite 数据库
+- 项目**免费开源**
+
+你的 Codex 数据始终属于你。实时额度及其他网络请求的详情见[隐私与网络访问](#隐私与网络访问)。
+
+## 零配置上手
+
+已经在使用 Codex CLI？那就可以开始探索用量了。
+
+1. 安装 Codex Usage Desktop。
+2. 打开应用。
+3. 已有的 Codex 会话会被自动检测并建立索引。
+4. 开始查看 Token、额度、项目、模型和会话。
+
+不用部署分析服务器，不用配置数据库，也不用粘贴 API Key。
+
+**安装即用。**
 
 ## 安装
 
