@@ -1255,8 +1255,8 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
     let normalized = output.to_ascii_lowercase();
     let exit_code = ["\"exit_code\"", "exit code:", "process exited with code"]
         .iter()
-        .find_map(|marker| {
-            normalized.split(marker).nth(1).and_then(|value| {
+        .flat_map(|marker| {
+            normalized.split(marker).skip(1).filter_map(|value| {
                 value
                     .trim_start_matches(|character: char| {
                         character.is_whitespace() || matches!(character, ':' | '=')
@@ -1265,7 +1265,8 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
                     .next()
                     .and_then(|code| code.parse::<i64>().ok())
             })
-        });
+        })
+        .max_by_key(|code| (*code != 0, *code));
     let signal = ["SIGINT", "SIGTERM", "SIGKILL", "SIGHUP"]
         .into_iter()
         .find(|signal| output.contains(signal));
@@ -1471,11 +1472,34 @@ fn extract_process_chunk(output: &str) -> Option<String> {
         if let Some(chunk) = value.get("output").and_then(Value::as_str) {
             return (!chunk.is_empty()).then(|| chunk.to_string());
         }
-        if value.is_object() {
+        if value.as_object().is_some_and(|object| object.is_empty()) {
             return None;
         }
     }
-    let cleaned = payload.trim();
+    let cleaned = payload
+        .lines()
+        .map(|line| {
+            let Ok(value) = serde_json::from_str::<Value>(line) else {
+                return line.to_string();
+            };
+            let result = if value.get("status").and_then(Value::as_str) == Some("fulfilled") {
+                value.get("value").unwrap_or(&value)
+            } else {
+                &value
+            };
+            let Some(stdout) = result.get("output").and_then(Value::as_str) else {
+                return line.to_string();
+            };
+            let stderr = result.get("stderr").and_then(Value::as_str).unwrap_or("");
+            [stdout, stderr]
+                .into_iter()
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let cleaned = cleaned.trim();
     (!cleaned.is_empty()).then(|| cleaned.to_string())
 }
 
@@ -1485,7 +1509,8 @@ fn decode_tool_output_text(output: &str) -> Option<String> {
     let text = blocks
         .iter()
         .filter_map(|block| block.get("text").and_then(Value::as_str))
-        .collect::<String>();
+        .collect::<Vec<_>>()
+        .join("\n");
     (!text.is_empty()).then_some(text)
 }
 
@@ -1612,6 +1637,64 @@ mod tests {
     };
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn decodes_batched_exec_result_blocks() {
+        let output = serde_json::json!([
+            {"type": "input_text", "text": "Script completed\nWall time 0.4 seconds\nOutput:\n"},
+            {"type": "input_text", "text": r#"{"chunk_id":"first","exit_code":0,"output":"first line\nsecond line"}"#},
+            {"type": "input_text", "text": r#"{"chunk_id":"second","exit_code":0,"output":"third line"}"#}
+        ]);
+        let raw = [
+            turn_context("2026-09-06T00:00:00.000Z", "turn-1", "gpt-6-astra", "/repo/app"),
+            response_item("2026-09-06T00:00:01.000Z", serde_json::json!({
+                "type": "custom_tool_call", "call_id": "call-exec", "name": "exec",
+                "input": "text(await tools.exec_command({cmd:\"first\"})); text(await tools.exec_command({cmd:\"second\"}));"
+            })),
+            response_item("2026-09-06T00:00:02.000Z", serde_json::json!({
+                "type": "custom_tool_call_output", "call_id": "call-exec",
+                "output": output
+            })),
+        ].join("\n");
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw.clone());
+        let tool = &detail.turns[0].tool_calls[0];
+        assert_eq!(tool.output.as_deref(), Some("first line\nsecond line\nthird line\nProcess exited with code 0"));
+        assert!(!tool.is_error);
+        assert_eq!(detail.raw_jsonl, raw);
+    }
+
+    #[test]
+    fn decodes_settled_exec_results_and_preserves_other_text() {
+        let output = concat!(
+            "Script completed\nWall time 0.2 seconds\nOutput:\n",
+            "Warning: truncated output\n",
+            "{\"status\":\"fulfilled\",\"value\":{\"exit_code\":0,\"output\":\"passed\"}}\n",
+            "{\"status\":\"fulfilled\",\"value\":{\"exit_code\":2,\"output\":\"failed\",\"stderr\":\"error details\"}}\n",
+            "{\"status\":\"rejected\",\"reason\":\"unavailable\"}"
+        );
+        let state = parse_process_output(output);
+        let text = state.output.unwrap();
+        assert!(text.contains("Warning: truncated output\npassed\nfailed\nerror details"));
+        assert!(text.contains(r#"{"status":"rejected","reason":"unavailable"}"#));
+        assert!(text.contains("Process exited with code 2"));
+        assert!(!text.contains("fulfilled"));
+        assert!(state.is_error);
+    }
+
+    #[test]
+    fn preserves_plain_and_truncated_process_output() {
+        for output in [
+            "first line\n\nlast line",
+            r#"{"status":"fulfilled","value":{"output":"truncated"#,
+            r#"{"custom":"result"}"#,
+        ] {
+            assert_eq!(extract_process_chunk(output).as_deref(), Some(output));
+        }
+        assert_eq!(
+            extract_process_chunk(r#"{"status":"fulfilled","value":{"exit_code":0,"output":"single result"}}"#).as_deref(),
+            Some("single result")
+        );
+    }
 
     #[test]
     fn parses_multiple_turns_and_preserves_raw_jsonl() {
