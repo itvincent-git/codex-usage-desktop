@@ -1,4 +1,8 @@
 {
+  "2.14.1": {
+    "zh": "- docs: rewrite readme introductions around user needs\n- docs: translate revised introduction into Japanese\n- fix: use interface language for session list timestamps\n- docs: refresh README screenshots\n- docs: sync README screenshots across translations\n- doc: remove old screen shot\n- fix: show tool output marker only on the first line\n- fix: decode batched tool results in session replay",
+    "en": "- docs: rewrite readme introductions around user needs\n- docs: translate revised introduction into Japanese\n- fix: use interface language for session list timestamps\n- docs: refresh README screenshots\n- docs: sync README screenshots across translations\n- doc: remove old screen shot\n- fix: show tool output marker only on the first line\n- fix: decode batched tool results in session replay"
+  },
   "2.14.0": {
     "zh": "- feat: support custom tray title formats\n- feat: customize tray countdown units\n- feat(tray): simplify default menu bar title\n- feat(sessions): show raw JSONL for replay items\n- fix(sessions): expose raw JSONL item links\n- fix(sessions): move raw JSONL inside item cards",
     "en": "- feat: support custom tray title formats\n- feat: customize tray countdown units\n- feat(tray): simplify default menu bar title\n- feat(sessions): show raw JSONL for replay items\n- fix(sessions): expose raw JSONL item links\n- fix(sessions): move raw JSONL inside item cards"
