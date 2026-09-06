@@ -2525,8 +2525,8 @@ describe("App", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("persists and applies the dashboard auto-refresh interval", async () => {
-    localStorage.setItem("auto_refresh_interval_minutes", "15");
+  it.each([2, 3, 4, 15])("persists and applies the %i-minute dashboard auto-refresh interval", async (minutes) => {
+    localStorage.setItem("auto_refresh_interval_minutes", String(minutes));
     mockLoadedDashboard();
 
     render(<App />);
@@ -2535,14 +2535,20 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("tab", { name: "General" }));
 
     const intervalSelect = screen.getByRole("combobox", { name: "Dashboard Auto-refresh" });
-    expect(intervalSelect).toHaveTextContent("Every 15 minutes");
-    await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenCalledWith({ minutes: 15 }));
+    expect(intervalSelect).toHaveTextContent(`Every ${minutes} minutes`);
+    await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenCalledWith({ minutes }));
 
     await userEvent.click(intervalSelect);
     await userEvent.click(await screen.findByRole("option", { name: "Every 30 minutes" }));
 
     expect(localStorage.getItem("auto_refresh_interval_minutes")).toBe("30");
     await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenLastCalledWith({ minutes: 30 }));
+
+    await userEvent.click(intervalSelect);
+    await userEvent.click(await screen.findByRole("option", { name: `Every ${minutes} minutes` }));
+
+    expect(localStorage.getItem("auto_refresh_interval_minutes")).toBe(String(minutes));
+    await waitFor(() => expect(setBackgroundRefreshIntervalMock).toHaveBeenLastCalledWith({ minutes }));
   });
 
   it("persists custom reset countdown units", async () => {

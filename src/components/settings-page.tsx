@@ -243,7 +243,7 @@ export function SettingsPage({
               onValueChange={(value) => onAutoRefreshIntervalChange(Number(value) as AutoRefreshIntervalMinutes)}
               disabled={isDisabled}
             >
-              <SelectTrigger className="w-[140px]" aria-label={t("settings.auto_refresh_title")}>
+              <SelectTrigger className="w-[180px] shrink-0" aria-label={t("settings.auto_refresh_title")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

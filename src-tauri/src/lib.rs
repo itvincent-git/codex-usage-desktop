@@ -31,7 +31,7 @@ use types::{
 };
 
 const DEFAULT_BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
-const ALLOWED_BACKGROUND_RESCAN_MINUTES: [u64; 5] = [1, 5, 15, 30, 60];
+const ALLOWED_BACKGROUND_RESCAN_MINUTES: [u64; 8] = [1, 2, 3, 4, 5, 15, 30, 60];
 
 struct AppState {
     database_path: PathBuf,
@@ -1119,10 +1119,12 @@ mod tests {
 
     #[test]
     fn background_refresh_interval_accepts_only_supported_values() {
-        assert_eq!(
-            background_refresh_interval(15).unwrap(),
-            Duration::from_secs(15 * 60)
-        );
+        for minutes in [1, 2, 3, 4, 5, 15, 30, 60] {
+            assert_eq!(
+                background_refresh_interval(minutes).unwrap(),
+                Duration::from_secs(minutes * 60)
+            );
+        }
         assert!(background_refresh_interval(0).is_err());
         assert!(background_refresh_interval(10).is_err());
     }

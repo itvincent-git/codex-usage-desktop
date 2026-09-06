@@ -60,7 +60,7 @@ function isNewerVersion(current: string, target: string): boolean {
   return tPat > cPat;
 }
 
-export const AUTO_REFRESH_INTERVAL_OPTIONS = [1, 5, 15, 30, 60] as const;
+export const AUTO_REFRESH_INTERVAL_OPTIONS = [1, 2, 3, 4, 5, 15, 30, 60] as const;
 export type AutoRefreshIntervalMinutes = (typeof AUTO_REFRESH_INTERVAL_OPTIONS)[number];
 const DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES: AutoRefreshIntervalMinutes = 5;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
