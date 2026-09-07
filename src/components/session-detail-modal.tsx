@@ -871,8 +871,12 @@ function formatActivityDuration(ms: number | null) {
 
 function processExitCode(output: string | null, isError: boolean) {
   if (output) {
-    const match = output.match(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+|command failed with exit code\s+)(-?\d+)/i);
-    if (match) return Number(match[1]);
+    const codes = [...output.matchAll(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+|command failed with exit code\s+)(-?\d+)/gi)]
+      .map((match) => Number(match[1]));
+    if (codes.length > 0) {
+      const nonzeroCodes = codes.filter((code) => code !== 0);
+      return Math.max(...(nonzeroCodes.length > 0 ? nonzeroCodes : codes));
+    }
   }
   return isError ? 1 : 0;
 }
@@ -1091,6 +1095,11 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
   const argumentsTitle = execArguments?.kind === "patch"
     ? t("sessions.detail.patch_input")
     : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
+  const displayToolName = execArguments?.kind === "patch"
+    ? "apply_patch"
+    : nestedWriteStdinArguments
+      ? toolName
+      : item.name;
   const rawOutputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
   const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
   const stderrText = execOutput?.stderr ?? item.stderr;
@@ -1178,7 +1187,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
       >
         <span className="flex min-w-0 items-center gap-1">
           <Terminal className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{nestedWriteStdinArguments ? toolName : item.name} {item.status ? `· ${item.status}` : ""}</span>
+          <span className="truncate">{displayToolName} {item.status ? `· ${item.status}` : ""}</span>
         </span>
         <span className="flex shrink-0 items-center gap-3">
           {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}

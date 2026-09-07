@@ -1242,7 +1242,8 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
         .and_then(|value| value.lines().next())
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(ToString::to_string);
+        .map(ToString::to_string)
+        .or_else(|| extract_process_session_id(output));
     let duration_ms = ["Wall time ", "Wait time "].iter().find_map(|prefix| {
         output.split(prefix).nth(1).and_then(|value| {
             value
@@ -1303,6 +1304,35 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
         is_stopped,
         is_error,
     }
+}
+
+fn extract_process_session_id(output: &str) -> Option<String> {
+    let payload = output
+        .split_once("\nOutput:\n")
+        .map(|(_, payload)| payload)
+        .or_else(|| {
+            output
+                .split_once("\r\nOutput:\r\n")
+                .map(|(_, payload)| payload)
+        })
+        .unwrap_or(output);
+
+    std::iter::once(payload.trim())
+        .chain(payload.lines().map(str::trim))
+        .find_map(|candidate| {
+            let value = serde_json::from_str::<Value>(candidate).ok()?;
+            let result = if value.get("status").and_then(Value::as_str) == Some("fulfilled") {
+                value.get("value").unwrap_or(&value)
+            } else {
+                &value
+            };
+            result.get("session_id").and_then(|session_id| {
+                session_id
+                    .as_str()
+                    .map(ToString::to_string)
+                    .or_else(|| session_id.as_i64().map(|value| value.to_string()))
+            })
+        })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2042,7 +2072,10 @@ mod tests {
                 serde_json::json!({
                     "type": "custom_tool_call_output",
                     "call_id": "call-exec",
-                    "output": "Script running with cell ID 4\nWall time 11.0 seconds\nOutput:\npartial test output"
+                    "output": [
+                        {"type":"input_text","text":"Script completed\nWall time 11.0 seconds\nOutput:\n"},
+                        {"type":"input_text","text":"{\"session_id\":4,\"wall_time_seconds\":11.0,\"output\":\"partial test output\"}"}
+                    ]
                 }),
             ),
             event_msg(

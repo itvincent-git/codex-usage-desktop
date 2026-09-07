@@ -1570,7 +1570,7 @@ describe("App", () => {
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /write_stdin/ })).not.toBeInTheDocument();
-    const applyPatchButton = screen.getByRole("button", { name: /functions.exec · completed/ });
+    const applyPatchButton = screen.getByRole("button", { name: /apply_patch · completed/ });
     const applyPatchCall = applyPatchButton.parentElement!;
     expect(applyPatchCall).toHaveTextContent("Edited 1 file");
     expect(applyPatchCall).toHaveTextContent("+1");
