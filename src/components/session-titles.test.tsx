@@ -982,6 +982,81 @@ describe("session titles", () => {
     expect(writeText).toHaveBeenCalledWith("fallback-session");
   });
 
+  it("renders failed command polling as one failed activity with token details", async () => {
+    await i18n.changeLanguage("en");
+    invokeMock.mockResolvedValue(replayDetail({
+      turns: [{
+        turnId: "turn-1",
+        startedAt: "2026-09-07T11:09:30.000Z",
+        completedAt: "2026-09-07T11:09:56.797Z",
+        durationMs: 26_797,
+        systemMessages: [],
+        userMessages: [],
+        assistantMessages: [],
+        reasoningSummaries: [],
+        toolCalls: [{
+          callId: "call-start",
+          name: "exec",
+          status: "failed",
+          arguments: JSON.stringify({ cmd: "pnpm tauri dev", workdir: "/repo/app" }),
+          output: "\u001b[31mError: Port 5273 is already in use\u001b[39m\nCommand failed with exit code 7.",
+          stderr: null,
+          startedAt: "2026-09-07T11:09:31.000Z",
+          completedAt: "2026-09-07T11:09:56.793Z",
+          durationMs: 25_793,
+          isError: true,
+        }],
+        patchResults: [],
+        tokenEvents: [{
+          timestamp: "2026-09-07T11:09:56.797Z",
+          model: "gpt-5.5",
+          inputTokens: 86_948,
+          cachedInputTokens: 86_400,
+          outputTokens: 53,
+          reasoningOutputTokens: 6,
+          totalTokens: 87_001,
+        }],
+        errors: [],
+        items: [{
+          kind: "toolCall",
+          callId: "call-start",
+          name: "exec",
+          status: "failed",
+          arguments: JSON.stringify({ cmd: "pnpm tauri dev", workdir: "/repo/app" }),
+          output: "\u001b[31mError: Port 5273 is already in use\u001b[39m\nCommand failed with exit code 7.",
+          stderr: null,
+          startedAt: "2026-09-07T11:09:31.000Z",
+          completedAt: "2026-09-07T11:09:56.793Z",
+          durationMs: 25_793,
+          isError: true,
+        }, {
+          kind: "tokenUsage",
+          timestamp: "2026-09-07T11:09:56.797Z",
+          model: "gpt-5.5",
+          inputTokens: 86_948,
+          cachedInputTokens: 86_400,
+          outputTokens: 53,
+          reasoningOutputTokens: 6,
+          totalTokens: 87_001,
+        }],
+      }],
+    }));
+
+    render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
+
+    const tokenMetadata = await screen.findByText("87k tokens");
+    const activityButton = tokenMetadata.closest("button");
+    expect(activityButton).toHaveTextContent("Failed");
+    expect(activityButton).toHaveTextContent("exit 7");
+    expect(activityButton).toHaveTextContent("pnpm tauri dev");
+    expect(document.body).not.toHaveTextContent("[31m");
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Input (incl. cache): 86,948"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Cached: 86,400"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Output: 53"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Reasoning: 6"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Total tokens: 87,001"));
+  });
+
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
     await i18n.changeLanguage("en");
     const agents = [

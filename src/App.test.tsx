@@ -1505,7 +1505,9 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent('"text"');
     const tokenMetadata = within(toolCallButton).getByText("56.5k tokens");
     expect(tokenMetadata).toHaveClass("text-violet-500/80");
-    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Model: gpt-5\nTokens: 56,500\nTime:"));
+    expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining(
+      "Model: gpt-5\nInput (incl. cache): 55,000\nCached: 500\nOutput: 1,500\nReasoning: 0\nTotal tokens: 56,500\nTime:",
+    ));
     expect(toolCall).not.toHaveTextContent("50.8k tokens");
     expect(toolCall).not.toHaveClass("border-fuchsia-300/70");
     await userEvent.click(toolCallButton);
@@ -1522,7 +1524,7 @@ describe("App", () => {
     expect(runningActivity.parentElement).toHaveTextContent("running test output");
     await userEvent.click(runningActivity);
     expect(runningActivity.parentElement).toHaveTextContent("› Sent: y");
-    const failedActivity = screen.getByRole("button", { name: /Ran \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
+    const failedActivity = screen.getByRole("button", { name: /Failed \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
     expect(failedActivity).toHaveAttribute("aria-expanded", "false");
     expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error");
     expect(failedActivity.parentElement).toHaveTextContent("└ 2 tests failed");

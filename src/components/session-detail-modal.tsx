@@ -153,7 +153,11 @@ function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
   const { t } = useTranslation();
   const tooltip = [
     `${t("common.model")}: ${usage.model}`,
-    `${t("common.tokens")}: ${formatNumber(usage.totalTokens)}`,
+    `${t("sessions.input_including_cache")}: ${formatNumber(usage.inputTokens)}`,
+    `${t("sessions.cached")}: ${formatNumber(usage.cachedInputTokens)}`,
+    `${t("sessions.output")}: ${formatNumber(usage.outputTokens)}`,
+    `${t("sessions.detail.reasoning_tokens")}: ${formatNumber(usage.reasoningOutputTokens)}`,
+    `${t("sessions.total_tokens")}: ${formatNumber(usage.totalTokens)}`,
     `${t("common.time")}: ${formatTimestamp(usage.timestamp)}`,
   ].join("\n");
 
@@ -596,6 +600,8 @@ type ToolContentBlocks = {
   images: string[];
 };
 
+const ANSI_ESCAPE_PATTERN = new RegExp(`${String.fromCharCode(27)}(?:[@-Z\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g");
+
 function parseJsonObject(value: string | null): Record<string, unknown> | null {
   if (!value) return null;
 
@@ -831,7 +837,10 @@ function parseExecOutput(value: string | null): ExecOutput | null {
 
 function cleanExecOutput(text: string) {
   return text
-    .split(/\r?\n/)
+    .replaceAll("\r\n", "\n")
+    .replace(ANSI_ESCAPE_PATTERN, "")
+    .replaceAll("\r", "")
+    .split("\n")
     .filter((line) => !/^Script (?:running with cell ID .+|completed)$/.test(line)
       && !/^(?:Wall|Wait) time [^\r\n]+$/.test(line)
       && !/^Process (?:exited with code -?\d+|stopped with signal SIG[A-Z]+)$/.test(line)
@@ -862,7 +871,7 @@ function formatActivityDuration(ms: number | null) {
 
 function processExitCode(output: string | null, isError: boolean) {
   if (output) {
-    const match = output.match(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+)(-?\d+)/i);
+    const match = output.match(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+|command failed with exit code\s+)(-?\d+)/i);
     if (match) return Number(match[1]);
   }
   return isError ? 1 : 0;
@@ -1129,7 +1138,9 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
                 ? t("sessions.detail.activity_running")
                 : activityStatus === "stopped"
                   ? t("sessions.detail.activity_stopped")
-                  : t("sessions.detail.activity_ran")}
+                  : activityStatus === "failed"
+                    ? t("sessions.detail.activity_failed")
+                    : t("sessions.detail.activity_ran")}
               {duration || activityStatus !== "running" ? " (" : " "}
               {duration}
               {duration && activityStatus !== "running" && (activityStatus !== "stopped" || signal) ? ", " : null}
