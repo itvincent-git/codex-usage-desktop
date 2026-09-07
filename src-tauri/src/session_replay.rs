@@ -687,17 +687,21 @@ impl ReplayParseState {
             .as_deref()
             .map(parse_process_output)
             .unwrap_or_default();
-        let is_process_activity = continuation.is_some()
-            || is_exec_command_call(&name, arguments.as_deref())
-            || output_state.cell_id.is_some()
-            || output_state.has_process_exit;
-        let process_was_stopped = output_state.is_stopped
-            || continuation.as_ref().is_some_and(|value| {
-                value.input.as_deref() == Some("\u{3}") && output_state.has_process_exit
-            });
+        let is_batched_process_activity = output_state.process_result_count > 1
+            && is_exec_command_call(&name, arguments.as_deref());
+        let is_process_activity = !is_batched_process_activity
+            && (continuation.is_some()
+                || is_exec_command_call(&name, arguments.as_deref())
+                || output_state.cell_id.is_some()
+                || output_state.has_process_exit);
+        let process_was_stopped = is_process_activity
+            && (output_state.is_stopped
+                || continuation.as_ref().is_some_and(|value| {
+                    value.input.as_deref() == Some("\u{3}") && output_state.has_process_exit
+                }));
         let status = if process_was_stopped {
             Some("stopped".to_string())
-        } else if output_state.is_error {
+        } else if is_process_activity && output_state.is_error {
             Some("failed".to_string())
         } else if continuation.as_ref().is_some_and(|value| {
             value.kind == ProcessContinuationKind::WriteStdin && !output_state.has_process_exit
@@ -709,7 +713,7 @@ impl ReplayParseState {
             string_field(event, "status").or_else(|| Some("completed".to_string()))
         };
         let is_error = !process_was_stopped
-            && (output_state.is_error
+            && ((is_process_activity && output_state.is_error)
                 || status
                     .as_deref()
                     .map(|status| {
@@ -1227,6 +1231,7 @@ struct ProcessOutputState {
     cell_id: Option<String>,
     duration_ms: Option<i64>,
     output: Option<String>,
+    process_result_count: usize,
     has_process_exit: bool,
     is_running: bool,
     is_stopped: bool,
@@ -1236,6 +1241,7 @@ struct ProcessOutputState {
 fn parse_process_output(output: &str) -> ProcessOutputState {
     let decoded_output = decode_tool_output_text(output);
     let output = decoded_output.as_deref().unwrap_or(output);
+    let process_result_count = count_structured_process_results(output);
     let cell_id = output
         .split("Script running with cell ID ")
         .nth(1)
@@ -1299,11 +1305,37 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
         cell_id,
         duration_ms,
         output: process_output,
+        process_result_count,
         has_process_exit,
         is_running,
         is_stopped,
         is_error,
     }
+}
+
+fn count_structured_process_results(output: &str) -> usize {
+    let payload = output
+        .split_once("\nOutput:\n")
+        .map(|(_, payload)| payload)
+        .or_else(|| {
+            output
+                .split_once("\r\nOutput:\r\n")
+                .map(|(_, payload)| payload)
+        })
+        .unwrap_or(output);
+
+    payload
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok())
+        .filter(|value| {
+            let result = if value.get("status").and_then(Value::as_str) == Some("fulfilled") {
+                value.get("value").unwrap_or(value)
+            } else {
+                value
+            };
+            result.get("exit_code").and_then(Value::as_i64).is_some()
+        })
+        .count()
 }
 
 fn extract_process_session_id(output: &str) -> Option<String> {
@@ -1674,11 +1706,11 @@ mod tests {
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
-    fn decodes_batched_exec_result_blocks() {
+    fn preserves_batched_exec_results_without_failing_the_parent_tool() {
         let output = serde_json::json!([
             {"type": "input_text", "text": "Script completed\nWall time 0.4 seconds\nOutput:\n"},
-            {"type": "input_text", "text": r#"{"chunk_id":"first","exit_code":0,"output":"first line\nsecond line"}"#},
-            {"type": "input_text", "text": r#"{"chunk_id":"second","exit_code":0,"output":"third line"}"#}
+            {"type": "input_text", "text": r#"{"status":"fulfilled","value":{"chunk_id":"first","exit_code":0,"output":"first line\nsecond line"}}
+        {"status":"fulfilled","value":{"chunk_id":"second","exit_code":1,"output":"third line"}}"#}
         ]);
         let raw = [
             turn_context("2026-09-06T00:00:00.000Z", "turn-1", "gpt-6-astra", "/repo/app"),
@@ -1693,7 +1725,12 @@ mod tests {
         ].join("\n");
         let detail = parse_session_detail(record("/tmp/session.jsonl"), raw.clone());
         let tool = &detail.turns[0].tool_calls[0];
-        assert_eq!(tool.output.as_deref(), Some("first line\nsecond line\nthird line\nProcess exited with code 0"));
+        assert_eq!(tool.status.as_deref(), Some("completed"));
+        assert!(tool
+            .output
+            .as_deref()
+            .unwrap()
+            .contains(r#"\"exit_code\":1"#));
         assert!(!tool.is_error);
         assert_eq!(detail.raw_jsonl, raw);
     }
@@ -1726,7 +1763,10 @@ mod tests {
             assert_eq!(extract_process_chunk(output).as_deref(), Some(output));
         }
         assert_eq!(
-            extract_process_chunk(r#"{"status":"fulfilled","value":{"exit_code":0,"output":"single result"}}"#).as_deref(),
+            extract_process_chunk(
+                r#"{"status":"fulfilled","value":{"exit_code":0,"output":"single result"}}"#
+            )
+            .as_deref(),
             Some("single result")
         );
     }

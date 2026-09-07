@@ -706,6 +706,18 @@ function parseNestedToolCall(value: string, toolName: string) {
   return null;
 }
 
+function parseNestedToolCalls(value: string, toolName: string) {
+  const marker = `tools.${toolName}(`;
+  const calls: Record<string, unknown>[] = [];
+  let start = 0;
+  while ((start = value.indexOf(marker, start)) >= 0) {
+    const parsed = parseNestedToolCall(value.slice(start), toolName);
+    if (parsed) calls.push(parsed);
+    start += marker.length;
+  }
+  return calls;
+}
+
 function parseExecArguments(value: string | null): ExecArguments | null {
   const parsed = parseJsonObject(value) ?? (value ? parseNestedToolCall(value, "exec_command") : null);
   if (parsed) {
@@ -734,6 +746,25 @@ function parseExecArguments(value: string | null): ExecArguments | null {
   } catch {
     return null;
   }
+}
+
+function parseExecArgumentList(value: string | null): ExecArguments[] {
+  if (!value) return [];
+  const calls = parseNestedToolCalls(value, "exec_command");
+  return calls.flatMap((parsed) => {
+    const command = typeof parsed.cmd === "string"
+      ? parsed.cmd
+      : typeof parsed.command === "string"
+        ? parsed.command
+        : null;
+    if (!command) return [];
+    const workdir = typeof parsed.workdir === "string"
+      ? parsed.workdir
+      : typeof parsed.cwd === "string"
+        ? parsed.cwd
+        : null;
+    return [{ command, workdir, kind: "command" as const }];
+  });
 }
 
 function parseWebSearchQueries(value: string | null) {
@@ -812,6 +843,47 @@ function parseToolContentBlocks(value: string | null): ToolContentBlocks | null 
   } catch {
     return null;
   }
+}
+
+type BatchExecResult = {
+  stdout: string | null;
+  stderr: string | null;
+  exitCode: number | null;
+  wallTimeSeconds: number | null;
+  isRejected: boolean;
+};
+
+function parseBatchExecResults(value: string | null): BatchExecResult[] | null {
+  const content = parseToolContentBlocks(value)?.text;
+  if (!content) return null;
+
+  const results = content.split("\n").flatMap((line) => {
+    const parsed = parseJsonObject(line.trim());
+    if (!parsed) return [];
+    if (parsed.status === "rejected") {
+      return [{
+        stdout: null,
+        stderr: typeof parsed.reason === "string" ? parsed.reason : JSON.stringify(parsed.reason ?? "Rejected"),
+        exitCode: null,
+        wallTimeSeconds: null,
+        isRejected: true,
+      }];
+    }
+
+    const result = parsed.status === "fulfilled" ? parsed.value : parsed;
+    if (!result || typeof result !== "object" || Array.isArray(result)) return [];
+    const output = result as Record<string, unknown>;
+    if (typeof output.exit_code !== "number") return [];
+    return [{
+      stdout: typeof output.output === "string" ? output.output : typeof output.stdout === "string" ? output.stdout : null,
+      stderr: typeof output.stderr === "string" ? output.stderr : null,
+      exitCode: typeof output.exit_code === "number" ? output.exit_code : null,
+      wallTimeSeconds: typeof output.wall_time_seconds === "number" ? output.wall_time_seconds : null,
+      isRejected: false,
+    }];
+  });
+
+  return results.length > 1 ? results : null;
 }
 
 function parseExecOutput(value: string | null): ExecOutput | null {
@@ -1084,7 +1156,12 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
   const webSearchQueries = isExec ? parseWebSearchQueries(item.arguments) : null;
   const webSearchResults = parseWebSearchResultCards(item.output);
-  const execArguments = isExec ? parseExecArguments(item.arguments) : null;
+  const batchExecResults = isExec ? parseBatchExecResults(item.output) : null;
+  const execArgumentList = batchExecResults ? parseExecArgumentList(item.arguments) : [];
+  const batchActivities = batchExecResults && execArgumentList.length > 1
+    ? batchExecResults.map((result, index) => ({ result, arguments: execArgumentList[index] ?? null }))
+    : null;
+  const execArguments = isExec && !batchActivities ? parseExecArguments(item.arguments) : null;
   const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const argumentEntries = parsedArguments
     ? Object.entries(parsedArguments).filter(([key]) => !execArguments || !["cmd", "command", "workdir", "cwd"].includes(key))
@@ -1110,6 +1187,59 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
     return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
+  }
+
+  if (batchActivities) {
+    return (
+      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${ITEM_TONES.tool}`}>
+        <button
+          type="button"
+          className={`flex w-full items-center justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+          aria-expanded={isExpanded}
+          onClick={() => setIsExpanded((value) => !value)}
+        >
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Terminal className="h-3.5 w-3.5 shrink-0 text-cyan-700 dark:text-cyan-300" />
+            <span className="truncate">{item.name} · {item.status ?? "completed"} · {t("sessions.detail.tool_count", { count: batchActivities.length })}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-3 font-sans text-muted-foreground">
+            {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+            <span className="flex items-center gap-1">
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
+            </span>
+          </span>
+        </button>
+        <div className="mt-3 space-y-2">
+          {batchActivities.map(({ result, arguments: activityArguments }, index) => {
+            const failed = result.isRejected || (result.exitCode !== null && result.exitCode !== 0);
+            const duration = result.wallTimeSeconds === null ? null : formatActivityDuration(result.wallTimeSeconds * 1000);
+            const command = activityArguments?.command ?? `${item.name} ${index + 1}`;
+            const stdout = result.stdout ? cleanExecOutput(result.stdout) : null;
+            const statusTone = failed ? "text-error" : "text-emerald-700 dark:text-emerald-300";
+            return (
+              <div key={`${index}-${command}`} className={`rounded-md border px-3 py-2 ${failed ? ITEM_TONES.error : "border-border/50 bg-muted/25"}`}>
+                <div className="flex min-w-0 gap-1.5 text-foreground">
+                  <span className={`shrink-0 ${statusTone}`}>•</span>
+                  <span className="min-w-0 whitespace-pre-wrap break-words">
+                    {failed ? t("sessions.detail.activity_failed") : t("sessions.detail.activity_ran")}
+                    {duration || result.exitCode !== null ? " (" : " "}
+                    {duration}
+                    {duration && result.exitCode !== null ? ", " : null}
+                    {result.exitCode !== null ? <span className={statusTone}>exit {result.exitCode}</span> : null}
+                    {duration || result.exitCode !== null ? ") " : null}
+                    {isExpanded ? command : buildCollapsedPreview(command, 1)}
+                  </span>
+                </div>
+                {stdout ? <ActivityOutput text={stdout} expanded={isExpanded} tone={failed ? "text-error" : "text-muted-foreground"} /> : null}
+                {result.stderr ? <ActivityOutput text={result.stderr} expanded={isExpanded} tone="text-error" /> : null}
+              </div>
+            );
+          })}
+        </div>
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
+      </div>
+    );
   }
 
   if (execArguments?.kind === "command") {

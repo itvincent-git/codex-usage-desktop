@@ -1017,6 +1017,11 @@ describe("App", () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;
     const execArguments = `const r = await tools.exec_command({cmd:${JSON.stringify(longArguments)},workdir:"/repo/app",yield_time_ms:10000,max_output_tokens:4000}); text(r.output);`;
+    const batchExecArguments = 'const results = await Promise.allSettled([tools.exec_command({cmd:"pnpm test"}),tools.exec_command({cmd:"rtk rg missing src"})]); for (const result of results) text(result);';
+    const batchExecOutput = JSON.stringify([
+      { text: "Script completed\nWall time 0.3 seconds\nOutput:\n", type: "input_text" },
+      { text: '{"status":"fulfilled","value":{"wall_time_seconds":0.2,"exit_code":0,"output":"tests passed"}}\n{"status":"fulfilled","value":{"wall_time_seconds":0.1,"exit_code":1,"output":""}}', type: "input_text" },
+    ]);
     const webSearchArguments = 'const res = await tools.web__run({search_query:[{q:"first search query"},{q:"second search query"}],response_length:"short"}); text(res);';
     const webSearchOutput = JSON.stringify([
       { text: "Script completed\nWall time 1.25 seconds\nOutput:\n", type: "input_text" },
@@ -1299,6 +1304,19 @@ describe("App", () => {
                 },
                 {
                   kind: "toolCall",
+                  callId: "call-batch",
+                  name: "exec",
+                  status: "completed",
+                  arguments: batchExecArguments,
+                  output: batchExecOutput,
+                  stderr: null,
+                  startedAt: "2026-06-11T00:00:01.500Z",
+                  completedAt: "2026-06-11T00:00:01.800Z",
+                  durationMs: 300,
+                  isError: false,
+                },
+                {
+                  kind: "toolCall",
                   callId: "call-running-tests",
                   name: "exec",
                   status: "running",
@@ -1519,6 +1537,11 @@ describe("App", () => {
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
+    const batchActivity = screen.getByRole("button", { name: /exec · completed · 2 tools/ });
+    expect(batchActivity.parentElement).toHaveClass("border-cyan-300/70");
+    expect(batchActivity.parentElement).toHaveTextContent("Ran (200ms, exit 0) pnpm test");
+    expect(batchActivity.parentElement).toHaveTextContent("Failed (100ms, exit 1) rtk rg missing src");
+    expect(batchActivity.parentElement).toHaveTextContent("tests passed");
     const runningActivity = screen.getByRole("button", { name: /Running \(11s\) pnpm test src\/App.test.tsx && pnpm typecheck/ });
     expect(runningActivity).toHaveAttribute("aria-expanded", "false");
     expect(runningActivity.parentElement).toHaveTextContent("running test output");
