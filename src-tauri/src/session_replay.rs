@@ -50,6 +50,8 @@ struct ReplayParseState {
     tool_aliases: BTreeMap<String, String>,
     cell_tools: BTreeMap<String, (String, String)>,
     process_continuations: BTreeMap<String, ProcessContinuation>,
+    process_exit_codes: BTreeMap<String, Vec<i64>>,
+    active_exec_call_id: Option<String>,
     token_target_tool: Option<(String, String)>,
 }
 
@@ -325,6 +327,21 @@ impl ReplayParseState {
             .clone()
             .unwrap_or_else(|| UNGROUPED_TURN_ID.to_string());
 
+        if event_type == "item_completed"
+            && event.pointer("/item/type").and_then(Value::as_str) == Some("CommandExecution")
+        {
+            if let (Some(call_id), Some(exit_code)) = (
+                self.active_exec_call_id.as_ref(),
+                event.pointer("/item/exit_code").and_then(Value::as_i64),
+            ) {
+                self.process_exit_codes
+                    .entry(call_id.clone())
+                    .or_default()
+                    .push(exit_code);
+            }
+            return;
+        }
+
         match event_type {
             "task_started" => {
                 let turn = self.turn_mut(&turn_id);
@@ -465,6 +482,9 @@ impl ReplayParseState {
                         call_id.clone(),
                         (turn_id.clone(), name.clone(), arguments.clone()),
                     );
+                    if is_exec_command_call(&name, arguments.as_deref()) {
+                        self.active_exec_call_id = Some(call_id.clone());
+                    }
                 }
                 let tool = SessionReplayToolCall {
                     call_id,
@@ -683,9 +703,18 @@ impl ReplayParseState {
                 .get("output")
                 .and_then(|output| string_field(output, "stderr"))
         });
+        let recorded_exit_codes = source_call_id
+            .as_ref()
+            .and_then(|call_id| self.process_exit_codes.remove(call_id))
+            .unwrap_or_default();
+        if source_call_id.as_ref() == self.active_exec_call_id.as_ref() {
+            self.active_exec_call_id = None;
+        }
+        let authoritative_exit_code =
+            (recorded_exit_codes.len() == 1).then(|| recorded_exit_codes[0]);
         let output_state = output
             .as_deref()
-            .map(parse_process_output)
+            .map(|output| parse_process_output(output, authoritative_exit_code))
             .unwrap_or_default();
         let is_batched_process_activity = output_state.process_result_count > 1
             && is_exec_command_call(&name, arguments.as_deref());
@@ -1238,7 +1267,7 @@ struct ProcessOutputState {
     is_error: bool,
 }
 
-fn parse_process_output(output: &str) -> ProcessOutputState {
+fn parse_process_output(output: &str, authoritative_exit_code: Option<i64>) -> ProcessOutputState {
     let decoded_output = decode_tool_output_text(output);
     let output = decoded_output.as_deref().unwrap_or(output);
     let process_result_count = count_structured_process_results(output);
@@ -1260,7 +1289,7 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
         })
     });
     let normalized = output.to_ascii_lowercase();
-    let exit_code = [
+    let detected_exit_code = [
         "\"exit_code\"",
         "exit code:",
         "process exited with code",
@@ -1279,6 +1308,7 @@ fn parse_process_output(output: &str) -> ProcessOutputState {
         })
     })
     .max_by_key(|code| (*code != 0, *code));
+    let exit_code = authoritative_exit_code.or(detected_exit_code);
     let signal = ["SIGINT", "SIGTERM", "SIGKILL", "SIGHUP"]
         .into_iter()
         .find(|signal| output.contains(signal));
@@ -1744,7 +1774,7 @@ mod tests {
             "{\"status\":\"fulfilled\",\"value\":{\"exit_code\":2,\"output\":\"failed\",\"stderr\":\"error details\"}}\n",
             "{\"status\":\"rejected\",\"reason\":\"unavailable\"}"
         );
-        let state = parse_process_output(output);
+        let state = parse_process_output(output, None);
         let text = state.output.unwrap();
         assert!(text.contains("Warning: truncated output\npassed\nfailed\nerror details"));
         assert!(text.contains(r#"{"status":"rejected","reason":"unavailable"}"#));
@@ -1769,6 +1799,41 @@ mod tests {
             .as_deref(),
             Some("single result")
         );
+    }
+
+    #[test]
+    fn trusts_command_execution_exit_code_over_incidental_stdout_text() {
+        let raw = [
+            turn_context("2026-09-08T00:00:00.000Z", "turn-1", "gpt-5.6", "/repo/app"),
+            response_item("2026-09-08T00:00:01.000Z", serde_json::json!({
+                "type": "custom_tool_call", "call_id": "call-exec", "name": "exec",
+                "input": "const r = await tools.exec_command({cmd:\"rtk sed -n '1,20p' src/example.test.ts\"}); text(r.output);"
+            })),
+            event_msg("2026-09-08T00:00:02.000Z", serde_json::json!({
+                "type": "item_completed",
+                "item": {
+                    "type": "CommandExecution",
+                    "status": "completed",
+                    "exit_code": 0
+                }
+            })),
+            response_item("2026-09-08T00:00:03.000Z", serde_json::json!({
+                "type": "custom_tool_call_output", "call_id": "call-exec",
+                "output": [{
+                    "type": "input_text",
+                    "text": "Script completed\nWall time 0.2 seconds\nOutput:\nconst fixture = 'Command failed with exit code 7.';"
+                }]
+            })),
+        ].join("\n");
+
+        let detail = parse_session_detail(record("/tmp/session.jsonl"), raw);
+        let tool = &detail.turns[0].tool_calls[0];
+        assert_eq!(tool.status.as_deref(), Some("completed"));
+        assert!(!tool.is_error);
+        assert!(tool
+            .output
+            .as_deref()
+            .is_some_and(|output| output.ends_with("Process exited with code 0")));
     }
 
     #[test]
@@ -2438,6 +2503,7 @@ mod tests {
     fn recognizes_nonzero_process_exit_codes_as_failures() {
         let output = parse_process_output(
             "Script completed\nWall time 14.2 seconds\nOutput:\n{\"exit_code\":2}",
+            None,
         );
 
         assert_eq!(output.duration_ms, Some(14_200));

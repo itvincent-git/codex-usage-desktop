@@ -982,7 +982,7 @@ describe("session titles", () => {
     expect(writeText).toHaveBeenCalledWith("fallback-session");
   });
 
-  it("renders failed command polling as one failed activity with token details", async () => {
+  it("renders canonical command exit states with token details", async () => {
     await i18n.changeLanguage("en");
     invokeMock.mockResolvedValue(replayDetail({
       turns: [{
@@ -1005,6 +1005,17 @@ describe("session titles", () => {
           completedAt: "2026-09-07T11:09:56.793Z",
           durationMs: 25_793,
           isError: true,
+        }, {
+          callId: "call-source-preview",
+          name: "exec",
+          status: "completed",
+          arguments: JSON.stringify({ cmd: "rtk sed -n '1,20p' src/example.test.ts" }),
+          output: "const fixture = 'Command failed with exit code 7.';\nProcess exited with code 0",
+          stderr: null,
+          startedAt: "2026-09-07T11:09:57.000Z",
+          completedAt: "2026-09-07T11:09:58.000Z",
+          durationMs: 1_000,
+          isError: false,
         }],
         patchResults: [],
         tokenEvents: [{
@@ -1038,6 +1049,18 @@ describe("session titles", () => {
           outputTokens: 53,
           reasoningOutputTokens: 6,
           totalTokens: 87_001,
+        }, {
+          kind: "toolCall",
+          callId: "call-source-preview",
+          name: "exec",
+          status: "completed",
+          arguments: JSON.stringify({ cmd: "rtk sed -n '1,20p' src/example.test.ts" }),
+          output: "const fixture = 'Command failed with exit code 7.';\nProcess exited with code 0",
+          stderr: null,
+          startedAt: "2026-09-07T11:09:57.000Z",
+          completedAt: "2026-09-07T11:09:58.000Z",
+          durationMs: 1_000,
+          isError: false,
         }],
       }],
     }));
@@ -1055,6 +1078,8 @@ describe("session titles", () => {
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Output: 53"));
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Reasoning: 6"));
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Total tokens: 87,001"));
+    const successfulActivity = screen.getByRole("button", { name: /Ran \(1s, exit 0\) rtk sed/ });
+    expect(successfulActivity.parentElement).toHaveClass("border-cyan-300/70");
 
     await i18n.changeLanguage("zh");
     expect(activityButton).toHaveTextContent("Failed");

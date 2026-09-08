@@ -943,6 +943,10 @@ function formatActivityDuration(ms: number | null) {
 
 function processExitCode(output: string | null, isError: boolean) {
   if (output) {
+    const canonicalCodes = [...output.matchAll(/^Process exited with code (-?\d+)$/gim)]
+      .map((match) => Number(match[1]));
+    if (canonicalCodes.length > 0) return canonicalCodes.at(-1)!;
+
     const codes = [...output.matchAll(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+|command failed with exit code\s+)(-?\d+)/gi)]
       .map((match) => Number(match[1]));
     if (codes.length > 0) {
