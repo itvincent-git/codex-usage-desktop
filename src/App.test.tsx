@@ -1469,24 +1469,16 @@ describe("App", () => {
     const assistantButton = screen.getByRole("button", { name: /Assistant/ });
     expect(systemButton).toHaveAttribute("aria-expanded", "false");
     expect(developerButton).toHaveAttribute("aria-expanded", "false");
-    expect(userButton).toHaveAttribute("aria-expanded", "false");
-    expect(assistantButton).toHaveAttribute("aria-expanded", "false");
+    expect(userButton).toHaveAttribute("aria-expanded", "true");
+    expect(assistantButton).toHaveAttribute("aria-expanded", "true");
     expect(systemButton).toHaveTextContent("Expand");
     expect(developerButton).toHaveTextContent("Expand");
-    expect(userButton).toHaveTextContent("Expand");
-    expect(assistantButton).toHaveTextContent("Expand");
-    expect(systemButton.parentElement).toHaveClass("border-zinc-300/70");
-    expect(developerButton.parentElement).toHaveClass("border-violet-300/70");
-    expect(userButton.parentElement).toHaveClass("border-blue-300/70");
-    expect(assistantButton.parentElement).toHaveClass("border-emerald-300/70");
+    expect(userButton).toHaveTextContent("Collapse");
+    expect(assistantButton).toHaveTextContent("Collapse");
     expect(systemButton.nextElementSibling).toHaveClass("line-clamp-3");
     expect(developerButton.nextElementSibling).toHaveClass("line-clamp-3");
-    expect(userButton.nextElementSibling).toHaveClass("line-clamp-[10]");
-    expect(assistantButton.nextElementSibling).toHaveClass("line-clamp-[10]");
     expect(systemButton.nextElementSibling).not.toHaveTextContent("SYSTEM_TAIL");
     expect(developerButton.nextElementSibling).not.toHaveTextContent("DEVELOPER_TAIL");
-    expect(userButton.nextElementSibling).not.toHaveTextContent("USER_TAIL");
-    expect(assistantButton.nextElementSibling).not.toHaveTextContent("ASSISTANT_TAIL");
     expect(screen.getAllByText(/Replay this session/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/LONG_TOOL_OUTPUT_TAIL/)).not.toBeInTheDocument();
     expect(screen.queryByText(/LONG_ARGUMENT_TAIL/)).not.toBeInTheDocument();
@@ -1499,7 +1491,6 @@ describe("App", () => {
     await userEvent.click(within(userItem).getByRole("button", { name: "Hide raw JSONL" }));
     expect(screen.queryByText(rawJsonl.split("\n")[0], { exact: true })).not.toBeInTheDocument();
 
-    await userEvent.click(assistantButton);
     const assistantItem = assistantButton.parentElement!;
     await waitFor(
       () => expect(assistantItem.querySelector(".session-markdown")).toBeInTheDocument(),
@@ -1514,7 +1505,6 @@ describe("App", () => {
     const toolCall = toolCallButton.parentElement!;
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCallButton.querySelector('[title="Process exited successfully"]')).toHaveClass("text-emerald-700");
-    expect(toolCall).toHaveClass("border-cyan-300/70");
     expect(toolCall).toHaveTextContent("first command");
     expect(toolCall).toHaveTextContent("└ tool output preview");
     expect(toolCall).not.toHaveTextContent("Working directory: /repo/app");
@@ -1541,16 +1531,15 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
     const batchActivity = screen.getByRole("button", { name: /exec · completed · 2 tools/ });
-    expect(batchActivity.parentElement).toHaveClass("border-cyan-300/70");
     expect(batchActivity.parentElement).toHaveTextContent("Ran (200ms, exit 0) pnpm test");
-    expect(batchActivity.parentElement).toHaveTextContent("Failed (100ms, exit 1) rtk rg missing src");
+    expect(batchActivity.parentElement).toHaveTextContent("Ran (100ms, exit 1) rtk rg missing src");
     expect(batchActivity.parentElement).toHaveTextContent("tests passed");
     const runningActivity = screen.getByRole("button", { name: /Running \(11s\) pnpm test src\/App.test.tsx && pnpm typecheck/ });
     expect(runningActivity).toHaveAttribute("aria-expanded", "false");
     expect(runningActivity.parentElement).toHaveTextContent("running test output");
     await userEvent.click(runningActivity);
     expect(runningActivity.parentElement).toHaveTextContent("› Sent: y");
-    const failedActivity = screen.getByRole("button", { name: /Failed \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
+    const failedActivity = screen.getByRole("button", { name: /Ran \(14.2s, exit 1\) pnpm test src\/App.test.tsx/ });
     expect(failedActivity).toHaveAttribute("aria-expanded", "false");
     expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error");
     expect(failedActivity.parentElement).toHaveTextContent("└ 2 tests failed");
@@ -1617,8 +1606,7 @@ describe("App", () => {
     expect(screen.getByText("Raw JSON").closest("li")).not.toHaveClass("border-primary/50");
     expect(screen.getByText("Show each choice as a readable option card.")).toBeInTheDocument();
 
-    const reasoningTitle = screen.getByText("Reasoning summary");
-    expect(reasoningTitle.parentElement?.parentElement).toHaveClass("border-amber-300/70");
+    expect(screen.getByText("Reasoning summary")).toBeInTheDocument();
     const failedPatchButton = screen.getByRole("button", { name: /Patch failed/ });
     expect(screen.queryByRole("button", { name: /Patch result/ })).not.toBeInTheDocument();
     expect(failedPatchButton.parentElement).toHaveClass("border-error/40");

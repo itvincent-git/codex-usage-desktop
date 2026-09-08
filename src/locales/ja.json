@@ -600,6 +600,8 @@
       },
       "output": "出力",
       "activity_running": "実行中",
+      "token_breakdown": "入力 {{input}} · キャッシュ {{cached}} · 出力 {{output}}",
+      "omitted_lines": "… {{count}} 行を省略",
       "activity_ran": "実行済み",
       "activity_stopped": "停止しました",
       "exit_success_tooltip": "プロセスが正常に終了しました",

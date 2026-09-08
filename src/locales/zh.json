@@ -566,6 +566,8 @@
       },
       "output": "输出",
       "activity_running": "Running",
+      "token_breakdown": "输入 {{input}} · 缓存 {{cached}} · 输出 {{output}}",
+      "omitted_lines": "… 省略 {{count}} 行",
       "activity_ran": "Ran",
       "activity_failed": "执行失败",
       "activity_stopped": "Stopped",

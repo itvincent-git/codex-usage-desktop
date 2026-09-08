@@ -559,6 +559,8 @@
       },
       "output": "Output",
       "activity_running": "Running",
+      "token_breakdown": "In {{input}} · Cache {{cached}} · Out {{output}}",
+      "omitted_lines": "… {{count}} lines omitted",
       "activity_ran": "Ran",
       "activity_failed": "Failed",
       "activity_stopped": "Stopped",

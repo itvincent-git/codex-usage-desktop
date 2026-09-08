@@ -1,3 +1,8 @@
+import {
+  buildConversation, cleanExecOutput, formatActivityDuration, formatJsonForDisplay, formatToolArgumentValue,
+  parseToolContentBlocks, parseUserInputAnswers, processExitCode, processSignal, splitWebSearchResults, summarizeOutput,
+  type ConversationBlock, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
+} from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -21,15 +26,9 @@ const RAW_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_PREVIEW_LINE_LENGTH = 240;
 const COLLAPSED_AGENT_LIMIT = 3;
 const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-const EXEC_TOOL_NAMES = new Set(["exec", "exec_command"]);
 const MarkdownContent = lazy(() => import("./markdown-content").then((module) => ({ default: module.MarkdownContent })));
 
 const ITEM_TONES = {
-  system: "border-zinc-300/70 bg-zinc-100/60 dark:border-zinc-700/70 dark:bg-zinc-900/40",
-  developer: "border-violet-300/70 bg-violet-50/70 dark:border-violet-800/70 dark:bg-violet-950/30",
-  user: "border-blue-300/70 bg-blue-50/70 dark:border-blue-800/70 dark:bg-blue-950/30",
-  assistant: "border-emerald-300/70 bg-emerald-50/70 dark:border-emerald-800/70 dark:bg-emerald-950/30",
-  reasoning: "border-amber-300/70 bg-amber-50/70 dark:border-amber-800/70 dark:bg-amber-950/30",
   tool: "border-cyan-300/70 bg-cyan-50/70 dark:border-cyan-800/70 dark:bg-cyan-950/30",
   patch: "border-green-300/70 bg-green-50/70 dark:border-green-800/70 dark:bg-green-950/30",
   error: "border-error/40 bg-error/5",
@@ -37,10 +36,6 @@ const ITEM_TONES = {
 } as const;
 
 const ITEM_TITLE_TONES = {
-  system: "text-zinc-600 dark:text-zinc-300",
-  developer: "text-violet-700 dark:text-violet-300",
-  user: "text-blue-700 dark:text-blue-300",
-  assistant: "text-emerald-700 dark:text-emerald-300",
   reasoning: "text-amber-700 dark:text-amber-300",
   tool: "text-cyan-700 dark:text-cyan-300",
   patch: "text-green-700 dark:text-green-300",
@@ -100,49 +95,6 @@ function firstUserPreview(turn: SessionReplayDetail["turns"][number]) {
   return normalized.length > 140 ? `${normalized.slice(0, 140)}...` : normalized;
 }
 
-type ReplayItem = SessionReplayDetail["turns"][number]["items"][number];
-type TokenUsageItem = Extract<ReplayItem, { kind: "tokenUsage" }>;
-
-type TimelineEntry = {
-  item: ReplayItem;
-  tokenUsage?: TokenUsageItem;
-};
-
-function orderedItems(turn: SessionReplayDetail["turns"][number]): ReplayItem[] {
-  if (turn.items?.length) return turn.items;
-  return [
-    ...turn.systemMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "system", source: message.kind, text: message.text })),
-    ...turn.userMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "user", source: message.kind, text: message.text })),
-    ...turn.assistantMessages.map((message) => ({ kind: "message" as const, timestamp: message.timestamp, role: "assistant", source: message.kind, text: message.text })),
-    ...turn.reasoningSummaries.map((message) => ({ kind: "reasoning" as const, timestamp: message.timestamp, text: message.text })),
-    ...turn.toolCalls.map((tool) => ({ kind: "toolCall" as const, ...tool })),
-    ...turn.patchResults.map((patch) => ({ kind: "patch" as const, ...patch })),
-    ...turn.tokenEvents.map((usage) => ({ kind: "tokenUsage" as const, ...usage })),
-    ...turn.errors.map((text) => ({ kind: "error" as const, timestamp: null, text })),
-  ];
-}
-
-function isVisibleTimelineItem(item: ReplayItem) {
-  return item.kind !== "patch" || item.isError || item.success === false;
-}
-
-function timelineEntries(items: ReplayItem[]): TimelineEntry[] {
-  const entries: TimelineEntry[] = [];
-
-  for (const item of items) {
-    if (item.kind === "tokenUsage") {
-      const previousEntry = entries.findLast((entry) => isVisibleTimelineItem(entry.item));
-      if (previousEntry) {
-        previousEntry.tokenUsage = item;
-        continue;
-      }
-    }
-    entries.push({ item });
-  }
-
-  return entries;
-}
-
 function formatCompactTokenCount(value: number) {
   if (Math.abs(value) < 1_000) return formatNumber(value);
   if (Math.abs(value) < 1_000_000) return `${Number((value / 1_000).toFixed(1))}k`;
@@ -162,11 +114,20 @@ function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
   ].join("\n");
 
   return (
-    <span
-      className="shrink-0 font-sans text-[11px] font-medium tabular-nums text-violet-500/80 dark:text-violet-300/75"
-      title={tooltip}
-    >
-      {formatCompactTokenCount(usage.totalTokens)} tokens
+    <span className="inline-flex flex-col items-end gap-0.5 normal-case tracking-normal">
+      <span
+        className="shrink-0 font-sans text-[11px] font-medium tabular-nums text-violet-500/80 dark:text-violet-300/75"
+        title={tooltip}
+      >
+        {formatCompactTokenCount(usage.totalTokens)} tokens
+      </span>
+      <span className="font-sans text-[10px] font-normal text-muted-foreground" title={tooltip}>
+        {t("sessions.detail.token_breakdown", {
+          input: formatCompactTokenCount(usage.inputTokens),
+          cached: formatCompactTokenCount(usage.cachedInputTokens),
+          output: formatCompactTokenCount(usage.outputTokens),
+        })}
+      </span>
     </span>
   );
 }
@@ -380,11 +341,11 @@ function TextBlock({
   const preview = isLong ? `${text.slice(0, TEXT_PREVIEW_LENGTH)}...` : text;
 
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+    <div className="py-2">
       <div className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${titleClassName}`}>{title}</div>
-      {isFullVisible && markdown ? (
+      {markdown ? (
         <Suspense fallback={<pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{text}</pre>}>
-          <MarkdownContent content={text} />
+          <MarkdownContent content={isFullVisible ? text : preview} />
         </Suspense>
       ) : (
         <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
@@ -408,56 +369,41 @@ function TextBlock({
 
 function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "message" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const title = item.role === "user"
-    ? t("sessions.detail.user")
-    : item.role === "assistant"
-      ? t("sessions.detail.assistant")
-      : item.role === "developer"
-        ? t("sessions.detail.developer")
-        : t("sessions.detail.system");
-  const previewLines = item.role === "user" || item.role === "assistant" ? 10 : 3;
-  const previewClass = previewLines === 10 ? "line-clamp-[10]" : "line-clamp-3";
-  const toneKey = item.role === "user" || item.role === "assistant" || item.role === "developer" ? item.role : "system";
+  const isConversation = item.role === "user" || item.role === "assistant";
+  const [isExpanded, setIsExpanded] = useState(isConversation);
+  const role = isConversation || item.role === "developer" ? item.role : "system";
+  const title = t(`sessions.detail.${role}`);
 
   return (
-    <div className={`rounded-lg border p-3 ${ITEM_TONES[toneKey]}`}>
+    <article className={item.role === "user" ? "my-5 rounded-2xl bg-muted/60 px-4 py-3" : "py-3"}>
       <button
         type="button"
-        className={`mb-2 flex w-full items-center justify-between gap-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] ${ITEM_TITLE_TONES[toneKey]} ${DISCLOSURE_BUTTON_CLASS}`}
+        className={`mb-2 flex w-full items-center justify-between gap-3 text-left text-xs font-medium text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`}
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((value) => !value)}
       >
         <span>{title}</span>
-        <span className="flex shrink-0 items-center gap-3">
+        <span className="flex flex-wrap items-center justify-end gap-3">
           {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
-          <span className="font-mono normal-case tracking-normal text-muted-foreground">{formatTimestamp(item.timestamp)}</span>
-          <span className="flex items-center gap-1 normal-case tracking-normal">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
-          </span>
+          <span title={formatTimestamp(item.timestamp)} className="text-[10px]">{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : "--"}</span>
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          <span className="sr-only">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
         </span>
       </button>
       {isExpanded ? (
-        <div className="rounded-md border border-border/50 bg-muted/35 p-3">
-          <Suspense fallback={<pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{item.text}</pre>}>
-            <MarkdownContent content={item.text} />
-          </Suspense>
-        </div>
-      ) : (
-        <pre className={`${previewClass} rounded-md border border-border/50 bg-muted/35 p-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground`}>
-          {buildCollapsedPreview(item.text, previewLines)}
-        </pre>
-      )}
+        <Suspense fallback={<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{item.text}</p>}>
+          <MarkdownContent content={item.text} />
+        </Suspense>
+      ) : <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{buildCollapsedPreview(item.text, 3)}</p>}
       <RawJsonlDisclosure rawJsonl={rawJsonl} />
-    </div>
+    </article>
   );
 }
 
 function ToolTextBlock({ title, text }: { title: string; text: string }) {
   const displayText = formatJsonForDisplay(text);
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+    <div className="py-2">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
       <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{displayText}</pre>
     </div>
@@ -467,7 +413,7 @@ function ToolTextBlock({ title, text }: { title: string; text: string }) {
 function ToolPreview({ title, text, lines }: { title: string; text: string; lines: 1 | 5 }) {
   const displayText = formatJsonForDisplay(text);
   return (
-    <div className="min-w-0 rounded-lg border border-border/50 bg-muted/35 p-3">
+    <div className="min-w-0 py-2">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
       <pre className={`${lines === 1 ? "line-clamp-1" : "line-clamp-5"} whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground`}>
         {buildCollapsedPreview(displayText, lines)}
@@ -581,438 +527,15 @@ function PatchDiffBlock({ patch, expanded }: { patch: string; expanded: boolean 
   );
 }
 
-type ExecArguments = {
-  command: string;
-  workdir: string | null;
-  kind: "command" | "patch";
-};
-
-type ExecOutput = {
-  stdout: string | null;
-  stderr: string | null;
-  exitCode: number | null;
-  wallTimeSeconds: number | null;
-  sessionId: string | number | null;
-};
-
-type ToolContentBlocks = {
-  text: string | null;
-  images: string[];
-};
-
-const ANSI_ESCAPE_PATTERN = new RegExp(`${String.fromCharCode(27)}(?:[@-Z\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g");
-
-function parseJsonObject(value: string | null): Record<string, unknown> | null {
-  if (!value) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function baseToolName(name: string) {
-  return name.split(".").at(-1) ?? name;
-}
-
-function formatToolArgumentValue(value: unknown) {
-  if (typeof value === "string") return value;
-  if (value === null) return "null";
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return JSON.stringify(value, null, 2);
-}
-
-function formatJsonForDisplay(text: string) {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    return parsed !== null && typeof parsed === "object" ? JSON.stringify(parsed, null, 2) : text;
-  } catch {
-    return text;
-  }
-}
-
-function parseNestedToolCall(value: string, toolName: string) {
-  const marker = `tools.${toolName}(`;
-  const start = value.indexOf(marker);
-  if (start < 0) return null;
-
-  const objectStart = value.indexOf("{", start + marker.length);
-  if (objectStart < 0) return null;
-
-  let depth = 0;
-  let inString = false;
-  let isEscaped = false;
-  for (let index = objectStart; index < value.length; index += 1) {
-    const character = value[index];
-    if (inString) {
-      if (isEscaped) {
-        isEscaped = false;
-      } else if (character === "\\") {
-        isEscaped = true;
-      } else if (character === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (character === '"') inString = true;
-    if (character === "{") depth += 1;
-    if (character === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        const objectLiteral = value.slice(objectStart, index + 1);
-        const parsed = parseJsonObject(objectLiteral);
-        if (parsed) return parsed;
-
-        let normalized = "";
-        let normalizedInString = false;
-        let normalizedIsEscaped = false;
-        for (let literalIndex = 0; literalIndex < objectLiteral.length; literalIndex += 1) {
-          const literalCharacter = objectLiteral[literalIndex];
-          normalized += literalCharacter;
-
-          if (normalizedInString) {
-            if (normalizedIsEscaped) {
-              normalizedIsEscaped = false;
-            } else if (literalCharacter === "\\") {
-              normalizedIsEscaped = true;
-            } else if (literalCharacter === '"') {
-              normalizedInString = false;
-            }
-            continue;
-          }
-
-          if (literalCharacter === '"') {
-            normalizedInString = true;
-            continue;
-          }
-          if (literalCharacter !== "{" && literalCharacter !== ",") continue;
-
-          const property = objectLiteral.slice(literalIndex + 1).match(/^(\s*)([A-Za-z_$][\w$]*)(\s*:)/);
-          if (!property) continue;
-          normalized += `${property[1]}"${property[2]}"${property[3]}`;
-          literalIndex += property[0].length;
-        }
-
-        return parseJsonObject(normalized);
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseNestedToolCalls(value: string, toolName: string) {
-  const marker = `tools.${toolName}(`;
-  const calls: Record<string, unknown>[] = [];
-  let start = 0;
-  while ((start = value.indexOf(marker, start)) >= 0) {
-    const parsed = parseNestedToolCall(value.slice(start), toolName);
-    if (parsed) calls.push(parsed);
-    start += marker.length;
-  }
-  return calls;
-}
-
-function parseExecArguments(value: string | null): ExecArguments | null {
-  const parsed = parseJsonObject(value) ?? (value ? parseNestedToolCall(value, "exec_command") : null);
-  if (parsed) {
-    const command = typeof parsed.cmd === "string"
-      ? parsed.cmd
-      : typeof parsed.command === "string"
-        ? parsed.command
-        : null;
-    if (!command) return null;
-
-    const workdir = typeof parsed.workdir === "string"
-      ? parsed.workdir
-      : typeof parsed.cwd === "string"
-        ? parsed.cwd
-        : null;
-    return { command, workdir, kind: "command" };
-  }
-
-  if (!value) return null;
-  const assignment = value.match(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*("(?:\\.|[^"\\])*")\s*;/s);
-  if (!assignment || !value.includes(`tools.apply_patch(${assignment[1]})`)) return null;
-
-  try {
-    const patch = JSON.parse(assignment[2]);
-    return typeof patch === "string" ? { command: patch, workdir: null, kind: "patch" } : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseExecArgumentList(value: string | null): ExecArguments[] {
-  if (!value) return [];
-  const calls = parseNestedToolCalls(value, "exec_command");
-  return calls.flatMap((parsed) => {
-    const command = typeof parsed.cmd === "string"
-      ? parsed.cmd
-      : typeof parsed.command === "string"
-        ? parsed.command
-        : null;
-    if (!command) return [];
-    const workdir = typeof parsed.workdir === "string"
-      ? parsed.workdir
-      : typeof parsed.cwd === "string"
-        ? parsed.cwd
-        : null;
-    return [{ command, workdir, kind: "command" as const }];
-  });
-}
-
-function parseWebSearchQueries(value: string | null) {
-  if (!value) return null;
-  const parsed = parseNestedToolCall(value, "web__run");
-  if (!parsed || !Array.isArray(parsed.search_query)) return null;
-
-  const queries = parsed.search_query.flatMap((entry) => (
-    entry && typeof entry === "object" && typeof (entry as { q?: unknown }).q === "string"
-      ? [(entry as { q: string }).q]
-      : []
-  ));
-  return queries.length > 0 ? queries : null;
-}
-
-function splitWebSearchResults(text: string) {
-  return cleanExecOutput(text)
-    .split(/-{10,}/)
-    .map((result) => result.trim())
-    .filter(Boolean);
-}
-
-type WebSearchResult = {
-  title: string;
-  url: string | null;
-  domain: string | null;
-  snippet: string | null;
-};
-
-function parseWebSearchResultCards(value: string | null): WebSearchResult[] | null {
-  if (!value) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return null;
-
-    const results = parsed.flatMap((entry) => {
-      if (!entry || typeof entry !== "object") return [];
-      const result = entry as Record<string, unknown>;
-      if (result.type !== "text_result" || typeof result.title !== "string") return [];
-      return [{
-        title: result.title,
-        url: typeof result.url === "string" ? result.url : null,
-        domain: typeof result.domain === "string" ? result.domain : null,
-        snippet: typeof result.snippet === "string" ? result.snippet : null,
-      }];
-    });
-    return results.length > 0 ? results : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseToolContentBlocks(value: string | null): ToolContentBlocks | null {
-  if (!value) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return null;
-    let text = "";
-    const images: string[] = [];
-
-    for (const block of parsed) {
-      if (block === null || typeof block !== "object") return null;
-      const content = block as Record<string, unknown>;
-      if (typeof content.text === "string") {
-        text += content.text;
-      } else if (typeof content.image_url === "string") {
-        images.push(content.image_url);
-      } else {
-        return null;
-      }
-    }
-
-    return text || images.length > 0 ? { text: text || null, images } : null;
-  } catch {
-    return null;
-  }
-}
-
-type BatchExecResult = {
-  stdout: string | null;
-  stderr: string | null;
-  exitCode: number | null;
-  wallTimeSeconds: number | null;
-  isRejected: boolean;
-};
-
-function parseBatchExecResults(value: string | null): BatchExecResult[] | null {
-  const content = parseToolContentBlocks(value)?.text;
-  if (!content) return null;
-
-  const results = content.split("\n").flatMap((line) => {
-    const parsed = parseJsonObject(line.trim());
-    if (!parsed) return [];
-    if (parsed.status === "rejected") {
-      return [{
-        stdout: null,
-        stderr: typeof parsed.reason === "string" ? parsed.reason : JSON.stringify(parsed.reason ?? "Rejected"),
-        exitCode: null,
-        wallTimeSeconds: null,
-        isRejected: true,
-      }];
-    }
-
-    const result = parsed.status === "fulfilled" ? parsed.value : parsed;
-    if (!result || typeof result !== "object" || Array.isArray(result)) return [];
-    const output = result as Record<string, unknown>;
-    if (typeof output.exit_code !== "number") return [];
-    return [{
-      stdout: typeof output.output === "string" ? output.output : typeof output.stdout === "string" ? output.stdout : null,
-      stderr: typeof output.stderr === "string" ? output.stderr : null,
-      exitCode: typeof output.exit_code === "number" ? output.exit_code : null,
-      wallTimeSeconds: typeof output.wall_time_seconds === "number" ? output.wall_time_seconds : null,
-      isRejected: false,
-    }];
-  });
-
-  return results.length > 1 ? results : null;
-}
-
-function parseExecOutput(value: string | null): ExecOutput | null {
-  const parsed = parseJsonObject(value);
-  if (!parsed) return null;
-
-  const stdout = typeof parsed.output === "string"
-    ? parsed.output
-    : typeof parsed.stdout === "string"
-      ? parsed.stdout
-      : null;
-  const stderr = typeof parsed.stderr === "string" ? parsed.stderr : null;
-  const exitCode = typeof parsed.exit_code === "number" ? parsed.exit_code : null;
-  const wallTimeSeconds = typeof parsed.wall_time_seconds === "number" ? parsed.wall_time_seconds : null;
-  const sessionId = typeof parsed.session_id === "string" || typeof parsed.session_id === "number"
-    ? parsed.session_id
-    : null;
-
-  return stdout !== null || stderr !== null || exitCode !== null || wallTimeSeconds !== null || sessionId !== null
-    ? { stdout, stderr, exitCode, wallTimeSeconds, sessionId }
-    : null;
-}
-
-function cleanExecOutput(text: string) {
-  return text
-    .replaceAll("\r\n", "\n")
-    .replace(ANSI_ESCAPE_PATTERN, "")
-    .replaceAll("\r", "")
-    .split("\n")
-    .filter((line) => !/^Script (?:running with cell ID .+|completed)$/.test(line)
-      && !/^(?:Wall|Wait) time [^\r\n]+$/.test(line)
-      && !/^Process (?:exited with code -?\d+|stopped with signal SIG[A-Z]+)$/.test(line)
-      && line !== "Output:")
-    .join("\n")
-    .trim();
-}
-
-function isEmptyExecOutput(text: string | null) {
-  if (!text) return true;
-  const cleaned = cleanExecOutput(text).trim();
-  return cleaned === "" || cleaned === "{}";
-}
-
-type UserInputQuestion = {
-  header: string;
-  id: string;
-  question: string;
-  options: Array<{ label: string; description: string }>;
-};
-
-function formatActivityDuration(ms: number | null) {
-  if (ms === null) return null;
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
-}
-
-function processExitCode(output: string | null, isError: boolean) {
-  if (output) {
-    const canonicalCodes = [...output.matchAll(/^Process exited with code (-?\d+)$/gim)]
-      .map((match) => Number(match[1]));
-    if (canonicalCodes.length > 0) return canonicalCodes.at(-1)!;
-
-    const structuredCode = parseExecOutput(output)?.exitCode;
-    if (structuredCode != null) return structuredCode;
-
-    const codes = [...output.matchAll(/^(?:exit code:\s*|command failed with exit code\s+)(-?\d+)\.?$/gim)]
-      .map((match) => Number(match[1]));
-    if (codes.length > 0) {
-      const nonzeroCodes = codes.filter((code) => code !== 0);
-      return Math.max(...(nonzeroCodes.length > 0 ? nonzeroCodes : codes));
-    }
-  }
-  return isError ? 1 : 0;
-}
-
-function processSignal(output: string | null) {
-  return output?.match(/Process stopped with signal (SIG[A-Z]+)/)?.[1] ?? null;
-}
-
 function ActivityOutput({ text, expanded, tone }: { text: string; expanded: boolean; tone: string }) {
-  const output = expanded ? text : buildCollapsedPreview(text, 5);
-  return (
-    <pre className={`mt-1 whitespace-pre-wrap break-words pl-2 ${tone}`}>
-      {`└ ${output}`}
-    </pre>
-  );
-}
-
-function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
-  if (!argumentsJson) return null;
-
-  try {
-    const parsed = JSON.parse(argumentsJson) as { questions?: unknown };
-    if (!Array.isArray(parsed.questions)) return null;
-
-    const questions = parsed.questions.filter((question): question is UserInputQuestion => {
-      if (!question || typeof question !== "object") return false;
-      const value = question as Partial<UserInputQuestion>;
-      return typeof value.header === "string"
-        && typeof value.id === "string"
-        && typeof value.question === "string"
-        && Array.isArray(value.options)
-        && value.options.every((option) => option
-          && typeof option === "object"
-          && typeof option.label === "string"
-          && typeof option.description === "string");
-    });
-
-    return questions.length > 0 ? questions : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseUserInputAnswers(outputJson: string | null): Record<string, string[]> {
-  if (!outputJson) return {};
-
-  try {
-    const parsed = JSON.parse(outputJson) as { answers?: Record<string, { answers?: unknown }> };
-    if (!parsed.answers || typeof parsed.answers !== "object") return {};
-    return Object.fromEntries(Object.entries(parsed.answers).flatMap(([id, answer]) => (
-      Array.isArray(answer?.answers) && answer.answers.every((value) => typeof value === "string")
-        ? [[id, answer.answers]]
-        : []
-    )));
-  } catch {
-    return {};
-  }
+  const { t } = useTranslation();
+  const preview = summarizeOutput(text);
+  const output = expanded ? text : [
+    ...preview.head,
+    ...(preview.omitted ? [t("sessions.detail.omitted_lines", { count: preview.omitted })] : []),
+    ...preview.tail,
+  ].join("\n");
+  return <pre className={`mt-1 whitespace-pre-wrap break-words border-l border-border/60 pl-4 ${tone}`}>{`└ ${output}`}</pre>;
 }
 
 function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
@@ -1034,7 +557,7 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
           const customAnswers = selectedAnswers.filter((answer) => !question.options.some((option) => option.label === answer));
 
           return (
-            <section key={question.id} className="rounded-lg border border-border/50 bg-muted/35 p-3">
+            <section key={question.id} className="py-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{question.header}</div>
               <div className="mt-1 text-sm font-semibold text-foreground">{question.question}</div>
               <ol className="mt-3 space-y-2">
@@ -1096,7 +619,7 @@ function WebSearchItem({
   const results = output ? splitWebSearchResults(output) : [];
 
   return (
-    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+    <div className={`py-2`}>
       <button
         type="button"
         className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1117,7 +640,7 @@ function WebSearchItem({
       </button>
       <div className="mt-3 space-y-2">
         {queries.length > 0 ? (
-          <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+          <div className="py-2">
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.search_queries")}</div>
             <ul className="space-y-1 font-mono text-xs leading-relaxed text-foreground">
               {queries.map((query, index) => <li key={`${index}-${query}`} className="break-words">• {query}</li>)}
@@ -1127,7 +650,7 @@ function WebSearchItem({
         {structuredResults ? (
           <div className="space-y-2">
             {structuredResults.map((result, index) => (
-              <article key={`${index}-${result.url ?? result.title}`} className="rounded-lg border border-border/50 bg-muted/35 p-3">
+              <article key={`${index}-${result.url ?? result.title}`} className="py-2">
                 {result.url ? (
                   <a href={result.url} target="_blank" rel="noreferrer" className="block break-words text-sm font-semibold text-primary hover:underline">{result.title}</a>
                 ) : <div className="break-words text-sm font-semibold text-foreground">{result.title}</div>}
@@ -1151,42 +674,13 @@ function WebSearchItem({
   );
 }
 
-function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
+function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: ToolActivity; item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const outerToolName = baseToolName(item.name);
-  const nestedWriteStdinArguments = EXEC_TOOL_NAMES.has(outerToolName) && item.arguments
-    ? parseNestedToolCall(item.arguments, "write_stdin")
-    : null;
-  const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
-  const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
-  const isExec = EXEC_TOOL_NAMES.has(outerToolName);
-  const webSearchQueries = isExec ? parseWebSearchQueries(item.arguments) : null;
-  const webSearchResults = parseWebSearchResultCards(item.output);
-  const batchExecResults = isExec ? parseBatchExecResults(item.output) : null;
-  const execArgumentList = batchExecResults ? parseExecArgumentList(item.arguments) : [];
-  const batchActivities = batchExecResults && execArgumentList.length > 1
-    ? batchExecResults.map((result, index) => ({ result, arguments: execArgumentList[index] ?? null }))
-    : null;
-  const execArguments = isExec && !batchActivities ? parseExecArguments(item.arguments) : null;
-  const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
-  const argumentEntries = parsedArguments
-    ? Object.entries(parsedArguments).filter(([key]) => !execArguments || !["cmd", "command", "workdir", "cwd"].includes(key))
-    : [];
-  const execOutput = isExec ? parseExecOutput(item.output) ?? parseExecOutput(item.output ? cleanExecOutput(item.output) : null) : null;
-  const contentBlocks = parseToolContentBlocks(item.output);
-  const argumentsText = execArguments?.command ?? (parsedArguments ? null : item.arguments);
+  const { outerToolName, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText } = activity;
   const argumentsTitle = execArguments?.kind === "patch"
     ? t("sessions.detail.patch_input")
     : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
-  const displayToolName = execArguments?.kind === "patch"
-    ? "apply_patch"
-    : nestedWriteStdinArguments
-      ? toolName
-      : item.name;
-  const rawOutputText = contentBlocks ? contentBlocks.text : execOutput?.stdout ?? (execOutput ? null : item.output);
-  const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
-  const stderrText = execOutput?.stderr ?? item.stderr;
 
   if (userInputQuestions) {
     return <UserInputItem item={item} questions={userInputQuestions} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
@@ -1198,7 +692,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
 
   if (batchActivities) {
     return (
-      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${ITEM_TONES.tool}`}>
+      <div className={`py-2 font-mono text-xs leading-relaxed`}>
         <button
           type="button"
           className={`flex w-full items-center justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1229,7 +723,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
                 <div className="flex min-w-0 gap-1.5 text-foreground">
                   <span className={`shrink-0 ${statusTone}`}>•</span>
                   <span className="min-w-0 whitespace-pre-wrap break-words">
-                    {failed ? "Failed" : t("sessions.detail.activity_ran")}
+                    {t("sessions.detail.activity_ran")}
                     {duration || result.exitCode !== null ? " (" : " "}
                     {duration}
                     {duration && result.exitCode !== null ? ", " : null}
@@ -1270,7 +764,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
           : "text-foreground";
     const outputTone = activityStatus === "failed" ? "text-error" : "text-muted-foreground";
     return (
-      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+      <div className={`py-2 font-mono text-xs leading-relaxed`}>
         <button
           type="button"
           className={`flex w-full min-w-0 items-start justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1284,9 +778,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
                 ? t("sessions.detail.activity_running")
                 : activityStatus === "stopped"
                   ? t("sessions.detail.activity_stopped")
-                  : activityStatus === "failed"
-                    ? "Failed"
-                    : t("sessions.detail.activity_ran")}
+                  : t("sessions.detail.activity_ran")}
               {duration || activityStatus !== "running" ? " (" : " "}
               {duration}
               {duration && activityStatus !== "running" && (activityStatus !== "stopped" || signal) ? ", " : null}
@@ -1315,7 +807,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
   }
 
   return (
-    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+    <div className={`py-2`}>
       <button
         type="button"
         className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1375,7 +867,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
             : <ToolPreview title={t("sessions.detail.output")} text={outputText} lines={5} />
         ) : null}
         {contentBlocks?.images.length ? (
-          <div className="rounded-lg border border-border/50 bg-muted/35 p-3">
+          <div className="py-2">
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {t("sessions.detail.image_count", { count: contentBlocks.images.length })}
             </div>
@@ -1433,7 +925,7 @@ function PatchItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, {
   );
 }
 
-function TimelineItem({ item, tokenUsage, rawJsonlLines }: TimelineEntry & { rawJsonlLines: string[] }) {
+function TimelineItem({ item, activity, tokenUsage, rawJsonlLines }: TimelineEntry & { rawJsonlLines: string[] }) {
   const { t } = useTranslation();
   const rawJsonl = [...(item.rawJsonlLineNumbers ?? []), ...(tokenUsage?.rawJsonlLineNumbers ?? [])]
     .flatMap((lineNumber) => rawJsonlLines[lineNumber - 1] === undefined ? [] : [rawJsonlLines[lineNumber - 1]]);
@@ -1443,14 +935,14 @@ function TimelineItem({ item, tokenUsage, rawJsonlLines }: TimelineEntry & { raw
     content = <MessageItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "reasoning") {
     content = (
-      <div className={`rounded-lg border p-3 ${ITEM_TONES.reasoning}`}>
+      <div className={`border-l border-border/60 pl-4 py-2 text-muted-foreground`}>
         {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
         <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
     );
   } else if (item.kind === "toolCall") {
-    content = <ToolCallItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
+    content = <ToolCallItem item={item} activity={activity!} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "patch") {
     if (!item.isError && item.success !== false) return null;
     content = <PatchItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
@@ -1474,6 +966,44 @@ function TimelineItem({ item, tokenUsage, rawJsonlLines }: TimelineEntry & { raw
   }
 
   return content;
+}
+
+export function ConversationItem({ block, rawJsonlLines }: { block: ConversationBlock; rawJsonlLines: string[] }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  if (block.kind === "item") return <TimelineItem {...block.entry} rawJsonlLines={rawJsonlLines} />;
+  // Merge adjacent reads only, retaining a badge for each original token event.
+  const rows: { label: string; names: string[]; entries: TimelineEntry[] }[] = [];
+  block.actions.forEach((actions, index) => {
+    actions.forEach((action, actionIndex) => {
+      const previous = rows.at(-1);
+      const entries = actionIndex === actions.length - 1 ? [block.entries[index]] : [];
+      if (action.label === "Read" && previous?.label === "Read") {
+        if (!previous.names.includes(action.text)) previous.names.push(action.text);
+        previous.entries.push(...entries);
+      } else rows.push({ label: action.label, names: [action.text], entries });
+    });
+  });
+  return (
+    <section className="py-2" aria-label="Explored">
+      <button type="button" className={`flex w-full items-center gap-2 text-left text-xs text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        <span aria-hidden="true">•</span><span className="font-semibold">Explored</span>
+        <span>{t("sessions.detail.tool_count", { count: block.entries.length })}</span>
+        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <span className="sr-only">{t(expanded ? "sessions.detail.collapse" : "sessions.detail.expand")}</span>
+      </button>
+      {expanded ? <div className="ml-2 mt-2 space-y-2 border-l border-border/60 pl-4">
+        {block.entries.map((entry, index) => <TimelineItem key={index} {...entry} rawJsonlLines={rawJsonlLines} />)}
+      </div> : <div className="ml-2 mt-2 space-y-2 border-l border-border/60 pl-4">
+        {rows.map((row, index) => <div key={index} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
+          <span className="min-w-0 break-words text-muted-foreground"><span className="mr-2 font-medium text-foreground">{row.label}</span>{row.names.join(", ")}</span>
+          <span className="flex flex-wrap justify-end gap-2">{row.entries.map((entry, entryIndex) => entry.tokenUsage ? <span key={entryIndex} className="inline-flex items-center gap-1" title={entry.activity?.execArguments?.command}>
+            {row.entries.length > 1 ? <span className="text-[10px] text-muted-foreground">#{entryIndex + 1}</span> : null}<TokenMetadata usage={entry.tokenUsage} />
+          </span> : null)}</span>
+        </div>)}
+      </div>}
+    </section>
+  );
 }
 
 export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
@@ -1589,6 +1119,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
   const rawJsonlLines = useMemo(() => detail?.rawJsonl.split("\n") ?? [], [detail?.rawJsonl]);
+  const conversation = useMemo(() => detail?.turns.map(buildConversation) ?? [], [detail]);
 
   async function copySessionId() {
     await navigator.clipboard?.writeText(displayedSessionId);
@@ -1706,7 +1237,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
         <div
           data-testid="session-detail-scroll"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 px-4 py-3"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background px-4 py-5"
           onScroll={(event) => {
             const nextIsScrolled = event.currentTarget.scrollTop > 12;
             setIsScrolled((current) => current === nextIsScrolled ? current : nextIsScrolled);
@@ -1723,7 +1254,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               {t("sessions.detail.loading_replay")}
             </div>
           ) : activeTab === "timeline" ? (
-            <div className="mx-auto max-w-6xl space-y-2.5">
+            <div className="mx-auto max-w-5xl space-y-5">
               <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={setActivePath} />
               {activePath === session.path ? <SessionQuotaUsageView usage={session.quotaUsage} detailed /> : null}
               {detail.turns.map((turn, index) => {
@@ -1731,7 +1262,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                 const isExpanded = expandedTurns.has(turnKey);
                 const userPreview = firstUserPreview(turn);
                 return (
-                <section key={turnKey} className="rounded-lg border border-border/60 bg-surface px-3 py-2.5">
+                <section key={turnKey} className="border-t border-border/50 pt-3">
                   <button
                     type="button"
                     className={`flex w-full flex-col gap-1.5 rounded-md text-left sm:flex-row sm:items-center sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1739,19 +1270,19 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     onClick={() => toggleTurn(turnKey)}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-sm font-bold">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                         <MessageSquare className="h-4 w-4 text-primary" />
                         {t("sessions.detail.turn", { id: turn.turnId })}
                       </div>
-                      {userPreview ? (
+                      {!isExpanded && userPreview ? (
                         <div className="mt-1 truncate text-xs text-muted-foreground">{userPreview}</div>
                       ) : null}
                       <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-                        <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.message_count", { count: countMessages(turn) })}</span>
-                        <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.tool_count", { count: turn.toolCalls.length })}</span>
-                        <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.patch_count", { count: turn.patchResults.length })}</span>
-                        <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.error_count", { count: turn.errors.length })}</span>
-                        <span className="rounded border border-border/50 px-2 py-0.5">{t("sessions.detail.token_event_count", { count: turn.tokenEvents.length })}</span>
+                        <span className="px-1 py-0.5">{t("sessions.detail.message_count", { count: countMessages(turn) })}</span>
+                        <span className="px-1 py-0.5">{t("sessions.detail.tool_count", { count: turn.toolCalls.length })}</span>
+                        <span className="px-1 py-0.5">{t("sessions.detail.patch_count", { count: turn.patchResults.length })}</span>
+                        <span className="px-1 py-0.5">{t("sessions.detail.error_count", { count: turn.errors.length })}</span>
+                        <span className="px-1 py-0.5">{t("sessions.detail.token_event_count", { count: turn.tokenEvents.length })}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
@@ -1763,9 +1294,9 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     </div>
                   </button>
                   {isExpanded ? (
-                  <div className="relative mt-2 ml-1 space-y-2 border-l-2 border-border/70 pl-4 before:absolute before:-left-[5px] before:top-1 before:h-2 before:w-2 before:rounded-full before:bg-primary">
-                    {timelineEntries(orderedItems(turn)).map((entry, itemIndex) => (
-                      <TimelineItem key={`${entry.item.kind}-${itemIndex}`} {...entry} rawJsonlLines={rawJsonlLines} />
+                  <div className="mt-4 space-y-3">
+                    {conversation[index].map((block, itemIndex) => (
+                      <ConversationItem key={itemIndex} block={block} rawJsonlLines={rawJsonlLines} />
                     ))}
                   </div>
                   ) : null}
