@@ -48,7 +48,7 @@ function isOAuthLoginError(err: string | null): boolean {
 export function hasSubscription(limits: CodexLimitsResponse | null | undefined): boolean {
   if (!limits || !limits.membershipLevel) return false;
   const level = limits.membershipLevel.toLowerCase();
-  return ["plus", "pro", "team", "enterprise"].includes(level);
+  return ["plus", "pro", "team", "business", "enterprise"].includes(level);
 }
 
 export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {

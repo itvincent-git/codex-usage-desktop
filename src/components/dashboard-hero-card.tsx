@@ -57,6 +57,10 @@ export function DashboardHeroCard({
   const topProjects = buildCostDrivers(projects.map((project) => ({ label: projectLabel(project), costUSD: project.costUSD })));
   const topDates = buildCostDrivers(overview.daily.map((day) => ({ label: day.date, costUSD: day.costUSD })));
   const subscriptionExpiryLabel = formatSubscriptionExpiry(codexLimits?.subscriptionExpiresAt ?? null, t);
+  const membershipLevel = codexLimits?.membershipLevel?.toLowerCase();
+  const membershipLabel = membershipLevel === "team" || membershipLevel === "business"
+    ? "Business"
+    : codexLimits?.membershipLevel;
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -132,20 +136,20 @@ export function DashboardHeroCard({
                       <span>{codexLimits.account}</span>
                     </div>
                   )}
-                  {codexLimits?.membershipLevel && (
+                  {membershipLevel && (
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
                         "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 border",
-                        codexLimits.membershipLevel.toLowerCase() === "plus" || codexLimits.membershipLevel.toLowerCase() === "pro"
+                        membershipLevel === "plus" || membershipLevel === "pro"
                           ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
-                          : codexLimits.membershipLevel.toLowerCase() === "team" || codexLimits.membershipLevel.toLowerCase() === "enterprise"
+                          : membershipLevel === "team" || membershipLevel === "business" || membershipLevel === "enterprise"
                           ? "bg-purple-500/10 border-purple-500/25 text-purple-400"
                           : "bg-muted/50 border-border/40 text-muted-foreground"
                       )}>
-                        {["plus", "pro", "team", "enterprise"].includes(codexLimits.membershipLevel.toLowerCase()) && (
+                        {["plus", "pro", "team", "business", "enterprise"].includes(membershipLevel) && (
                           <Sparkles className="h-2.5 w-2.5" />
                         )}
-                        {codexLimits.membershipLevel}
+                        {membershipLabel}
                       </span>
                     </div>
                   )}

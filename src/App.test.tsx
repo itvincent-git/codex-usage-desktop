@@ -573,7 +573,7 @@ describe("App", () => {
           updatedAt: "2026-04-26T00:00:00.000Z",
           source: "cli-rpc",
           account: "user@example.com",
-          membershipLevel: "plus",
+          membershipLevel: "team",
           subscriptionExpiresAt: "2026-06-12T08:22:29+00:00",
           subscriptionWillRenew: false,
         };
@@ -718,6 +718,7 @@ describe("App", () => {
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Business")).toBeInTheDocument();
     expect(screen.getByText(/Expires 2026-06-11 \(\d+ days? left\)/)).toBeInTheDocument();
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
     expect(screen.getByText("Total Token Trend")).toBeInTheDocument();
