@@ -995,6 +995,7 @@ mod tests {
             source: "test".to_string(),
             account: None,
             membership_level: None,
+            workspace_name: None,
             subscription_expires_at: None,
             subscription_will_renew: None,
         }

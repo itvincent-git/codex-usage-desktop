@@ -265,6 +265,7 @@ pub struct CodexLimitsResponse {
     pub source: String,
     pub account: Option<String>,
     pub membership_level: Option<String>,
+    pub workspace_name: Option<String>,
     pub subscription_expires_at: Option<String>,
     pub subscription_will_renew: Option<bool>,
 }

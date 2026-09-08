@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles, Building2 } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,12 +128,18 @@ export function DashboardHeroCard({
               </div>
 
               {/* Account and Membership Info */}
-              {(codexLimits?.account || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
+              {(codexLimits?.account || codexLimits?.workspaceName || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
                 <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
                   {codexLimits?.account && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                       <User className="h-3.5 w-3.5 text-muted-foreground/60" />
                       <span>{codexLimits.account}</span>
+                    </div>
+                  )}
+                  {codexLimits?.workspaceName && (
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                      <Building2 className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span>{codexLimits.workspaceName}</span>
                     </div>
                   )}
                   {membershipLevel && (

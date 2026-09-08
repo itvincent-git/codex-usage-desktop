@@ -176,6 +176,7 @@ struct AccountSnapshot {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct SubscriptionInfo {
+    workspace_name: Option<String>,
     expires_at: Option<String>,
     will_renew: Option<bool>,
     has_active_subscription: Option<bool>,
@@ -540,6 +541,7 @@ fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimit
         source: limits.source.to_string(),
         account: account.account,
         membership_level: account.membership_level,
+        workspace_name: account.subscription.workspace_name,
         subscription_expires_at: account.subscription.expires_at,
         subscription_will_renew: account.subscription.will_renew,
     }
@@ -581,18 +583,21 @@ fn fetch_subscription_info(auth: &CodexAuth) -> Result<SubscriptionInfo, String>
 
     let value = serde_json::from_str::<Value>(&body)
         .map_err(|error| format!("Failed to parse ChatGPT account check response: {error}"))?;
-    Ok(parse_subscription_info(&value))
+    Ok(parse_subscription_info(&value, auth.account_id.as_deref()))
 }
 
 fn chatgpt_timezone_offset_min() -> i32 {
     -Local::now().offset().local_minus_utc() / 60
 }
 
-fn parse_subscription_info(value: &Value) -> SubscriptionInfo {
-    let Some(account) = subscription_account_value(value) else {
+fn parse_subscription_info(value: &Value, account_id: Option<&str>) -> SubscriptionInfo {
+    let Some(account) = subscription_account_value(value, account_id) else {
         return SubscriptionInfo::default();
     };
 
+    let workspace_name = account
+        .get("account")
+        .and_then(|account| string_field(account, "name"));
     let expires_at = account
         .get("entitlement")
         .and_then(|entitlement| string_field(entitlement, "expires_at"));
@@ -606,20 +611,24 @@ fn parse_subscription_info(value: &Value) -> SubscriptionInfo {
         .and_then(Value::as_bool);
 
     SubscriptionInfo {
+        workspace_name,
         expires_at,
         will_renew,
         has_active_subscription,
     }
 }
 
-fn subscription_account_value(value: &Value) -> Option<&Value> {
+fn subscription_account_value<'a>(value: &'a Value, account_id: Option<&str>) -> Option<&'a Value> {
     let accounts = value.get("accounts")?;
-    accounts.get("default").or_else(|| {
-        accounts
-            .as_object()?
-            .values()
-            .find(|account| account.get("entitlement").is_some())
-    })
+    account_id
+        .and_then(|account_id| accounts.get(account_id))
+        .or_else(|| accounts.get("default"))
+        .or_else(|| {
+            accounts
+                .as_object()?
+                .values()
+                .find(|account| account.get("entitlement").is_some())
+        })
 }
 
 fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
@@ -1891,11 +1900,47 @@ mod tests {
         });
 
         assert_eq!(
-            parse_subscription_info(&value),
+            parse_subscription_info(&value, None),
             SubscriptionInfo {
+                workspace_name: None,
                 expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
                 will_renew: Some(false),
                 has_active_subscription: Some(true),
+            }
+        );
+    }
+
+    #[test]
+    fn selects_workspace_account_from_account_check_response() {
+        let value = serde_json::json!({
+            "accounts": {
+                "business-account": {
+                    "account": {
+                        "account_id": "business-account",
+                        "name": "Elelive团队"
+                    },
+                    "entitlement": {
+                        "has_active_subscription": true
+                    }
+                },
+                "default": {
+                    "account": {
+                        "account_id": "personal-account",
+                        "name": null
+                    },
+                    "entitlement": {
+                        "has_active_subscription": false
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            parse_subscription_info(&value, Some("business-account")),
+            SubscriptionInfo {
+                workspace_name: Some("Elelive团队".to_string()),
+                has_active_subscription: Some(true),
+                ..SubscriptionInfo::default()
             }
         );
     }
@@ -1938,7 +1983,10 @@ mod tests {
             }
         });
 
-        assert_eq!(parse_subscription_info(&value), SubscriptionInfo::default());
+        assert_eq!(
+            parse_subscription_info(&value, None),
+            SubscriptionInfo::default()
+        );
     }
 
     #[test]
@@ -1981,6 +2029,7 @@ mod tests {
                 account: Some("user@example.com".to_string()),
                 membership_level: Some("plus".to_string()),
                 subscription: SubscriptionInfo {
+                    workspace_name: Some("Workspace".to_string()),
                     expires_at: Some("2026-06-12T08:22:29+00:00".to_string()),
                     will_renew: Some(false),
                     has_active_subscription: Some(true),
@@ -1993,6 +2042,7 @@ mod tests {
             Some("2026-06-12T08:22:29+00:00".to_string())
         );
         assert_eq!(response.subscription_will_renew, Some(false));
+        assert_eq!(response.workspace_name, Some("Workspace".to_string()));
         assert_eq!(response.reset_credits_available_count, Some(2));
     }
 

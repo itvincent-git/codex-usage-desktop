@@ -143,6 +143,7 @@ export type CodexLimitsResponse = {
   source: string;
   account?: string | null;
   membershipLevel?: string | null;
+  workspaceName?: string | null;
   subscriptionExpiresAt?: string | null;
   subscriptionWillRenew?: boolean | null;
 };

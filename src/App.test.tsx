@@ -574,6 +574,7 @@ describe("App", () => {
           source: "cli-rpc",
           account: "user@example.com",
           membershipLevel: "team",
+          workspaceName: "Elelive团队",
           subscriptionExpiresAt: "2026-06-12T08:22:29+00:00",
           subscriptionWillRenew: false,
         };
@@ -718,6 +719,7 @@ describe("App", () => {
     expect(screen.getAllByText("80%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("55%").length).toBeGreaterThan(0);
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Elelive团队")).toBeInTheDocument();
     expect(screen.getByText("Business")).toBeInTheDocument();
     expect(screen.getByText(/Expires 2026-06-11 \(\d+ days? left\)/)).toBeInTheDocument();
     expect(screen.getByText("· Auto-renew off")).toBeInTheDocument();
