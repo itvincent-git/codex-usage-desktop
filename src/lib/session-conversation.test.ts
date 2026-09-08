@@ -45,6 +45,30 @@ describe("conversation projection", () => {
     expect(blocks[0].kind).toBe("item");
   });
 
+  it("projects nested commands, patches and images in source order", () => {
+    const patch = "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-tools.view_image({path: 'not a call'})\n+fixed\n*** End Patch";
+    const argumentsJson = [
+      'text(await tools.exec_command({cmd:"pnpm test", workdir:"/repo"}));',
+      `const patch = ${JSON.stringify(patch)}; text(await tools.apply_patch(patch));`,
+      'const image = await tools.view_image({path:"/tmp/result.png"}); image(image.image_url);',
+      'text(await tools.exec_command({cmd:"git status --short"}));',
+    ].join("\n");
+    const output = JSON.stringify([
+      { type: "input_text", text: JSON.stringify({ exit_code: 0, output: "tests passed", wall_time_seconds: 1.2 }) },
+      { type: "input_text", text: "Done!" },
+      { type: "image", image_url: "data:image/png;base64,AA==" },
+      { type: "input_text", text: JSON.stringify({ exit_code: 0, output: "M src/a.ts", wall_time_seconds: 0.1 }) },
+    ]);
+    const block = buildConversation(replayTurn([command("", { name: "exec", arguments: argumentsJson, output })]))[0];
+    if (block.kind !== "item" || block.entry.item.kind !== "toolCall") throw new Error("Expected tool activity");
+    expect(block.entry.activity?.nestedActivities).toEqual([
+      { kind: "command", command: "pnpm test", workdir: "/repo", output: { stdout: "tests passed", stderr: null, exitCode: 0, wallTimeSeconds: 1.2, sessionId: null } },
+      { kind: "patch", patch },
+      { kind: "image", path: "/tmp/result.png", imageUrl: "data:image/png;base64,AA==" },
+      { kind: "command", command: "git status --short", workdir: null, output: { stdout: "M src/a.ts", stderr: null, exitCode: 0, wallTimeSeconds: 0.1, sessionId: null } },
+    ]);
+  });
+
   it("recognizes literal RTK read, search and list commands", () => {
     expect(classifyExploration("rtk proxy cat 'src/a b.rs'")).toEqual([{ label: "Read", text: "src/a b.rs" }]);
     expect(classifyExploration("rtk sed -n '1,20p' src/a.rs")).toEqual([{ label: "Read", text: "src/a.rs" }]);

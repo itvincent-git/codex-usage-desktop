@@ -1530,10 +1530,10 @@ describe("App", () => {
     expect(toolCallButton).toHaveAttribute("aria-expanded", "false");
     expect(toolCall).not.toHaveTextContent("LONG_ARGUMENT_TAIL");
     expect(toolCall).not.toHaveTextContent("LONG_TOOL_OUTPUT_TAIL");
-    const batchActivity = screen.getByRole("button", { name: /exec · completed · 2 tools/ });
-    expect(batchActivity.parentElement).toHaveTextContent("Ran (200ms, exit 0) pnpm test");
-    expect(batchActivity.parentElement).toHaveTextContent("Ran (100ms, exit 1) rtk rg missing src");
-    expect(batchActivity.parentElement).toHaveTextContent("tests passed");
+    const batchSuccess = screen.getByRole("button", { name: /Ran \(200ms\) pnpm test/ });
+    const batchFailure = screen.getByRole("button", { name: /Ran \(100ms\) rtk rg missing src/ });
+    expect(batchSuccess.parentElement).toHaveTextContent("tests passed");
+    expect(batchFailure.querySelector(".text-error")).toBeInTheDocument();
     const runningActivity = screen.getByRole("button", { name: /Running \(11s\) pnpm test src\/App.test.tsx && pnpm typecheck/ });
     expect(runningActivity).toHaveAttribute("aria-expanded", "false");
     expect(runningActivity.parentElement).toHaveTextContent("running test output");
@@ -1585,9 +1585,9 @@ describe("App", () => {
     await userEvent.click(waitCallButton);
     expect(within(waitCall).getByRole("img", { name: "Output image 1" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /write_stdin/ })).not.toBeInTheDocument();
-    const applyPatchButton = screen.getByRole("button", { name: /apply_patch · completed/ });
+    const applyPatchButton = screen.getByRole("button", { name: /Edited .*src\/example.ts/ });
     const applyPatchCall = applyPatchButton.parentElement!;
-    expect(applyPatchCall).toHaveTextContent("Edited 1 file");
+    expect(applyPatchCall).toHaveTextContent("Edited /repo/app/src/example.ts");
     expect(applyPatchCall).toHaveTextContent("+1");
     expect(applyPatchCall).toHaveTextContent("-1");
     expect(applyPatchCall).not.toHaveTextContent("*** Begin Patch");

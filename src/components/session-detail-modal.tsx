@@ -1,7 +1,7 @@
 import {
   buildConversation, cleanExecOutput, formatActivityDuration, formatJsonForDisplay, formatToolArgumentValue,
   parseToolContentBlocks, parseUserInputAnswers, processExitCode, processSignal, splitWebSearchResults, summarizeOutput,
-  type ConversationBlock, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
+  type ConversationBlock, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
@@ -423,6 +423,7 @@ function ToolPreview({ title, text, lines }: { title: string; text: string; line
 }
 
 type PatchDiffFile = {
+  action: "added" | "edited" | "deleted";
   path: string;
   lines: string[];
   additions: number;
@@ -434,9 +435,10 @@ function parsePatchDiff(patch: string): PatchDiffFile[] {
   let current: PatchDiffFile | null = null;
 
   for (const line of patch.split("\n")) {
-    const fileMatch = line.match(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/);
+    const fileMatch = line.match(/^\*\*\* (Add|Update|Delete) File: (.+)$/);
     if (fileMatch) {
-      current = { path: fileMatch[1], lines: [], additions: 0, deletions: 0 };
+      const action = fileMatch[1] === "Add" ? "added" : fileMatch[1] === "Delete" ? "deleted" : "edited";
+      current = { action, path: fileMatch[2], lines: [], additions: 0, deletions: 0 };
       files.push(current);
       continue;
     }
@@ -447,6 +449,16 @@ function parsePatchDiff(patch: string): PatchDiffFile[] {
   }
 
   return files;
+}
+
+function patchSummary(patch: string, t: ReturnType<typeof useTranslation>["t"]) {
+  const files = parsePatchDiff(patch);
+  const additions = files.reduce((total, file) => total + file.additions, 0);
+  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+  const label = files.length === 1
+    ? t(`sessions.detail.patch_${files[0].action}`, { path: files[0].path })
+    : t("sessions.detail.edited_files", { count: files.length });
+  return { files, additions, deletions, label };
 }
 
 function numberPatchLines(lines: string[]) {
@@ -473,11 +485,9 @@ function numberPatchLines(lines: string[]) {
   });
 }
 
-function PatchDiffBlock({ patch, expanded }: { patch: string; expanded: boolean }) {
+function PatchDiffBlock({ patch, expanded, hideHeader = false }: { patch: string; expanded: boolean; hideHeader?: boolean }) {
   const { t } = useTranslation();
-  const files = parsePatchDiff(patch);
-  const additions = files.reduce((total, file) => total + file.additions, 0);
-  const deletions = files.reduce((total, file) => total + file.deletions, 0);
+  const { files, additions, deletions, label } = patchSummary(patch, t);
 
   if (files.length === 0) {
     return expanded
@@ -487,12 +497,12 @@ function PatchDiffBlock({ patch, expanded }: { patch: string; expanded: boolean 
 
   return (
     <div className="overflow-hidden rounded-lg border border-border/60 bg-background/70 font-mono text-xs">
-      <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2 font-semibold">
+      {!hideHeader ? <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2 font-semibold">
         <FileDiff className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{t("sessions.detail.edited_files", { count: files.length })}</span>
+        <span className="min-w-0 truncate">{label}</span>
         <span className="text-green-600 dark:text-green-400">+{additions}</span>
         <span className="text-red-600 dark:text-red-400">-{deletions}</span>
-      </div>
+      </div> : null}
       {expanded ? files.map((file) => (
         <section key={file.path}>
           <div className="flex items-center gap-2 border-b border-border/50 bg-muted/40 px-3 py-2 font-semibold">
@@ -536,6 +546,47 @@ function ActivityOutput({ text, expanded, tone }: { text: string; expanded: bool
     ...preview.tail,
   ].join("\n");
   return <pre className={`mt-1 whitespace-pre-wrap break-words border-l border-border/60 pl-4 ${tone}`}>{`└ ${output}`}</pre>;
+}
+
+function NestedActivityItem({ activity, tokenUsage }: { activity: NestedActivity; tokenUsage?: TokenUsageItem }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+
+  if (activity.kind === "patch") {
+    const { files, additions, deletions, label } = patchSummary(activity.patch, t);
+    return <div className="py-1.5">
+      <button type="button" className={`flex w-full items-start justify-between gap-3 text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        <span className="flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
+          <span className="text-muted-foreground">•</span><span className="min-w-0 break-all">{label}</span>
+          {files.length ? <><span className="text-green-600 dark:text-green-400">+{additions}</span><span className="text-red-600 dark:text-red-400">-{deletions}</span></> : null}
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-muted-foreground">{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}{expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
+      </button>
+      {expanded ? <div className="ml-4 mt-2"><PatchDiffBlock patch={activity.patch} expanded hideHeader /></div> : null}
+    </div>;
+  }
+
+  if (activity.kind === "image") {
+    return <div className="py-1.5">
+      <button type="button" className={`flex w-full items-start justify-between gap-3 text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        <span className="min-w-0"><span className="font-semibold"><span className="mr-1.5 text-muted-foreground">•</span>{t("sessions.detail.viewed_image")}</span><span className="mt-1 block break-all border-l border-border/60 pl-4 text-muted-foreground">└ {activity.path}</span></span>
+        <span className="flex shrink-0 items-center gap-2 text-muted-foreground">{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}{activity.imageUrl ? expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" /> : null}</span>
+      </button>
+      {expanded && activity.imageUrl ? <img src={activity.imageUrl} alt={activity.path} loading="lazy" className="ml-4 mt-2 max-h-80 max-w-[calc(100%-1rem)] rounded-md border border-border/60 bg-background object-contain" /> : null}
+    </div>;
+  }
+
+  const failed = activity.output?.exitCode != null && activity.output.exitCode !== 0;
+  const stdout = activity.output?.stdout ? cleanExecOutput(activity.output.stdout) : null;
+  const duration = activity.output?.wallTimeSeconds == null ? null : formatActivityDuration(activity.output.wallTimeSeconds * 1000);
+  return <div className="py-1.5">
+    <button type="button" className={`flex w-full min-w-0 items-start justify-between gap-3 text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+      <span className="flex min-w-0 gap-1.5"><span className={failed ? "shrink-0 text-error" : "shrink-0 text-muted-foreground"}>•</span><span className="min-w-0 whitespace-pre-wrap break-words"><span className="font-semibold">{t("sessions.detail.activity_ran")}</span>{duration ? ` (${duration})` : ""} {expanded ? activity.command : buildCollapsedPreview(activity.command, 1)}</span></span>
+      <span className="flex shrink-0 items-center gap-2 text-muted-foreground">{tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}{expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
+    </button>
+    {stdout ? <ActivityOutput text={stdout} expanded={expanded} tone={failed ? "text-error" : "text-muted-foreground"} /> : null}
+    {activity.output?.stderr ? <ActivityOutput text={activity.output.stderr} expanded={expanded} tone="text-error" /> : null}
+  </div>;
 }
 
 function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
@@ -677,7 +728,7 @@ function WebSearchItem({
 function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: ToolActivity; item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const { outerToolName, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText } = activity;
+  const { outerToolName, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, nestedActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText } = activity;
   const argumentsTitle = execArguments?.kind === "patch"
     ? t("sessions.detail.patch_input")
     : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
@@ -688,6 +739,21 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
     return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
+  }
+
+  if (nestedActivities) {
+    return <div className="py-2 font-mono text-xs leading-relaxed">
+      <div className="space-y-1">
+        {nestedActivities.map((nestedActivity, index) => (
+          <NestedActivityItem
+            key={`${nestedActivity.kind}-${index}`}
+            activity={nestedActivity}
+            tokenUsage={index === nestedActivities.length - 1 ? tokenUsage : undefined}
+          />
+        ))}
+      </div>
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
+    </div>;
   }
 
   if (batchActivities) {

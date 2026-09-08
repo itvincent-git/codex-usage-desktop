@@ -41,3 +41,32 @@ it("keeps each call's tokens visible after deduplicating reads and exposes origi
   await userEvent.click(screen.getAllByRole("button", { name: "View raw JSONL" })[1]);
   expect(screen.getByText('{"call":1}')).toBeInTheDocument();
 });
+
+it("renders nested orchestration calls as ordered CLI-style activities", async () => {
+  await i18n.changeLanguage("en");
+  const patch = "*** Begin Patch\n*** Update File: src/a.ts\n@@ -1 +1 @@\n-old\n+new\n*** End Patch";
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [{
+      kind: "toolCall", callId: "outer", name: "exec", status: "completed",
+      arguments: `text(await tools.exec_command({cmd:"pnpm test"}));\nconst patch = ${JSON.stringify(patch)}; text(await tools.apply_patch(patch));\nconst result = await tools.view_image({path:"/tmp/result.png"}); image(result.image_url);`,
+      output: JSON.stringify([
+        { type: "input_text", text: JSON.stringify({ exit_code: 0, output: "tests passed", wall_time_seconds: 1 }) },
+        { type: "input_text", text: "Done!" },
+        { type: "input_image", image_url: "data:image/png;base64,AA==" },
+      ]),
+      stderr: null, startedAt: null, completedAt: null, durationMs: 100, isError: false,
+    }],
+  };
+  render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={[]} />);
+  const activities = screen.getAllByRole("button");
+  expect(activities[0]).toHaveTextContent("Ran (1s) pnpm test");
+  expect(activities[1]).toHaveTextContent("Edited src/a.ts+1-1");
+  expect(activities[2]).toHaveTextContent("Viewed Image");
+  expect(activities[2]).toHaveTextContent("/tmp/result.png");
+  await userEvent.click(activities[0]);
+  expect(screen.getByText(/tests passed/)).toBeInTheDocument();
+  await userEvent.click(activities[2]);
+  expect(screen.getByRole("img", { name: "/tmp/result.png" })).toBeInTheDocument();
+});
