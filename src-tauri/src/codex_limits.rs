@@ -488,36 +488,43 @@ fn fetch_account_snapshot() -> AccountSnapshot {
     let Ok(auth) = load_codex_auth() else {
         return AccountSnapshot::default();
     };
-    let (account, mut membership_level) = decode_jwt_info(&auth.access_token);
+    let (account, membership_level) = decode_jwt_info(&auth.access_token);
     let subscription = match fetch_subscription_info(&auth) {
-        Ok(subscription) => {
-            let is_expired = if let Some(ref expires_at_str) = subscription.expires_at {
-                if let Ok(expires_at) = chrono::DateTime::parse_from_rfc3339(expires_at_str) {
-                    Utc::now() > expires_at.with_timezone(&Utc)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            let has_active = subscription.has_active_subscription.unwrap_or(true);
-            if !has_active || is_expired {
-                membership_level = Some("free".to_string());
-            }
-
-            subscription
-        }
+        Ok(subscription) => subscription,
         Err(error) => {
             log::warn!("ChatGPT account check unavailable: {error}");
             SubscriptionInfo::default()
         }
     };
+    let membership_level = reconcile_membership_level(membership_level, &subscription);
 
     AccountSnapshot {
         account,
         membership_level,
         subscription,
+    }
+}
+
+fn reconcile_membership_level(
+    membership_level: Option<String>,
+    subscription: &SubscriptionInfo,
+) -> Option<String> {
+    let is_workspace_plan = membership_level.as_deref().is_some_and(|level| {
+        ["team", "business", "enterprise"]
+            .iter()
+            .any(|workspace_plan| level.eq_ignore_ascii_case(workspace_plan))
+    });
+    let is_expired = subscription
+        .expires_at
+        .as_deref()
+        .and_then(|expires_at| chrono::DateTime::parse_from_rfc3339(expires_at).ok())
+        .is_some_and(|expires_at| Utc::now() > expires_at.with_timezone(&Utc));
+    let has_active = subscription.has_active_subscription.unwrap_or(true);
+
+    if !is_workspace_plan && (!has_active || is_expired) {
+        Some("free".to_string())
+    } else {
+        membership_level
     }
 }
 
@@ -1932,6 +1939,32 @@ mod tests {
         });
 
         assert_eq!(parse_subscription_info(&value), SubscriptionInfo::default());
+    }
+
+    #[test]
+    fn preserves_workspace_membership_when_personal_subscription_is_inactive() {
+        let subscription = SubscriptionInfo {
+            has_active_subscription: Some(false),
+            ..SubscriptionInfo::default()
+        };
+
+        assert_eq!(
+            reconcile_membership_level(Some("team".to_string()), &subscription),
+            Some("team".to_string())
+        );
+    }
+
+    #[test]
+    fn downgrades_personal_membership_when_subscription_is_inactive() {
+        let subscription = SubscriptionInfo {
+            has_active_subscription: Some(false),
+            ..SubscriptionInfo::default()
+        };
+
+        assert_eq!(
+            reconcile_membership_level(Some("plus".to_string()), &subscription),
+            Some("free".to_string())
+        );
     }
 
     #[test]
