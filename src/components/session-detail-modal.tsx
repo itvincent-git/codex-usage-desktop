@@ -1222,7 +1222,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
                 <div className="flex min-w-0 gap-1.5 text-foreground">
                   <span className={`shrink-0 ${statusTone}`}>•</span>
                   <span className="min-w-0 whitespace-pre-wrap break-words">
-                    {failed ? t("sessions.detail.activity_failed") : t("sessions.detail.activity_ran")}
+                    {failed ? "Failed" : t("sessions.detail.activity_ran")}
                     {duration || result.exitCode !== null ? " (" : " "}
                     {duration}
                     {duration && result.exitCode !== null ? ", " : null}
@@ -1278,7 +1278,7 @@ function ToolCallItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem
                 : activityStatus === "stopped"
                   ? t("sessions.detail.activity_stopped")
                   : activityStatus === "failed"
-                    ? t("sessions.detail.activity_failed")
+                    ? "Failed"
                     : t("sessions.detail.activity_ran")}
               {duration || activityStatus !== "running" ? " (" : " "}
               {duration}

@@ -1055,6 +1055,11 @@ describe("session titles", () => {
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Output: 53"));
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Reasoning: 6"));
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining("Total tokens: 87,001"));
+
+    await i18n.changeLanguage("zh");
+    expect(activityButton).toHaveTextContent("Failed");
+    expect(activityButton).not.toHaveTextContent("执行失败");
+    await i18n.changeLanguage("en");
   });
 
   it("shows the parent-child agent hierarchy and opens a subagent replay", async () => {
