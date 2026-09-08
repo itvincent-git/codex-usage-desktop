@@ -468,6 +468,7 @@ impl ReplayParseState {
                                 .insert(call_id.clone(), target_call_id.clone());
                             self.process_continuations
                                 .insert(call_id.clone(), continuation);
+                            self.active_exec_call_id = Some(call_id.clone());
                             self.append_tool_raw_jsonl_line(
                                 &target_turn_id,
                                 &target_call_id,
@@ -1289,34 +1290,55 @@ fn parse_process_output(output: &str, authoritative_exit_code: Option<i64>) -> P
         })
     });
     let normalized = output.to_ascii_lowercase();
-    let detected_exit_code = [
-        "\"exit_code\"",
-        "exit code:",
-        "process exited with code",
-        "command failed with exit code",
-    ]
-    .iter()
-    .flat_map(|marker| {
-        normalized.split(marker).skip(1).filter_map(|value| {
-            value
-                .trim_start_matches(|character: char| {
-                    character.is_whitespace() || matches!(character, ':' | '=')
-                })
-                .split(|character: char| !character.is_ascii_digit() && character != '-')
-                .next()
-                .and_then(|code| code.parse::<i64>().ok())
+    let detected_exit_code = output
+        .lines()
+        .filter_map(|line| {
+            if let Ok(value) = serde_json::from_str::<Value>(line) {
+                let result = if value.get("status").and_then(Value::as_str) == Some("fulfilled") {
+                    value.get("value").unwrap_or(&value)
+                } else {
+                    &value
+                };
+                return result.get("exit_code").and_then(Value::as_i64);
+            }
+            let line = line.trim().to_ascii_lowercase();
+            [
+                "exit code:",
+                "process exited with code",
+                "command failed with exit code",
+            ]
+            .iter()
+            .find_map(|prefix| {
+                line.strip_prefix(prefix)?
+                    .trim()
+                    .trim_end_matches('.')
+                    .parse::<i64>()
+                    .ok()
+            })
         })
-    })
-    .max_by_key(|code| (*code != 0, *code));
+        .max_by_key(|code| (*code != 0, *code));
     let exit_code = authoritative_exit_code.or(detected_exit_code);
     let signal = ["SIGINT", "SIGTERM", "SIGKILL", "SIGHUP"]
         .into_iter()
-        .find(|signal| output.contains(signal));
+        .find(|signal| {
+            authoritative_exit_code.is_none()
+                && output.lines().any(|line| {
+                    line == format!("Process stopped with signal {signal}")
+                        || serde_json::from_str::<Value>(line)
+                            .ok()
+                            .is_some_and(|value| {
+                                value.get("signal").and_then(Value::as_str) == Some(*signal)
+                                    || value.pointer("/value/signal").and_then(Value::as_str)
+                                        == Some(*signal)
+                            })
+                })
+        });
     let has_process_exit = exit_code.is_some() || signal.is_some();
     let is_running = cell_id.is_some() && !has_process_exit;
     let is_stopped = signal.is_some();
     let is_error = !is_stopped
-        && (normalized.contains("script failed") || exit_code.is_some_and(|code| code != 0));
+        && (exit_code.is_some_and(|code| code != 0)
+            || (authoritative_exit_code.is_none() && normalized.starts_with("script failed")));
     let mut process_output = extract_process_chunk(output);
     if let Some(exit_code) = exit_code {
         process_output = merge_process_output(
@@ -1821,7 +1843,7 @@ mod tests {
                 "type": "custom_tool_call_output", "call_id": "call-exec",
                 "output": [{
                     "type": "input_text",
-                    "text": "Script completed\nWall time 0.2 seconds\nOutput:\nconst fixture = 'Command failed with exit code 7.';"
+                    "text": "Script completed\nWall time 0.2 seconds\nOutput:\nconst fixture = 'Command failed with exit code 7.';\nnormalized.contains(\"script failed\")"
                 }]
             })),
         ].join("\n");
@@ -1834,6 +1856,30 @@ mod tests {
             .output
             .as_deref()
             .is_some_and(|output| output.ends_with("Process exited with code 0")));
+    }
+
+    #[test]
+    fn authoritative_exit_codes_ignore_signal_names_in_stdout() {
+        for code in [0, 2] {
+            let state = parse_process_output(
+                "Script completed\nOutput:\nconst signals = ['SIGINT', 'SIGTERM'];",
+                Some(code),
+            );
+            assert!(!state.is_stopped);
+            assert_eq!(state.is_error, code != 0);
+        }
+    }
+
+    #[test]
+    fn ignores_failure_and_signal_mentions_in_plain_output() {
+        let state = parse_process_output(
+            "Script completed\nOutput:\nnormalized.contains(\"script failed\");\nconst signals = ['SIGINT', 'SIGTERM'];\nSearch result: command failed with exit code 7.\n{\"exit_code\":0,\"output\":\"Command failed with exit code 9.\"}",
+            None,
+        );
+        assert!(!state.is_error);
+        assert!(!state.is_stopped);
+        assert!(state.has_process_exit);
+        assert!(parse_process_output("Script failed\nError: boom", None).is_error);
     }
 
     #[test]
@@ -2382,6 +2428,13 @@ mod tests {
                     "input": "const r = await tools.write_stdin({\"session_id\":4581,\"chars\":\"\",\"yield_time_ms\":3000,\"max_output_tokens\":20000});\ntext(r.output);\n"
                 }),
             ),
+            event_msg(
+                "2026-09-07T11:09:56.792Z",
+                serde_json::json!({
+                    "type": "item_completed",
+                    "item": { "type": "CommandExecution", "status": "failed", "exit_code": 1 }
+                }),
+            ),
             response_item(
                 "2026-09-07T11:09:56.793Z",
                 serde_json::json!({
@@ -2389,7 +2442,7 @@ mod tests {
                     "call_id": "call-poll",
                     "output": [
                         {"type":"input_text","text":"Script completed\nWall time 5.0 seconds\nOutput:\n"},
-                        {"type":"input_text","text":"Error: Port 5273 is already in use\nCommand failed with exit code 1."}
+                        {"type":"input_text","text":"Error: Port 5273 is already in use"}
                     ]
                 }),
             ),

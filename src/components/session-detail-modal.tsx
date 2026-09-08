@@ -947,7 +947,10 @@ function processExitCode(output: string | null, isError: boolean) {
       .map((match) => Number(match[1]));
     if (canonicalCodes.length > 0) return canonicalCodes.at(-1)!;
 
-    const codes = [...output.matchAll(/(?:"exit_code"\s*:\s*|exit code:\s*|process exited with code\s+|command failed with exit code\s+)(-?\d+)/gi)]
+    const structuredCode = parseExecOutput(output)?.exitCode;
+    if (structuredCode != null) return structuredCode;
+
+    const codes = [...output.matchAll(/^(?:exit code:\s*|command failed with exit code\s+)(-?\d+)\.?$/gim)]
       .map((match) => Number(match[1]));
     if (codes.length > 0) {
       const nonzeroCodes = codes.filter((code) => code !== 0);

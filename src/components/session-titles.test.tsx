@@ -982,7 +982,7 @@ describe("session titles", () => {
     expect(writeText).toHaveBeenCalledWith("fallback-session");
   });
 
-  it("renders canonical command exit states with token details", async () => {
+  it.each(["\nProcess exited with code 0", ""])("renders command exit states without treating source text as metadata (%s)", async (exitMarker) => {
     await i18n.changeLanguage("en");
     invokeMock.mockResolvedValue(replayDetail({
       turns: [{
@@ -1010,7 +1010,7 @@ describe("session titles", () => {
           name: "exec",
           status: "completed",
           arguments: JSON.stringify({ cmd: "rtk sed -n '1,20p' src/example.test.ts" }),
-          output: "const fixture = 'Command failed with exit code 7.';\nProcess exited with code 0",
+          output: `const fixture = 'Command failed with exit code 7.';${exitMarker}`,
           stderr: null,
           startedAt: "2026-09-07T11:09:57.000Z",
           completedAt: "2026-09-07T11:09:58.000Z",
@@ -1055,7 +1055,7 @@ describe("session titles", () => {
           name: "exec",
           status: "completed",
           arguments: JSON.stringify({ cmd: "rtk sed -n '1,20p' src/example.test.ts" }),
-          output: "const fixture = 'Command failed with exit code 7.';\nProcess exited with code 0",
+          output: `const fixture = 'Command failed with exit code 7.';${exitMarker}`,
           stderr: null,
           startedAt: "2026-09-07T11:09:57.000Z",
           completedAt: "2026-09-07T11:09:58.000Z",
