@@ -7,6 +7,27 @@ import { buildConversation } from "@/lib/session-conversation";
 import type { SessionReplayDetail } from "@/lib/api";
 import { ConversationItem } from "./session-detail-modal";
 
+it("uses distinct card backgrounds and borders for conversation item types", async () => {
+  await i18n.changeLanguage("en");
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [
+      { kind: "message", role: "system", text: "System fixture", source: "base_instructions", timestamp: null },
+      { kind: "message", role: "developer", text: "Developer fixture", source: "developer_message", timestamp: null },
+      { kind: "message", role: "user", text: "User fixture", source: "user_message", timestamp: null },
+      { kind: "message", role: "assistant", text: "Assistant fixture", source: "assistant_message", timestamp: null },
+      { kind: "reasoning", text: "Reasoning fixture", timestamp: null },
+    ],
+  };
+  render(<>{buildConversation(turn).map((block, index) => <ConversationItem key={index} block={block} rawJsonlLines={[]} />)}</>);
+  expect(screen.getByRole("button", { name: /^System/ }).closest("article")).toHaveClass("border-zinc-300/70", "bg-zinc-100/60");
+  expect(screen.getByRole("button", { name: /^Developer/ }).closest("article")).toHaveClass("border-violet-300/70", "bg-violet-50/70");
+  expect(screen.getByRole("button", { name: /^User/ }).closest("article")).toHaveClass("border-blue-300/70", "bg-blue-50/70");
+  expect(screen.getByRole("button", { name: /^Assistant/ }).closest("article")).toHaveClass("border-emerald-300/70", "bg-emerald-50/70");
+  expect(screen.getByText("Reasoning fixture").closest(".rounded-lg")).toHaveClass("border-amber-300/70", "bg-amber-50/70");
+});
+
 it("keeps each call's tokens visible after deduplicating reads and exposes original output on expansion", async () => {
   await i18n.changeLanguage("en");
   const turn: SessionReplayDetail["turns"][number] = {
@@ -60,6 +81,7 @@ it("renders nested orchestration calls as ordered CLI-style activities", async (
     }],
   };
   render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={[]} />);
+  expect(screen.getByRole("button", { name: /Ran/ }).closest(".rounded-lg")).toHaveClass("border-cyan-300/70", "bg-cyan-50/70");
   const activities = screen.getAllByRole("button");
   expect(activities[0]).toHaveTextContent("Ran (1s) pnpm test");
   expect(activities[1]).toHaveTextContent("Edited src/a.ts+1-1");

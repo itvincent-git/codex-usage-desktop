@@ -29,6 +29,11 @@ const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:r
 const MarkdownContent = lazy(() => import("./markdown-content").then((module) => ({ default: module.MarkdownContent })));
 
 const ITEM_TONES = {
+  system: "border-zinc-300/70 bg-zinc-100/60 dark:border-zinc-700/70 dark:bg-zinc-900/40",
+  developer: "border-violet-300/70 bg-violet-50/70 dark:border-violet-800/70 dark:bg-violet-950/30",
+  user: "border-blue-300/70 bg-blue-50/70 dark:border-blue-800/70 dark:bg-blue-950/30",
+  assistant: "border-emerald-300/70 bg-emerald-50/70 dark:border-emerald-800/70 dark:bg-emerald-950/30",
+  reasoning: "border-amber-300/70 bg-amber-50/70 dark:border-amber-800/70 dark:bg-amber-950/30",
   tool: "border-cyan-300/70 bg-cyan-50/70 dark:border-cyan-800/70 dark:bg-cyan-950/30",
   patch: "border-green-300/70 bg-green-50/70 dark:border-green-800/70 dark:bg-green-950/30",
   error: "border-error/40 bg-error/5",
@@ -371,11 +376,11 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
   const { t } = useTranslation();
   const isConversation = item.role === "user" || item.role === "assistant";
   const [isExpanded, setIsExpanded] = useState(isConversation);
-  const role = isConversation || item.role === "developer" ? item.role : "system";
-  const title = t(`sessions.detail.${role}`);
+  const toneKey = item.role === "user" || item.role === "assistant" || item.role === "developer" ? item.role : "system";
+  const title = t(`sessions.detail.${toneKey}`);
 
   return (
-    <article className={item.role === "user" ? "my-5 rounded-2xl bg-muted/60 px-4 py-3" : "py-3"}>
+    <article className={`${item.role === "user" ? "my-5" : ""} rounded-lg border p-3 ${ITEM_TONES[toneKey]}`}>
       <button
         type="button"
         className={`mb-2 flex w-full items-center justify-between gap-3 text-left text-xs font-medium text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`}
@@ -670,7 +675,7 @@ function WebSearchItem({
   const results = output ? splitWebSearchResults(output) : [];
 
   return (
-    <div className={`py-2`}>
+    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
       <button
         type="button"
         className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
@@ -742,7 +747,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
   }
 
   if (nestedActivities) {
-    return <div className="py-2 font-mono text-xs leading-relaxed">
+    return <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
       <div className="space-y-1">
         {nestedActivities.map((nestedActivity, index) => (
           <NestedActivityItem
@@ -758,7 +763,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
 
   if (batchActivities) {
     return (
-      <div className={`py-2 font-mono text-xs leading-relaxed`}>
+      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
         <button
           type="button"
           className={`flex w-full items-center justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
@@ -830,7 +835,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
           : "text-foreground";
     const outputTone = activityStatus === "failed" ? "text-error" : "text-muted-foreground";
     return (
-      <div className={`py-2 font-mono text-xs leading-relaxed`}>
+      <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${activityStatus === "failed" ? ITEM_TONES.error : ITEM_TONES.tool}`}>
         <button
           type="button"
           className={`flex w-full min-w-0 items-start justify-between gap-3 text-left text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
@@ -873,7 +878,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
   }
 
   return (
-    <div className={`py-2`}>
+    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
       <button
         type="button"
         className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1001,7 +1006,7 @@ function TimelineItem({ item, activity, tokenUsage, rawJsonlLines }: TimelineEnt
     content = <MessageItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "reasoning") {
     content = (
-      <div className={`border-l border-border/60 pl-4 py-2 text-muted-foreground`}>
+      <div className={`rounded-lg border p-3 text-muted-foreground ${ITEM_TONES.reasoning}`}>
         {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
         <RawJsonlDisclosure rawJsonl={rawJsonl} />
@@ -1051,7 +1056,7 @@ export function ConversationItem({ block, rawJsonlLines }: { block: Conversation
     });
   });
   return (
-    <section className="py-2" aria-label="Explored">
+    <section className={`rounded-lg border p-3 ${ITEM_TONES.tool}`} aria-label="Explored">
       <button type="button" className={`flex w-full items-center gap-2 text-left text-xs text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
         <span aria-hidden="true">•</span><span className="font-semibold">Explored</span>
         <span>{t("sessions.detail.tool_count", { count: block.entries.length })}</span>
