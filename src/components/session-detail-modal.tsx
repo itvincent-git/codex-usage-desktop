@@ -1333,7 +1333,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                 const isExpanded = expandedTurns.has(turnKey);
                 const userPreview = firstUserPreview(turn);
                 return (
-                <section key={turnKey} className="border-t border-border/50 pt-3">
+                <section key={turnKey} className="rounded-xl border-2 border-border/50 p-3">
                   <button
                     type="button"
                     className={`flex w-full flex-col gap-1.5 rounded-md text-left sm:flex-row sm:items-center sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}

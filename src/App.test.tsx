@@ -1455,6 +1455,7 @@ describe("App", () => {
     fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 20 } });
     expect(detailHeader).toHaveClass("py-1");
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
+    expect(turnButton.closest("section")).toHaveClass("rounded-xl", "border-2", "border-border/50");
     expect(turnButton).toHaveAttribute("aria-expanded", "true");
     expect(turnButton).toHaveTextContent("4 messages");
     expect(turnButton).toHaveTextContent("6 tools");
