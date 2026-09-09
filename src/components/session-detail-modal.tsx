@@ -1090,6 +1090,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [showFullRaw, setShowFullRaw] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [collapsedHeight, setCollapsedHeight] = useState(0);
+  const summaryRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1121,6 +1123,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setShowFullRaw(false);
     setShowDetails(false);
     setIsScrolled(false);
+    setCollapsedHeight(0);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
 
     void fetchSessionDetail(activePath)
@@ -1237,7 +1240,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
       aria-labelledby="session-detail-title"
     >
       <div className="flex h-screen w-full flex-col overflow-hidden overscroll-contain">
-        <header className={`z-10 border-b border-border/70 bg-surface px-4 shadow-sm transition-[padding] ${isScrolled ? "py-1" : "py-1.5"}`}>
+        <header className={`z-10 shrink-0 border-b border-border/70 bg-surface px-4 shadow-sm transition-[padding] motion-reduce:transition-none ${isScrolled ? "py-1" : "py-1.5"}`}>
           <div className="flex min-h-8 items-center gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -1264,6 +1267,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               onClick={() => {
                 setShowDetails((value) => isScrolled || !value);
                 if (scrollRef.current) scrollRef.current.scrollTop = 0;
+                setIsScrolled(false);
+                setCollapsedHeight(0);
               }}
             >
               <Info className="h-3.5 w-3.5" />
@@ -1282,18 +1287,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <X className="h-4 w-4" />
             </Button>
           </div>
-        </header>
-
-        <div
-          ref={scrollRef}
-          data-testid="session-detail-scroll"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background"
-          onScroll={(event) => {
-            const scrollTop = event.currentTarget.scrollTop;
-            setIsScrolled((current) => scrollTop > (current ? 0 : 12));
-          }}
-        >
-          <section aria-label={t("sessions.detail.session_summary")} className="border-b border-border/70 bg-surface px-4 pb-2">
+          <div
+            className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${isScrolled ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
+            inert={isScrolled}
+            aria-hidden={isScrolled}
+          >
+          <section ref={summaryRef} aria-label={t("sessions.detail.session_summary")} className="min-h-0 overflow-hidden bg-surface">
           <div className="flex flex-wrap gap-1.5 pt-1 pb-0.5">
             {metric(t("sessions.detail.duration"), formatDuration(detail?.summary.durationMs), <Clock3 className="h-3.5 w-3.5" />, "blue")}
             {metric(t("sessions.detail.total_tokens"), formatNumber(detail?.summary.totalTokens ?? session.totalTokens), <Database className="h-3.5 w-3.5" />, "violet")}
@@ -1343,9 +1342,27 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <span>{t("sessions.detail.cli", { value: detail?.summary.cliVersion ?? "--" })}</span>
             </div>
           ) : null}
-          {detail && activePath === session.path ? <div className="mt-2"><SessionQuotaUsageView usage={session.quotaUsage} detailed /></div> : null}
+          {detail && activePath === session.path ? <div className="mt-1.5 border-t border-border/50 pt-1.5"><SessionQuotaUsageView usage={session.quotaUsage} detailed /></div> : null}
           </section>
+          </div>
+        </header>
 
+        <div
+          ref={scrollRef}
+          data-testid="session-detail-scroll"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background [overflow-anchor:none]"
+          onScroll={(event) => {
+            const scrollTop = event.currentTarget.scrollTop;
+            if (!isScrolled && scrollTop > 12) {
+              // Preserve the scroll range while the header releases space, even for short replays.
+              setCollapsedHeight((summaryRef.current?.offsetHeight ?? 0) + 4);
+              setIsScrolled(true);
+            } else if (isScrolled && scrollTop <= 0) {
+              setIsScrolled(false);
+              setCollapsedHeight(0);
+            }
+          }}
+        >
           <div className="px-4 py-5">
           {error ? (
             <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
@@ -1441,6 +1458,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
             </div>
           )}
           </div>
+          <div aria-hidden="true" style={{ height: collapsedHeight }} />
         </div>
       </div>
     </div>

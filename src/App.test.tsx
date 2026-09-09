@@ -1455,6 +1455,11 @@ describe("App", () => {
     expect(document.body.style.overflow).toBe("hidden");
     fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 20 } });
     expect(detailHeader).toHaveClass("py-1");
+    expect(screen.queryByRole("region", { name: "Session summary" })).not.toBeInTheDocument();
+    expect(detailSummary.parentElement).toHaveAttribute("inert");
+    fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 0 } });
+    expect(screen.getByRole("region", { name: "Session summary" })).toBeVisible();
+    expect(detailSummary.parentElement).not.toHaveAttribute("inert");
     const turnButton = screen.getByRole("button", { name: /Turn turn-1/ });
     expect(turnButton.closest("section")).toHaveClass("rounded-xl", "border-2", "border-border/50");
     expect(turnButton).toHaveAttribute("aria-expanded", "true");

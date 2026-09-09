@@ -115,30 +115,28 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
   }
 
   return (
-    <section className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3" aria-labelledby="session-quota-title">
-      <div className="flex items-center gap-2">
-        <Clock3 className="h-4 w-4 text-amber-500" />
-        <h3 id="session-quota-title" className="text-sm font-bold">{t("sessions.quota.title")}</h3>
+    <section className="flex flex-wrap items-start gap-x-4 gap-y-1 text-[11px]" aria-labelledby="session-quota-title" title={caveat}>
+      <div className="flex items-center gap-1.5 py-0.5">
+        <Clock3 className="h-3.5 w-3.5 text-amber-500" />
+        <h3 id="session-quota-title" className="font-semibold">{t("sessions.quota.title")}</h3>
         <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">{t("sessions.quota.estimated")}</span>
       </div>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <div className="flex flex-1 flex-wrap gap-x-4 gap-y-1">
         {groups.map((group) => (
-          <div key={group.key} className="rounded-md border border-border/50 bg-background/60 p-2">
-            <div className="mb-1 text-xs font-semibold">{group.label}</div>
+          <div key={group.key} className="flex items-baseline gap-2 py-0.5">
+            <div className="shrink-0 font-semibold text-muted-foreground">{group.label}</div>
             {group.windows.length === 0 ? (
-              <div className="text-sm font-bold text-muted-foreground">--</div>
+              <div className="font-bold text-muted-foreground">--</div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
                 {group.windows.map((window, index) => (
-                  <div key={index} className="text-xs text-muted-foreground">
+                  <div key={index} className="text-muted-foreground" title={`${formatTime(window.observedStartAt, i18n.language)} – ${formatTime(window.observedEndAt, i18n.language)}\n${t("sessions.quota.resets", { value: window.resetsAt ? formatTime(window.resetsAt, i18n.language) : "--" })}`}>
                     <span className="font-bold text-foreground">
                       {t("sessions.quota.used_and_remaining_change", {
                         usage: formatDetailedUsage(window),
                         remaining: formatRemainingRange(window),
                       })}
                     </span>
-                    <span className="ml-2">{formatTime(window.observedStartAt, i18n.language)} – {formatTime(window.observedEndAt, i18n.language)}</span>
-                    <div>{t("sessions.quota.resets", { value: window.resetsAt ? formatTime(window.resetsAt, i18n.language) : "--" })}</div>
                   </div>
                 ))}
               </div>
@@ -146,7 +144,7 @@ export function SessionQuotaUsageView({ usage, detailed = false }: SessionQuotaU
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{caveat}</p>
+      <p className="sr-only">{caveat}</p>
     </section>
   );
 }
