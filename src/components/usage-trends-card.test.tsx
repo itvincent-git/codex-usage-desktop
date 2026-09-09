@@ -9,7 +9,13 @@ beforeAll(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class ResizeObserver {
-      observe() {}
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ target, contentRect: { width: 800, height: 300 } } as ResizeObserverEntry],
+          this as unknown as globalThis.ResizeObserver,
+        );
+      }
       unobserve() {}
       disconnect() {}
     },
@@ -34,6 +40,12 @@ describe("UsageTrendTooltip", () => {
 
     expect(container.firstElementChild).toHaveClass("bg-surface");
     expect(container.firstElementChild).not.toHaveClass("bg-surface/95", "backdrop-blur-md");
+  });
+
+  it("keeps the chart tooltip above the summary metrics", () => {
+    const { container } = render(<UsageTrendsCard daily={[]} metrics={[]} cacheHitRate={0} />);
+
+    expect(container.querySelector(".recharts-tooltip-wrapper")).toHaveStyle({ zIndex: "10" });
   });
 
   it("expands the whole chart card and exits with Escape", async () => {

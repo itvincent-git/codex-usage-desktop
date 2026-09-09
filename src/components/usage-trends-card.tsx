@@ -223,6 +223,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
               <Tooltip
                 content={<UsageTrendTooltip t={t} />}
                 cursor={{ stroke: "rgb(var(--primary) / 0.22)", strokeDasharray: "4 4", strokeWidth: 1 }}
+                wrapperStyle={{ zIndex: 10 }}
               />
 
               <Area
