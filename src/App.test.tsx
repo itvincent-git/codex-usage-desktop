@@ -1443,13 +1443,14 @@ describe("App", () => {
     expect(within(detailHeader).queryByText("session-replay")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Details/ }));
     expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "true");
-    const sessionIdButton = within(detailHeader).getByRole("button", { name: "Copy session ID" });
+    const detailSummary = screen.getByRole("region", { name: "Session summary" });
+    const sessionIdButton = within(detailSummary).getByRole("button", { name: "Copy session ID" });
     expect(sessionIdButton).toHaveClass("border-zinc-300/70");
     await userEvent.click(sessionIdButton);
     expect(writeTextMock).toHaveBeenCalledWith("session-replay");
     expect(sessionIdButton).toHaveAccessibleName("Session ID copied");
-    expect(within(detailHeader).getByText("/repo/app")).toHaveClass("border-blue-300/60");
-    expect(within(detailHeader).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
+    expect(within(detailSummary).getByRole("button", { name: "Copy project path: /repo/app" })).toHaveClass("border-blue-300/60");
+    expect(within(detailSummary).getByText("gpt-5")).toHaveClass("border-emerald-300/60");
     expect(screen.getAllByText("session-replay").length).toBeGreaterThan(0);
     expect(document.body.style.overflow).toBe("hidden");
     fireEvent.scroll(screen.getByTestId("session-detail-scroll"), { target: { scrollTop: 20 } });

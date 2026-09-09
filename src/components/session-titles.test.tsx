@@ -907,6 +907,8 @@ describe("session titles", () => {
   });
 
   it("shows the Codex project name in session details while retaining the cwd", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
     await i18n.changeLanguage("en");
     invokeMock.mockResolvedValue(replayDetail({
       threadName: "Usage work",
@@ -928,12 +930,27 @@ describe("session titles", () => {
       }],
     })} onClose={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Details" }));
+    await user.click(screen.getByRole("button", { name: "Details" }));
     const project = screen.getByTitle("/repo/codex-usage-desktop");
     expect(within(project).getByText("Codex Usage Desktop")).toBeInTheDocument();
     expect(project).toHaveAttribute("title", "/repo/codex-usage-desktop");
     expect(project).toHaveTextContent("/repo/codex-usage-desktop");
     expect(within(project).getByText("Codex project")).toBeInTheDocument();
+    await user.click(project);
+    expect(writeText).toHaveBeenCalledWith("/repo/codex-usage-desktop");
+    expect(project).toHaveAccessibleName("Project path copied: /repo/codex-usage-desktop");
+  });
+
+  it("shows summary input and output tokens before and after replay loads", async () => {
+    let resolveDetail!: (detail: SessionReplayDetail) => void;
+    invokeMock.mockReturnValue(new Promise<SessionReplayDetail>((resolve) => { resolveDetail = resolve; }));
+    render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
+    const summary = screen.getByRole("region", { name: "Session summary" });
+    expect(within(summary).getByText("Input tokens").parentElement).toHaveTextContent("100");
+    expect(within(summary).getByText("Output tokens").parentElement).toHaveTextContent("40");
+    resolveDetail(replayDetail({ summary: { ...replayDetail({}).summary, inputTokens: 250, outputTokens: 75 } }));
+    await waitFor(() => expect(within(summary).getByText("Input tokens").parentElement).toHaveTextContent("250"));
+    expect(within(summary).getByText("Output tokens").parentElement).toHaveTextContent("75");
   });
 
   it("falls back to the session ID in session details", async () => {
@@ -1193,6 +1210,7 @@ describe("session titles", () => {
     render(<SessionDetailModal session={session({ quotaUsage: { fiveHour: [quotaWindow, { ...quotaWindow, observedEndPercent: 12, observedDeltaPercent: 2 }], weekly: [] } })} onClose={vi.fn()} />);
 
     expect(await screen.findByText("观测到的限额消耗")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "会话摘要" })).getByText("观测到的限额消耗")).toBeInTheDocument();
     expect(screen.getByText("5h")).toBeInTheDocument();
     expect(screen.getByText("周")).toBeInTheDocument();
     expect(screen.getByText("使用了 4% • 90% → 86%")).toBeInTheDocument();

@@ -1085,12 +1085,14 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
   const [copied, setCopied] = useState(false);
   const [copiedSessionId, setCopiedSessionId] = useState(false);
+  const [copiedProjectPath, setCopiedProjectPath] = useState<string | null>(null);
   const [expandedTurns, setExpandedTurns] = useState<Set<string>>(() => new Set());
   const [showFullRaw, setShowFullRaw] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -1114,10 +1116,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setError(null);
     setActiveTab("timeline");
     setCopiedSessionId(false);
+    setCopiedProjectPath(null);
     setExpandedTurns(new Set());
     setShowFullRaw(false);
     setShowDetails(false);
     setIsScrolled(false);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
 
     void fetchSessionDetail(activePath)
       .then((data) => {
@@ -1205,6 +1209,13 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     window.setTimeout(() => setCopied(false), 1400);
   }
 
+  async function copyProjectPath(path: string) {
+    if (!navigator.clipboard) return;
+    await navigator.clipboard.writeText(path);
+    setCopiedProjectPath(path);
+    window.setTimeout(() => setCopiedProjectPath((current) => current === path ? null : current), 1400);
+  }
+
   function toggleTurn(key: string) {
     setExpandedTurns((current) => {
       const next = new Set(current);
@@ -1250,7 +1261,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               type="button"
               className={`flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
               aria-expanded={showDetails}
-              onClick={() => setShowDetails((value) => !value)}
+              onClick={() => {
+                setShowDetails((value) => isScrolled || !value);
+                if (scrollRef.current) scrollRef.current.scrollTop = 0;
+              }}
             >
               <Info className="h-3.5 w-3.5" />
               {t("sessions.detail.details")}
@@ -1268,9 +1282,23 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="mt-1 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        </header>
+
+        <div
+          ref={scrollRef}
+          data-testid="session-detail-scroll"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background"
+          onScroll={(event) => {
+            const scrollTop = event.currentTarget.scrollTop;
+            setIsScrolled((current) => scrollTop > (current ? 0 : 12));
+          }}
+        >
+          <section aria-label={t("sessions.detail.session_summary")} className="border-b border-border/70 bg-surface px-4 pb-2">
+          <div className="flex flex-wrap gap-1.5 pt-1 pb-0.5">
             {metric(t("sessions.detail.duration"), formatDuration(detail?.summary.durationMs), <Clock3 className="h-3.5 w-3.5" />, "blue")}
             {metric(t("sessions.detail.total_tokens"), formatNumber(detail?.summary.totalTokens ?? session.totalTokens), <Database className="h-3.5 w-3.5" />, "violet")}
+            {metric(t("sessions.detail.input_tokens"), formatNumber(detail?.summary.inputTokens ?? session.inputTokens), <Database className="h-3.5 w-3.5" />, "blue")}
+            {metric(t("sessions.detail.output_tokens"), formatNumber(detail?.summary.outputTokens ?? session.outputTokens), <Database className="h-3.5 w-3.5" />, "green")}
             {metric(t("sessions.detail.cost"), formatCurrency(detail?.summary.costUSD ?? session.costUSD), <Coins className="h-3.5 w-3.5" />, "emerald")}
             {metric(t("sessions.detail.cache"), formatPercent(cacheRate), <Database className="h-3.5 w-3.5" />, "cyan")}
             {metric(t("sessions.detail.tool_calls"), formatNumber(detail?.summary.toolCallCount ?? 0), <Wrench className="h-3.5 w-3.5" />, "amber")}
@@ -1291,9 +1319,20 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                   <span className="truncate">{displayedSessionId}</span>
                 </button>
               ) : null}
-              {displayedProjects.map((project) => project.codexProjectName
-                ? <span key={project.path} className="inline-flex max-w-[480px] items-center gap-1.5 rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project.path}><span className="truncate">{projectLabel(project)}</span><span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1 py-px text-[8px] font-semibold text-indigo-500">{t("projects.codex_project")}</span><span aria-hidden="true">·</span><span className="truncate font-mono">{project.path}</span></span>
-                : <span key={project.path} className="max-w-[360px] truncate rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" title={project.path}>{project.path}</span>)}
+              {displayedProjects.map((project) => (
+                <button
+                  key={project.path}
+                  type="button"
+                  className={`inline-flex max-w-full items-center gap-1.5 rounded border border-blue-300/60 bg-blue-50/80 px-2 py-0.5 text-left font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 ${DISCLOSURE_BUTTON_CLASS}`}
+                  title={project.path}
+                  aria-label={t(copiedProjectPath === project.path ? "sessions.detail.project_path_copied" : "sessions.detail.copy_project_path", { path: project.path })}
+                  onClick={() => void copyProjectPath(project.path)}
+                >
+                  {project.codexProjectName ? <><span className="truncate">{projectLabel(project)}</span><span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-1 py-px text-[8px] font-semibold text-indigo-500">{t("projects.codex_project")}</span><span aria-hidden="true">·</span></> : null}
+                  <span className="min-w-0 break-all font-mono">{project.path}</span>
+                  {copiedProjectPath === project.path ? <Check className="h-3 w-3 shrink-0" /> : <Clipboard className="h-3 w-3 shrink-0" />}
+                </button>
+              ))}
               {models.map((model) => <span key={model} className="rounded-full border border-emerald-300/60 bg-emerald-50/80 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{model}</span>)}
               <span>{t("sessions.detail.started", { value: formatTimestamp(detail?.summary.startTime ?? null) })}</span>
               <span>·</span>
@@ -1304,16 +1343,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <span>{t("sessions.detail.cli", { value: detail?.summary.cliVersion ?? "--" })}</span>
             </div>
           ) : null}
-        </header>
+          {detail && activePath === session.path ? <div className="mt-2"><SessionQuotaUsageView usage={session.quotaUsage} detailed /></div> : null}
+          </section>
 
-        <div
-          data-testid="session-detail-scroll"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background px-4 py-5"
-          onScroll={(event) => {
-            const nextIsScrolled = event.currentTarget.scrollTop > 12;
-            setIsScrolled((current) => current === nextIsScrolled ? current : nextIsScrolled);
-          }}
-        >
+          <div className="px-4 py-5">
           {error ? (
             <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
               <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -1327,7 +1360,6 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
           ) : activeTab === "timeline" ? (
             <div className="mx-auto max-w-5xl space-y-5">
               <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={setActivePath} />
-              {activePath === session.path ? <SessionQuotaUsageView usage={session.quotaUsage} detailed /> : null}
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey);
@@ -1408,6 +1440,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               </pre>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
