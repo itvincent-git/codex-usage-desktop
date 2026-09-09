@@ -1404,6 +1404,9 @@ fn extract_process_session_id(output: &str) -> Option<String> {
     std::iter::once(payload.trim())
         .chain(payload.lines().map(str::trim))
         .find_map(|candidate| {
+            if let Some(session_id) = process_session_marker(candidate) {
+                return Some(session_id);
+            }
             let value = serde_json::from_str::<Value>(candidate).ok()?;
             let result = if value.get("status").and_then(Value::as_str) == Some("fulfilled") {
                 value.get("value").unwrap_or(&value)
@@ -1417,6 +1420,15 @@ fn extract_process_session_id(output: &str) -> Option<String> {
                     .or_else(|| session_id.as_i64().map(|value| value.to_string()))
             })
         })
+}
+
+fn process_session_marker(line: &str) -> Option<String> {
+    let session_id = line.trim().strip_prefix("SESSION_ID=")?.trim();
+    (!session_id.is_empty()
+        && session_id
+            .chars()
+            .all(|character| character.is_ascii_digit()))
+    .then(|| session_id.to_string())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1597,6 +1609,7 @@ fn extract_process_chunk(output: &str) -> Option<String> {
     }
     let cleaned = payload
         .lines()
+        .filter(|line| process_session_marker(line).is_none())
         .map(|line| {
             let Ok(value) = serde_json::from_str::<Value>(line) else {
                 return line.to_string();
@@ -2225,7 +2238,8 @@ mod tests {
                     "call_id": "call-exec",
                     "output": [
                         {"type":"input_text","text":"Script completed\nWall time 11.0 seconds\nOutput:\n"},
-                        {"type":"input_text","text":"{\"session_id\":4,\"wall_time_seconds\":11.0,\"output\":\"partial test output\"}"}
+                        {"type":"input_text","text":"partial test output"},
+                        {"type":"input_text","text":"SESSION_ID=4"}
                     ]
                 }),
             ),
@@ -2334,6 +2348,11 @@ mod tests {
             .as_deref()
             .unwrap()
             .contains("all tests passed"));
+        assert!(!turn.tool_calls[0]
+            .output
+            .as_deref()
+            .unwrap()
+            .contains("SESSION_ID="));
         assert!(matches!(
             turn.items.get(1),
             Some(SessionReplayItem::TokenUsage { usage, .. }) if usage.total_tokens == 56_500
