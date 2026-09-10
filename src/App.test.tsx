@@ -457,6 +457,46 @@ describe("App", () => {
     });
   });
 
+  it("starts an expired limit window once and applies the verified server response", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-10T00:00:00.000Z"));
+    const expiredLimits = {
+      ...limits(100, "2026-09-09T23:00:00.000Z"),
+      membershipLevel: "plus",
+    };
+    const activeLimits = {
+      ...limits(99, "2026-09-10T05:00:00.000Z"),
+      membershipLevel: "plus",
+    };
+    let finishActivation: ((value: unknown) => void) | undefined;
+    const activation = new Promise((resolve) => {
+      finishActivation = resolve;
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") return expiredLimits;
+      if (command === "activate_codex_window") return activation;
+      if (command === "scan_usage") return scan(0);
+      if (command === "fetch_overview" && args?.range === "30d") return overview();
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+    const activateButton = await screen.findByRole("button", { name: "Start limit window" });
+    fireEvent.click(activateButton);
+    fireEvent.click(activateButton);
+
+    expect(invokeMock.mock.calls.filter(([command]) => command === "activate_codex_window")).toHaveLength(1);
+    await act(async () => {
+      finishActivation?.({ status: "started", limits: activeLimits });
+    });
+    expect(await screen.findByText("The new 5-hour window started and was verified against the server limit state.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
+  });
+
   it("shows string errors returned by a background rescan", async () => {
     invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
       if (command === "fetch_codex_limits") {

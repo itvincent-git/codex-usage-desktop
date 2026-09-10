@@ -96,6 +96,66 @@ describe("formatResetTime", () => {
 });
 
 describe("CodexLimitsCard component", () => {
+  it("separates limit checks from window activation and only enables activation after expiry", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T00:00:00.000Z"));
+    const onRefreshLimits = vi.fn();
+    const onActivateWindow = vi.fn();
+    const baseLimits = {
+      session: { usedPercent: 0, remainingPercent: 100, windowMinutes: 300, resetsAt: "2026-09-09T23:00:00.000Z" },
+      weekly: { usedPercent: 10, remainingPercent: 90, windowMinutes: 10080, resetsAt: "2026-09-14T00:00:00.000Z" },
+      updatedAt: "2026-09-10T00:00:00.000Z",
+      source: "oauth",
+      membershipLevel: "plus",
+    };
+
+    const { rerender } = render(
+      <CodexLimitsCard
+        limits={baseLimits}
+        error={null}
+        onRefreshLimits={onRefreshLimits}
+        onActivateWindow={onActivateWindow}
+        onOpenResetCredits={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Check limits" }));
+    expect(onRefreshLimits).toHaveBeenCalledOnce();
+    expect(onActivateWindow).not.toHaveBeenCalled();
+
+    const activateButton = screen.getByRole("button", { name: "Start limit window" });
+    expect(activateButton).toBeEnabled();
+    fireEvent.click(activateButton);
+    expect(onActivateWindow).toHaveBeenCalledOnce();
+
+    rerender(
+      <CodexLimitsCard
+        limits={{
+          ...baseLimits,
+          session: { ...baseLimits.session, resetsAt: "2026-09-10T05:00:00.000Z" },
+        }}
+        error={null}
+        onRefreshLimits={onRefreshLimits}
+        onActivateWindow={onActivateWindow}
+        onOpenResetCredits={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
+
+    rerender(
+      <CodexLimitsCard
+        limits={baseLimits}
+        error={null}
+        windowActivationStatus="recentlyRequested"
+        onRefreshLimits={onRefreshLimits}
+        onActivateWindow={onActivateWindow}
+        onOpenResetCredits={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
+    vi.useRealTimers();
+  });
+
   it("renders friendly tip for OAuth login / no credentials error", () => {
     const errorMsg = "OAuth unavailable: Failed to read Codex auth at /Users/vincent/.codex/auth.json: No such file or directory (os error 2); CLI RPC unavailable: Codex CLI not found.";
     render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={errorMsg} />);

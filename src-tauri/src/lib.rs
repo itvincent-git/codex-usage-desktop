@@ -24,10 +24,11 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
-    CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, ExportResponse,
-    ModelPricingCatalogResponse, MonthlyUsageResponse, OverviewResponse, ProjectAnalyticsResponse,
-    ScanResponse, SessionDetailRow, SessionReplayDetail, UpdateCheckResponse,
-    UpdateDownloadProgress, UpdateInstallResponse, UsageRefreshResponse,
+    CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement,
+    CodexWindowActivationResponse, ExportResponse, ModelPricingCatalogResponse,
+    MonthlyUsageResponse, OverviewResponse, ProjectAnalyticsResponse, ScanResponse,
+    SessionDetailRow, SessionReplayDetail, UpdateCheckResponse, UpdateDownloadProgress,
+    UpdateInstallResponse, UsageRefreshResponse,
 };
 
 const DEFAULT_BACKGROUND_RESCAN_INTERVAL: Duration = Duration::from_secs(5 * 60);
@@ -36,6 +37,7 @@ const ALLOWED_BACKGROUND_RESCAN_MINUTES: [u64; 8] = [1, 2, 3, 4, 5, 15, 30, 60];
 struct AppState {
     database_path: PathBuf,
     pricing_cache_path: PathBuf,
+    window_activation_marker_path: PathBuf,
 }
 
 struct BackgroundRefreshSchedule {
@@ -244,6 +246,16 @@ async fn fetch_monthly_usage(
 #[tauri::command]
 async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn activate_codex_window(
+    state: tauri::State<'_, AppState>,
+) -> Result<CodexWindowActivationResponse, String> {
+    let marker_path = state.window_activation_marker_path.clone();
+    tauri::async_runtime::spawn_blocking(move || codex_limits::activate_codex_window(&marker_path))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -850,6 +862,7 @@ pub fn run() {
             app.manage(AppState {
                 database_path: database_path.clone(),
                 pricing_cache_path: pricing_cache_path.clone(),
+                window_activation_marker_path: app_data_dir.join("codex-window-activation.json"),
             });
             let background_refresh_schedule = Arc::new(BackgroundRefreshSchedule::new());
             app.manage(background_refresh_schedule.clone());
@@ -938,6 +951,7 @@ pub fn run() {
             fetch_model_pricing_catalog,
             fetch_monthly_usage,
             fetch_codex_limits,
+            activate_codex_window,
             fetch_codex_quota_forecast,
             fetch_latest_codex_reset,
             fetch_codex_reset_history,

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  activateCodexWindow,
   exportUsage,
   fetchCodexLimits,
   fetchCodexQuotaForecast,
@@ -27,6 +28,7 @@ import {
   type UpdateDownloadProgress,
   fetchSessionDetails,
   type CodexLimitWindow,
+  type CodexWindowActivationStatus,
   type SessionDetailRow,
   updateTray,
   type TrayMenuItemDto,
@@ -122,6 +124,10 @@ export function useUsageDashboard() {
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
+  const [isLimitsRefreshing, setIsLimitsRefreshing] = useState(false);
+  const [isWindowActivating, setIsWindowActivating] = useState(false);
+  const [windowActivationStatus, setWindowActivationStatus] = useState<CodexWindowActivationStatus | null>(null);
+  const [windowActivationError, setWindowActivationError] = useState<string | null>(null);
   const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
   const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
   const [recentCodexResets, setRecentCodexResets] = useState<CodexResetAnnouncement[] | null>(null);
@@ -293,6 +299,7 @@ export function useUsageDashboard() {
   const lastAutoScanTimeRef = useRef<number>(0);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
   const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
+  const windowActivationInFlightRef = useRef(false);
 
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
     const data = await fetchOverview(nextRange);
@@ -882,6 +889,44 @@ export function useUsageDashboard() {
     }
   }
 
+  async function handleLimitsRefresh() {
+    setIsLimitsRefreshing(true);
+    setWindowActivationStatus(null);
+    setWindowActivationError(null);
+    try {
+      await loadCodexLimits({ force: true });
+    } finally {
+      setIsLimitsRefreshing(false);
+    }
+  }
+
+  async function handleActivateCodexWindow() {
+    if (windowActivationInFlightRef.current) {
+      return;
+    }
+    const confirmed = window.confirm(t("limits.activate_confirm"));
+    if (!confirmed) {
+      return;
+    }
+
+    windowActivationInFlightRef.current = true;
+    setIsWindowActivating(true);
+    setWindowActivationStatus(null);
+    setWindowActivationError(null);
+    try {
+      const response = await activateCodexWindow();
+      setCodexLimits(response.limits);
+      setCodexLimitsError(null);
+      setWindowActivationStatus(response.status);
+      lastLimitsFetchTimeRef.current = Date.now();
+    } catch (activationError) {
+      setWindowActivationError(errorMessage(activationError, t("limits.activate_failed")));
+    } finally {
+      windowActivationInFlightRef.current = false;
+      setIsWindowActivating(false);
+    }
+  }
+
   async function handleReset() {
     const confirmed = window.confirm(
       t("settings.reset_confirm", { defaultValue: "Reset cached usage and pricing data, then rebuild it from local Codex logs? Source logs will not be deleted." })
@@ -1045,6 +1090,10 @@ export function useUsageDashboard() {
     monthlyUsage,
     codexLimits,
     codexLimitsError,
+    isLimitsRefreshing,
+    isWindowActivating,
+    windowActivationStatus,
+    windowActivationError,
     codexQuotaForecast,
     latestCodexReset,
     recentCodexResets,
@@ -1075,6 +1124,8 @@ export function useUsageDashboard() {
     handleViewChange,
     handleRangeChange,
     handleRefresh,
+    handleLimitsRefresh,
+    handleActivateCodexWindow,
     handleReset,
     handleExport,
     handleDismissUpdate,

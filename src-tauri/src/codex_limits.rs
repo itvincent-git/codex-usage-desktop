@@ -1,16 +1,19 @@
 use crate::{
     codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
-    types::{CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit},
+    types::{
+        CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetCredit,
+        CodexWindowActivationResponse, CodexWindowActivationStatus,
+    },
 };
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
     env,
     ffi::{OsStr, OsString},
     fs,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{mpsc, Arc, Condvar, Mutex, OnceLock},
@@ -27,6 +30,9 @@ const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
 const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
+const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -138,6 +144,14 @@ struct ResetCreditsCache {
 }
 
 static RESET_CREDITS_CACHE: OnceLock<ResetCreditsCache> = OnceLock::new();
+static WINDOW_ACTIVATION_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WindowActivationMarker {
+    window_key: String,
+    attempted_at: i64,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -185,6 +199,178 @@ struct SubscriptionInfo {
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     log::info!("Starting fetch_codex_limits...");
     fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)
+}
+
+pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivationResponse, String> {
+    let _guard = WINDOW_ACTIVATION_LOCK
+        .lock()
+        .map_err(|_| "Codex window activation lock was poisoned.".to_string())?;
+    activate_codex_window_with(
+        marker_path,
+        Utc::now().timestamp(),
+        fetch_codex_limits,
+        run_codex_window_activation,
+    )
+}
+
+fn activate_codex_window_with(
+    marker_path: &Path,
+    now: i64,
+    mut fetch_limits: impl FnMut() -> Result<CodexLimitsResponse, String>,
+    run_activation: impl FnOnce() -> Result<(), String>,
+) -> Result<CodexWindowActivationResponse, String> {
+    let current = fetch_limits()?;
+    let Some(window_key) = inactive_session_window_key(&current, now)? else {
+        return Ok(CodexWindowActivationResponse {
+            status: CodexWindowActivationStatus::AlreadyActive,
+            limits: current,
+        });
+    };
+
+    if activation_was_recently_requested(marker_path, &window_key, now) {
+        return Ok(CodexWindowActivationResponse {
+            status: CodexWindowActivationStatus::RecentlyRequested,
+            limits: current,
+        });
+    }
+
+    write_activation_marker(marker_path, &window_key, now)?;
+    let activation_result = run_activation();
+    let updated = fetch_limits().map_err(|error| {
+        format!("The activation request finished, but the updated Codex limits could not be verified: {error}")
+    })?;
+
+    if session_window_is_active(&updated, now)? {
+        return Ok(CodexWindowActivationResponse {
+            status: CodexWindowActivationStatus::Started,
+            limits: updated,
+        });
+    }
+
+    match activation_result {
+        Err(error) => Err(error),
+        Ok(()) => Err(
+            "Codex completed the activation request, but did not return a new active 5-hour window. The request will not be repeated during the safety cooldown."
+                .to_string(),
+        ),
+    }
+}
+
+fn inactive_session_window_key(
+    limits: &CodexLimitsResponse,
+    now: i64,
+) -> Result<Option<String>, String> {
+    let session = limits.session.as_ref().ok_or_else(|| {
+        "Codex did not return a 5-hour limit window, so activation was not attempted.".to_string()
+    })?;
+    let resets_at = session.resets_at.as_deref().ok_or_else(|| {
+        "The 5-hour window has no reset time, so activation was not attempted.".to_string()
+    })?;
+    let reset_timestamp = chrono::DateTime::parse_from_rfc3339(resets_at)
+        .map_err(|_| {
+            "The 5-hour window returned an invalid reset time, so activation was not attempted."
+                .to_string()
+        })?
+        .timestamp();
+
+    if reset_timestamp > now {
+        return Ok(None);
+    }
+
+    Ok(Some(format!(
+        "{}|{resets_at}",
+        limits.account.as_deref().unwrap_or("unknown-account")
+    )))
+}
+
+fn session_window_is_active(limits: &CodexLimitsResponse, now: i64) -> Result<bool, String> {
+    let Some(resets_at) = limits
+        .session
+        .as_ref()
+        .and_then(|window| window.resets_at.as_deref())
+    else {
+        return Ok(false);
+    };
+    let reset_timestamp = chrono::DateTime::parse_from_rfc3339(resets_at)
+        .map_err(|_| "Codex returned an invalid 5-hour reset time after activation.".to_string())?
+        .timestamp();
+    Ok(reset_timestamp > now)
+}
+
+fn activation_was_recently_requested(marker_path: &Path, window_key: &str, now: i64) -> bool {
+    let Ok(contents) = fs::read_to_string(marker_path) else {
+        return false;
+    };
+    let Ok(marker) = serde_json::from_str::<WindowActivationMarker>(&contents) else {
+        return false;
+    };
+    let age = now.saturating_sub(marker.attempted_at);
+    marker.window_key == window_key && age >= 0 && age < WINDOW_ACTIVATION_COOLDOWN.as_secs() as i64
+}
+
+fn write_activation_marker(marker_path: &Path, window_key: &str, now: i64) -> Result<(), String> {
+    if let Some(parent) = marker_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!("Failed to prepare the Codex window activation state: {error}")
+        })?;
+    }
+    let marker = WindowActivationMarker {
+        window_key: window_key.to_string(),
+        attempted_at: now,
+    };
+    let contents = serde_json::to_vec(&marker)
+        .map_err(|error| format!("Failed to encode the Codex window activation state: {error}"))?;
+    fs::write(marker_path, contents)
+        .map_err(|error| format!("Failed to save the Codex window activation state: {error}"))
+}
+
+fn run_codex_window_activation() -> Result<(), String> {
+    let codex = resolve_codex_command(selected_codex_environment()).ok_or_else(|| {
+        "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
+    })?;
+    let display = codex_command_display(&codex);
+    let mut command = codex_activation_process_command(&codex);
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Failed to start Codex CLI at {display}: {error}"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to open Codex CLI activation stderr.".to_string())?;
+    let stderr_reader = thread::spawn(move || {
+        let mut output = String::new();
+        let _ = stderr.read_to_string(&mut output);
+        output
+    });
+    let deadline = Instant::now() + WINDOW_ACTIVATION_TIMEOUT;
+
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("Failed while waiting for Codex CLI: {error}"))?
+        {
+            let _ = child.wait();
+            let stderr = stderr_reader.join().unwrap_or_default().trim().to_string();
+            if status.success() {
+                return Ok(());
+            }
+            return if stderr.is_empty() {
+                Err(format!("Codex CLI activation exited with status {status}."))
+            } else {
+                Err(format!("Codex CLI activation failed: {stderr}"))
+            };
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stderr_reader.join();
+            return Err("Codex CLI activation timed out after 2 minutes.".to_string());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
 }
 
 pub fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
@@ -1104,6 +1290,20 @@ fn codex_app_server_args() -> [&'static str; 7] {
     ]
 }
 
+fn codex_activation_args() -> [&'static str; 9] {
+    [
+        "-c",
+        "mcp_servers={}",
+        "-s",
+        "read-only",
+        "-a",
+        "never",
+        "exec",
+        "--skip-git-repo-check",
+        WINDOW_ACTIVATION_PROMPT,
+    ]
+}
+
 fn resolve_codex_command(environment: &CodexEnvironment) -> Option<CodexCommand> {
     match &environment.runtime {
         CodexRuntime::Native => resolve_native_codex_binary()
@@ -1316,6 +1516,52 @@ fn codex_process_command(codex: &CodexCommand) -> Command {
     }
 }
 
+fn codex_activation_process_command(codex: &CodexCommand) -> Command {
+    let args = codex_activation_args();
+    match codex {
+        CodexCommand::Native(path) => {
+            #[cfg(target_os = "windows")]
+            let mut command = Command::new(path);
+            #[cfg(not(target_os = "windows"))]
+            let mut command = {
+                let mut command = Command::new("/usr/bin/env");
+                command.arg(path);
+                command
+            };
+            command
+                .args(args)
+                .env("PATH", effective_path_with_codex(path));
+            command
+        }
+        CodexCommand::WindowsCmd(path) => {
+            let args = args
+                .iter()
+                .map(|arg| format!("\"{}\"", arg.replace('"', "\"\"")))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let mut command = Command::new("cmd.exe");
+            command
+                .args(["/D", "/S", "/C"])
+                .arg(format!("\"{}\" {args}", path.display()))
+                .env("PATH", effective_path_with_codex(path));
+            command
+        }
+        CodexCommand::Wsl { distribution, path } => {
+            let inner_command = std::iter::once(path.as_str())
+                .chain(args)
+                .map(shell_quote)
+                .collect::<Vec<_>>()
+                .join(" ");
+            let login_command = format!("exec \"$SHELL\" -lic {}", shell_quote(&inner_command));
+            let mut command = Command::new("wsl.exe");
+            command
+                .args(["-d", distribution, "--", "sh", "-lc"])
+                .arg(login_command);
+            command
+        }
+    }
+}
+
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
@@ -1441,12 +1687,34 @@ fn is_executable(path: &PathBuf) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
 
     fn window(used_percent: f64, window_minutes: Option<i64>) -> RpcRateLimitWindow {
         RpcRateLimitWindow {
             used_percent,
             window_duration_mins: window_minutes,
             resets_at: Some(1_800_000_000),
+        }
+    }
+
+    fn limits_with_session(resets_at: &str) -> CodexLimitsResponse {
+        CodexLimitsResponse {
+            session: Some(CodexLimitWindow {
+                used_percent: 0.0,
+                remaining_percent: 100.0,
+                window_minutes: Some(SESSION_WINDOW_MINUTES),
+                resets_at: Some(resets_at.to_string()),
+            }),
+            weekly: None,
+            reset_credits_available_count: None,
+            reset_credits: None,
+            updated_at: "2026-09-10T00:00:00.000Z".to_string(),
+            source: "test".to_string(),
+            account: None,
+            membership_level: Some("plus".to_string()),
+            workspace_name: None,
+            subscription_expires_at: None,
+            subscription_will_renew: None,
         }
     }
 
@@ -1515,6 +1783,104 @@ mod tests {
                 "app-server",
             ]
         );
+    }
+
+    #[test]
+    fn activation_args_disable_tools_and_use_read_only_sandbox() {
+        assert_eq!(
+            codex_activation_args(),
+            [
+                "-c",
+                "mcp_servers={}",
+                "-s",
+                "read-only",
+                "-a",
+                "never",
+                "exec",
+                "--skip-git-repo-check",
+                WINDOW_ACTIVATION_PROMPT,
+            ]
+        );
+    }
+
+    #[test]
+    fn active_window_does_not_send_activation_request() {
+        let marker = command_v_fixture("active-window-marker");
+        let launches = Cell::new(0);
+        let response = activate_codex_window_with(
+            &marker,
+            1_789_000_000,
+            || Ok(limits_with_session("2026-09-10T05:00:00.000Z")),
+            || {
+                launches.set(launches.get() + 1);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(response.status, CodexWindowActivationStatus::AlreadyActive);
+        assert_eq!(launches.get(), 0);
+        assert!(!marker.exists());
+    }
+
+    #[test]
+    fn expired_window_sends_one_request_and_verifies_new_window() {
+        let marker = command_v_fixture("expired-window-marker");
+        let _ = fs::remove_file(&marker);
+        let fetches = Cell::new(0);
+        let launches = Cell::new(0);
+        let response = activate_codex_window_with(
+            &marker,
+            1_789_000_000,
+            || {
+                fetches.set(fetches.get() + 1);
+                Ok(if fetches.get() == 1 {
+                    limits_with_session("2026-09-09T23:00:00.000Z")
+                } else {
+                    limits_with_session("2026-09-10T06:00:00.000Z")
+                })
+            },
+            || {
+                launches.set(launches.get() + 1);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(response.status, CodexWindowActivationStatus::Started);
+        assert_eq!(fetches.get(), 2);
+        assert_eq!(launches.get(), 1);
+        fs::remove_file(marker).unwrap();
+    }
+
+    #[test]
+    fn recent_marker_suppresses_a_repeated_activation_request() {
+        let marker = command_v_fixture("recent-activation-marker");
+        let _ = fs::remove_file(&marker);
+        write_activation_marker(
+            &marker,
+            "unknown-account|2026-09-09T23:00:00.000Z",
+            1_789_000_000,
+        )
+        .unwrap();
+        let launches = Cell::new(0);
+        let response = activate_codex_window_with(
+            &marker,
+            1_789_000_001,
+            || Ok(limits_with_session("2026-09-09T23:00:00.000Z")),
+            || {
+                launches.set(launches.get() + 1);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            response.status,
+            CodexWindowActivationStatus::RecentlyRequested
+        );
+        assert_eq!(launches.get(), 0);
+        fs::remove_file(marker).unwrap();
     }
 
     #[test]

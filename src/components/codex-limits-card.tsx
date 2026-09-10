@@ -1,7 +1,8 @@
-import { ChevronDown, ExternalLink, LogIn, RotateCcw } from "lucide-react";
+import { ChevronDown, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { LatestResetButton } from "@/components/codex-reset-history";
-import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, CodexResetCredit } from "@/lib/api";
+import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -13,6 +14,12 @@ type CodexLimitsCardProps = {
   quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
+  isLimitsRefreshing?: boolean;
+  isWindowActivating?: boolean;
+  windowActivationStatus?: CodexWindowActivationStatus | null;
+  windowActivationError?: string | null;
+  onRefreshLimits?: () => void;
+  onActivateWindow?: () => void;
   onOpenQuotaForecast?: () => void;
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
@@ -51,14 +58,26 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "team", "business", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
   const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
   const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
-      <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center">
+      <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center gap-3">
+        {onRefreshLimits && onActivateWindow ? (
+          <LimitActions
+            window={limits?.session ?? null}
+            showActivation={hasSubscription(limits)}
+            isRefreshing={isLimitsRefreshing}
+            isActivating={isWindowActivating}
+            activationStatus={windowActivationStatus}
+            activationError={windowActivationError}
+            onRefresh={onRefreshLimits}
+            onActivate={onActivateWindow}
+          />
+        ) : null}
         {error ? (
           isOAuthLoginError(error) ? (
             <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
@@ -85,10 +104,11 @@ export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, rec
             </div>
           )
         ) : (
-          <div className={cn(
-            "grid gap-3 flex-1 justify-center",
-            hasSubscription(limits) ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
-          )}>
+          <div className="flex flex-1 flex-col justify-center">
+            <div className={cn(
+              "grid gap-3 justify-center",
+              hasSubscription(limits) ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
+            )}>
             {hasSubscription(limits) ? (
               <>
                 <LimitRow label="5 hour" window={limits?.session ?? null} />
@@ -109,10 +129,65 @@ export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, rec
               onOpenResetHistory={onOpenResetHistory}
               onOpenResetCredits={onOpenResetCredits}
             />
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function LimitActions({
+  window,
+  showActivation,
+  isRefreshing,
+  isActivating,
+  activationStatus,
+  activationError,
+  onRefresh,
+  onActivate,
+}: {
+  window: CodexLimitWindow | null;
+  showActivation: boolean;
+  isRefreshing: boolean;
+  isActivating: boolean;
+  activationStatus?: CodexWindowActivationStatus | null;
+  activationError?: string | null;
+  onRefresh: () => void;
+  onActivate: () => void;
+}) {
+  const { t } = useTranslation();
+  const resetAt = window?.resetsAt ? Date.parse(window.resetsAt) : Number.NaN;
+  const canActivate = Number.isFinite(resetAt) && resetAt <= Date.now();
+  const busy = isRefreshing || isActivating;
+  const activationRecentlyRequested = activationStatus === "recentlyRequested";
+  const statusText = activationError
+    ? activationError
+    : activationStatus
+      ? t(`limits.activate_status_${activationStatus}`)
+      : t(showActivation ? (canActivate ? "limits.activate_ready" : "limits.activate_active") : "limits.query_desc");
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/15 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-foreground">{t("limits.actions_title")}</p>
+        <p className={cn("mt-0.5 text-[10px] leading-normal", activationError ? "text-error" : "text-muted-foreground")}>
+          {statusText}
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={onRefresh}>
+          {isRefreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {t("limits.query_action")}
+        </Button>
+        {showActivation ? (
+          <Button type="button" size="sm" disabled={busy || !canActivate || activationRecentlyRequested} onClick={onActivate}>
+            {isActivating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            {t(isActivating ? "limits.activating_action" : "limits.activate_action")}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

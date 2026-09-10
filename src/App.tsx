@@ -45,6 +45,10 @@ export default function App() {
     monthlyUsage,
     codexLimits,
     codexLimitsError,
+    isLimitsRefreshing,
+    isWindowActivating,
+    windowActivationStatus,
+    windowActivationError,
     codexQuotaForecast,
     latestCodexReset,
     recentCodexResets,
@@ -75,6 +79,8 @@ export default function App() {
     handleViewChange,
     handleRangeChange,
     handleRefresh,
+    handleLimitsRefresh,
+    handleActivateCodexWindow,
     handleReset,
     handleExport,
     handleDismissUpdate,
@@ -326,6 +332,12 @@ export default function App() {
                   quotaForecast={codexQuotaForecast}
                   latestReset={latestCodexReset}
                   recentResets={recentCodexResets}
+                  isLimitsRefreshing={isLimitsRefreshing}
+                  isWindowActivating={isWindowActivating}
+                  windowActivationStatus={windowActivationStatus}
+                  windowActivationError={windowActivationError}
+                  onRefreshLimits={() => void handleLimitsRefresh()}
+                  onActivateWindow={() => void handleActivateCodexWindow()}
                   onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
                   onOpenResetHistory={() => setIsResetHistoryOpen(true)}
                   onOpenResetCredits={() => void handleOpenResetCredits()}

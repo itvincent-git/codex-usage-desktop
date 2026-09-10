@@ -148,6 +148,13 @@ export type CodexLimitsResponse = {
   subscriptionWillRenew?: boolean | null;
 };
 
+export type CodexWindowActivationStatus = "started" | "alreadyActive" | "recentlyRequested";
+
+export type CodexWindowActivationResponse = {
+  status: CodexWindowActivationStatus;
+  limits: CodexLimitsResponse;
+};
+
 export type CodexQuotaForecastResponse = {
   score: number;
   fetchedAt: string;
@@ -203,6 +210,10 @@ export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
 
 export async function fetchCodexLimits(): Promise<CodexLimitsResponse> {
   return invoke<CodexLimitsResponse>("fetch_codex_limits");
+}
+
+export async function activateCodexWindow(): Promise<CodexWindowActivationResponse> {
+  return invoke<CodexWindowActivationResponse>("activate_codex_window");
 }
 
 export async function fetchCodexQuotaForecast(): Promise<CodexQuotaForecastResponse> {

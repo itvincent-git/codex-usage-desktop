@@ -272,6 +272,21 @@ pub struct CodexLimitsResponse {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct CodexWindowActivationResponse {
+    pub status: CodexWindowActivationStatus,
+    pub limits: CodexLimitsResponse,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum CodexWindowActivationStatus {
+    Started,
+    AlreadyActive,
+    RecentlyRequested,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
     pub score: i64,
     pub fetched_at: String,
