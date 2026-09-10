@@ -679,7 +679,7 @@ function WebSearchItem({
   const displayQueries = queries.length > 0 ? queries : [null];
 
   return (
-    <div className="py-1.5 font-mono text-xs leading-relaxed">
+    <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
       <button
         type="button"
         className={`flex w-full items-start justify-between gap-3 text-left ${item.isError ? ITEM_TITLE_TONES.error : "text-foreground"} ${DISCLOSURE_BUTTON_CLASS}`}
@@ -703,7 +703,7 @@ function WebSearchItem({
           <span className="sr-only">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
         </span>
       </button>
-      {isExpanded ? <div className={`ml-4 mt-2 space-y-2 rounded-md border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+      {isExpanded ? <div className="ml-4 mt-2 space-y-2">
         {structuredResults ? (
           <div className="space-y-2">
             {structuredResults.map((result, index) => (

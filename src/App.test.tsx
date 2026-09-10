@@ -1557,7 +1557,7 @@ describe("App", () => {
     const webSearchCall = webSearchButton.parentElement!;
     expect(webSearchCall).toHaveTextContent("first search query");
     expect(webSearchCall).toHaveTextContent("second search query");
-    expect(webSearchCall).not.toHaveClass("rounded-lg", "border");
+    expect(webSearchCall).toHaveClass("rounded-lg", "border", "border-cyan-300/70", "bg-cyan-50/70");
     expect(webSearchCall).not.toHaveTextContent("tools.web__run");
     expect(webSearchCall).not.toHaveTextContent("search_query");
     expect(webSearchCall).not.toHaveTextContent("--------------------------------------------------------------------------------");
