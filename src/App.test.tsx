@@ -1553,14 +1553,15 @@ describe("App", () => {
     const stoppedActivity = screen.getByRole("button", { name: /Stopped \(12s, SIGTERM\) pnpm tauri dev/ });
     expect(stoppedActivity.parentElement).toHaveTextContent("└ shutting down");
     expect(stoppedActivity.parentElement).not.toHaveTextContent("Process stopped with signal");
-    const webSearchButton = screen.getAllByRole("button", { name: /Web search · completed/ })
-      .find((button) => button.parentElement?.textContent?.includes("first search query"))!;
+    const webSearchButton = screen.getByRole("button", { name: /Searched the web for first search query/ });
     const webSearchCall = webSearchButton.parentElement!;
     expect(webSearchCall).toHaveTextContent("first search query");
     expect(webSearchCall).toHaveTextContent("second search query");
+    expect(webSearchCall).not.toHaveClass("rounded-lg", "border");
     expect(webSearchCall).not.toHaveTextContent("tools.web__run");
     expect(webSearchCall).not.toHaveTextContent("search_query");
     expect(webSearchCall).not.toHaveTextContent("--------------------------------------------------------------------------------");
+    expect(webSearchCall).not.toHaveTextContent("First result");
     await userEvent.click(webSearchButton);
     expect(webSearchCall).toHaveTextContent("Search result 1");
     expect(webSearchCall).toHaveTextContent("First result");
@@ -1568,6 +1569,9 @@ describe("App", () => {
     expect(webSearchCall).toHaveTextContent("Second result");
     expect(webSearchCall).toHaveTextContent("Search result 3");
     expect(screen.getByText("Search result 3").nextElementSibling?.textContent).toBe('{\n  "nested": {\n    "visible": true\n  }\n}');
+    const directWebSearchButton = screen.getByRole("button", { name: /Searched the web for codex usage desktop/ });
+    expect(directWebSearchButton.parentElement).not.toHaveTextContent("A local dashboard for Codex CLI token usage.");
+    await userEvent.click(directWebSearchButton);
     const directWebSearchLink = screen.getByRole("link", { name: "Codex Usage Desktop" });
     const directWebSearchCall = directWebSearchLink.closest("article")!.parentElement!.parentElement!;
     expect(directWebSearchLink).toHaveAttribute("href", "https://github.com/itvincent-git/codex-usage-desktop");

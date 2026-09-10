@@ -673,36 +673,37 @@ function WebSearchItem({
   const contentBlocks = parseToolContentBlocks(item.output);
   const output = contentBlocks?.text ?? item.output;
   const results = output ? splitWebSearchResults(output) : [];
+  const searchLabel = item.status === "completed"
+    ? t("sessions.detail.web_search_completed")
+    : t("sessions.detail.web_search_running");
+  const displayQueries = queries.length > 0 ? queries : [null];
 
   return (
-    <div className={`rounded-lg border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
+    <div className="py-1.5 font-mono text-xs leading-relaxed">
       <button
         type="button"
-        className={`flex w-full items-center justify-between gap-3 text-left text-xs font-semibold ${item.isError ? ITEM_TITLE_TONES.error : ITEM_TITLE_TONES.tool} ${DISCLOSURE_BUTTON_CLASS}`}
+        className={`flex w-full items-start justify-between gap-3 text-left ${item.isError ? ITEM_TITLE_TONES.error : "text-foreground"} ${DISCLOSURE_BUTTON_CLASS}`}
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((value) => !value)}
       >
-        <span className="flex min-w-0 items-center gap-1">
-          <Terminal className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{t("sessions.detail.web_search")} {item.status ? `· ${item.status}` : ""}</span>
+        <span className="min-w-0 space-y-1">
+          {displayQueries.map((query, index) => (
+            <span key={`${index}-${query ?? "web-search"}`} className="flex min-w-0 gap-1.5">
+              <span className="shrink-0 text-muted-foreground">•</span>
+              <span className="min-w-0 break-words">
+                <span className="font-semibold">{query ? searchLabel : t("sessions.detail.web_search")}</span>
+                {query ? ` ${query}` : null}
+              </span>
+            </span>
+          ))}
         </span>
-        <span className="flex shrink-0 items-center gap-3">
+        <span className="flex shrink-0 items-center gap-3 font-sans text-muted-foreground">
           {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
-          <span className="flex items-center gap-1">
-            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-            {isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}
-          </span>
+          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          <span className="sr-only">{isExpanded ? t("sessions.detail.collapse") : t("sessions.detail.expand")}</span>
         </span>
       </button>
-      <div className="mt-3 space-y-2">
-        {queries.length > 0 ? (
-          <div className="py-2">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("sessions.detail.search_queries")}</div>
-            <ul className="space-y-1 font-mono text-xs leading-relaxed text-foreground">
-              {queries.map((query, index) => <li key={`${index}-${query}`} className="break-words">• {query}</li>)}
-            </ul>
-          </div>
-        ) : null}
+      {isExpanded ? <div className={`ml-4 mt-2 space-y-2 rounded-md border p-3 ${item.isError ? ITEM_TONES.error : ITEM_TONES.tool}`}>
         {structuredResults ? (
           <div className="space-y-2">
             {structuredResults.map((result, index) => (
@@ -711,21 +712,19 @@ function WebSearchItem({
                   <a href={result.url} target="_blank" rel="noreferrer" className="block break-words text-sm font-semibold text-primary hover:underline">{result.title}</a>
                 ) : <div className="break-words text-sm font-semibold text-foreground">{result.title}</div>}
                 {result.domain ? <div className="mt-1 text-xs text-muted-foreground">{result.domain}</div> : null}
-                {result.snippet ? <p className={`mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground ${isExpanded ? "" : "line-clamp-3"}`}>{result.snippet}</p> : null}
+                {result.snippet ? <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">{result.snippet}</p> : null}
               </article>
             ))}
           </div>
-        ) : results.length > 0 ? isExpanded ? (
+        ) : results.length > 0 ? (
           <div className="space-y-2">
             {results.map((result, index) => (
               <ToolTextBlock key={`${index}-${result.slice(0, 80)}`} title={t("sessions.detail.search_result", { index: index + 1 })} text={result} />
             ))}
           </div>
-        ) : (
-          <ToolPreview title={t("sessions.detail.output")} text={results.join("\n\n")} lines={5} />
         ) : null}
-      </div>
-      <RawJsonlDisclosure rawJsonl={rawJsonl} />
+        <RawJsonlDisclosure rawJsonl={rawJsonl} />
+      </div> : null}
     </div>
   );
 }

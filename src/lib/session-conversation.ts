@@ -582,9 +582,14 @@ function buildToolActivity(item: Extract<ReplayItem, { kind: "toolCall" }>) {
     ? parseNestedToolCall(item.arguments, "write_stdin")
     : null;
   const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
+  const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
-  const webSearchQueries = isExec ? parseWebSearchQueries(item.arguments) : null;
+  const webSearchQueries = isExec
+    ? parseWebSearchQueries(item.arguments)
+    : outerToolName === "web_search" && typeof parsedArguments?.q === "string"
+      ? [parsedArguments.q]
+      : null;
   const webSearchResults = parseWebSearchResultCards(item.output);
   const batchExecResults = isExec ? parseBatchExecResults(item.output) : null;
   const execArgumentList = isExec ? parseExecArgumentList(item.arguments) : [];
@@ -592,7 +597,6 @@ function buildToolActivity(item: Extract<ReplayItem, { kind: "toolCall" }>) {
     ? batchExecResults.map((result, index) => ({ result, arguments: execArgumentList[index] ?? null }))
     : null;
   const execArguments = isExec && !batchActivities && execArgumentList.length <= 1 ? parseExecArguments(item.arguments) : null;
-  const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const argumentEntries = parsedArguments
     ? Object.entries(parsedArguments).filter(([key]) => !execArguments || !["cmd", "command", "workdir", "cwd"].includes(key))
     : [];
