@@ -1,4 +1,4 @@
-import { memo, type ComponentPropsWithoutRef } from "react";
+import { memo, type ComponentPropsWithoutRef, type MouseEvent } from "react";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";
@@ -16,6 +16,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { openUrl } from "@/lib/api";
 import "katex/dist/katex.min.css";
 
 type MarkdownContentProps = {
@@ -73,6 +74,13 @@ function MarkdownCode({ className, children }: ComponentPropsWithoutRef<"code">)
   );
 }
 
+function openMarkdownLink(event: MouseEvent<HTMLAnchorElement>) {
+  const href = event.currentTarget.href;
+  if (!href) return;
+  event.preventDefault();
+  void openUrl(href);
+}
+
 function MarkdownContentComponent({ content }: MarkdownContentProps) {
   return (
     <div className="session-markdown">
@@ -83,7 +91,7 @@ function MarkdownContentComponent({ content }: MarkdownContentProps) {
         ]}
         components={{
           a: ({ children, ...props }: ComponentPropsWithoutRef<"a">) => (
-            <a {...props} target="_blank" rel="noreferrer">
+            <a {...props} target="_blank" rel="noreferrer" onClick={openMarkdownLink}>
               {children}
             </a>
           ),

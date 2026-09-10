@@ -1,10 +1,20 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { openUrl } from "@/lib/api";
 import { MarkdownContent } from "./markdown-content";
 
+vi.mock("@/lib/api", () => ({
+  openUrl: vi.fn(),
+}));
+
 describe("MarkdownContent", () => {
+  beforeEach(() => {
+    vi.mocked(openUrl).mockReset();
+  });
+
   it("renders GFM tables, highlighted code, and math", () => {
     const { container } = render(
       <MarkdownContent
@@ -35,14 +45,20 @@ describe("MarkdownContent", () => {
     expect(container.querySelector(".katex-display")).toBeInTheDocument();
   });
 
-  it("keeps raw HTML inert and secures external links", () => {
+  it("keeps raw HTML inert and opens external links outside the webview", async () => {
+    vi.mocked(openUrl).mockResolvedValue();
     const { container } = render(
       <MarkdownContent content={'<img src="x" onerror="alert(1)">\n\n[Example](https://example.com)'} />,
     );
 
     expect(container.querySelector("img")).not.toBeInTheDocument();
     expect(container).toHaveTextContent('<img src="x" onerror="alert(1)">');
-    expect(screen.getByRole("link", { name: "Example" })).toHaveAttribute("target", "_blank");
-    expect(screen.getByRole("link", { name: "Example" })).toHaveAttribute("rel", "noreferrer");
+    const link = screen.getByRole("link", { name: "Example" });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noreferrer");
+
+    await userEvent.click(link);
+
+    expect(openUrl).toHaveBeenCalledWith("https://example.com/");
   });
 });
