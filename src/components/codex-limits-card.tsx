@@ -157,10 +157,9 @@ function LimitActions({
   onActivate: () => void;
 }) {
   const { t } = useTranslation();
-  const resetAt = window?.resetsAt ? Date.parse(window.resetsAt) : Number.NaN;
-  const canActivate = Number.isFinite(resetAt) && resetAt <= Date.now();
+  const canActivate = window !== null && window.usedPercent <= 0;
   const busy = isRefreshing || isActivating;
-  const activationRecentlyRequested = activationStatus === "recentlyRequested";
+  const activationAlreadyRequested = activationStatus === "started" || activationStatus === "recentlyRequested";
   const statusText = activationError
     ? activationError
     : activationStatus
@@ -181,7 +180,7 @@ function LimitActions({
           {t("limits.query_action")}
         </Button>
         {showActivation ? (
-          <Button type="button" size="sm" disabled={busy || !canActivate || activationRecentlyRequested} onClick={onActivate}>
+          <Button type="button" size="sm" disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
             {isActivating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
             {t(isActivating ? "limits.activating_action" : "limits.activate_action")}
           </Button>

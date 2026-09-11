@@ -96,13 +96,13 @@ describe("formatResetTime", () => {
 });
 
 describe("CodexLimitsCard component", () => {
-  it("separates limit checks from window activation and only enables activation after expiry", () => {
+  it("enables activation at zero usage and disables it after usage starts", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-10T00:00:00.000Z"));
     const onRefreshLimits = vi.fn();
     const onActivateWindow = vi.fn();
     const baseLimits = {
-      session: { usedPercent: 0, remainingPercent: 100, windowMinutes: 300, resetsAt: "2026-09-09T23:00:00.000Z" },
+      session: { usedPercent: 0, remainingPercent: 100, windowMinutes: 300, resetsAt: "2026-09-10T05:00:00.000Z" },
       weekly: { usedPercent: 10, remainingPercent: 90, windowMinutes: 10080, resetsAt: "2026-09-14T00:00:00.000Z" },
       updatedAt: "2026-09-10T00:00:00.000Z",
       source: "oauth",
@@ -132,9 +132,21 @@ describe("CodexLimitsCard component", () => {
       <CodexLimitsCard
         limits={{
           ...baseLimits,
-          session: { ...baseLimits.session, resetsAt: "2026-09-10T05:00:00.000Z" },
+          session: { ...baseLimits.session, usedPercent: 1, remainingPercent: 99, resetsAt: "2026-09-10T05:00:00.000Z" },
         }}
         error={null}
+        onRefreshLimits={onRefreshLimits}
+        onActivateWindow={onActivateWindow}
+        onOpenResetCredits={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
+
+    rerender(
+      <CodexLimitsCard
+        limits={baseLimits}
+        error={null}
+        windowActivationStatus="started"
         onRefreshLimits={onRefreshLimits}
         onActivateWindow={onActivateWindow}
         onOpenResetCredits={() => {}}

@@ -129,7 +129,7 @@
     "activate_active": "The 5-hour window is active. Checking limits does not start or extend it.",
     "activate_confirm": "Start a new 5-hour limit window? This sends one minimal Codex request and uses a small amount of 5-hour and weekly quota.",
     "activate_failed": "Unable to start a new 5-hour limit window.",
-    "activate_status_started": "The new 5-hour window started and was verified against the server limit state.",
+    "activate_status_started": "The new 5-hour window was started successfully.",
     "activate_status_alreadyActive": "The server reports that the 5-hour window is already active. No request was sent.",
     "activate_status_recentlyRequested": "An activation request was sent for this window within 5 minutes. It was not repeated; check limits before trying later.",
     "unavailable": "Unavailable",

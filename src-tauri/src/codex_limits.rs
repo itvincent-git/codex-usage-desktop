@@ -220,7 +220,7 @@ fn activate_codex_window_with(
     run_activation: impl FnOnce() -> Result<(), String>,
 ) -> Result<CodexWindowActivationResponse, String> {
     let current = fetch_limits()?;
-    let Some(window_key) = inactive_session_window_key(&current, now)? else {
+    let Some(window_key) = inactive_session_window_key(&current)? else {
         return Ok(CodexWindowActivationResponse {
             status: CodexWindowActivationStatus::AlreadyActive,
             limits: current,
@@ -240,61 +240,38 @@ fn activate_codex_window_with(
         format!("The activation request finished, but the updated Codex limits could not be verified: {error}")
     })?;
 
-    if session_window_is_active(&updated, now)? {
+    if session_window_has_usage(&updated) {
         return Ok(CodexWindowActivationResponse {
             status: CodexWindowActivationStatus::Started,
             limits: updated,
         });
     }
 
-    match activation_result {
-        Err(error) => Err(error),
-        Ok(()) => Err(
-            "Codex completed the activation request, but did not return a new active 5-hour window. The request will not be repeated during the safety cooldown."
-                .to_string(),
-        ),
-    }
+    activation_result.map(|()| CodexWindowActivationResponse {
+        status: CodexWindowActivationStatus::Started,
+        limits: updated,
+    })
 }
 
-fn inactive_session_window_key(
-    limits: &CodexLimitsResponse,
-    now: i64,
-) -> Result<Option<String>, String> {
+fn inactive_session_window_key(limits: &CodexLimitsResponse) -> Result<Option<String>, String> {
     let session = limits.session.as_ref().ok_or_else(|| {
         "Codex did not return a 5-hour limit window, so activation was not attempted.".to_string()
     })?;
-    let resets_at = session.resets_at.as_deref().ok_or_else(|| {
-        "The 5-hour window has no reset time, so activation was not attempted.".to_string()
-    })?;
-    let reset_timestamp = chrono::DateTime::parse_from_rfc3339(resets_at)
-        .map_err(|_| {
-            "The 5-hour window returned an invalid reset time, so activation was not attempted."
-                .to_string()
-        })?
-        .timestamp();
-
-    if reset_timestamp > now {
+    if session.used_percent > 0.0 {
         return Ok(None);
     }
 
     Ok(Some(format!(
-        "{}|{resets_at}",
+        "{}|zero-usage",
         limits.account.as_deref().unwrap_or("unknown-account")
     )))
 }
 
-fn session_window_is_active(limits: &CodexLimitsResponse, now: i64) -> Result<bool, String> {
-    let Some(resets_at) = limits
+fn session_window_has_usage(limits: &CodexLimitsResponse) -> bool {
+    limits
         .session
         .as_ref()
-        .and_then(|window| window.resets_at.as_deref())
-    else {
-        return Ok(false);
-    };
-    let reset_timestamp = chrono::DateTime::parse_from_rfc3339(resets_at)
-        .map_err(|_| "Codex returned an invalid 5-hour reset time after activation.".to_string())?
-        .timestamp();
-    Ok(reset_timestamp > now)
+        .is_some_and(|window| window.used_percent > 0.0)
 }
 
 fn activation_was_recently_requested(marker_path: &Path, window_key: &str, now: i64) -> bool {
@@ -1697,11 +1674,11 @@ mod tests {
         }
     }
 
-    fn limits_with_session(resets_at: &str) -> CodexLimitsResponse {
+    fn limits_with_session(used_percent: f64, resets_at: &str) -> CodexLimitsResponse {
         CodexLimitsResponse {
             session: Some(CodexLimitWindow {
-                used_percent: 0.0,
-                remaining_percent: 100.0,
+                used_percent,
+                remaining_percent: 100.0 - used_percent,
                 window_minutes: Some(SESSION_WINDOW_MINUTES),
                 resets_at: Some(resets_at.to_string()),
             }),
@@ -1810,7 +1787,7 @@ mod tests {
         let response = activate_codex_window_with(
             &marker,
             1_789_000_000,
-            || Ok(limits_with_session("2026-09-10T05:00:00.000Z")),
+            || Ok(limits_with_session(1.0, "2026-09-10T05:00:00.000Z")),
             || {
                 launches.set(launches.get() + 1);
                 Ok(())
@@ -1824,8 +1801,8 @@ mod tests {
     }
 
     #[test]
-    fn expired_window_sends_one_request_and_verifies_new_window() {
-        let marker = command_v_fixture("expired-window-marker");
+    fn zero_usage_window_sends_one_request_even_with_a_future_reset_time() {
+        let marker = command_v_fixture("zero-usage-window-marker");
         let _ = fs::remove_file(&marker);
         let fetches = Cell::new(0);
         let launches = Cell::new(0);
@@ -1835,9 +1812,9 @@ mod tests {
             || {
                 fetches.set(fetches.get() + 1);
                 Ok(if fetches.get() == 1 {
-                    limits_with_session("2026-09-09T23:00:00.000Z")
+                    limits_with_session(0.0, "2026-09-10T05:00:00.000Z")
                 } else {
-                    limits_with_session("2026-09-10T06:00:00.000Z")
+                    limits_with_session(0.0, "2026-09-10T06:00:00.000Z")
                 })
             },
             || {
@@ -1857,17 +1834,12 @@ mod tests {
     fn recent_marker_suppresses_a_repeated_activation_request() {
         let marker = command_v_fixture("recent-activation-marker");
         let _ = fs::remove_file(&marker);
-        write_activation_marker(
-            &marker,
-            "unknown-account|2026-09-09T23:00:00.000Z",
-            1_789_000_000,
-        )
-        .unwrap();
+        write_activation_marker(&marker, "unknown-account|zero-usage", 1_789_000_000).unwrap();
         let launches = Cell::new(0);
         let response = activate_codex_window_with(
             &marker,
             1_789_000_001,
-            || Ok(limits_with_session("2026-09-09T23:00:00.000Z")),
+            || Ok(limits_with_session(0.0, "2026-09-10T05:00:00.000Z")),
             || {
                 launches.set(launches.get() + 1);
                 Ok(())

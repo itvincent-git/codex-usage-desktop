@@ -129,7 +129,7 @@
     "activate_active": "5 小时窗口仍在计时；查询限额不会启动或延长窗口。",
     "activate_confirm": "启动新的 5 小时额度窗口？这会发送一次最小 Codex 请求，并消耗少量 5 小时和周度额度。",
     "activate_failed": "无法启动新的 5 小时额度窗口。",
-    "activate_status_started": "新的 5 小时额度窗口已启动，并已通过服务端限额状态确认。",
+    "activate_status_started": "新的 5 小时额度窗口已成功启动。",
     "activate_status_alreadyActive": "服务端确认 5 小时额度窗口已在运行，没有发送请求。",
     "activate_status_recentlyRequested": "5 分钟内已为这个窗口发送过启动请求；为避免重复消耗，本次没有再次发送。可稍后先查询限额。",
     "unavailable": "不可用",

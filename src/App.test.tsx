@@ -493,7 +493,7 @@ describe("App", () => {
     await act(async () => {
       finishActivation?.({ status: "started", limits: activeLimits });
     });
-    expect(await screen.findByText("The new 5-hour window started and was verified against the server limit state.")).toBeInTheDocument();
+    expect(await screen.findByText("The new 5-hour window was started successfully.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
   });
 

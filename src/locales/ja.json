@@ -129,7 +129,7 @@
     "activate_active": "5時間ウィンドウは実行中です。利用枠の確認では開始も延長もされません。",
     "activate_confirm": "新しい5時間の利用枠ウィンドウを開始しますか？最小限の Codex リクエストが1回送信され、5時間および週間の利用枠を少量消費します。",
     "activate_failed": "新しい5時間の利用枠ウィンドウを開始できませんでした。",
-    "activate_status_started": "新しい5時間ウィンドウが開始され、サーバーの利用枠状態で確認されました。",
+    "activate_status_started": "新しい5時間ウィンドウを正常に開始しました。",
     "activate_status_alreadyActive": "5時間ウィンドウはすでに実行中です。リクエストは送信されませんでした。",
     "activate_status_recentlyRequested": "このウィンドウには5分以内に開始リクエストが送信されています。重複消費を避けるため再送信しませんでした。後でもう一度利用枠を確認してください。",
     "unavailable": "利用不可",
