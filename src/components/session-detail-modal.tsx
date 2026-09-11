@@ -1420,9 +1420,9 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               {t("sessions.detail.loading_replay")}
             </div>
           ) : activeTab === "timeline" ? (
-            <div className="relative mx-auto max-w-5xl min-[1440px]:max-w-[77rem]">
+            <div className="relative mx-auto max-w-5xl min-[1280px]:max-w-[77rem]">
               <nav
-                className="absolute inset-y-0 right-0 hidden w-48 min-[1440px]:block"
+                className="absolute inset-y-0 right-0 hidden w-48 min-[1280px]:block"
                 aria-label={t("sessions.detail.quick_navigation")}
               >
                 <div className="sticky top-5 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-border/60 bg-surface/95 p-2 shadow-sm backdrop-blur">
