@@ -1,4 +1,8 @@
 {
+  "3.2.0": {
+    "zh": "- fix(limits): enable activation for unused windows\n- fix(limits): isolate window activation request\n- feat(limits): add repeatable activation debug mode\n- fix(sessions): render background terminal waits\n- feat: add session turn quick navigation\n- fix(ui): center session detail navigation group\n- fix(ui): show session quick navigation sooner",
+    "en": "- fix(limits): enable activation for unused windows\n- fix(limits): isolate window activation request\n- feat(limits): add repeatable activation debug mode\n- fix(sessions): render background terminal waits\n- feat: add session turn quick navigation\n- fix(ui): center session detail navigation group\n- fix(ui): show session quick navigation sooner"
+  },
   "3.1.0": {
     "zh": "- fix(dashboard): keep chart tooltip above metrics\n- feat(sessions): collapse summary on scroll and copy project paths\n- fix(sessions): consolidate summary into collapsing app bar\n- fix(sessions): merge write stdin continuations\n- docs: add Star History chart to README\n- fix(sessions): open markdown links externally\n- feat: render web searches like codex cli\n- fix(sessions): restore web search card styling\n- feat(limits): add explicit window activation",
     "en": "- fix(dashboard): keep chart tooltip above metrics\n- feat(sessions): collapse summary on scroll and copy project paths\n- fix(sessions): consolidate summary into collapsing app bar\n- fix(sessions): merge write stdin continuations\n- docs: add Star History chart to README\n- fix(sessions): open markdown links externally\n- feat: render web searches like codex cli\n- fix(sessions): restore web search card styling\n- feat(limits): add explicit window activation"
