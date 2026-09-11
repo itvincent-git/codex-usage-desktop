@@ -92,3 +92,27 @@ it("renders nested orchestration calls as ordered CLI-style activities", async (
   await userEvent.click(activities[2]);
   expect(screen.getByRole("img", { name: "/tmp/result.png" })).toBeInTheDocument();
 });
+
+it("renders background terminal polling like Codex CLI", async () => {
+  await i18n.changeLanguage("en");
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [{
+      kind: "toolCall", callId: "wait", name: "exec", status: "completed",
+      arguments: 'const ids=[88600,42227];\nconst rs=await Promise.all(ids.map(session_id=>tools.write_stdin({session_id,chars:"",yield_time_ms:30000,max_output_tokens:20000})));',
+      output: JSON.stringify([
+        { type: "input_text", text: "JOB1\nBackground task output" },
+        { type: "input_text", text: "SESSION1=88600" },
+      ]),
+      stderr: null, startedAt: null, completedAt: null, durationMs: 30000, isError: false,
+    }],
+  };
+
+  render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={[]} />);
+
+  expect(screen.getByText("Waited for background terminal")).toBeInTheDocument();
+  expect(screen.queryByText(/Background task output/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/session_id/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /exec · completed/ })).not.toBeInTheDocument();
+});

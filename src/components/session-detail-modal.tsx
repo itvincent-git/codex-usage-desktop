@@ -729,10 +729,31 @@ function WebSearchItem({
   );
 }
 
+function BackgroundTerminalItem({ input, tokenUsage, rawJsonl }: { input: string; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
+  const { t } = useTranslation();
+  const waitedOnly = input.length === 0;
+
+  return (
+    <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${ITEM_TONES.tool}`}>
+      <div className="flex items-start justify-between gap-3 text-foreground">
+        <span className="flex min-w-0 gap-1.5">
+          <span className="shrink-0 text-muted-foreground">{waitedOnly ? "•" : "↳"}</span>
+          <span className="font-semibold">
+            {t(waitedOnly ? "sessions.detail.waited_for_background_terminal" : "sessions.detail.interacted_with_background_terminal")}
+          </span>
+        </span>
+        {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+      </div>
+      {!waitedOnly ? <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border/60 pl-4 text-muted-foreground">{`└ ${input}`}</pre> : null}
+      <RawJsonlDisclosure rawJsonl={rawJsonl} />
+    </div>
+  );
+}
+
 function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: ToolActivity; item: Extract<ReplayItem, { kind: "toolCall" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const { outerToolName, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, nestedActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText } = activity;
+  const { outerToolName, backgroundTerminalInput, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, nestedActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText } = activity;
   const argumentsTitle = execArguments?.kind === "patch"
     ? t("sessions.detail.patch_input")
     : t(execArguments ? "sessions.detail.command" : "sessions.detail.arguments");
@@ -743,6 +764,10 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
 
   if (webSearchQueries || (outerToolName === "web_search" && webSearchResults)) {
     return <WebSearchItem item={item} queries={webSearchQueries ?? []} structuredResults={webSearchResults} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
+  }
+
+  if (backgroundTerminalInput !== null) {
+    return <BackgroundTerminalItem input={backgroundTerminalInput} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   }
 
   if (nestedActivities) {

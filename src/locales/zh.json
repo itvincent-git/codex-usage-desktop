@@ -586,6 +586,8 @@
       },
       "output": "输出",
       "activity_running": "Running",
+      "waited_for_background_terminal": "等待了后台终端",
+      "interacted_with_background_terminal": "与后台终端交互",
       "token_breakdown": "输入 {{input}} · 缓存 {{cached}} · 输出 {{output}}",
       "omitted_lines": "… 省略 {{count}} 行",
       "activity_ran": "Ran",

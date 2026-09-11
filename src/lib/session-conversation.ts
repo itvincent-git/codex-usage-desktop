@@ -185,6 +185,28 @@ function parseNestedToolCalls(value: string, toolName: string) {
   return calls;
 }
 
+function parseBackgroundTerminalInput(value: string | null, outerToolName: string, parsedArguments: Record<string, unknown> | null) {
+  if (outerToolName === "write_stdin") {
+    return typeof parsedArguments?.chars === "string" ? parsedArguments.chars : "";
+  }
+  if (!EXEC_TOOL_NAMES.has(outerToolName) || !value?.includes("tools.write_stdin")) return null;
+  if (/tools\.(?:exec_command|apply_patch|view_image|web__run)\s*\(/.test(value)) return null;
+
+  const nestedArguments = parseNestedToolCall(value, "write_stdin");
+  if (typeof nestedArguments?.chars === "string") return nestedArguments.chars;
+
+  const literal = value.match(/\bchars\s*:\s*("(?:\\.|[^"\\])*")/s)?.[1];
+  if (literal) {
+    try {
+      const parsed: unknown = JSON.parse(literal);
+      if (typeof parsed === "string") return parsed;
+    } catch {
+      return null;
+    }
+  }
+  return /\bchars\s*:/.test(value) ? null : "";
+}
+
 function parseExecArguments(value: string | null): ExecArguments | null {
   const parsed = parseJsonObject(value) ?? (value ? parseNestedToolCall(value, "exec_command") : null);
   if (parsed) {
@@ -583,6 +605,7 @@ function buildToolActivity(item: Extract<ReplayItem, { kind: "toolCall" }>) {
     : null;
   const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
   const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
+  const backgroundTerminalInput = parseBackgroundTerminalInput(item.arguments, outerToolName, parsedArguments);
   const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
   const webSearchQueries = isExec
@@ -613,7 +636,7 @@ function buildToolActivity(item: Extract<ReplayItem, { kind: "toolCall" }>) {
   const outputText = isExec && isEmptyExecOutput(rawOutputText) ? null : rawOutputText;
   const stderrText = execOutput?.stderr ?? item.stderr;
 
-  return { outerToolName, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, nestedActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText };
+  return { outerToolName, backgroundTerminalInput, userInputQuestions, webSearchQueries, webSearchResults, batchActivities, nestedActivities, execArguments, argumentEntries, execOutput, contentBlocks, argumentsText, displayToolName, outputText, stderrText };
 }
 
 export type ToolActivity = ReturnType<typeof buildToolActivity>;
