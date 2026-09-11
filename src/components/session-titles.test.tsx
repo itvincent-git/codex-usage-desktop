@@ -953,6 +953,41 @@ describe("session titles", () => {
     expect(within(summary).getByText("Output tokens").parentElement).toHaveTextContent("75");
   });
 
+  it("navigates directly to a session turn from the quick navigation", async () => {
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    await i18n.changeLanguage("en");
+    invokeMock.mockResolvedValue(replayDetail({
+      turns: [
+        { turnId: "turn-1", prompt: "Investigate the sync issue" },
+        { turnId: "turn-2", prompt: "Apply the verified fix" },
+      ].map(({ turnId, prompt }) => ({
+        turnId,
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+        systemMessages: [],
+        userMessages: [{ timestamp: null, kind: "message", text: prompt }],
+        assistantMessages: [],
+        reasoningSummaries: [],
+        toolCalls: [],
+        patchResults: [],
+        tokenEvents: [],
+        errors: [],
+        items: [],
+      })),
+    }));
+
+    render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
+
+    const navigation = await screen.findByRole("navigation", { name: "Quick navigation" });
+    expect(within(navigation).getByRole("button", { name: /Navigate to turn turn-1.*Investigate the sync issue/ })).toHaveAttribute("aria-current", "location");
+    const secondTurn = within(navigation).getByRole("button", { name: /Navigate to turn turn-2.*Apply the verified fix/ });
+    await userEvent.click(secondTurn);
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(secondTurn).toHaveAttribute("aria-current", "location");
+  });
+
   it("falls back to the session ID in session details", async () => {
     const writeText = vi.fn();
     Object.defineProperty(navigator, "clipboard", {

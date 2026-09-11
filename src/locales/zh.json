@@ -526,6 +526,8 @@
       "errors": "错误",
       "details": "详情",
       "timeline": "时间线",
+      "quick_navigation": "快速导航",
+      "navigate_to_turn": "跳转到回合 {{id}}",
       "raw_jsonl": "原始 JSONL",
       "loading_replay": "正在加载会话回放",
       "session_summary": "会话摘要",

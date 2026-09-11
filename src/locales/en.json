@@ -525,6 +525,8 @@
       "errors": "Errors",
       "details": "Details",
       "timeline": "Timeline",
+      "quick_navigation": "Quick navigation",
+      "navigate_to_turn": "Navigate to turn {{id}}",
       "raw_jsonl": "Raw JSONL",
       "loading_replay": "Loading session replay",
       "session_summary": "Session summary",

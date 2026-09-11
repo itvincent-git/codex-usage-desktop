@@ -4,7 +4,7 @@ import {
   type ConversationBlock, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, revealInFileManager, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -1115,10 +1115,12 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const [showDetails, setShowDetails] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [collapsedHeight, setCollapsedHeight] = useState(0);
+  const [activeTurnKey, setActiveTurnKey] = useState<string | null>(null);
   const summaryRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const turnRefs = useRef(new Map<string, HTMLElement>());
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -1148,6 +1150,8 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
     setShowDetails(false);
     setIsScrolled(false);
     setCollapsedHeight(0);
+    setActiveTurnKey(null);
+    turnRefs.current.clear();
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
 
     void fetchSessionDetail(activePath)
@@ -1155,6 +1159,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
         if (!cancelled) {
           setDetail(data);
           setExpandedTurns(new Set(data.turns.map((turn, index) => `${turn.turnId}-${index}`)));
+          setActiveTurnKey(data.turns.length > 0 ? `${data.turns[0].turnId}-0` : null);
         }
       })
       .catch((err) => {
@@ -1253,6 +1258,11 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
       }
       return next;
     });
+  }
+
+  function scrollToTurn(key: string) {
+    setActiveTurnKey(key);
+    turnRefs.current.get(key)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -1385,6 +1395,17 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               setIsScrolled(false);
               setCollapsedHeight(0);
             }
+
+            const turnSections = Array.from(turnRefs.current.entries());
+            if (turnSections.length > 0) {
+              const marker = event.currentTarget.getBoundingClientRect().top + 80;
+              let currentTurnKey = turnSections[0][0];
+              for (const [turnKey, element] of turnSections) {
+                if (element.getBoundingClientRect().top > marker) break;
+                currentTurnKey = turnKey;
+              }
+              setActiveTurnKey((current) => current === currentTurnKey ? current : currentTurnKey);
+            }
           }}
         >
           <div className="px-4 py-5">
@@ -1399,14 +1420,53 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               {t("sessions.detail.loading_replay")}
             </div>
           ) : activeTab === "timeline" ? (
-            <div className="mx-auto max-w-5xl space-y-5">
+            <div className="relative mx-auto max-w-5xl">
+              <nav
+                className="absolute inset-y-0 left-full ml-4 hidden w-48 min-[1440px]:block"
+                aria-label={t("sessions.detail.quick_navigation")}
+              >
+                <div className="sticky top-5 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-border/60 bg-surface/95 p-2 shadow-sm backdrop-blur">
+                  <div className="flex items-center gap-1.5 px-2 pb-2 text-xs font-semibold text-muted-foreground">
+                    <List className="h-3.5 w-3.5" />
+                    {t("sessions.detail.quick_navigation")}
+                  </div>
+                  <div className="space-y-0.5">
+                    {detail.turns.map((turn, index) => {
+                      const turnKey = `${turn.turnId}-${index}`;
+                      const preview = firstUserPreview(turn);
+                      const isActive = activeTurnKey === turnKey;
+                      return (
+                        <button
+                          key={turnKey}
+                          type="button"
+                          className={`block w-full rounded-md px-2 py-1.5 text-left transition ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                          aria-label={`${t("sessions.detail.navigate_to_turn", { id: turn.turnId })}${preview ? `: ${preview}` : ""}`}
+                          aria-current={isActive ? "location" : undefined}
+                          onClick={() => scrollToTurn(turnKey)}
+                        >
+                          <span className="block text-xs font-semibold">{t("sessions.detail.turn", { id: turn.turnId })}</span>
+                          {preview ? <span className="mt-0.5 block truncate text-[10px] opacity-75">{preview}</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </nav>
+              <div className="space-y-5">
               <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={setActivePath} />
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey);
                 const userPreview = firstUserPreview(turn);
                 return (
-                <section key={turnKey} className="rounded-xl border-2 border-border/50 p-3">
+                <section
+                  key={turnKey}
+                  ref={(element) => {
+                    if (element) turnRefs.current.set(turnKey, element);
+                    else turnRefs.current.delete(turnKey);
+                  }}
+                  className="scroll-mt-5 rounded-xl border-2 border-border/50 p-3"
+                >
                   <button
                     type="button"
                     className={`flex w-full flex-col gap-1.5 rounded-md text-left sm:flex-row sm:items-center sm:justify-between ${DISCLOSURE_BUTTON_CLASS}`}
@@ -1447,6 +1507,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                 </section>
                 );
               })}
+              </div>
             </div>
           ) : (
             <div className="mx-auto flex h-full max-w-6xl flex-col gap-3">
