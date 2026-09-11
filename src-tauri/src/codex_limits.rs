@@ -32,6 +32,7 @@ const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const WINDOW_ACTIVATION_MODEL: &str = "gpt-5.6-luna";
 const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -205,11 +206,14 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
     let _guard = WINDOW_ACTIVATION_LOCK
         .lock()
         .map_err(|_| "Codex window activation lock was poisoned.".to_string())?;
+    let working_directory = marker_path.parent().ok_or_else(|| {
+        "The Codex window activation state has no application data directory.".to_string()
+    })?;
     activate_codex_window_with(
         marker_path,
         Utc::now().timestamp(),
         fetch_codex_limits,
-        run_codex_window_activation,
+        || run_codex_window_activation(working_directory),
     )
 }
 
@@ -301,12 +305,12 @@ fn write_activation_marker(marker_path: &Path, window_key: &str, now: i64) -> Re
         .map_err(|error| format!("Failed to save the Codex window activation state: {error}"))
 }
 
-fn run_codex_window_activation() -> Result<(), String> {
+fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
     let codex = resolve_codex_command(selected_codex_environment()).ok_or_else(|| {
         "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
     })?;
     let display = codex_command_display(&codex);
-    let mut command = codex_activation_process_command(&codex);
+    let mut command = codex_activation_process_command(&codex, working_directory);
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -1267,10 +1271,14 @@ fn codex_app_server_args() -> [&'static str; 7] {
     ]
 }
 
-fn codex_activation_args() -> [&'static str; 9] {
+fn codex_activation_args() -> [&'static str; 13] {
     [
         "-c",
         "mcp_servers={}",
+        "-c",
+        r#"model_reasoning_effort="low""#,
+        "-m",
+        WINDOW_ACTIVATION_MODEL,
         "-s",
         "read-only",
         "-a",
@@ -1493,7 +1501,7 @@ fn codex_process_command(codex: &CodexCommand) -> Command {
     }
 }
 
-fn codex_activation_process_command(codex: &CodexCommand) -> Command {
+fn codex_activation_process_command(codex: &CodexCommand, working_directory: &Path) -> Command {
     let args = codex_activation_args();
     match codex {
         CodexCommand::Native(path) => {
@@ -1507,6 +1515,7 @@ fn codex_activation_process_command(codex: &CodexCommand) -> Command {
             };
             command
                 .args(args)
+                .current_dir(working_directory)
                 .env("PATH", effective_path_with_codex(path));
             command
         }
@@ -1520,6 +1529,7 @@ fn codex_activation_process_command(codex: &CodexCommand) -> Command {
             command
                 .args(["/D", "/S", "/C"])
                 .arg(format!("\"{}\" {args}", path.display()))
+                .current_dir(working_directory)
                 .env("PATH", effective_path_with_codex(path));
             command
         }
@@ -1533,7 +1543,8 @@ fn codex_activation_process_command(codex: &CodexCommand) -> Command {
             let mut command = Command::new("wsl.exe");
             command
                 .args(["-d", distribution, "--", "sh", "-lc"])
-                .arg(login_command);
+                .arg(login_command)
+                .current_dir(working_directory);
             command
         }
     }
@@ -1763,12 +1774,27 @@ mod tests {
     }
 
     #[test]
+    fn activation_command_uses_supplied_working_directory() {
+        let working_directory = env::temp_dir();
+        let command = codex_activation_process_command(
+            &CodexCommand::Native(PathBuf::from("/usr/local/bin/codex")),
+            &working_directory,
+        );
+
+        assert_eq!(command.get_current_dir(), Some(working_directory.as_path()));
+    }
+
+    #[test]
     fn activation_args_disable_tools_and_use_read_only_sandbox() {
         assert_eq!(
             codex_activation_args(),
             [
                 "-c",
                 "mcp_servers={}",
+                "-c",
+                r#"model_reasoning_effort="low""#,
+                "-m",
+                WINDOW_ACTIVATION_MODEL,
                 "-s",
                 "read-only",
                 "-a",
