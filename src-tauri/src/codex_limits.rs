@@ -34,6 +34,8 @@ const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 const WINDOW_ACTIVATION_MODEL: &str = "gpt-5.6-luna";
 const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
+#[cfg(debug_assertions)]
+const WINDOW_ACTIVATION_DEBUG_ENV: &str = "CODEX_USAGE_DEBUG_WINDOW_ACTIVATION";
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -199,10 +201,30 @@ struct SubscriptionInfo {
 
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     log::info!("Starting fetch_codex_limits...");
-    fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)
+    let limits =
+        fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)?;
+    #[cfg(debug_assertions)]
+    let limits = if window_activation_debug_enabled() {
+        let mut debug_limits = limits;
+        set_debug_session_window(&mut debug_limits, 0.0, Utc::now().timestamp());
+        debug_limits
+    } else {
+        limits
+    };
+    Ok(limits)
 }
 
 pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivationResponse, String> {
+    #[cfg(debug_assertions)]
+    if window_activation_debug_enabled() {
+        let mut limits = fetch_codex_limits()?;
+        set_debug_session_window(&mut limits, 1.0, Utc::now().timestamp());
+        return Ok(CodexWindowActivationResponse {
+            status: CodexWindowActivationStatus::Started,
+            limits,
+        });
+    }
+
     let _guard = WINDOW_ACTIVATION_LOCK
         .lock()
         .map_err(|_| "Codex window activation lock was poisoned.".to_string())?;
@@ -215,6 +237,24 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
         fetch_codex_limits,
         || run_codex_window_activation(working_directory),
     )
+}
+
+#[cfg(debug_assertions)]
+fn window_activation_debug_enabled() -> bool {
+    env::var(WINDOW_ACTIVATION_DEBUG_ENV).is_ok_and(|value| value == "1")
+}
+
+#[cfg(debug_assertions)]
+fn set_debug_session_window(limits: &mut CodexLimitsResponse, used_percent: f64, now: i64) {
+    limits.session = Some(CodexLimitWindow {
+        used_percent,
+        remaining_percent: 100.0 - used_percent,
+        window_minutes: Some(SESSION_WINDOW_MINUTES),
+        resets_at: Utc
+            .timestamp_opt(now + SESSION_WINDOW_MINUTES * 60, 0)
+            .single()
+            .map(|value| value.to_rfc3339_opts(SecondsFormat::Millis, true)),
+    });
 }
 
 fn activate_codex_window_with(
@@ -1824,6 +1864,19 @@ mod tests {
         assert_eq!(response.status, CodexWindowActivationStatus::AlreadyActive);
         assert_eq!(launches.get(), 0);
         assert!(!marker.exists());
+    }
+
+    #[test]
+    fn debug_session_window_can_cycle_from_inactive_to_started() {
+        let mut limits = limits_with_session(75.0, "2026-09-10T01:00:00.000Z");
+
+        set_debug_session_window(&mut limits, 0.0, 1_789_000_000);
+        assert_eq!(limits.session.as_ref().unwrap().used_percent, 0.0);
+        assert_eq!(limits.session.as_ref().unwrap().remaining_percent, 100.0);
+
+        set_debug_session_window(&mut limits, 1.0, 1_789_000_000);
+        assert_eq!(limits.session.as_ref().unwrap().used_percent, 1.0);
+        assert_eq!(limits.session.as_ref().unwrap().remaining_percent, 99.0);
     }
 
     #[test]

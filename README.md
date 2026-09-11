@@ -236,6 +236,14 @@ pnpm install
 pnpm tauri dev
 ```
 
+To repeatedly test the 5-hour window activation flow without consuming quota, start the debug build with:
+
+```bash
+CODEX_USAGE_DEBUG_WINDOW_ACTIVATION=1 pnpm tauri dev
+```
+
+In this mode, checking limits restores a simulated inactive window and starting it returns a simulated successful activation. The switch is ignored in release builds.
+
 Run the checks:
 
 ```bash
