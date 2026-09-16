@@ -1,4 +1,8 @@
 {
+  "3.2.1": {
+    "zh": "- fix(limits): isolate activation CLI request\n- fix(limits): pass isolation flags to exec\n- feat(limits): log quota window activation command",
+    "en": "- fix(limits): isolate activation CLI request\n- fix(limits): pass isolation flags to exec\n- feat(limits): log quota window activation command"
+  },
   "3.2.0": {
     "zh": "- fix(limits): enable activation for unused windows\n- fix(limits): isolate window activation request\n- feat(limits): add repeatable activation debug mode\n- fix(sessions): render background terminal waits\n- feat: add session turn quick navigation\n- fix(ui): center session detail navigation group\n- fix(ui): show session quick navigation sooner",
     "en": "- fix(limits): enable activation for unused windows\n- fix(limits): isolate window activation request\n- feat(limits): add repeatable activation debug mode\n- fix(sessions): render background terminal waits\n- feat: add session turn quick navigation\n- fix(ui): center session detail navigation group\n- fix(ui): show session quick navigation sooner"
