@@ -1313,9 +1313,6 @@ fn codex_app_server_args() -> [&'static str; 7] {
 
 fn codex_activation_args() -> [&'static str; 16] {
     [
-        "--ephemeral",
-        "--ignore-user-config",
-        "--ignore-rules",
         "-c",
         "mcp_servers={}",
         "-c",
@@ -1327,6 +1324,9 @@ fn codex_activation_args() -> [&'static str; 16] {
         "-a",
         "never",
         "exec",
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
         "--skip-git-repo-check",
         WINDOW_ACTIVATION_PROMPT,
     ]
@@ -1832,9 +1832,6 @@ mod tests {
         assert_eq!(
             codex_activation_args(),
             [
-                "--ephemeral",
-                "--ignore-user-config",
-                "--ignore-rules",
                 "-c",
                 "mcp_servers={}",
                 "-c",
@@ -1846,6 +1843,9 @@ mod tests {
                 "-a",
                 "never",
                 "exec",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
                 "--skip-git-repo-check",
                 WINDOW_ACTIVATION_PROMPT,
             ]
