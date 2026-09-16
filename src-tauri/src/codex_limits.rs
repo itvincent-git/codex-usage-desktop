@@ -31,7 +31,7 @@ const CHATGPT_ACCOUNT_CHECK_URL: &str =
 const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
-const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const WINDOW_ACTIVATION_MODEL: &str = "gpt-5.6-luna";
 const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
 #[cfg(debug_assertions)]
@@ -388,7 +388,7 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
             let _ = child.kill();
             let _ = child.wait();
             let _ = stderr_reader.join();
-            return Err("Codex CLI activation timed out after 2 minutes.".to_string());
+            return Err("Codex CLI activation timed out after 3 minutes.".to_string());
         }
         thread::sleep(Duration::from_millis(100));
     }
@@ -1311,8 +1311,11 @@ fn codex_app_server_args() -> [&'static str; 7] {
     ]
 }
 
-fn codex_activation_args() -> [&'static str; 13] {
+fn codex_activation_args() -> [&'static str; 16] {
     [
+        "--ephemeral",
+        "--ignore-user-config",
+        "--ignore-rules",
         "-c",
         "mcp_servers={}",
         "-c",
@@ -1829,6 +1832,9 @@ mod tests {
         assert_eq!(
             codex_activation_args(),
             [
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
                 "-c",
                 "mcp_servers={}",
                 "-c",
