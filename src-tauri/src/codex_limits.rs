@@ -215,8 +215,11 @@ pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
 }
 
 pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivationResponse, String> {
+    log::info!("Codex window activation requested.");
+
     #[cfg(debug_assertions)]
     if window_activation_debug_enabled() {
+        log::info!("Codex window activation completed in debug mode without starting the CLI.");
         let mut limits = fetch_codex_limits()?;
         set_debug_session_window(&mut limits, 1.0, Utc::now().timestamp());
         return Ok(CodexWindowActivationResponse {
@@ -265,6 +268,7 @@ fn activate_codex_window_with(
 ) -> Result<CodexWindowActivationResponse, String> {
     let current = fetch_limits()?;
     let Some(window_key) = inactive_session_window_key(&current)? else {
+        log::info!("Codex window activation skipped because the 5-hour window is already active.");
         return Ok(CodexWindowActivationResponse {
             status: CodexWindowActivationStatus::AlreadyActive,
             limits: current,
@@ -272,6 +276,9 @@ fn activate_codex_window_with(
     };
 
     if activation_was_recently_requested(marker_path, &window_key, now) {
+        log::info!(
+            "Codex window activation skipped because a request was sent within the cooldown."
+        );
         return Ok(CodexWindowActivationResponse {
             status: CodexWindowActivationStatus::RecentlyRequested,
             limits: current,
@@ -350,13 +357,22 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
         "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
     })?;
     let display = codex_command_display(&codex);
+    log::info!(
+        "Starting Codex window activation command. command={display}, args={:?}",
+        codex_activation_args()
+    );
     let mut command = codex_activation_process_command(&codex, working_directory);
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("Failed to start Codex CLI at {display}: {error}"))?;
+        .map_err(|error| {
+            log::error!("Failed to start Codex window activation command at {display}: {error}");
+            format!("Failed to start Codex CLI at {display}: {error}")
+        })?;
+    let pid = child.id();
+    log::info!("Codex window activation command started. pid={pid}");
     let mut stderr = child
         .stderr
         .take()
@@ -376,8 +392,14 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
             let _ = child.wait();
             let stderr = stderr_reader.join().unwrap_or_default().trim().to_string();
             if status.success() {
+                log::info!(
+                    "Codex window activation command completed successfully. pid={pid}, status={status}"
+                );
                 return Ok(());
             }
+            log::warn!(
+                "Codex window activation command failed. pid={pid}, status={status}, stderr={stderr}"
+            );
             return if stderr.is_empty() {
                 Err(format!("Codex CLI activation exited with status {status}."))
             } else {
@@ -388,6 +410,7 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
             let _ = child.kill();
             let _ = child.wait();
             let _ = stderr_reader.join();
+            log::warn!("Codex window activation command timed out. pid={pid}");
             return Err("Codex CLI activation timed out after 3 minutes.".to_string());
         }
         thread::sleep(Duration::from_millis(100));
