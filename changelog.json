@@ -1,4 +1,8 @@
 {
+  "3.3.0": {
+    "zh": "- feat: show token deltas in session details\n- feat: color session token deltas by size",
+    "en": "- feat: show token deltas in session details\n- feat: color session token deltas by size"
+  },
   "3.2.1": {
     "zh": "- fix(limits): isolate activation CLI request\n- fix(limits): pass isolation flags to exec\n- feat(limits): log quota window activation command",
     "en": "- fix(limits): isolate activation CLI request\n- fix(limits): pass isolation flags to exec\n- feat(limits): log quota window activation command"
