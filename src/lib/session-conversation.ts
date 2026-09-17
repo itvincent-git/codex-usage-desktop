@@ -4,10 +4,11 @@ const EXEC_TOOL_NAMES = new Set(["exec", "exec_command"]);
 
 export type ReplayItem = SessionReplayDetail["turns"][number]["items"][number];
 export type TokenUsageItem = Extract<ReplayItem, { kind: "tokenUsage" }>;
+export type DisplayTokenUsageItem = TokenUsageItem & { deltaTokens?: number };
 
 export type TimelineEntry = {
   item: ReplayItem;
-  tokenUsage?: TokenUsageItem;
+  tokenUsage?: DisplayTokenUsageItem;
   activity?: ToolActivity;
 };
 
@@ -29,16 +30,23 @@ function isVisibleTimelineItem(item: ReplayItem) {
   return item.kind !== "patch" || item.isError || item.success === false;
 }
 
-function timelineEntries(items: ReplayItem[]): TimelineEntry[] {
+function timelineEntries(items: ReplayItem[], previousTotalTokens: { value?: number }): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
 
   for (const item of items) {
     if (item.kind === "tokenUsage") {
+      const tokenUsage = {
+        ...item,
+        deltaTokens: previousTotalTokens.value === undefined ? undefined : item.totalTokens - previousTotalTokens.value,
+      };
+      previousTotalTokens.value = item.totalTokens;
       const previousEntry = entries.findLast((entry) => isVisibleTimelineItem(entry.item));
       if (previousEntry) {
-        previousEntry.tokenUsage = item;
+        previousEntry.tokenUsage = tokenUsage;
         continue;
       }
+      entries.push({ item: tokenUsage });
+      continue;
     }
     entries.push({ item, activity: item.kind === "toolCall" ? buildToolActivity(item) : undefined });
   }
@@ -694,9 +702,9 @@ export function classifyExploration(command: string): Exploration[] | null {
   return actions.length ? actions : null;
 }
 
-export function buildConversation(turn: SessionReplayDetail["turns"][number]): ConversationBlock[] {
+function buildTurnConversation(turn: SessionReplayDetail["turns"][number], previousTotalTokens: { value?: number }): ConversationBlock[] {
   const blocks: ConversationBlock[] = [];
-  for (const entry of timelineEntries(orderedItems(turn))) {
+  for (const entry of timelineEntries(orderedItems(turn), previousTotalTokens)) {
     if (!isVisibleTimelineItem(entry.item)) continue;
     const activity = entry.activity;
     const tool = entry.item.kind === "toolCall" ? entry.item : null;
@@ -716,6 +724,15 @@ export function buildConversation(turn: SessionReplayDetail["turns"][number]): C
     } else blocks.push({ kind: "item", entry });
   }
   return blocks;
+}
+
+export function buildConversation(turn: SessionReplayDetail["turns"][number]): ConversationBlock[] {
+  return buildTurnConversation(turn, {});
+}
+
+export function buildSessionConversation(turns: SessionReplayDetail["turns"]): ConversationBlock[][] {
+  const previousTotalTokens: { value?: number } = {};
+  return turns.map((turn) => buildTurnConversation(turn, previousTotalTokens));
 }
 
 export function summarizeOutput(text: string) {

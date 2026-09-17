@@ -1561,7 +1561,7 @@ describe("App", () => {
     expect(toolCall).not.toHaveTextContent("yield time");
     expect(toolCall).not.toHaveTextContent("input_text");
     expect(toolCall).not.toHaveTextContent('"text"');
-    const tokenMetadata = within(toolCallButton).getByText("56.5k tokens");
+    const tokenMetadata = within(toolCallButton).getByText("56.5k (+5.7k) tokens");
     expect(tokenMetadata).toHaveClass("text-violet-500/80");
     expect(tokenMetadata).toHaveAttribute("title", expect.stringContaining(
       "Model: gpt-5\nInput (incl. cache): 55,000\nCached: 500\nOutput: 1,500\nReasoning: 0\nTotal tokens: 56,500\nTime:",

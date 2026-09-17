@@ -50,14 +50,14 @@ it("keeps each call's tokens visible after deduplicating reads and exposes origi
   render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={['{"call":0}', '{"call":1}']} />);
   expect(screen.getAllByText("src/shimmer.rs")).toHaveLength(1);
   expect(screen.getByText("42k tokens")).toBeInTheDocument();
-  expect(screen.getByText("45k tokens")).toBeInTheDocument();
+  expect(screen.getByText("45k (+3k) tokens")).toBeInTheDocument();
   expect(screen.getByText("In 41.5k · Cache 40k · Out 500")).toBeInTheDocument();
   expect(screen.queryByText(/original output/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /Explored/ }));
   const calls = screen.getAllByRole("button", { name: /Ran/ });
   expect(calls).toHaveLength(2);
   expect(within(calls[0]).getByText("42k tokens")).toBeInTheDocument();
-  expect(within(calls[1]).getByText("45k tokens")).toBeInTheDocument();
+  expect(within(calls[1]).getByText("45k (+3k) tokens")).toBeInTheDocument();
   expect(screen.getByText(/original output 0/)).toBeInTheDocument();
   await userEvent.click(screen.getAllByRole("button", { name: "View raw JSONL" })[1]);
   expect(screen.getByText('{"call":1}')).toBeInTheDocument();

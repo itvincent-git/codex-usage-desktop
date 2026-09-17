@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildConversation, classifyExploration, summarizeOutput, type ReplayItem } from "./session-conversation";
+import { buildConversation, buildSessionConversation, classifyExploration, summarizeOutput, type ReplayItem } from "./session-conversation";
 import type { SessionReplayDetail } from "./api";
 
 function replayTurn(items: ReplayItem[]): SessionReplayDetail["turns"][number] {
@@ -24,8 +24,19 @@ describe("conversation projection", () => {
     const first = blocks[0];
     if (first.kind !== "exploration") throw new Error("Expected exploration");
     expect(first.entries.map((entry) => entry.tokenUsage?.totalTokens)).toEqual([100, 200, 300]);
+    expect(first.entries.map((entry) => entry.tokenUsage?.deltaTokens)).toEqual([undefined, 100, 100]);
     expect(first.entries[0].item.rawJsonlLineNumbers).toEqual([1, 2]);
     expect(first.actions[0]).toEqual([{ label: "Search", text: "shimmer in src" }]);
+  });
+
+  it("keeps token deltas continuous across turns", () => {
+    const conversations = buildSessionConversation([
+      replayTurn([command("cat a"), usage(100)]),
+      replayTurn([command("cat b"), usage(130)]),
+    ]);
+
+    expect(conversations[0][0].kind === "exploration" && conversations[0][0].entries[0].tokenUsage?.deltaTokens).toBeUndefined();
+    expect(conversations[1][0].kind === "exploration" && conversations[1][0].entries[0].tokenUsage?.deltaTokens).toBe(30);
   });
 
   it("keeps failures, running commands, writes and ambiguous shell scripts visible", () => {

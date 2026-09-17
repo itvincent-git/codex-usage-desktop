@@ -1,7 +1,7 @@
 import {
-  buildConversation, cleanExecOutput, formatActivityDuration, formatJsonForDisplay, formatToolArgumentValue,
+  buildSessionConversation, cleanExecOutput, formatActivityDuration, formatJsonForDisplay, formatToolArgumentValue,
   parseToolContentBlocks, parseUserInputAnswers, processExitCode, processSignal, splitWebSearchResults, summarizeOutput,
-  type ConversationBlock, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
+  type ConversationBlock, type DisplayTokenUsageItem, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
@@ -106,8 +106,11 @@ function formatCompactTokenCount(value: number) {
   return `${Number((value / 1_000_000).toFixed(1))}m`;
 }
 
-function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
+function TokenMetadata({ usage }: { usage: DisplayTokenUsageItem }) {
   const { t } = useTranslation();
+  const delta = usage.deltaTokens === undefined
+    ? ""
+    : ` (${usage.deltaTokens >= 0 ? "+" : ""}${formatCompactTokenCount(usage.deltaTokens)})`;
   const tooltip = [
     `${t("common.model")}: ${usage.model}`,
     `${t("sessions.input_including_cache")}: ${formatNumber(usage.inputTokens)}`,
@@ -124,7 +127,7 @@ function TokenMetadata({ usage }: { usage: TokenUsageItem }) {
         className="shrink-0 font-sans text-[11px] font-medium tabular-nums text-violet-500/80 dark:text-violet-300/75"
         title={tooltip}
       >
-        {formatCompactTokenCount(usage.totalTokens)} tokens
+        {formatCompactTokenCount(usage.totalTokens)}{delta} tokens
       </span>
       <span className="font-sans text-[10px] font-normal text-muted-foreground" title={tooltip}>
         {t("sessions.detail.token_breakdown", {
@@ -1226,7 +1229,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
   const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = detail ? buildRawPreview(detail.rawJsonl) : "";
   const rawJsonlLines = useMemo(() => detail?.rawJsonl.split("\n") ?? [], [detail?.rawJsonl]);
-  const conversation = useMemo(() => detail?.turns.map(buildConversation) ?? [], [detail]);
+  const conversation = useMemo(() => detail ? buildSessionConversation(detail.turns) : [], [detail]);
 
   async function copySessionId() {
     await navigator.clipboard?.writeText(displayedSessionId);
