@@ -35,7 +35,7 @@ it("keeps each call's tokens visible after deduplicating reads and exposes origi
     systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
     toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [],
   };
-  for (const [index, totalTokens] of [42000, 45000].entries()) {
+  for (const [index, totalTokens] of [42000, 45000, 75000, 135000].entries()) {
     turn.items.push({
       kind: "toolCall", callId: String(index), name: "exec_command", status: "completed",
       arguments: JSON.stringify({ cmd: "cat src/shimmer.rs" }),
@@ -49,15 +49,21 @@ it("keeps each call's tokens visible after deduplicating reads and exposes origi
   }
   render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={['{"call":0}', '{"call":1}']} />);
   expect(screen.getAllByText("src/shimmer.rs")).toHaveLength(1);
-  expect(screen.getByText("42k tokens")).toBeInTheDocument();
-  expect(screen.getByText("45k (+3k) tokens")).toBeInTheDocument();
+  const collapsedTokenMetadata = screen.getAllByTestId("token-metadata");
+  expect(collapsedTokenMetadata[0]).toHaveTextContent("42k tokens");
+  expect(collapsedTokenMetadata[1]).toHaveTextContent("45k (+3k) tokens");
+  expect(collapsedTokenMetadata[2]).toHaveTextContent("75k (+30k) tokens");
+  expect(collapsedTokenMetadata[3]).toHaveTextContent("135k (+60k) tokens");
+  expect(screen.getByText("(+3k)")).toHaveClass("text-sky-600");
+  expect(screen.getByText("(+30k)")).toHaveClass("text-amber-600");
+  expect(screen.getByText("(+60k)")).toHaveClass("text-red-600");
   expect(screen.getByText("In 41.5k · Cache 40k · Out 500")).toBeInTheDocument();
   expect(screen.queryByText(/original output/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /Explored/ }));
   const calls = screen.getAllByRole("button", { name: /Ran/ });
-  expect(calls).toHaveLength(2);
-  expect(within(calls[0]).getByText("42k tokens")).toBeInTheDocument();
-  expect(within(calls[1]).getByText("45k (+3k) tokens")).toBeInTheDocument();
+  expect(calls).toHaveLength(4);
+  expect(within(calls[0]).getByTestId("token-metadata")).toHaveTextContent("42k tokens");
+  expect(within(calls[1]).getByTestId("token-metadata")).toHaveTextContent("45k (+3k) tokens");
   expect(screen.getByText(/original output 0/)).toBeInTheDocument();
   await userEvent.click(screen.getAllByRole("button", { name: "View raw JSONL" })[1]);
   expect(screen.getByText('{"call":1}')).toBeInTheDocument();

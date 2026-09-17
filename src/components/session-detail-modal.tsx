@@ -106,11 +106,16 @@ function formatCompactTokenCount(value: number) {
   return `${Number((value / 1_000_000).toFixed(1))}m`;
 }
 
+function tokenDeltaTone(deltaTokens: number) {
+  if (deltaTokens <= 0) return "text-muted-foreground";
+  if (deltaTokens < 1_000) return "text-emerald-600 dark:text-emerald-400";
+  if (deltaTokens < 10_000) return "text-sky-600 dark:text-sky-400";
+  if (deltaTokens < 50_000) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
 function TokenMetadata({ usage }: { usage: DisplayTokenUsageItem }) {
   const { t } = useTranslation();
-  const delta = usage.deltaTokens === undefined
-    ? ""
-    : ` (${usage.deltaTokens >= 0 ? "+" : ""}${formatCompactTokenCount(usage.deltaTokens)})`;
   const tooltip = [
     `${t("common.model")}: ${usage.model}`,
     `${t("sessions.input_including_cache")}: ${formatNumber(usage.inputTokens)}`,
@@ -125,9 +130,15 @@ function TokenMetadata({ usage }: { usage: DisplayTokenUsageItem }) {
     <span className="inline-flex flex-col items-end gap-0.5 normal-case tracking-normal">
       <span
         className="shrink-0 font-sans text-[11px] font-medium tabular-nums text-violet-500/80 dark:text-violet-300/75"
+        data-testid="token-metadata"
         title={tooltip}
       >
-        {formatCompactTokenCount(usage.totalTokens)}{delta} tokens
+        {formatCompactTokenCount(usage.totalTokens)}
+        {usage.deltaTokens === undefined ? null : (
+          <span className={`font-semibold ${tokenDeltaTone(usage.deltaTokens)}`}>
+            {` (${usage.deltaTokens >= 0 ? "+" : ""}${formatCompactTokenCount(usage.deltaTokens)})`}
+          </span>
+        )} tokens
       </span>
       <span className="font-sans text-[10px] font-normal text-muted-foreground" title={tooltip}>
         {t("sessions.detail.token_breakdown", {
