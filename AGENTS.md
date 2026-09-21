@@ -62,31 +62,23 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Tauri UI Debugging
 
-**Use playwright-cli instead of the built-in Codex browser during debugging and testing.**
-**Use `playwright-cli` for UI inspection, but always start from the real Tauri startup path.**
+**Use WDIO e2e for UI inspection and testing through the real Tauri application.**
 
 Recommended workflow in this repo:
-- Start the app with `pnpm tauri dev`, not just `pnpm dev`. The UI depends on Tauri commands backed by the native Rust usage pipeline.
-- Before starting `pnpm tauri dev`, check if the development server has already been started. If it has, please reuse it.
+- Run `pnpm test:e2e`. It builds the native application with the e2e feature and launches it through `@wdio/tauri-service`.
+- For iteration, add or update a focused spec under `e2e/`, then run that spec with `pnpm exec wdio run ./wdio.conf.ts --spec ./e2e/<name>.spec.ts`. The WDIO configuration builds the e2e application before starting the session.
+- Use WDIO browser, element, and assertion APIs to inspect rendered state, exercise interactions, and wait for asynchronous updates.
 - If the issue looks like loading, sync, or missing data, inspect the Tauri command path and Rust logs before blaming React.
-- Use `playwright-cli` against `http://localhost:5173` to inspect the rendered UI state:
-  - `playwright-cli open http://localhost:5173`
-  - `playwright-cli snapshot`
-  - `playwright-cli console`
-  - `playwright-cli network`
-  - `playwright-cli click <target>`
-  - `playwright-cli run-code "<playwright code>"`
 
-Preferred `playwright-cli` usage:
-- Use `snapshot` first to get stable element refs before clicking or reading state.
-- Use `console` before changing code. Confirm whether the page is failing in UI state, invoke state, or startup state.
-- Use `run-code` when you need exact DOM state after a delay, for example waiting a few seconds and then reading `document.body.innerText`.
-- If a session is unreliable, open a fresh browser and inspect in the same command flow instead of assuming `attach` will work.
+Preferred WDIO usage:
+- Prefer accessible, user-visible selectors and explicit WDIO waits over fixed sleeps.
+- Assert the state before and after an interaction so the spec proves the reported behavior.
+- Keep regression specs focused on the failing user flow and preserve them after the fix.
+- Use WDIO logs and captured application output to distinguish UI state, Tauri invoke failures, and startup failures before changing code.
 
 Known pitfalls to avoid:
 - Do not assume `Data sync failed` or `Load failed` means the React code is broken. In this app it can mean a Tauri command, Rust scanner, app data path, or Codex log parsing failure.
-- Do not run `pnpm dev` and `pnpm tauri dev` independently on the same port unless you intend to. Port `5173` conflicts will break Tauri startup and look unrelated.
-- Do not rely on `playwright-cli` alone to prove a Tauri-only bug. It is useful for React/UI behavior, but it is still a browser approximation of the WebView path.
+- Do not substitute `pnpm dev` or browser-only automation for WDIO e2e when proving a Tauri UI bug; they do not exercise the native command path.
 - In React dev mode, `StrictMode` re-runs effects. If startup logic lives in `useEffect`, guard against duplicate bootstrap requests and loading-state flicker.
 - If data is already on screen, avoid replacing the whole view with a full-page loading card for background refreshes unless that behavior is explicitly desired.
 

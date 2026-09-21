@@ -34,7 +34,12 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-log = "2.0.0"
 tauri-plugin-updater = "2"
+tauri-plugin-wdio = { version = "1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 walkdir = "2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.5.1"
+
+[features]
+e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]

@@ -1,0 +1,18 @@
+{
+  "build": {
+    "beforeBuildCommand": "pnpm build --mode e2e"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "e2e",
+          "windows": ["main"],
+          "permissions": ["wdio:default", "wdio-webdriver:default"]
+        }
+      ]
+    }
+  }
+}

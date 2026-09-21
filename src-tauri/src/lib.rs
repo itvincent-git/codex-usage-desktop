@@ -809,7 +809,7 @@ fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
@@ -823,7 +823,13 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build());
+    #[cfg(feature = "e2e")]
+    let builder = builder
+        .plugin(tauri_plugin_wdio_webdriver::init())
+        .plugin(tauri_plugin_wdio::init());
+
+    builder
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
