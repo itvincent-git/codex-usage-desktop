@@ -653,6 +653,8 @@
       "show_full_raw": "JSONL を完全に表示",
       "copy": "コピー",
       "copied": "コピーされました",
+      "copy_content": "内容をコピー",
+      "content_copied": "内容をコピーしました",
       "copy_session_id": "セッションIDをコピー",
       "session_id_copied": "セッションIDをコピーしました",
       "reveal_in_file_manager": "Finderで表示"

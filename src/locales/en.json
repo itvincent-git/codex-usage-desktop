@@ -615,6 +615,8 @@
       "show_full_raw": "Show full JSONL",
       "copy": "Copy",
       "copied": "Copied",
+      "copy_content": "Copy content",
+      "content_copied": "Content copied",
       "copy_session_id": "Copy session ID",
       "session_id_copied": "Session ID copied",
       "reveal_in_file_manager": "Show in File Manager"

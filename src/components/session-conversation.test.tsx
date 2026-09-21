@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import i18n from "@/i18n";
 import { buildConversation } from "@/lib/session-conversation";
 import type { SessionReplayDetail } from "@/lib/api";
@@ -26,6 +26,36 @@ it("uses distinct card backgrounds and borders for conversation item types", asy
   expect(screen.getByRole("button", { name: /^User/ }).closest("article")).toHaveClass("border-blue-300/70", "bg-blue-50/70");
   expect(screen.getByRole("button", { name: /^Assistant/ }).closest("article")).toHaveClass("border-emerald-300/70", "bg-emerald-50/70");
   expect(screen.getByText("Reasoning fixture").closest(".rounded-lg")).toHaveClass("border-amber-300/70", "bg-amber-50/70");
+});
+
+it("copies the full text content from message and reasoning cards without raw JSONL", async () => {
+  await i18n.changeLanguage("en");
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  const message = "Full **message** content";
+  const reasoning = "Full reasoning content";
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [
+      { kind: "message", role: "assistant", text: message, source: "assistant_message", timestamp: null, rawJsonlLineNumbers: [1] },
+      { kind: "reasoning", text: reasoning, timestamp: null, rawJsonlLineNumbers: [2] },
+    ],
+  };
+
+  render(<>{buildConversation(turn).map((block, index) => <ConversationItem key={index} block={block} rawJsonlLines={['{"message":true}', '{"reasoning":true}']} />)}</>);
+
+  const copyButtons = screen.getAllByRole("button", { name: "Copy content" });
+  await userEvent.click(copyButtons[0]);
+  expect(writeText).toHaveBeenLastCalledWith(message);
+  expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining("message\":true"));
+  expect(copyButtons[0]).toHaveAccessibleName("Content copied");
+
+  await userEvent.click(copyButtons[1]);
+  expect(writeText).toHaveBeenLastCalledWith(reasoning);
 });
 
 it("keeps each call's tokens visible after deduplicating reads and exposes original output on expansion", async () => {

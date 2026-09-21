@@ -179,6 +179,31 @@ function RawJsonlDisclosure({ rawJsonl }: { rawJsonl: string[] }) {
   );
 }
 
+function CopyContentButton({ content }: { content: string }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  async function copyContent() {
+    if (!navigator.clipboard) return;
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <button
+      type="button"
+      className={`flex h-7 shrink-0 items-center gap-1 rounded px-1.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+      title={t(copied ? "sessions.detail.content_copied" : "sessions.detail.copy_content")}
+      aria-label={t(copied ? "sessions.detail.content_copied" : "sessions.detail.copy_content")}
+      onClick={() => void copyContent()}
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Clipboard className="h-3 w-3" />}
+      {t(copied ? "sessions.detail.copied" : "sessions.detail.copy")}
+    </button>
+  );
+}
+
 const METRIC_TONES = {
   blue: "border-blue-300/60 bg-blue-50/80 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
   violet: "border-violet-300/60 bg-violet-50/80 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
@@ -414,6 +439,7 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
           <MarkdownContent content={item.text} />
         </Suspense>
       ) : <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{buildCollapsedPreview(item.text, 3)}</p>}
+      <div className="mt-2 flex justify-end"><CopyContentButton content={item.text} /></div>
       <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </article>
   );
@@ -1045,7 +1071,10 @@ function TimelineItem({ item, activity, tokenUsage, rawJsonlLines }: TimelineEnt
   } else if (item.kind === "reasoning") {
     content = (
       <div className={`rounded-lg border p-3 text-muted-foreground ${ITEM_TONES.reasoning}`}>
-        {tokenUsage ? <div className="mb-1 flex justify-end"><TokenMetadata usage={tokenUsage} /></div> : null}
+        <div className="mb-1 flex justify-end gap-2">
+          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+          <CopyContentButton content={item.text} />
+        </div>
         <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
         <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
