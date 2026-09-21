@@ -1,4 +1,8 @@
 {
+  "3.4.0": {
+    "zh": "- feat(sessions): copy conversation card content\n- test: add WebdriverIO Tauri e2e setup",
+    "en": "- feat(sessions): copy conversation card content\n- test: add WebdriverIO Tauri e2e setup"
+  },
   "3.3.0": {
     "zh": "- feat: show token deltas in session details\n- feat: color session token deltas by size",
     "en": "- feat: show token deltas in session details\n- feat: color session token deltas by size"
