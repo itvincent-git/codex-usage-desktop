@@ -215,6 +215,32 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
 
+  it("renders subscription limit windows for Pro Lite memberships", () => {
+    const proLiteLimits = {
+      session: {
+        usedPercent: 10,
+        remainingPercent: 90,
+        windowMinutes: 300,
+        resetsAt: "2026-05-22T16:30:00.000Z",
+      },
+      weekly: {
+        usedPercent: 98,
+        remainingPercent: 2,
+        windowMinutes: 10080,
+        resetsAt: "2026-05-25T05:00:00.000Z",
+      },
+      updatedAt: "2026-05-22T12:00:00.000Z",
+      source: "oauth",
+      membershipLevel: "prolite",
+    };
+
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={proLiteLimits} error={null} />);
+
+    expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
+    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
+    expect(screen.queryByText("Monthly usage limit")).not.toBeInTheDocument();
+  });
+
   it("renders all limit sections without the outer title, description, or update time", () => {
     render(
       <CodexLimitsCard

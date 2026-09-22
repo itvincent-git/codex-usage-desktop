@@ -146,13 +146,13 @@ export function DashboardHeroCard({
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
                         "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 border",
-                        membershipLevel === "plus" || membershipLevel === "pro"
+                        membershipLevel === "plus" || membershipLevel === "pro" || membershipLevel === "prolite"
                           ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
                           : membershipLevel === "team" || membershipLevel === "business" || membershipLevel === "enterprise"
                           ? "bg-purple-500/10 border-purple-500/25 text-purple-400"
                           : "bg-muted/50 border-border/40 text-muted-foreground"
                       )}>
-                        {["plus", "pro", "team", "business", "enterprise"].includes(membershipLevel) && (
+                        {["plus", "pro", "prolite", "team", "business", "enterprise"].includes(membershipLevel) && (
                           <Sparkles className="h-2.5 w-2.5" />
                         )}
                         {membershipLabel}
