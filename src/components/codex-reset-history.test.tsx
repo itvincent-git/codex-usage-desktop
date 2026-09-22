@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import dayjs from "dayjs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildResetHistorySummary, CodexResetHistoryModal } from "./codex-reset-history";
 import { fetchCodexResetHistory, openUrl } from "@/lib/api";
 
@@ -13,6 +13,8 @@ vi.mock("@/lib/api", () => ({
 
 describe("CodexResetHistoryModal", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-25T00:46:51.000Z"));
     vi.mocked(fetchCodexResetHistory).mockResolvedValue([
       {
         id: "2091688655828246890",
@@ -64,6 +66,10 @@ describe("CodexResetHistoryModal", () => {
       },
     ]);
     vi.mocked(openUrl).mockResolvedValue();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("loads and summarizes the last 30 days", async () => {
