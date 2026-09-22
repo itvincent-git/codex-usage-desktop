@@ -60,7 +60,9 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
 
 export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
+  const quotaForecast24hScore = quotaForecast ? Math.round(clampPercent(quotaForecast.probability24h)) : null;
   const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
+  const quotaForecast24hTone = quotaForecast24hScore === null ? null : getQuotaForecastTone(quotaForecast24hScore, t);
   const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
 
   return (
@@ -121,6 +123,8 @@ export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, rec
               quotaForecast={quotaForecast}
               latestReset={latestReset}
               recentResets={recentResets}
+              quotaForecast24hScore={quotaForecast24hScore}
+              quotaForecast24hTone={quotaForecast24hTone}
               quotaForecastScore={quotaForecastScore}
               quotaForecastTone={quotaForecastTone}
               resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
@@ -228,32 +232,35 @@ function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
   };
 }
 
-function QuotaForecastRing({ score, tone }: { score: number; tone: QuotaForecastTone }) {
+function QuotaForecastRing({ score, tone, horizon }: { score: number; tone: QuotaForecastTone; horizon: "24h" | "48h" }) {
   const radius = 18;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/55">
-      <svg viewBox="0 0 48 48" className="h-10 w-10" role="img" aria-label={`${score}% reset probability`}>
-        <circle cx="24" cy="24" r={radius} fill="none" stroke="rgb(var(--border) / 0.65)" strokeWidth="4" />
-        <circle
-          cx="24"
-          cy="24"
-          r={radius}
-          fill="none"
-          stroke={tone.ringColor}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          strokeWidth="4"
-          transform="rotate(-90 24 24)"
-          className="transition-all duration-500 ease-out"
-        />
-      </svg>
-      <span className={cn("absolute font-mono text-[11px] font-bold leading-none tabular-nums", tone.scoreClassName)}>
-        {score}
+    <span data-forecast-horizon={horizon} className="flex flex-col items-center gap-0.5">
+      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/55">
+        <svg viewBox="0 0 48 48" className="h-10 w-10" role="img" aria-label={`${score}% reset probability in ${horizon}`}>
+          <circle cx="24" cy="24" r={radius} fill="none" stroke="rgb(var(--border) / 0.65)" strokeWidth="4" />
+          <circle
+            cx="24"
+            cy="24"
+            r={radius}
+            fill="none"
+            stroke={tone.ringColor}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            strokeWidth="4"
+            transform="rotate(-90 24 24)"
+            className="transition-all duration-500 ease-out"
+          />
+        </svg>
+        <span className={cn("absolute font-mono text-[11px] font-bold leading-none tabular-nums", tone.scoreClassName)}>
+          {score}
+        </span>
       </span>
+      <span className="font-mono text-[9px] font-semibold leading-none text-foreground/70">{horizon}</span>
     </span>
   );
 }
@@ -262,6 +269,8 @@ function ResetArea({
   quotaForecast,
   latestReset,
   recentResets,
+  quotaForecast24hScore,
+  quotaForecast24hTone,
   quotaForecastScore,
   quotaForecastTone,
   resetCreditsAvailableCount,
@@ -273,6 +282,8 @@ function ResetArea({
   quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
+  quotaForecast24hScore: number | null;
+  quotaForecast24hTone: QuotaForecastTone | null;
   quotaForecastScore: number | null;
   quotaForecastTone: QuotaForecastTone | null;
   resetCreditsAvailableCount?: number | null;
@@ -282,7 +293,7 @@ function ResetArea({
   onOpenResetCredits: () => void;
 }) {
   const { t } = useTranslation();
-  const showQuotaForecast = quotaForecast && quotaForecastScore !== null && quotaForecastTone;
+  const showQuotaForecast = quotaForecast && quotaForecast24hScore !== null && quotaForecast24hTone && quotaForecastScore !== null && quotaForecastTone;
   const showResetCredits = resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
 
   return (
@@ -310,12 +321,9 @@ function ResetArea({
             onClick={onOpenQuotaForecast}
             aria-label={t("limits.quota_forecast_open")}
           >
-            <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
-            <span className="whitespace-nowrap font-mono text-[9px] font-semibold tabular-nums text-foreground/75">
-              {t("limits.quota_forecast_probabilities", {
-                probability24h: Math.round(clampPercent(quotaForecast.probability24h)),
-                probability48h: quotaForecastScore,
-              })}
+            <span className="flex items-center gap-2">
+              <QuotaForecastRing score={quotaForecast24hScore} tone={quotaForecast24hTone} horizon="24h" />
+              <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} horizon="48h" />
             </span>
             <span className="text-[10px] font-semibold leading-tight text-foreground/80">
               {quotaForecastTone.label}

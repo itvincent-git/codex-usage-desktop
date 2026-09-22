@@ -174,7 +174,6 @@
     "quota_forecast_likely_label": "48h 内可能重置",
     "quota_forecast_possible_label": "48h 内有机会",
     "quota_forecast_low_label": "48h 内概率较低",
-    "quota_forecast_probabilities": "24h {{probability24h}}% · 48h {{probability48h}}%",
     "quota_forecast_open": "打开 Codex 额度重置预测",
     "latest_reset": "最近一次 Token 重置",
     "latest_reset_recent": "24 小时内刚刚重置",
