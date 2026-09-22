@@ -523,7 +523,6 @@ describe("App", () => {
     forecastInvokeMock.mockResolvedValue({
       score: 73,
       fetchedAt: "2026-06-25T09:00:19.499Z",
-      nextRefreshAt: "2026-06-25T09:30:19.499Z",
     });
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
@@ -549,7 +548,7 @@ describe("App", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Open Codex quota reset forecast" }));
 
-    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://www.willcodexquotareset.com/" });
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codexreset.app/" });
   });
 
   it("opens ChatGPT Usage when reset credits are clicked", async () => {

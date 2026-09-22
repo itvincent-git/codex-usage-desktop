@@ -28,7 +28,7 @@ const CODEX_RESET_CREDITS_URL: &str =
     "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
 const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
-const CODEX_QUOTA_FORECAST_URL: &str = "https://www.willcodexquotareset.com/api/forecast";
+const CODEX_QUOTA_FORECAST_URL: &str = "https://codexreset.app/api/signal";
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
@@ -159,14 +159,14 @@ struct WindowActivationMarker {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexQuotaForecastApiResponse {
-    fetched_at: String,
-    next_refresh_at: String,
+    generated_at: String,
     forecast: CodexQuotaForecastScore,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CodexQuotaForecastScore {
-    score: i64,
+    probability_48h: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -447,9 +447,8 @@ fn parse_codex_quota_forecast(body: &str) -> Result<CodexQuotaForecastResponse, 
         .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
 
     Ok(CodexQuotaForecastResponse {
-        score: response.forecast.score,
-        fetched_at: response.fetched_at,
-        next_refresh_at: response.next_refresh_at,
+        score: response.forecast.probability_48h,
+        fetched_at: response.generated_at,
     })
 }
 
@@ -2395,15 +2394,15 @@ mod tests {
     fn parses_quota_forecast_from_full_response() {
         let response = parse_codex_quota_forecast(
             r#"{
-                "fetchedAt": "2026-06-25T09:00:19.499Z",
-                "incidents": [{"id": "incident-1"}],
-                "nextRefreshAt": "2026-06-25T09:30:19.499Z",
+                "generatedAt": "2026-09-22T06:26:28.349Z",
+                "dataAsOf": "2026-09-22T01:19:18.975Z",
                 "forecast": {
-                    "breakdown": [{"label": "baseline", "points": 12}],
-                    "daysSinceReset": 7,
-                    "score": 73
+                    "probability24h": 67,
+                    "probability48h": 85,
+                    "confidence": "moderate",
+                    "hoursSinceLastReset": 1418.8
                 },
-                "history": [{"toScore": 73}]
+                "sourceMonitoring": [{"source": "github", "status": "elevated"}]
             }"#,
         )
         .unwrap();
@@ -2411,9 +2410,8 @@ mod tests {
         assert_eq!(
             response,
             CodexQuotaForecastResponse {
-                score: 73,
-                fetched_at: "2026-06-25T09:00:19.499Z".to_string(),
-                next_refresh_at: "2026-06-25T09:30:19.499Z".to_string(),
+                score: 85,
+                fetched_at: "2026-09-22T06:26:28.349Z".to_string(),
             }
         );
     }

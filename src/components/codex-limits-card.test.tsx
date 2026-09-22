@@ -232,7 +232,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 73,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
       />,
     );
@@ -288,7 +287,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
       />,
     );
@@ -487,7 +485,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 73,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
       />,
     );
@@ -523,7 +520,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 73,
           fetchedAt: "2026-08-25T09:00:19.499Z",
-          nextRefreshAt: "2026-08-25T09:30:19.499Z",
         }}
       />,
     );
@@ -623,7 +619,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 18,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
       />,
     );
@@ -637,7 +632,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
       />,
     );
@@ -655,7 +649,6 @@ describe("CodexLimitsCard component", () => {
         quotaForecast={{
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
-          nextRefreshAt: "2026-06-25T09:30:19.499Z",
         }}
         onOpenQuotaForecast={onOpenQuotaForecast}
       />,

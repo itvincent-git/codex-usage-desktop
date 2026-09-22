@@ -290,7 +290,6 @@ pub enum CodexWindowActivationStatus {
 pub struct CodexQuotaForecastResponse {
     pub score: i64,
     pub fetched_at: String,
-    pub next_refresh_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -67,7 +67,7 @@ export type AutoRefreshIntervalMinutes = (typeof AUTO_REFRESH_INTERVAL_OPTIONS)[
 const DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES: AutoRefreshIntervalMinutes = 5;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
-const CODEX_QUOTA_FORECAST_URL = "https://www.willcodexquotareset.com/";
+const CODEX_QUOTA_FORECAST_URL = "https://codexreset.app/";
 const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
 
 function hasExpiredLimitWindow(window: CodexLimitWindow | null | undefined): boolean {

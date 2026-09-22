@@ -158,7 +158,6 @@ export type CodexWindowActivationResponse = {
 export type CodexQuotaForecastResponse = {
   score: number;
   fetchedAt: string;
-  nextRefreshAt: string;
 };
 
 export type CodexResetAnnouncement = {
