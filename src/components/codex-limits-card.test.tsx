@@ -498,7 +498,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByRole("img", { name: "73% reset probability in 48h" })).toBeInTheDocument();
     expect(screen.getByText("24h")).toBeInTheDocument();
     expect(screen.getByText("48h")).toBeInTheDocument();
-    expect(forecastButton).toHaveTextContent("Reset likely in 48h");
+    expect(forecastButton).toHaveTextContent("Reset likely in 24/48h");
     expect(forecastButton).toHaveClass("flex-col");
     expect(forecastButton).toHaveClass("border-error/30");
   });
