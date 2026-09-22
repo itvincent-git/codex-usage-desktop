@@ -1,4 +1,8 @@
 {
+  "3.5.1": {
+    "zh": "- test: stabilize reset history date assertions",
+    "en": "- test: stabilize reset history date assertions"
+  },
   "3.5.0": {
     "zh": "- fix: switch reset forecast to codexreset api\n- feat: show 24-hour reset forecast\n- feat: render dual reset forecast rings\n- fix: clarify reset forecast horizons\n- fix(limits): recognize Pro Lite subscriptions",
     "en": "- fix: switch reset forecast to codexreset api\n- feat: show 24-hour reset forecast\n- feat: render dual reset forecast rings\n- fix: clarify reset forecast horizons\n- fix(limits): recognize Pro Lite subscriptions"
