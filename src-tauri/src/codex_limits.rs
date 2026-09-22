@@ -166,6 +166,7 @@ struct CodexQuotaForecastApiResponse {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexQuotaForecastScore {
+    probability_24h: i64,
     probability_48h: i64,
 }
 
@@ -447,6 +448,7 @@ fn parse_codex_quota_forecast(body: &str) -> Result<CodexQuotaForecastResponse, 
         .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
 
     Ok(CodexQuotaForecastResponse {
+        probability_24h: response.forecast.probability_24h,
         score: response.forecast.probability_48h,
         fetched_at: response.generated_at,
     })
@@ -2410,6 +2412,7 @@ mod tests {
         assert_eq!(
             response,
             CodexQuotaForecastResponse {
+                probability_24h: 67,
                 score: 85,
                 fetched_at: "2026-09-22T06:26:28.349Z".to_string(),
             }

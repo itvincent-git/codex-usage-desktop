@@ -288,6 +288,7 @@ pub enum CodexWindowActivationStatus {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
+    pub probability_24h: i64,
     pub score: i64,
     pub fetched_at: String,
 }

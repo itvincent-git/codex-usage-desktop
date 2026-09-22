@@ -521,6 +521,7 @@ describe("App", () => {
 
   it("opens the external quota forecast when the forecast badge is clicked", async () => {
     forecastInvokeMock.mockResolvedValue({
+      probability24h: 61,
       score: 73,
       fetchedAt: "2026-06-25T09:00:19.499Z",
     });

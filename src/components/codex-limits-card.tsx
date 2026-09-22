@@ -302,6 +302,7 @@ function ResetArea({
         {showQuotaForecast ? (
           <button
             type="button"
+            data-testid="quota-forecast"
             className={cn(
               "flex flex-col items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               quotaForecastTone.className,
@@ -310,6 +311,12 @@ function ResetArea({
             aria-label={t("limits.quota_forecast_open")}
           >
             <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} />
+            <span className="whitespace-nowrap font-mono text-[9px] font-semibold tabular-nums text-foreground/75">
+              {t("limits.quota_forecast_probabilities", {
+                probability24h: Math.round(clampPercent(quotaForecast.probability24h)),
+                probability48h: quotaForecastScore,
+              })}
+            </span>
             <span className="text-[10px] font-semibold leading-tight text-foreground/80">
               {quotaForecastTone.label}
             </span>

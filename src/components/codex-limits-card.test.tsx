@@ -230,6 +230,7 @@ describe("CodexLimitsCard component", () => {
         }}
         error={null}
         quotaForecast={{
+          probability24h: 61,
           score: 73,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}
@@ -285,6 +286,7 @@ describe("CodexLimitsCard component", () => {
         }}
         error={null}
         quotaForecast={{
+          probability24h: 35,
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}
@@ -483,6 +485,7 @@ describe("CodexLimitsCard component", () => {
         limits={null}
         error={null}
         quotaForecast={{
+          probability24h: 61,
           score: 73,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}
@@ -493,6 +496,7 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByRole("img", { name: "73% reset probability" })).toBeInTheDocument();
     expect(forecastButton).toHaveTextContent("73");
+    expect(forecastButton).toHaveTextContent("24h 61% · 48h 73%");
     expect(forecastButton).toHaveTextContent("Reset likely in 48h");
     expect(forecastButton).toHaveClass("flex-col");
     expect(forecastButton).toHaveClass("border-error/30");
@@ -518,6 +522,7 @@ describe("CodexLimitsCard component", () => {
           },
         }}
         quotaForecast={{
+          probability24h: 61,
           score: 73,
           fetchedAt: "2026-08-25T09:00:19.499Z",
         }}
@@ -617,6 +622,7 @@ describe("CodexLimitsCard component", () => {
         limits={null}
         error={null}
         quotaForecast={{
+          probability24h: 12,
           score: 18,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}
@@ -630,6 +636,7 @@ describe("CodexLimitsCard component", () => {
         limits={null}
         error={null}
         quotaForecast={{
+          probability24h: 35,
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}
@@ -647,6 +654,7 @@ describe("CodexLimitsCard component", () => {
         limits={null}
         error={null}
         quotaForecast={{
+          probability24h: 35,
           score: 55,
           fetchedAt: "2026-06-25T09:00:19.499Z",
         }}

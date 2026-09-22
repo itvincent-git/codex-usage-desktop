@@ -156,6 +156,7 @@ export type CodexWindowActivationResponse = {
 };
 
 export type CodexQuotaForecastResponse = {
+  probability24h: number;
   score: number;
   fetchedAt: string;
 };
