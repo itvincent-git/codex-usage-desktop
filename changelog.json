@@ -1,4 +1,8 @@
 {
+  "3.5.0": {
+    "zh": "- fix: switch reset forecast to codexreset api\n- feat: show 24-hour reset forecast\n- feat: render dual reset forecast rings\n- fix: clarify reset forecast horizons\n- fix(limits): recognize Pro Lite subscriptions",
+    "en": "- fix: switch reset forecast to codexreset api\n- feat: show 24-hour reset forecast\n- feat: render dual reset forecast rings\n- fix: clarify reset forecast horizons\n- fix(limits): recognize Pro Lite subscriptions"
+  },
   "3.4.0": {
     "zh": "- feat(sessions): copy conversation card content\n- test: add WebdriverIO Tauri e2e setup",
     "en": "- feat(sessions): copy conversation card content\n- test: add WebdriverIO Tauri e2e setup"
