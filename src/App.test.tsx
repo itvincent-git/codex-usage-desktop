@@ -1894,7 +1894,9 @@ describe("App", () => {
           weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: weeklyReset },
           updatedAt: new Date().toISOString(),
           source: "cli-rpc",
+          account: "user@example.com",
           membershipLevel: "pro",
+          workspaceName: "Example Team",
         };
       }
       if (command === "scan_usage") {
@@ -1912,15 +1914,18 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
-        payload: expect.objectContaining({
-          title: "⏱️ 80%/3h┃🗓️ 55%/4d",
-          items: expect.arrayContaining([
-            expect.objectContaining({ id: "status_5h", text: expect.stringContaining("3 hours left") }),
-            expect.objectContaining({ id: "status_weekly", text: expect.stringContaining("4 days left") }),
-          ]),
-        }),
-      }));
+      const payload = updateTrayMock.mock.calls.at(-1)?.[0]?.payload;
+      expect(payload?.title).toBe("⏱️ 80%/3h┃🗓️ 55%/4d");
+      expect(payload?.items.slice(0, 4)).toEqual([
+        { id: "account", text: "Account: user@example.com", enabled: false },
+        { id: "membership", text: "Plan: pro", enabled: false },
+        { id: "workspace", text: "Workspace: Example Team", enabled: false },
+        { id: "separator", text: "", enabled: false },
+      ]);
+      expect(payload?.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "status_5h", text: expect.stringContaining("3 hours left") }),
+        expect.objectContaining({ id: "status_weekly", text: expect.stringContaining("4 days left") }),
+      ]));
     });
   });
 

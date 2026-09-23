@@ -769,6 +769,17 @@ export function useUsageDashboard() {
 
     const items: TrayMenuItemDto[] = [];
 
+    if (codexLimits?.account) {
+      items.push({ id: "account", text: `${t("settings.menu_bar_account")}: ${codexLimits.account}`, enabled: false });
+    }
+    if (codexLimits?.membershipLevel) {
+      items.push({ id: "membership", text: `${t("settings.menu_bar_membership")}: ${codexLimits.membershipLevel}`, enabled: false });
+    }
+    if (codexLimits?.workspaceName) {
+      items.push({ id: "workspace", text: `${t("settings.menu_bar_workspace")}: ${codexLimits.workspaceName}`, enabled: false });
+    }
+    const accountItemCount = items.length;
+
     if (hasSub) {
       if (trayMenuShow.limit5h && codexLimits?.session) {
         const text = `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%); ${formatResetTime(codexLimits.session.resetsAt, codexLimits.session.windowMinutes, t)}`;
@@ -791,7 +802,7 @@ export function useUsageDashboard() {
       }
     }
 
-    if (items.length > 0 && (trayMenuShow.tokens || trayMenuShow.cost)) {
+    if (items.length > accountItemCount && (trayMenuShow.tokens || trayMenuShow.cost)) {
       items.push({ id: "separator", text: "", enabled: false });
     }
 
@@ -803,6 +814,10 @@ export function useUsageDashboard() {
     if (trayMenuShow.cost) {
       const text = `${t("settings.menu_bar_opt_cost")}: ${formatCurrency(todayCost)}`;
       items.push({ id: "status_cost", text, enabled: false });
+    }
+
+    if (accountItemCount > 0 && items.length > accountItemCount) {
+      items.splice(accountItemCount, 0, { id: "separator", text: "", enabled: false });
     }
 
     void updateTray({
