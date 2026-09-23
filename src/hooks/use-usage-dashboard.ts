@@ -746,8 +746,8 @@ export function useUsageDashboard() {
 
     const titleParts: string[] = [];
     if (hasSub) {
-      if (trayTitleShow.limit5h) {
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits?.session, trayCountdownUnits));
+      if (trayTitleShow.limit5h && codexLimits?.session) {
+        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits.session, trayCountdownUnits));
       }
       if (trayTitleShow.limitWeekly) {
         titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitWeekly, codexLimits?.weekly, trayCountdownUnits));
@@ -770,10 +770,8 @@ export function useUsageDashboard() {
     const items: TrayMenuItemDto[] = [];
 
     if (hasSub) {
-      if (trayMenuShow.limit5h) {
-        const text = codexLimits?.session
-          ? `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%); ${formatResetTime(codexLimits.session.resetsAt, codexLimits.session.windowMinutes, t)}`
-          : `${t("limits.window_5hour")}: ${t("limits.unavailable")}`;
+      if (trayMenuShow.limit5h && codexLimits?.session) {
+        const text = `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%); ${formatResetTime(codexLimits.session.resetsAt, codexLimits.session.windowMinutes, t)}`;
         items.push({ id: "status_5h", text, enabled: false });
       }
 
@@ -793,7 +791,7 @@ export function useUsageDashboard() {
       }
     }
 
-    if ((trayMenuShow.limit5h || trayMenuShow.limitWeekly) && (trayMenuShow.tokens || trayMenuShow.cost)) {
+    if (items.length > 0 && (trayMenuShow.tokens || trayMenuShow.cost)) {
       items.push({ id: "separator", text: "", enabled: false });
     }
 

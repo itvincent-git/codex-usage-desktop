@@ -1924,6 +1924,45 @@ describe("App", () => {
     });
   });
 
+  it("omits the 5-hour limit from the menu bar when it is unavailable", async () => {
+    const now = new Date().getTime();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const weeklyReset = new Date(now + 4 * 24 * 60 * 60_000).toISOString();
+    localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: false, cost: false }));
+    localStorage.setItem("tray_menu_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: false, cost: false }));
+
+    invokeMock.mockImplementation(async (command: string, args?: { range?: string }) => {
+      if (command === "fetch_codex_limits") {
+        return {
+          session: null,
+          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: weeklyReset },
+          updatedAt: new Date().toISOString(),
+          source: "cli-rpc",
+          membershipLevel: "pro",
+        };
+      }
+      if (command === "scan_usage") return scan(0);
+      if (command === "fetch_overview" && args?.range === "30d") return overview();
+      if (command === "check_for_updates") {
+        return { hasUpdate: false, currentVersion: "1.0.0", latestVersion: "1.0.0", latestTag: "v1.0.0", releaseName: null, releaseNotes: null, releaseUrl: "" };
+      }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      const payload = updateTrayMock.mock.calls.at(-1)?.[0]?.payload;
+      expect(payload?.title).toBe("🗓️ 55%/4d");
+      expect(payload?.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "status_weekly" }),
+      ]));
+      expect(payload?.items).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "status_5h" }),
+      ]));
+    });
+  });
+
   it("uses saved custom tray title templates and countdown units", async () => {
     const now = new Date().getTime();
     vi.spyOn(Date, "now").mockReturnValue(now);
