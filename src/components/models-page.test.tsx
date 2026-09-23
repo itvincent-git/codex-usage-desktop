@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelsPage } from "@/components/models-page";
+import type { ModelPricingCatalogResponse } from "@/lib/api";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
@@ -40,6 +41,44 @@ describe("ModelsPage pricing catalog", () => {
     expect(invokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenCalledWith("fetch_model_pricing_catalog");
     expect(screen.queryByTestId("range-switcher")).not.toBeInTheDocument();
+  });
+
+  it("refreshes once, updates the catalog, and reloads usage costs", async () => {
+    let resolveRefresh!: (value: ModelPricingCatalogResponse) => void;
+    const refreshPromise = new Promise<ModelPricingCatalogResponse>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    invokeMock.mockImplementation((command: string) => command === "refresh_model_pricing"
+      ? refreshPromise
+      : Promise.resolve({ isLimited: false, models: [entry(1)] }));
+    const onPricingRefreshed = vi.fn().mockResolvedValue(undefined);
+    render(<ModelsPage models={[]} range="30d" onRangeChange={vi.fn()} onPricingRefreshed={onPricingRefreshed} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Pricing Catalog" }));
+    await screen.findByText("model-01");
+
+    const refresh = screen.getByRole("button", { name: "Refresh pricing" });
+    await userEvent.click(refresh);
+    fireEvent.click(refresh);
+
+    expect(refresh).toBeDisabled();
+    expect(invokeMock.mock.calls.filter(([command]) => command === "refresh_model_pricing")).toHaveLength(1);
+    resolveRefresh({ isLimited: false, models: [entry(2)] });
+    await screen.findByText("model-02");
+    await waitFor(() => expect(onPricingRefreshed).toHaveBeenCalledTimes(1));
+    expect(refresh).not.toBeDisabled();
+  });
+
+  it("keeps the existing catalog and shows an error when refresh fails", async () => {
+    invokeMock.mockResolvedValueOnce({ isLimited: false, models: [entry(1)] });
+    invokeMock.mockRejectedValueOnce(new Error("offline"));
+    render(<ModelsPage models={[]} range="30d" onRangeChange={vi.fn()} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Pricing Catalog" }));
+    await screen.findByText("model-01");
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh pricing" }));
+
+    await screen.findByText("Failed to load the pricing catalog.");
+    expect(screen.getByText("model-01")).toBeInTheDocument();
   });
 
   it("searches, filters providers, paginates, and resets pagination", async () => {

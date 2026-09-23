@@ -103,6 +103,7 @@ export function DashboardHeader({
             <button
               type="button"
               role="tab"
+              data-testid="models-nav-tab"
               aria-selected={view === "models"}
               className={`border-b-2 px-0 pb-2 pt-1 text-sm font-medium transition ${
                 view === "models"

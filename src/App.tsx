@@ -78,6 +78,7 @@ export default function App() {
     isSessionsLoading,
     handleViewChange,
     handleRangeChange,
+    handlePricingRefreshed,
     handleRefresh,
     handleLimitsRefresh,
     handleActivateCodexWindow,
@@ -347,7 +348,7 @@ export default function App() {
           ) : null}
 
           {!isLoading && view === "models" && overview ? (
-            <ModelsPage models={overview.models} range={range} onRangeChange={handleRangeChange} />
+            <ModelsPage models={overview.models} range={range} onRangeChange={handleRangeChange} onPricingRefreshed={handlePricingRefreshed} />
           ) : null}
 
           {!isLoading && view === "projects" && overview ? (

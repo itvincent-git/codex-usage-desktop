@@ -1,3 +1,4 @@
+use crate::pricing::{calculate_cost_usd, PricingSource};
 use crate::types::{
     DailyUsageRow, ModelUsage, ProjectUsage, SessionDailyUsageRow, SessionDetailRow,
     SessionQuotaUsage,
@@ -497,6 +498,60 @@ pub fn query_daily_rows(
         .map_err(|error| error.to_string())
 }
 
+pub fn query_all_daily_rows(db: &Connection) -> Result<Vec<DailyUsageRow>, String> {
+    let bounds = db
+        .query_row(
+            "SELECT MIN(date), MAX(date) FROM daily_usage_rollups",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                ))
+            },
+        )
+        .map_err(|error| error.to_string())?;
+    match bounds {
+        (Some(start), Some(end)) => query_daily_rows(db, &start, &end),
+        _ => Ok(Vec::new()),
+    }
+}
+
+pub fn pricing_models(db: &Connection) -> Result<Vec<String>, String> {
+    Ok(query_all_daily_rows(db)?
+        .into_iter()
+        .flat_map(|row| row.models.into_keys())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect())
+}
+
+pub fn recalculate_daily_costs(
+    db: &mut Connection,
+    pricing_source: &PricingSource,
+) -> Result<(), String> {
+    let rows = query_all_daily_rows(db)?;
+    let tx = db.transaction().map_err(|error| error.to_string())?;
+    {
+        let mut statement = tx
+            .prepare("UPDATE daily_usage_rollups SET cost_usd = ? WHERE date = ?")
+            .map_err(|error| error.to_string())?;
+        for row in rows {
+            let cost = row
+                .models
+                .iter()
+                .map(|(model, usage)| {
+                    calculate_cost_usd(usage, pricing_source.pricing_for_model(model))
+                })
+                .sum::<f64>();
+            statement
+                .execute(params![cost, row.date])
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    tx.commit().map_err(|error| error.to_string())
+}
+
 pub fn query_latest_update_at(db: &Connection) -> Result<Option<String>, String> {
     db.query_row(
         "SELECT MAX(updated_at) AS updated_at FROM daily_usage_rollups",
@@ -617,7 +672,46 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pricing::PricingSource;
     use chrono::Utc;
+
+    #[test]
+    fn recalculates_existing_daily_rollup_costs_without_reparsing_sessions() {
+        let path = std::env::temp_dir().join(format!(
+            "codex-usage-db-reprice-{}.sqlite",
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let mut db = open_database(&path).unwrap();
+        let usage = ModelUsage {
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            total_tokens: 2_000_000,
+            ..Default::default()
+        };
+        upsert_daily_rows(
+            &mut db,
+            &[DailyUsageRow {
+                date: "2026-09-23".to_string(),
+                input_tokens: usage.input_tokens,
+                cached_input_tokens: 0,
+                output_tokens: usage.output_tokens,
+                reasoning_output_tokens: 0,
+                total_tokens: usage.total_tokens,
+                cost_usd: 999.0,
+                models: BTreeMap::from([("gpt-5".to_string(), usage)]),
+                projects: BTreeMap::new(),
+                updated_at: "2026-09-23T00:00:00.000Z".to_string(),
+            }],
+        )
+        .unwrap();
+
+        recalculate_daily_costs(&mut db, &PricingSource::embedded()).unwrap();
+
+        let rows = query_all_daily_rows(&db).unwrap();
+        assert_eq!(pricing_models(&db).unwrap(), ["gpt-5"]);
+        assert!((rows[0].cost_usd - 11.25).abs() < f64::EPSILON);
+        let _ = std::fs::remove_file(path);
+    }
 
     #[test]
     fn open_database_adds_missing_rollup_columns() {

@@ -873,6 +873,10 @@ export function useUsageDashboard() {
     }
   }
 
+  async function handlePricingRefreshed() {
+    await loadOverview(range);
+  }
+
   async function handleRefresh() {
     setIsRefreshing(true);
     const startedAt = performance.now();
@@ -1121,6 +1125,7 @@ export function useUsageDashboard() {
     isSessionsLoading,
     handleViewChange,
     handleRangeChange,
+    handlePricingRefreshed,
     handleRefresh,
     handleLimitsRefresh,
     handleActivateCodexWindow,

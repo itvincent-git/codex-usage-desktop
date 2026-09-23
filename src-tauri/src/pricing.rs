@@ -3,16 +3,19 @@ use crate::types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    sync::{Mutex, OnceLock},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 const LITELLM_PRICING_URL: &str =
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 const MILLION: f64 = 1_000_000.0;
 const CACHE_VERSION: u32 = 2;
+const CACHE_TTL_SECS: u64 = 24 * 60 * 60;
+const FAILURE_RETRY_COOLDOWN_SECS: u64 = 15 * 60;
 const PROVIDER_PREFIXES: [&str; 3] = ["openai/", "azure/", "openrouter/openai/"];
 const CODEX_MODEL_PREFIXES: [&str; 5] = [
     "gpt-5",
@@ -33,6 +36,7 @@ pub struct Pricing {
 pub struct PricingSource {
     pricing: BTreeMap<String, LiteLlmModelPricing>,
     is_limited: bool,
+    refreshed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,14 +61,50 @@ struct PricingCache {
     version: u32,
     is_complete: bool,
     pricing: BTreeMap<String, LiteLlmModelPricing>,
+    #[serde(default)]
+    last_successful_refresh_at: Option<u64>,
+    #[serde(default)]
+    last_failed_attempt_at: Option<u64>,
+    #[serde(default)]
+    confirmed_missing_models: BTreeSet<String>,
 }
+
+static PRICING_REFRESH_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 impl PricingSource {
     pub fn load(cache_path: Option<PathBuf>) -> Self {
         Self::load_with(cache_path, load_remote_pricing)
     }
 
+    pub fn load_for_models<I>(cache_path: Option<PathBuf>, models: I) -> Self
+    where
+        I: IntoIterator<Item = String>,
+    {
+        Self::load_with_options(
+            cache_path,
+            models.into_iter().collect(),
+            false,
+            unix_timestamp(),
+            load_remote_pricing,
+        )
+        .unwrap_or_else(|_| Self::embedded_fallback())
+    }
+
+    pub fn refresh(cache_path: Option<PathBuf>) -> Result<Self, String> {
+        Self::load_with_options(
+            cache_path,
+            BTreeSet::new(),
+            true,
+            unix_timestamp(),
+            load_remote_pricing,
+        )
+    }
+
     pub fn load_cached_or_embedded(cache_path: Option<PathBuf>) -> Self {
+        let _guard = PRICING_REFRESH_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .ok();
         let cache = cache_path
             .as_deref()
             .ok_or_else(|| "Pricing cache path missing".to_string())
@@ -74,6 +114,7 @@ impl PricingSource {
         Self {
             pricing: cache.pricing,
             is_limited: !cache.is_complete,
+            refreshed: false,
         }
     }
 
@@ -81,87 +122,119 @@ impl PricingSource {
     where
         F: FnOnce() -> Result<BTreeMap<String, LiteLlmModelPricing>, String>,
     {
-        let mut fallback_cache = None;
-        let mut use_cache = false;
-        let mut cache_age_secs = None;
+        Self::load_with_options(
+            cache_path,
+            BTreeSet::new(),
+            false,
+            unix_timestamp(),
+            load_remote,
+        )
+        .unwrap_or_else(|_| Self::embedded_fallback())
+    }
 
-        if let Some(ref path) = cache_path {
-            if let Ok(cached) = read_cache(path) {
-                fallback_cache = Some(cached);
-                // Check if the cache is less than 24 hours old (24 * 3600 = 86400 seconds)
-                if let Ok(metadata) = fs::metadata(path) {
-                    if let Ok(modified) = metadata.modified() {
-                        if let Ok(duration) = std::time::SystemTime::now().duration_since(modified)
-                        {
-                            let age = duration.as_secs();
-                            cache_age_secs = Some(age);
-                            if age < 86400 {
-                                use_cache = true;
-                            }
-                        }
-                    }
-                }
-            }
+    fn load_with_options<F>(
+        cache_path: Option<PathBuf>,
+        requested_models: BTreeSet<String>,
+        force: bool,
+        now: u64,
+        load_remote: F,
+    ) -> Result<Self, String>
+    where
+        F: FnOnce() -> Result<BTreeMap<String, LiteLlmModelPricing>, String>,
+    {
+        let _guard = PRICING_REFRESH_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|error| error.to_string())?;
+        let mut cache = cache_path
+            .as_deref()
+            .and_then(|path| read_cache(path).ok())
+            .unwrap_or_else(embedded_cache);
+        hydrate_v2_success_timestamp(cache_path.as_deref(), &mut cache);
+
+        let source = Self::from_cache(&cache, false);
+        let unchecked_models = requested_models
+            .iter()
+            .filter(|model| {
+                source.resolve_pricing_for_model(model).status == PricingStatus::Unavailable
+                    && !cache.confirmed_missing_models.contains(*model)
+            })
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let is_stale = cache
+            .last_successful_refresh_at
+            .map(|timestamp| now.saturating_sub(timestamp) >= CACHE_TTL_SECS)
+            .unwrap_or(true);
+        let in_failure_cooldown = cache
+            .last_failed_attempt_at
+            .is_some_and(|timestamp| now.saturating_sub(timestamp) < FAILURE_RETRY_COOLDOWN_SECS);
+        let should_refresh =
+            force || ((!unchecked_models.is_empty() || is_stale) && !in_failure_cooldown);
+
+        if !should_refresh {
+            return Ok(source);
         }
 
-        let cache = if use_cache {
-            if let Some(age) = cache_age_secs {
-                log::info!(
-                    "Loaded pricing from local cache (age: {}s, less than 24h).",
-                    age
+        match load_remote() {
+            Ok(remote_pricing) => {
+                let checked_models = cache
+                    .confirmed_missing_models
+                    .union(&requested_models)
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                cache = PricingCache {
+                    version: CACHE_VERSION,
+                    is_complete: true,
+                    pricing: remote_pricing,
+                    last_successful_refresh_at: Some(now),
+                    last_failed_attempt_at: None,
+                    confirmed_missing_models: BTreeSet::new(),
+                };
+                let refreshed_source = Self::from_cache(&cache, true);
+                cache.confirmed_missing_models = checked_models
+                    .into_iter()
+                    .filter(|model| {
+                        refreshed_source.resolve_pricing_for_model(model).status
+                            == PricingStatus::Unavailable
+                    })
+                    .collect();
+                if let Some(ref path) = cache_path {
+                    write_cache(path, &cache)?;
+                }
+                log::info!("Successfully fetched and cached remote pricing.");
+                Ok(Self::from_cache(&cache, true))
+            }
+            Err(error) => {
+                cache.last_failed_attempt_at = Some(now);
+                if let Some(ref path) = cache_path {
+                    let _ = write_cache(path, &cache);
+                }
+                log::warn!(
+                    "Failed to load remote pricing: {error}. Keeping existing pricing data."
                 );
-            } else {
-                log::info!("Loaded pricing from local cache.");
-            }
-            fallback_cache.unwrap()
-        } else {
-            if let Some(age) = cache_age_secs {
-                log::info!("Local pricing cache is expired (age: {}s, older than 24h). Fetching remote pricing...", age);
-            } else {
-                log::info!("Local pricing cache missing or unreadable. Fetching remote pricing...");
-            }
-
-            match load_remote() {
-                Ok(remote_pricing) => {
-                    let remote_cache = PricingCache {
-                        version: CACHE_VERSION,
-                        is_complete: true,
-                        pricing: remote_pricing,
-                    };
-                    log::info!("Successfully fetched and cached remote pricing.");
-                    if let Some(ref path) = cache_path {
-                        let _ = write_cache(path, &remote_cache);
-                    }
-                    remote_cache
-                }
-                Err(err) => {
-                    log::warn!(
-                        "Failed to load remote pricing: {err}. Falling back to cache or embedded."
-                    );
-                    if let Some(cached) = fallback_cache {
-                        log::info!("Falling back to existing local pricing cache (touching cache timestamp to prevent retries for 24h).");
-                        // Touch the cache file by writing it back to disk to update modification time.
-                        // This prevents repeating the slow timeout request on subsequent loads for 24 hours.
-                        if let Some(ref path) = cache_path {
-                            let _ = write_cache(path, &cached);
-                        }
-                        cached
-                    } else {
-                        log::info!("Falling back to embedded pricing (creating fresh cache file to prevent retries for 24h).");
-                        let embedded = embedded_cache();
-                        if let Some(ref path) = cache_path {
-                            let _ = write_cache(path, &embedded);
-                        }
-                        embedded
-                    }
+                if force {
+                    Err(error)
+                } else {
+                    Ok(Self::from_cache(&cache, false))
                 }
             }
-        };
-
-        Self {
-            pricing: cache.pricing,
-            is_limited: !cache.is_complete,
         }
+    }
+
+    fn from_cache(cache: &PricingCache, refreshed: bool) -> Self {
+        Self {
+            pricing: cache.pricing.clone(),
+            is_limited: !cache.is_complete,
+            refreshed,
+        }
+    }
+
+    fn embedded_fallback() -> Self {
+        Self::from_cache(&embedded_cache(), false)
+    }
+
+    pub fn was_refreshed(&self) -> bool {
+        self.refreshed
     }
 
     #[cfg(test)]
@@ -169,6 +242,7 @@ impl PricingSource {
         Self {
             pricing: embedded_pricing(),
             is_limited: true,
+            refreshed: false,
         }
     }
 
@@ -177,6 +251,7 @@ impl PricingSource {
         Self {
             pricing,
             is_limited: false,
+            refreshed: false,
         }
     }
 
@@ -390,6 +465,24 @@ fn read_cache(path: &Path) -> Result<PricingCache, String> {
     Ok(cache)
 }
 
+fn hydrate_v2_success_timestamp(path: Option<&Path>, cache: &mut PricingCache) {
+    if cache.last_successful_refresh_at.is_some() || !cache.is_complete {
+        return;
+    }
+    cache.last_successful_refresh_at = path
+        .and_then(|path| fs::metadata(path).ok())
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs());
+}
+
+fn unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 fn write_cache(path: &Path, cache: &PricingCache) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -434,6 +527,9 @@ fn embedded_cache() -> PricingCache {
         version: CACHE_VERSION,
         is_complete: false,
         pricing: embedded_pricing(),
+        last_successful_refresh_at: None,
+        last_failed_attempt_at: None,
+        confirmed_missing_models: BTreeSet::new(),
     }
 }
 
@@ -490,6 +586,7 @@ fn to_per_million(value: Option<f64>, fallback: Option<f64>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_pricing_cache_path(name: &str) -> PathBuf {
@@ -498,6 +595,27 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("codex-pricing-{name}-{nanos}.json"))
+    }
+
+    fn test_pricing(input: f64) -> LiteLlmModelPricing {
+        LiteLlmModelPricing {
+            litellm_provider: Some("openai".to_string()),
+            mode: Some("chat".to_string()),
+            input_cost_per_token: Some(input),
+            cache_read_input_token_cost: Some(input / 10.0),
+            output_cost_per_token: Some(input * 8.0),
+        }
+    }
+
+    fn fresh_cache(pricing: BTreeMap<String, LiteLlmModelPricing>, now: u64) -> PricingCache {
+        PricingCache {
+            version: CACHE_VERSION,
+            is_complete: true,
+            pricing,
+            last_successful_refresh_at: Some(now),
+            last_failed_attempt_at: None,
+            confirmed_missing_models: BTreeSet::new(),
+        }
     }
 
     #[test]
@@ -535,6 +653,9 @@ mod tests {
                 version: CACHE_VERSION,
                 is_complete: true,
                 pricing: cached,
+                last_successful_refresh_at: Some(unix_timestamp()),
+                last_failed_attempt_at: None,
+                confirmed_missing_models: BTreeSet::new(),
             },
         )
         .unwrap();
@@ -547,6 +668,160 @@ mod tests {
         assert!((pricing.input_cost_per_m_token - 1.0).abs() < f64::EPSILON);
         assert!((pricing.cached_input_cost_per_m_token - 0.2).abs() < f64::EPSILON);
         assert!((pricing.output_cost_per_m_token - 3.0).abs() < f64::EPSILON);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn unknown_model_bypasses_fresh_cache() {
+        let path = temp_pricing_cache_path("unknown-model");
+        let now = 10_000;
+        write_cache(
+            &path,
+            &fresh_cache(
+                BTreeMap::from([("known".to_string(), test_pricing(1e-6))]),
+                now,
+            ),
+        )
+        .unwrap();
+
+        let source = PricingSource::load_with_options(
+            Some(path.clone()),
+            BTreeSet::from(["gpt-6-sol".to_string()]),
+            false,
+            now + 1,
+            || {
+                Ok(BTreeMap::from([(
+                    "gpt-6-sol".to_string(),
+                    test_pricing(2e-6),
+                )]))
+            },
+        )
+        .unwrap();
+
+        assert!(source.was_refreshed());
+        assert_eq!(
+            source.resolve_pricing_for_model("gpt-6-sol").status,
+            PricingStatus::Priced
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn failed_refresh_uses_short_retry_cooldown_without_changing_success_time() {
+        let path = temp_pricing_cache_path("failure-cooldown");
+        let now = 20_000;
+        write_cache(
+            &path,
+            &fresh_cache(
+                BTreeMap::from([("known".to_string(), test_pricing(1e-6))]),
+                now,
+            ),
+        )
+        .unwrap();
+        let attempts = AtomicUsize::new(0);
+        let requested = BTreeSet::from(["new-model".to_string()]);
+
+        let first = PricingSource::load_with_options(
+            Some(path.clone()),
+            requested.clone(),
+            false,
+            now + 1,
+            || {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                Err("offline".to_string())
+            },
+        )
+        .unwrap();
+        let second =
+            PricingSource::load_with_options(Some(path.clone()), requested, false, now + 2, || {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                Err("should be cooling down".to_string())
+            })
+            .unwrap();
+
+        assert!(!first.was_refreshed());
+        assert!(!second.was_refreshed());
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+        let cache = read_cache(&path).unwrap();
+        assert_eq!(cache.last_successful_refresh_at, Some(now));
+        assert_eq!(cache.last_failed_attempt_at, Some(now + 1));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn successfully_checked_missing_model_does_not_repeat_within_ttl() {
+        let path = temp_pricing_cache_path("confirmed-missing");
+        let now = 30_000;
+        write_cache(&path, &fresh_cache(BTreeMap::new(), now)).unwrap();
+        let requested = BTreeSet::from(["not-listed".to_string()]);
+
+        PricingSource::load_with_options(
+            Some(path.clone()),
+            requested.clone(),
+            false,
+            now + 1,
+            || Ok(BTreeMap::new()),
+        )
+        .unwrap();
+        PricingSource::load_with_options(Some(path.clone()), requested, false, now + 2, || {
+            panic!("confirmed missing model should not trigger another request")
+        })
+        .unwrap();
+
+        assert!(read_cache(&path)
+            .unwrap()
+            .confirmed_missing_models
+            .contains("not-listed"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn forced_refresh_bypasses_ttl_and_failure_cooldown() {
+        let path = temp_pricing_cache_path("forced");
+        let now = 40_000;
+        let mut cache = fresh_cache(BTreeMap::new(), now);
+        cache.last_failed_attempt_at = Some(now);
+        write_cache(&path, &cache).unwrap();
+
+        let source = PricingSource::load_with_options(
+            Some(path.clone()),
+            BTreeSet::new(),
+            true,
+            now + 1,
+            || {
+                Ok(BTreeMap::from([(
+                    "gpt-6-luna".to_string(),
+                    test_pricing(3e-6),
+                )]))
+            },
+        )
+        .unwrap();
+
+        assert!(source.was_refreshed());
+        assert_eq!(
+            source.resolve_pricing_for_model("gpt-6-luna").status,
+            PricingStatus::Priced
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn v2_cache_without_metadata_uses_file_timestamp() {
+        let path = temp_pricing_cache_path("v2-compatible");
+        std::fs::write(
+            &path,
+            r#"{"version":2,"is_complete":true,"pricing":{"known":{"mode":"chat","input_cost_per_token":0.000001}}}"#,
+        )
+        .unwrap();
+
+        let source = PricingSource::load_with(Some(path.clone()), || {
+            panic!("fresh v2 cache should remain readable without refreshing")
+        });
+
+        assert_eq!(
+            source.resolve_pricing_for_model("known").status,
+            PricingStatus::Priced
+        );
         let _ = std::fs::remove_file(path);
     }
 

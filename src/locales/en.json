@@ -299,6 +299,7 @@
       "model": "Model",
       "unit": "USD / 1M tokens",
       "loading": "Loading pricing catalog...",
+      "refresh": "Refresh pricing",
       "error": "Failed to load the pricing catalog.",
       "no_results": "No pricing entries match your filters.",
       "limited": "Offline: showing the limited built-in pricing catalog.",

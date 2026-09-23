@@ -74,8 +74,27 @@ fn scan_usage_blocking(
         pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path.to_path_buf()));
     let pricing_ms = pricing_started.elapsed().as_millis();
     let mut response = scanner::scan_codex_usage(&mut db, &pricing_source, None, None)?;
-    response.metrics.pricing_ms = pricing_ms;
+    let models = db::pricing_models(&db)?;
+    let pricing_source =
+        pricing::PricingSource::load_for_models(Some(pricing_cache_path.to_path_buf()), models);
+    if pricing_source.was_refreshed() {
+        db::recalculate_daily_costs(&mut db, &pricing_source)?;
+    }
+    response.metrics.pricing_ms = pricing_started.elapsed().as_millis().max(pricing_ms);
     Ok(response)
+}
+
+fn load_usage_pricing(
+    db: &mut rusqlite::Connection,
+    pricing_cache_path: &Path,
+) -> Result<pricing::PricingSource, String> {
+    let models = db::pricing_models(db)?;
+    let pricing_source =
+        pricing::PricingSource::load_for_models(Some(pricing_cache_path.to_path_buf()), models);
+    if pricing_source.was_refreshed() {
+        db::recalculate_daily_costs(db, &pricing_source)?;
+    }
+    Ok(pricing_source)
 }
 
 fn refresh_usage_data_with<S, L>(
@@ -185,8 +204,8 @@ async fn fetch_overview(
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let db = db::open_database(&database_path)?;
-        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        let mut db = db::open_database(&database_path)?;
+        let pricing_source = load_usage_pricing(&mut db, &pricing_cache_path)?;
         let mut overview = overview::get_overview(&db, &range, None, &pricing_source)?;
         codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
             .enrich_overview(&mut overview);
@@ -205,8 +224,8 @@ async fn fetch_project_analytics(
     let database_path = state.database_path.clone();
     let pricing_cache_path = state.pricing_cache_path.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let db = db::open_database(&database_path)?;
-        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        let mut db = db::open_database(&database_path)?;
+        let pricing_source = load_usage_pricing(&mut db, &pricing_cache_path)?;
         let mut analytics =
             overview::get_project_analytics(&db, &project, &range, None, &pricing_source)?;
         codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
@@ -224,6 +243,22 @@ async fn fetch_model_pricing_catalog(
     let pricing_cache_path = state.pricing_cache_path.clone();
     tauri::async_runtime::spawn_blocking(move || {
         Ok(pricing::PricingSource::load(Some(pricing_cache_path)).catalog())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn refresh_model_pricing(
+    state: tauri::State<'_, AppState>,
+) -> Result<ModelPricingCatalogResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let pricing_source = pricing::PricingSource::refresh(Some(pricing_cache_path))?;
+        let mut db = db::open_database(&database_path)?;
+        db::recalculate_daily_costs(&mut db, &pricing_source)?;
+        Ok(pricing_source.catalog())
     })
     .await
     .map_err(|error| error.to_string())?
@@ -362,8 +397,8 @@ async fn export_usage(
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let db = db::open_database(&database_path)?;
-        let pricing_source = pricing::PricingSource::load(Some(pricing_cache_path));
+        let mut db = db::open_database(&database_path)?;
+        let pricing_source = load_usage_pricing(&mut db, &pricing_cache_path)?;
         let mut overview = overview::get_overview(&db, &range, None, &pricing_source)?;
         codex_projects::CodexProjectCatalog::load(&scanner::default_codex_home())
             .enrich_overview(&mut overview);
@@ -955,6 +990,7 @@ pub fn run() {
             fetch_overview,
             fetch_project_analytics,
             fetch_model_pricing_catalog,
+            refresh_model_pricing,
             fetch_monthly_usage,
             fetch_codex_limits,
             activate_codex_window,

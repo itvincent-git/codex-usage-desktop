@@ -204,6 +204,10 @@ export async function fetchModelPricingCatalog(): Promise<ModelPricingCatalogRes
   return invoke<ModelPricingCatalogResponse>("fetch_model_pricing_catalog");
 }
 
+export async function refreshModelPricing(): Promise<ModelPricingCatalogResponse> {
+  return invoke<ModelPricingCatalogResponse>("refresh_model_pricing");
+}
+
 export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
   return invoke<MonthlyUsageResponse>("fetch_monthly_usage");
 }

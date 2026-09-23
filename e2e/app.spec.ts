@@ -22,4 +22,21 @@ describe("Codex Usage Desktop page", () => {
     expect(await forecast24h.getText()).toMatch(/^\d+\s*24h$/);
     expect(await forecast48h.getText()).toMatch(/^\d+\s*48h$/);
   });
+
+  it("opens the pricing catalog and refreshes without leaving the app unusable", async () => {
+    await $('[data-testid="models-nav-tab"]').click();
+    await $('[data-testid="models-catalog-tab"]').click();
+
+    const catalog = $('[data-testid="pricing-catalog"]');
+    const refresh = $('[data-testid="refresh-pricing"]');
+    await refresh.waitForEnabled({ timeout: 10_000 });
+    await refresh.click();
+    await refresh.waitForEnabled({ timeout: 15_000 });
+
+    const search = $('[data-testid="pricing-search"]');
+    await search.setValue("gpt-6-");
+    const catalogText = await catalog.getText();
+    expect(catalogText).toContain("gpt-6-sol");
+    expect(catalogText).toContain("gpt-6-luna");
+  }).timeout(240_000);
 });
