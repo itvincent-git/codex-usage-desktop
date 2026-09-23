@@ -1,4 +1,8 @@
 {
+  "3.6.0": {
+    "zh": "- fix(tray): hide unavailable 5-hour limit\n- fix: refresh pricing for newly discovered models\n- feat: show current account details in tray menu\n- feat: show daily quota consumption percentages",
+    "en": "- fix(tray): hide unavailable 5-hour limit\n- fix: refresh pricing for newly discovered models\n- feat: show current account details in tray menu\n- feat: show daily quota consumption percentages"
+  },
   "3.5.1": {
     "zh": "- test: stabilize reset history date assertions",
     "en": "- test: stabilize reset history date assertions"
