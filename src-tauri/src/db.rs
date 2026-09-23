@@ -561,6 +561,55 @@ pub fn query_latest_update_at(db: &Connection) -> Result<Option<String>, String>
     .map_err(|error| error.to_string())
 }
 
+pub fn query_daily_quota_percents(
+    db: &Connection,
+    start_date: &str,
+    end_date: &str,
+) -> Result<BTreeMap<String, (Option<f64>, Option<f64>)>, String> {
+    let mut statement = db
+        .prepare(
+            "SELECT quota_usage_json FROM session_file_rollups WHERE quota_usage_json IS NOT NULL",
+        )
+        .map_err(|error| error.to_string())?;
+    let rollups = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| error.to_string())?;
+    let mut windows = BTreeMap::<(String, bool, Option<String>), (f64, f64)>::new();
+
+    for json in rollups {
+        let json = json.map_err(|error| error.to_string())?;
+        let Ok(rollup) = serde_json::from_str::<SessionQuotaRollup>(&json) else {
+            continue;
+        };
+        for (date, usage) in rollup.daily {
+            if date.as_str() < start_date || date.as_str() > end_date {
+                continue;
+            }
+            for (is_five_hour, group) in [(true, usage.five_hour), (false, usage.weekly)] {
+                for window in group {
+                    let entry = windows
+                        .entry((date.clone(), is_five_hour, window.resets_at))
+                        .or_insert((window.observed_start_percent, window.observed_end_percent));
+                    entry.0 = entry.0.min(window.observed_start_percent);
+                    entry.1 = entry.1.max(window.observed_end_percent);
+                }
+            }
+        }
+    }
+
+    let mut daily = BTreeMap::<String, (Option<f64>, Option<f64>)>::new();
+    for ((date, is_five_hour, _), (start, end)) in windows {
+        let entry = daily.entry(date).or_default();
+        let percent = if is_five_hour {
+            &mut entry.0
+        } else {
+            &mut entry.1
+        };
+        *percent = Some(percent.unwrap_or(0.0) + (end - start).max(0.0));
+    }
+    Ok(daily)
+}
+
 pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, String> {
     let mut statement = db
         .prepare(
@@ -673,7 +722,58 @@ pub fn query_session_details(db: &Connection) -> Result<Vec<SessionDetailRow>, S
 mod tests {
     use super::*;
     use crate::pricing::PricingSource;
+    use crate::types::SessionQuotaWindowUsage;
     use chrono::Utc;
+
+    #[test]
+    fn daily_quota_percents_merge_overlapping_sessions_and_add_reset_windows() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE session_file_rollups (quota_usage_json TEXT)")
+            .unwrap();
+        let window = |start, end, reset: &str| SessionQuotaWindowUsage {
+            window_minutes: 300,
+            resets_at: Some(reset.to_string()),
+            observed_start_at: "2026-04-02T00:00:00Z".to_string(),
+            observed_end_at: "2026-04-02T01:00:00Z".to_string(),
+            observed_start_percent: start,
+            observed_end_percent: end,
+            observed_delta_percent: end - start,
+            below_resolution: false,
+        };
+        let first = SessionQuotaRollup {
+            daily: BTreeMap::from([(
+                "2026-04-02".to_string(),
+                SessionQuotaUsage {
+                    five_hour: vec![window(10.0, 30.0, "reset-1")],
+                    weekly: vec![window(40.0, 50.0, "weekly-reset")],
+                },
+            )]),
+            ..Default::default()
+        };
+        let second = SessionQuotaRollup {
+            daily: BTreeMap::from([(
+                "2026-04-02".to_string(),
+                SessionQuotaUsage {
+                    five_hour: vec![window(25.0, 35.0, "reset-1"), window(0.0, 5.0, "reset-2")],
+                    weekly: vec![window(48.0, 55.0, "weekly-reset")],
+                },
+            )]),
+            ..Default::default()
+        };
+        for rollup in [first, second] {
+            db.execute(
+                "INSERT INTO session_file_rollups (quota_usage_json) VALUES (?)",
+                [serde_json::to_string(&rollup).unwrap()],
+            )
+            .unwrap();
+        }
+
+        let daily = query_daily_quota_percents(&db, "2026-04-02", "2026-04-02").unwrap();
+        assert_eq!(daily["2026-04-02"], (Some(30.0), Some(15.0)));
+        assert!(query_daily_quota_percents(&db, "2026-04-03", "2026-04-03")
+            .unwrap()
+            .is_empty());
+    }
 
     #[test]
     fn recalculates_existing_daily_rollup_costs_without_reparsing_sessions() {

@@ -17,6 +17,8 @@ export type OverviewResponse = {
     outputTokens: number;
     totalTokens: number;
     costUSD: number;
+    fiveHourPercent?: number | null;
+    weeklyPercent?: number | null;
   }>;
   totals: {
     inputTokens: number;

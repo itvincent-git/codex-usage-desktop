@@ -206,6 +206,7 @@
     "cols": {
       "date": "Date",
       "tokens": "Total Tokens",
+      "quota": "Quota Used",
       "cost": "Cost",
       "cache": "Cache Hit",
       "actions": "Actions"

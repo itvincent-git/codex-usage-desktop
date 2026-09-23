@@ -398,6 +398,8 @@ mod tests {
                 output_tokens: 400,
                 total_tokens: 1600,
                 cost_usd: 0.005275,
+                five_hour_percent: None,
+                weekly_percent: None,
             }],
             totals: OverviewTotals {
                 input_tokens: 1200,

@@ -23,6 +23,16 @@ describe("Codex Usage Desktop page", () => {
     expect(await forecast48h.getText()).toMatch(/^\d+\s*48h$/);
   });
 
+  it("shows five-hour and weekly consumption in daily usage", async () => {
+    await $('[data-testid="daily-nav-tab"]').click();
+    const fiveHour = $('[data-daily-row] [data-quota="fiveHour"]');
+    const weekly = $('[data-daily-row] [data-quota="weekly"]');
+    await fiveHour.waitForDisplayed({ timeout: 15_000 });
+    await expect(weekly).toBeDisplayed();
+    expect(await fiveHour.getText()).toMatch(/%|--/);
+    expect(await weekly.getText()).toMatch(/%|--/);
+  });
+
   it("opens the pricing catalog and refreshes without leaving the app unusable", async () => {
     await $('[data-testid="models-nav-tab"]').click();
     await $('[data-testid="models-catalog-tab"]').click();

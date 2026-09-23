@@ -50,6 +50,8 @@ pub struct OverviewDailyRow {
     pub total_tokens: i64,
     #[serde(rename = "costUSD")]
     pub cost_usd: f64,
+    pub five_hour_percent: Option<f64>,
+    pub weekly_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

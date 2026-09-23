@@ -35,7 +35,9 @@ function isInactiveDay(day: DailyRow) {
     day.cachedInputTokens === 0 &&
     day.outputTokens === 0 &&
     day.totalTokens === 0 &&
-    day.costUSD === 0
+    day.costUSD === 0 &&
+    day.fiveHourPercent == null &&
+    day.weeklyPercent == null
   );
 }
 
@@ -96,6 +98,12 @@ function PeakBadge({ label }: { label: string }) {
       {label}
     </span>
   );
+}
+
+function QuotaPercent({ value }: { value?: number | null }) {
+  const { t } = useTranslation();
+  if (value == null) return <span className="text-muted-foreground">--</span>;
+  return <span>{value < 0.5 ? "<1%" : `${t("sessions.quota.approx")} ${Math.round(value)}%`}</span>;
 }
 
 export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTableProps) {
@@ -185,11 +193,12 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
           <p className="px-6 py-10 text-center text-sm text-muted-foreground">{t("daily.no_data")}</p>
         ) : (
           <div className="overflow-x-auto px-4 sm:px-6">
-            <table className="min-w-[680px] w-full border-separate border-spacing-0 text-sm">
+            <table className="min-w-[800px] w-full border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   <th className="w-40 border-b border-border py-3 font-medium">{t("daily.cols.date")}</th>
                   <th className="border-b border-border px-4 py-3 font-medium">{t("daily.cols.tokens")}</th>
+                  <th className="w-36 border-b border-border px-4 py-3 font-medium">{t("daily.cols.quota")}</th>
                   <th className="w-52 border-b border-border py-3 text-right font-medium">{t("daily.cols.cost")}</th>
                 </tr>
               </thead>
@@ -206,6 +215,7 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
                       <tr key={`inactive-${row.startDate}-${row.endDate}`} className="daily-usage-row align-top">
                         <td className="border-b border-border/70 py-4 font-medium text-foreground">{dateLabel}</td>
                         <td className="border-b border-border/70 px-4 py-4"><span className="inline-flex rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{activityLabel}</span></td>
+                        <td className="border-b border-border/70 px-4 py-4 text-muted-foreground">--</td>
                         <td className="border-b border-border/70 py-4 text-right text-muted-foreground">--</td>
                       </tr>
                     );
@@ -257,6 +267,12 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
                             <span className="inline-flex items-center gap-1.5" data-metric="cachedInputTokens">{t("daily.cached_with_rate", { rate: formatPercent(cacheHitRate) })} <strong className="font-medium text-foreground">{formatNumber(day.cachedInputTokens)}</strong>{day.cachedInputTokens > 0 && day.cachedInputTokens === peaks.cachedInputTokens ? <PeakBadge label={peakLabel} /> : null}</span>
                             <span className="inline-flex items-center gap-1.5" data-metric="outputTokens">{t("daily.output")} <strong className="font-medium text-foreground">{formatNumber(day.outputTokens)}</strong>{day.outputTokens > 0 && day.outputTokens === peaks.outputTokens ? <PeakBadge label={peakLabel} /> : null}</span>
                           </div>
+                        </div>
+                      </td>
+                      <td className="border-b border-border/70 px-4 py-4 text-xs tabular-nums">
+                        <div className="space-y-1">
+                          <div data-quota="fiveHour"><span className="font-medium text-muted-foreground">{t("sessions.quota.five_hour")}</span> <QuotaPercent value={day.fiveHourPercent} /></div>
+                          <div data-quota="weekly"><span className="font-medium text-muted-foreground">{t("sessions.quota.weekly")}</span> <QuotaPercent value={day.weeklyPercent} /></div>
                         </div>
                       </td>
                       <td className="border-b border-border/70 py-4 text-right tabular-nums">

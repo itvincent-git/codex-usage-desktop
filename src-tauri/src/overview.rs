@@ -1,6 +1,6 @@
 use crate::{
     date::{date_key_in_timezone, list_date_keys, resolve_app_timezone, shift_date_key},
-    db::{query_daily_rows, query_latest_update_at},
+    db::{query_daily_quota_percents, query_daily_rows, query_latest_update_at},
     pricing::{calculate_cost_usd, PricingSource},
     types::{
         ModelUsage, MonthlyUsageResponse, MonthlyUsageRow, OverviewDailyRow, OverviewModelRow,
@@ -69,11 +69,13 @@ pub fn get_overview(
         .into_iter()
         .map(|row| (row.date.clone(), row))
         .collect::<BTreeMap<_, _>>();
+    let quota_by_date = query_daily_quota_percents(db, &start_date, &end_date)?;
 
     let daily = list_date_keys(&start_date, &end_date)?
         .into_iter()
         .map(|date| {
             let row = rows_by_date.get(&date);
+            let quota = quota_by_date.get(&date);
             OverviewDailyRow {
                 date,
                 input_tokens: row.map(|row| row.input_tokens).unwrap_or(0),
@@ -81,6 +83,8 @@ pub fn get_overview(
                 output_tokens: row.map(|row| row.output_tokens).unwrap_or(0),
                 total_tokens: row.map(|row| row.total_tokens).unwrap_or(0),
                 cost_usd: row.map(|row| row.cost_usd).unwrap_or(0.0),
+                five_hour_percent: quota.and_then(|quota| quota.0),
+                weekly_percent: quota.and_then(|quota| quota.1),
             }
         })
         .collect::<Vec<_>>();
@@ -252,6 +256,8 @@ pub fn get_project_analytics(
                 output_tokens: usage.map(|usage| usage.output_tokens).unwrap_or(0),
                 total_tokens: usage.map(|usage| usage.total_tokens).unwrap_or(0),
                 cost_usd,
+                five_hour_percent: None,
+                weekly_percent: None,
             }
         })
         .collect::<Vec<_>>();

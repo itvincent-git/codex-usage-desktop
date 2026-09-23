@@ -206,6 +206,7 @@
     "cols": {
       "date": "日期",
       "tokens": "Tokens 消耗",
+      "quota": "额度消耗",
       "cost": "成本",
       "cache": "缓存命中率",
       "actions": "操作"

@@ -44,6 +44,21 @@ beforeAll(async () => {
 });
 
 describe("DailyUsageTable", () => {
+  it("shows daily five-hour and weekly quota consumption when snapshots are available", () => {
+    render(<DailyUsageTable range="7d" daily={[
+      day("2026-04-03", { fiveHourPercent: 12.4, weeklyPercent: 0.2 }),
+      day("2026-04-02", { fiveHourPercent: null, weeklyPercent: null }),
+    ]} />);
+
+    expect(screen.getByRole("columnheader", { name: "Quota Used" })).toBeInTheDocument();
+    const withQuota = document.querySelector("[data-daily-row='2026-04-03']") as HTMLElement;
+    expect(within(withQuota.querySelector('[data-quota="fiveHour"]') as HTMLElement).getByText("Approx. 12%")).toBeInTheDocument();
+    expect(within(withQuota.querySelector('[data-quota="weekly"]') as HTMLElement).getByText("<1%")).toBeInTheDocument();
+    const withoutQuota = document.querySelector("[data-daily-row='2026-04-02']") as HTMLElement;
+    expect(withoutQuota.querySelectorAll("[data-quota]")).toHaveLength(2);
+    expect(within(withoutQuota).getAllByText("--")).toHaveLength(2);
+  });
+
   it("defaults to newest date and sorts every metric descending with newest-date tie breaking", async () => {
     const rows = [
       day("2026-04-01"),
