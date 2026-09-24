@@ -1,4 +1,8 @@
 {
+  "3.6.1": {
+    "zh": "- fix: relaunch macOS app after update\n- fix: prevent duplicate background limit fetches on Windows",
+    "en": "- fix: relaunch macOS app after update\n- fix: prevent duplicate background limit fetches on Windows"
+  },
   "3.6.0": {
     "zh": "- fix(tray): hide unavailable 5-hour limit\n- fix: refresh pricing for newly discovered models\n- feat: show current account details in tray menu\n- feat: show daily quota consumption percentages",
     "en": "- fix(tray): hide unavailable 5-hour limit\n- fix: refresh pricing for newly discovered models\n- feat: show current account details in tray menu\n- feat: show daily quota consumption percentages"
