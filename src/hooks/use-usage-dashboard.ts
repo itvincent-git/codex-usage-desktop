@@ -296,6 +296,7 @@ export function useUsageDashboard() {
 
   const hasBootstrappedRef = useRef(false);
   const lastLimitsFetchTimeRef = useRef<number>(0);
+  const limitsFetchInFlightRef = useRef(false);
   const lastAutoScanTimeRef = useRef<number>(0);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
   const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
@@ -321,6 +322,7 @@ export function useUsageDashboard() {
   });
 
   const loadCodexLimits = useEffectEvent(async (options?: { force?: boolean }) => {
+    if (limitsFetchInFlightRef.current) return;
     const now = Date.now();
     const isManual = options?.force === true;
     if (!isManual && now - lastLimitsFetchTimeRef.current < 5000) {
@@ -328,6 +330,7 @@ export function useUsageDashboard() {
     }
 
     lastLimitsFetchTimeRef.current = now;
+    limitsFetchInFlightRef.current = true;
 
     try {
       const data = await fetchCodexLimits();
@@ -335,6 +338,8 @@ export function useUsageDashboard() {
       setCodexLimitsError(null);
     } catch (limitsError) {
       setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
+    } finally {
+      limitsFetchInFlightRef.current = false;
     }
   });
 
@@ -710,6 +715,7 @@ export function useUsageDashboard() {
   useEffect(() => {
     if (!bootstrapped) return;
 
+    let cancelled = false;
     let unlistenFn: (() => void) | null = null;
 
     const setupListener = async () => {
@@ -717,7 +723,11 @@ export function useUsageDashboard() {
         const unsubscribe = await listen<UsageRefreshResponse>("background-refresh-completed", async (event) => {
           await handleBackgroundRefreshCompleted(event.payload);
         });
-        unlistenFn = unsubscribe;
+        if (cancelled) {
+          unsubscribe();
+        } else {
+          unlistenFn = unsubscribe;
+        }
       } catch (err) {
         console.error("Failed to setup background refresh listener:", err);
       }
@@ -726,11 +736,10 @@ export function useUsageDashboard() {
     void setupListener();
 
     return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
+      cancelled = true;
+      unlistenFn?.();
     };
-  }, [bootstrapped, handleBackgroundRefreshCompleted]);
+  }, [bootstrapped]);
 
   // Update tray icon whenever limits, overview, translation, or tray settings change
   useEffect(() => {

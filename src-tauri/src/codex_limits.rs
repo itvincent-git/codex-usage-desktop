@@ -148,6 +148,13 @@ struct ResetCreditsCache {
 
 static RESET_CREDITS_CACHE: OnceLock<ResetCreditsCache> = OnceLock::new();
 static WINDOW_ACTIVATION_LOCK: Mutex<()> = Mutex::new(());
+static LIMITS_FETCH_IN_FLIGHT: Mutex<Option<Arc<LimitsFetchFlight>>> = Mutex::new(None);
+
+#[derive(Default)]
+struct LimitsFetchFlight {
+    result: Mutex<Option<Result<CodexLimitsResponse, String>>>,
+    ready: Condvar,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,18 +208,66 @@ struct SubscriptionInfo {
 }
 
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
-    log::info!("Starting fetch_codex_limits...");
-    let limits =
-        fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)?;
-    #[cfg(debug_assertions)]
-    let limits = if window_activation_debug_enabled() {
-        let mut debug_limits = limits;
-        set_debug_session_window(&mut debug_limits, 0.0, Utc::now().timestamp());
-        debug_limits
-    } else {
-        limits
+    fetch_codex_limits_single_flight(|| {
+        log::info!("Starting fetch_codex_limits...");
+        let limits =
+            fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)?;
+        #[cfg(debug_assertions)]
+        let limits = if window_activation_debug_enabled() {
+            let mut debug_limits = limits;
+            set_debug_session_window(&mut debug_limits, 0.0, Utc::now().timestamp());
+            debug_limits
+        } else {
+            limits
+        };
+        Ok(limits)
+    })
+}
+
+fn fetch_codex_limits_single_flight(
+    fetch: impl FnOnce() -> Result<CodexLimitsResponse, String>,
+) -> Result<CodexLimitsResponse, String> {
+    let (flight, should_fetch) = {
+        let mut in_flight = LIMITS_FETCH_IN_FLIGHT
+            .lock()
+            .map_err(|_| "Codex limits fetch lock was poisoned.".to_string())?;
+        match in_flight.as_ref() {
+            Some(flight) => (Arc::clone(flight), false),
+            None => {
+                let flight = Arc::new(LimitsFetchFlight::default());
+                *in_flight = Some(Arc::clone(&flight));
+                (flight, true)
+            }
+        }
     };
-    Ok(limits)
+
+    if !should_fetch {
+        let mut result = flight
+            .result
+            .lock()
+            .map_err(|_| "Codex limits fetch result lock was poisoned.".to_string())?;
+        while result.is_none() {
+            result = flight
+                .ready
+                .wait(result)
+                .map_err(|_| "Codex limits fetch result lock was poisoned.".to_string())?;
+        }
+        return result.as_ref().unwrap().clone();
+    }
+
+    let result = fetch();
+    {
+        let mut stored = flight
+            .result
+            .lock()
+            .map_err(|_| "Codex limits fetch result lock was poisoned.".to_string())?;
+        *stored = Some(result.clone());
+        flight.ready.notify_all();
+    }
+    *LIMITS_FETCH_IN_FLIGHT
+        .lock()
+        .map_err(|_| "Codex limits fetch lock was poisoned.".to_string())? = None;
+    result
 }
 
 pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivationResponse, String> {
@@ -1137,6 +1192,11 @@ impl CodexRpcProcess {
     fn start(codex: CodexCommand) -> Result<Self, String> {
         let display = codex_command_display(&codex);
         let mut command = codex_process_command(&codex);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
         let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -1743,6 +1803,51 @@ fn is_executable(path: &PathBuf) -> bool {
 mod tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn concurrent_limits_fetches_share_one_result() {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let first = thread::spawn(move || {
+            fetch_codex_limits_single_flight(|| {
+                started_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+                Ok(make_response(
+                    LimitsSnapshot {
+                        primary: None,
+                        secondary: None,
+                        reset_credits_available_count: None,
+                        reset_credits: None,
+                        source: "first",
+                    },
+                    AccountSnapshot::default(),
+                ))
+            })
+        });
+        started_rx.recv().unwrap();
+
+        let second = thread::spawn(|| {
+            fetch_codex_limits_single_flight(|| Err("duplicate fetch".to_string()))
+        });
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !LIMITS_FETCH_IN_FLIGHT
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|flight| Arc::strong_count(flight) >= 3)
+        {
+            assert!(Instant::now() < deadline, "second fetch did not join");
+            thread::yield_now();
+        }
+        release_tx.send(()).unwrap();
+
+        let first_result = first.join().unwrap().unwrap();
+        assert_eq!(second.join().unwrap().unwrap(), first_result);
+        assert_eq!(first_result.source, "first");
+
+        let fresh = fetch_codex_limits_single_flight(|| Err("new fetch".to_string()));
+        assert_eq!(fresh.unwrap_err(), "new fetch");
+    }
 
     fn window(used_percent: f64, window_minutes: Option<i64>) -> RpcRateLimitWindow {
         RpcRateLimitWindow {

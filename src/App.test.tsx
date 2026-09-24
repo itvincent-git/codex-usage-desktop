@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import i18n from "./i18n";
@@ -2089,6 +2090,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(eventListeners.get("background-refresh-completed")?.length).toBeGreaterThan(0));
+    expect(eventListeners.get("background-refresh-completed")).toHaveLength(1);
     const listener = eventListeners.get("background-refresh-completed")?.[0];
     expect(listener).toBeDefined();
 
@@ -2102,10 +2104,20 @@ describe("App", () => {
           refreshedAt: "2026-06-11T06:00:00.000Z",
         },
       });
+      listener?.({
+        payload: {
+          scan: scan(0),
+          limits: null,
+          limitsError: null,
+          limitsSkipped: true,
+          refreshedAt: "2026-06-11T06:00:00.000Z",
+        },
+      });
     });
 
     await waitFor(() => {
       expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_codex_limits")).toHaveLength(2);
+      expect(eventListeners.get("background-refresh-completed")).toHaveLength(1);
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
           title: "⏱️ 100%/soon",
@@ -2115,6 +2127,28 @@ describe("App", () => {
         }),
       }));
     });
+  });
+
+  it("unsubscribes when listener setup finishes after unmount", async () => {
+    mockLoadedDashboard();
+    let finishListening: (() => void) | undefined;
+    vi.mocked(listen).mockImplementationOnce((event, callback) => {
+      const listeners = eventListeners.get(event) ?? [];
+      listeners.push(callback as (event: { payload: any }) => void);
+      eventListeners.set(event, listeners);
+      return new Promise((resolve) => {
+        finishListening = () => resolve(() => {
+          eventListeners.set(event, (eventListeners.get(event) ?? []).filter((listener) => listener !== callback));
+        });
+      });
+    });
+
+    const { unmount } = render(<App />);
+    await waitFor(() => expect(finishListening).toBeDefined());
+    unmount();
+
+    await act(async () => finishListening?.());
+    expect(eventListeners.get("background-refresh-completed")).toHaveLength(0);
   });
 
   it("resets the local cache and rebuilds usage data", async () => {
