@@ -1,4 +1,8 @@
 {
+  "3.12.0": {
+    "zh": "- feat(i18n): add Traditional Chinese support\n- docs: add Traditional Chinese README",
+    "en": "- feat(i18n): add Traditional Chinese support\n- docs: add Traditional Chinese README"
+  },
   "3.11.1": {
     "zh": "- feat: paginate project sessions within the selected date range\n- test(e2e): remove slow project details spec\n- fix(projects): align session day limit with selected range\n- feat(projects): double date range when loading more days\n- fix(tests): account for load more days in modal focus order",
     "en": "- feat: paginate project sessions within the selected date range\n- test(e2e): remove slow project details spec\n- fix(projects): align session day limit with selected range\n- feat(projects): double date range when loading more days\n- fix(tests): account for load more days in modal focus order"
