@@ -122,7 +122,7 @@ Codex Usage Desktop is designed to stay out of your way:
 - macOS menu bar / Windows system tray
 - Launch at login
 - Automatic update checks
-- English, 简体中文, and 日本語
+- English, 简体中文, 繁體中文, and 日本語
 - Windows WSL Codex session detection
 - Light and dark themes
 

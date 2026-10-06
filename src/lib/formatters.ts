@@ -13,14 +13,14 @@ const formatters = Object.fromEntries(languageCodes.map((code) => {
     currency: new Intl.NumberFormat(locale, {
       style: "currency",
       currency: "USD",
-      currencyDisplay: code === "zh" ? "narrowSymbol" : "symbol",
+      currencyDisplay: code === "zh" || code === "zh-Hant" ? "narrowSymbol" : "symbol",
       minimumFractionDigits: 2,
       maximumFractionDigits: 4,
     }),
     currencyShort: new Intl.NumberFormat(locale, {
       style: "currency",
       currency: "USD",
-      currencyDisplay: code === "zh" ? "narrowSymbol" : "symbol",
+      currencyDisplay: code === "zh" || code === "zh-Hant" ? "narrowSymbol" : "symbol",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }),
