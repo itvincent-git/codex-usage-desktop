@@ -2,7 +2,7 @@
 
 > **Codex のトークンの使い道、残りの利用枠、リセット時刻を、ひとつのローカルデスクトップアプリで把握。**
 
-**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md)
+**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md) · [繁體中文](README_zh-TW.md)
 
 ⭐ Codex Usage Desktop が役に立ったら、[プロジェクトに **Star** を付けて](https://github.com/itvincent-git/codex-usage-desktop)応援してください。
 
