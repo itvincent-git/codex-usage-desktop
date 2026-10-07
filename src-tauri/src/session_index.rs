@@ -63,7 +63,7 @@ pub fn resolve_thread_name(
     thread_name_for_path(path, names).or(fallback)
 }
 
-fn rollout_thread_id(path: &Path) -> Option<&str> {
+pub(crate) fn rollout_thread_id(path: &Path) -> Option<&str> {
     let stem = path.file_stem()?.to_str()?;
     let id = stem.get(stem.len().checked_sub(THREAD_ID_LENGTH)?..)?;
     let bytes = id.as_bytes();

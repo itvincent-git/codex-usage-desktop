@@ -14,11 +14,10 @@ use crate::{
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde_json::Value;
-#[cfg(test)]
-use std::io::{BufRead, BufReader};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     time::{Instant, SystemTime},
 };
@@ -103,28 +102,9 @@ pub(crate) fn default_codex_home() -> PathBuf {
 
 #[cfg(test)]
 fn load_token_usage_events(codex_home: Option<PathBuf>) -> Result<Vec<UsageEvent>, String> {
-    let sessions_dir = codex_home
-        .unwrap_or_else(default_codex_home)
-        .join("sessions");
-    if !sessions_dir.is_dir() {
-        return Ok(Vec::new());
-    }
-
     let mut events = Vec::new();
-    for entry in WalkDir::new(sessions_dir)
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
-            continue;
-        }
-
-        load_session_file(path, &mut events)?;
+    for file in find_session_files(codex_home)? {
+        load_session_file(&file.path, &mut events)?;
     }
 
     events.sort_by_key(|event| event.timestamp);
@@ -206,37 +186,68 @@ fn load_daily_rows(
 }
 
 fn find_session_files(codex_home: Option<PathBuf>) -> Result<Vec<SessionFile>, String> {
-    let sessions_dir = codex_home
-        .unwrap_or_else(default_codex_home)
-        .join("sessions");
-    if !sessions_dir.is_dir() {
-        return Ok(Vec::new());
-    }
-
+    let codex_home = codex_home.unwrap_or_else(default_codex_home);
     let mut files = Vec::new();
-    for entry in WalkDir::new(sessions_dir)
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        if !entry.file_type().is_file() {
+    let mut seen = BTreeSet::new();
+    // Active copies take precedence; archived rollouts can have a flat layout.
+    for directory in ["sessions", "archived_sessions"] {
+        let sessions_dir = codex_home.join(directory);
+        if !sessions_dir.is_dir() {
             continue;
         }
+        for entry in WalkDir::new(&sessions_dir)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
 
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
-            continue;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let key = session_file_id(path)
+                .map(|id| format!("id:{id}"))
+                .unwrap_or_else(|| {
+                    format!(
+                        "path:{}",
+                        path.strip_prefix(&sessions_dir).unwrap().display()
+                    )
+                });
+            if !seen.insert(key) {
+                continue;
+            }
+
+            let metadata = entry.metadata().map_err(|error| error.to_string())?;
+            files.push(SessionFile {
+                path: path.to_path_buf(),
+                cache_key: path.to_string_lossy().to_string(),
+                modified_at_ms: modified_at_ms(&metadata),
+                size_bytes: metadata.len() as i64,
+            });
         }
-
-        let metadata = entry.metadata().map_err(|error| error.to_string())?;
-        files.push(SessionFile {
-            path: path.to_path_buf(),
-            cache_key: path.to_string_lossy().to_string(),
-            modified_at_ms: modified_at_ms(&metadata),
-            size_bytes: metadata.len() as i64,
-        });
     }
 
     Ok(files)
+}
+
+fn session_file_id(path: &Path) -> Option<String> {
+    if let Some(id) = crate::session_index::rollout_thread_id(path) {
+        return Some(id.to_string());
+    }
+    let file = fs::File::open(path).ok()?;
+    let line = BufReader::new(file).lines().next()?.ok()?;
+    let entry: Value = serde_json::from_str(&line).ok()?;
+    if entry.get("type").and_then(Value::as_str) != Some("session_meta") {
+        return None;
+    }
+    entry
+        .get("payload")?
+        .get("id")?
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
 }
 
 fn modified_at_ms(metadata: &fs::Metadata) -> i64 {
@@ -1463,6 +1474,132 @@ mod tests {
 
         assert_eq!(third.metrics.files_parsed, 1);
         assert_eq!(third.metrics.files_reused, 0);
+    }
+
+    #[test]
+    fn imports_archived_sessions_without_active_sessions() {
+        let temp_dir = tempfile_dir();
+        let codex_home = temp_dir.join(".codex");
+        let archived = codex_home.join("archived_sessions").join("2026/09/01");
+        fs::create_dir_all(&archived).unwrap();
+        let path = archived.join("session.jsonl");
+        write_usage_session(&path, "archived", 1000, 300);
+        fs::write(archived.join("ignored.txt"), "not a session").unwrap();
+        let mut db = crate::db::open_database(&temp_dir.join("usage.sqlite")).unwrap();
+
+        let scan = scan_codex_usage(
+            &mut db,
+            &PricingSource::embedded(),
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let rows = crate::db::query_all_daily_rows(&db).unwrap();
+
+        assert_eq!(scan.metrics.files_scanned, 1);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].date, "2026-09-01");
+        assert_eq!(rows[0].total_tokens, 1300);
+        assert_eq!(rows[0].models["gpt-5"].total_tokens, 1300);
+        assert_eq!(rows[0].projects["/repo/alpha"].total_tokens, 1300);
+        assert!(rows[0].cost_usd > 0.0);
+        assert_eq!(crate::db::query_session_details(&db).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn preserves_usage_when_a_session_is_archived_and_reuses_its_cache() {
+        let temp_dir = tempfile_dir();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions/2026/09/01");
+        let archived = codex_home.join("archived_sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::create_dir_all(&archived).unwrap();
+        let id = "01977e3d-d9f6-72b7-93cf-f3f2f83c382c";
+        let active_path = sessions.join(format!("rollout-2026-09-01T09-00-00-{id}.jsonl"));
+        let archived_path = archived.join(format!("rollout-2026-09-01T10-00-00-{id}.jsonl"));
+        write_usage_session(&active_path, id, 1000, 300);
+        let mut db = crate::db::open_database(&temp_dir.join("usage.sqlite")).unwrap();
+        let pricing = PricingSource::embedded();
+        let scan = |db: &mut Connection| {
+            scan_codex_usage(db, &pricing, Some(codex_home.clone()), Some("UTC".into())).unwrap()
+        };
+        scan(&mut db);
+        let initial = crate::db::query_all_daily_rows(&db).unwrap().remove(0);
+
+        // An archived copy must not override the active file, even if it differs.
+        write_usage_session(&archived_path, id, 4000, 900);
+        let duplicate = scan(&mut db);
+        assert_eq!(duplicate.metrics.files_scanned, 1);
+        assert_eq!(duplicate.metrics.files_reused, 1);
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+            initial.total_tokens
+        );
+
+        fs::rename(&active_path, &archived_path).unwrap();
+        let moved = scan(&mut db);
+        let after = crate::db::query_all_daily_rows(&db).unwrap().remove(0);
+        assert_eq!(moved.metrics.files_parsed, 1);
+        assert_eq!(after.date, initial.date);
+        assert_eq!(after.input_tokens, initial.input_tokens);
+        assert_eq!(after.cached_input_tokens, initial.cached_input_tokens);
+        assert_eq!(after.output_tokens, initial.output_tokens);
+        assert_eq!(after.total_tokens, initial.total_tokens);
+        assert_eq!(after.cost_usd, initial.cost_usd);
+        assert!(
+            crate::db::query_session_rollup_record(&db, &active_path.to_string_lossy())
+                .unwrap()
+                .is_none()
+        );
+        let indexed = crate::db::query_session_details(&db).unwrap();
+        assert_eq!(indexed.len(), 1);
+        assert_eq!(indexed[0].path, archived_path.to_string_lossy());
+        let cached = scan(&mut db);
+        assert_eq!(cached.metrics.files_parsed, 0);
+        assert_eq!(cached.metrics.files_reused, 1);
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+            initial.total_tokens
+        );
+    }
+
+    #[test]
+    fn deduplicates_archived_sessions_by_metadata_with_nonstandard_filenames() {
+        let temp_dir = tempfile_dir();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions/2026/09/01");
+        let archived = codex_home.join("archived_sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::create_dir_all(&archived).unwrap();
+        write_usage_session(&sessions.join("session.jsonl"), "same-session", 1000, 300);
+        write_usage_session(&archived.join("renamed.jsonl"), "same-session", 4000, 900);
+        write_usage_session(&archived.join("session.jsonl"), "other-session", 400, 200);
+        let mut db = crate::db::open_database(&temp_dir.join("usage.sqlite")).unwrap();
+
+        let scan = scan_codex_usage(
+            &mut db,
+            &PricingSource::embedded(),
+            Some(codex_home),
+            Some("UTC".into()),
+        )
+        .unwrap();
+
+        assert_eq!(scan.metrics.files_scanned, 2);
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+            1900
+        );
+        assert_eq!(crate::db::query_session_details(&db).unwrap().len(), 2);
+    }
+
+    fn write_usage_session(path: &Path, id: &str, input: i64, output: i64) {
+        let timestamp = "2026-09-01T09:00:00.000Z";
+        let total = input + output;
+        fs::write(path, [
+            serde_json::json!({ "timestamp": timestamp, "type": "session_meta", "payload": { "id": id, "cwd": "/repo/alpha" } }).to_string(),
+            token_context(timestamp, "gpt-5"),
+            token_event(timestamp, "gpt-5", input, 0, output, total, input, 0, output, total),
+        ].join("\n")).unwrap();
     }
 
     #[test]

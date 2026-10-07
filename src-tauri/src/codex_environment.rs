@@ -73,15 +73,20 @@ fn resolve_codex_environment() -> CodexEnvironment {
 
 #[cfg(any(target_os = "windows", test))]
 pub fn has_jsonl_sessions(codex_home: &Path) -> bool {
-    let sessions = codex_home.join("sessions");
-    sessions.is_dir()
-        && WalkDir::new(sessions)
-            .into_iter()
-            .filter_map(Result::ok)
-            .any(|entry| {
-                entry.file_type().is_file()
-                    && entry.path().extension().and_then(|ext| ext.to_str()) == Some("jsonl")
-            })
+    ["sessions", "archived_sessions"]
+        .into_iter()
+        .any(|directory| {
+            let sessions = codex_home.join(directory);
+            sessions.is_dir()
+                && WalkDir::new(sessions)
+                    .into_iter()
+                    .filter_map(Result::ok)
+                    .any(|entry| {
+                        entry.file_type().is_file()
+                            && entry.path().extension().and_then(|ext| ext.to_str())
+                                == Some("jsonl")
+                    })
+        })
 }
 
 #[cfg(target_os = "windows")]
@@ -200,6 +205,17 @@ mod tests {
         assert!(!has_jsonl_sessions(&root));
         fs::create_dir_all(root.join("sessions/2026/07/22")).unwrap();
         fs::write(root.join("sessions/2026/07/22/session.jsonl"), "{}\n").unwrap();
+        assert!(has_jsonl_sessions(&root));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn detects_archived_sessions_without_active_sessions() {
+        let root = tempfile_dir();
+        fs::create_dir_all(root.join("archived_sessions")).unwrap();
+        fs::write(root.join("archived_sessions/notes.txt"), "{}\n").unwrap();
+        assert!(!has_jsonl_sessions(&root));
+        fs::write(root.join("archived_sessions/session.jsonl"), "{}\n").unwrap();
         assert!(has_jsonl_sessions(&root));
         fs::remove_dir_all(root).unwrap();
     }
