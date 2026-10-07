@@ -188,6 +188,24 @@ Codex Usage Desktop 将这些数据留在你的电脑上。
 > [!NOTE]
 > 应用不会绕过 macOS Gatekeeper。如果首次启动被系统拦截，请打开 **系统设置 → 隐私与安全性** 并允许打开。
 
+### Homebrew
+
+将本仓库添加为 tap，然后安装：
+
+```bash
+brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
+brew install --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+后续升级：
+
+```bash
+brew update
+brew upgrade --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+每次发布会自动更新 Cask 的版本号、对应版本的下载地址，以及 Apple 芯片和 Intel 安装包的校验值。普通批量 `brew upgrade` 也会包含此应用。此前 Homebrew 安装记录为 `latest` 的版本会在升级时迁移到明确版本，无需重新安装。
+
 ### 通过终端安装
 
 安装脚本会自动识别 Apple 芯片或 Intel，下载对应 DMG，并将应用复制到 `/Applications`：

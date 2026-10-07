@@ -188,6 +188,24 @@ DMG を開き、**Codex Usage Desktop** を「アプリケーション」フォ�
 > [!NOTE]
 > このアプリは macOS の Gatekeeper を無効化・回避しません。初回起動時に macOS によってブロックされた場合は、**システム設定 → プライバシーとセキュリティ**を開き、アプリの起動を許可してください。
 
+### Homebrew
+
+このリポジトリを tap として追加してからインストールします：
+
+```bash
+brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
+brew install --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+更新するには：
+
+```bash
+brew update
+brew upgrade --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+各リリースで Cask のバージョン、リリース固有のダウンロード URL、Apple Silicon と Intel 用のチェックサムが自動更新されます。通常の一括 `brew upgrade` にもこのアプリが含まれます。以前 `latest` として記録された Homebrew インストールも、更新時に番号付きバージョンへ移行するため、再インストールは不要です。
+
 ### ターミナルからインストール
 
 インストーラーが Apple Silicon または Intel を判別し、対応する DMG をダウンロードして `/Applications` にアプリをコピーします。

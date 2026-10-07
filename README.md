@@ -188,6 +188,24 @@ Open the DMG and move **Codex Usage Desktop** to Applications. You can also brow
 > [!NOTE]
 > The app does not bypass macOS Gatekeeper. If macOS blocks the first launch, open **System Settings → Privacy & Security** and allow the app.
 
+### Homebrew
+
+Add this repository as a tap and install the cask:
+
+```bash
+brew tap itvincent-git/codex-usage-desktop https://github.com/itvincent-git/codex-usage-desktop
+brew install --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+To upgrade:
+
+```bash
+brew update
+brew upgrade --cask itvincent-git/codex-usage-desktop/codex-usage-desktop
+```
+
+Each release updates the cask's version, release-specific download URL, and checksums for Apple Silicon and Intel. Ordinary bulk `brew upgrade` also includes this cask. Existing Homebrew installations recorded as `latest` migrate to the numbered version on upgrade; no reinstall is needed.
+
 ### Install from Terminal
 
 The installer detects Apple Silicon or Intel, downloads the matching DMG, and copies the app to `/Applications`:

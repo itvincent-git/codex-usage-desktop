@@ -327,3 +327,47 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false --latest
+
+  homebrew-cask:
+    name: Update Homebrew cask
+    needs: updater-manifest
+    runs-on: ubuntu-latest
+    concurrency:
+      group: homebrew-cask
+      cancel-in-progress: false
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Download released DMGs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --dir "${RUNNER_TEMP}/homebrew-assets" \
+            --pattern 'codex-usage-desktop-macos-*.dmg'
+
+      - name: Update and commit cask
+        run: |
+          set -euo pipefail
+          node scripts/update-homebrew-cask.cjs "${RELEASE_TAG}" "${RUNNER_TEMP}/homebrew-assets"
+          if git diff --quiet -- Casks/codex-usage-desktop.rb; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/codex-usage-desktop.rb
+          git commit -m "chore(homebrew): update cask to ${RELEASE_TAG#app-v}"
+          git pull --rebase origin "${DEFAULT_BRANCH}"
+          git push origin "HEAD:${DEFAULT_BRANCH}"
