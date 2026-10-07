@@ -1,4 +1,8 @@
 {
+  "3.13.0": {
+    "zh": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details",
+    "en": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details"
+  },
   "3.12.0": {
     "zh": "- feat(i18n): add Traditional Chinese support\n- docs: add Traditional Chinese README",
     "en": "- feat(i18n): add Traditional Chinese support\n- docs: add Traditional Chinese README"
