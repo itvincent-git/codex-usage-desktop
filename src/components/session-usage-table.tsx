@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 import { modelTone } from "@/lib/model-tone";
 import { SessionQuotaUsageView } from "./session-quota-usage";
+import { SessionArchivedBadge } from "./session-archived-badge";
 import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 
 type SessionDisplayRow = SessionDetailRow & {
@@ -814,6 +815,7 @@ export function SessionUsageTable({
                         <div className="session-card-summary min-w-0 space-y-1.5">
                           <div className="flex min-w-0 items-center gap-2">
                             <h3 className="truncate text-sm font-semibold leading-tight text-foreground" title={title}>{title}</h3>
+                            <SessionArchivedBadge path={session.path} />
                             {isSubagent ? (
                               <span
                                 className="shrink-0 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-1.5 py-px text-[9px] font-semibold text-indigo-400"

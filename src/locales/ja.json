@@ -504,6 +504,7 @@
     "btn_apply": "期間を適用"
   },
   "sessions": {
+    "archived": "アーカイブ済み",
     "title": "セッションの詳細",
     "subtitle": "コマンドごとの詳細な履歴、またはファイル編集履歴。",
     "search_placeholder": "パスまたはコマンドを検索...",

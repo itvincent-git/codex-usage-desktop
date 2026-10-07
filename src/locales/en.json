@@ -461,6 +461,7 @@
     "btn_apply": "Apply Range"
   },
   "sessions": {
+    "archived": "Archived",
     "title": "Session Details",
     "subtitle": "Granular command-by-command or file-edit history.",
     "search_placeholder": "Search path or command...",

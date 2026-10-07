@@ -11,6 +11,7 @@ import { fetchSessionDetail, revealInFileManager, type SessionDetailRow, type Se
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 import { SessionQuotaUsageView } from "./session-quota-usage";
+import { SessionArchivedBadge } from "./session-archived-badge";
 import { MetricBadge } from "./metric-badge";
 import { useModalFocus } from "@/hooks/use-modal-focus";
 
@@ -1268,6 +1269,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     </button>
                   )}
                 </h2>
+                <SessionArchivedBadge path={activePath} />
               </div>
             </div>
             <button

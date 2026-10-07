@@ -7,7 +7,7 @@ import type { MonthlyUsageResponse } from "../src/lib/api";
 describe("archived session usage", () => {
   const run = process.env.CODEX_USAGE_ARCHIVE_E2E === "1" ? it : it.skip;
 
-  run("preserves monthly totals after archiving and counts duplicate copies once", async () => {
+  run("shows archive status in the list and detail while preserving totals and deduplicating copies", async () => {
     const home = process.env.CODEX_HOME!;
     const sessions = join(home, "sessions", "2026", "09", "01");
     const archived = join(home, "archived_sessions");
@@ -41,19 +41,60 @@ describe("archived session usage", () => {
       await row.waitForDisplayed({ timeout: 15_000 });
       await expect(row.$('[data-metric="totalTokens"]')).toHaveText(expect.stringContaining("1,300"));
     };
+    const showSessionStatus = async (isArchived: boolean) => {
+      const tab = $('button[role="tab"]=Sessions');
+      await tab.click();
+      const card = $('[data-testid="session-card"]');
+      await card.waitForDisplayed({ timeout: 15_000 });
+      const cardBadge = card.$('[data-testid="session-archived-badge"]');
+      if (isArchived) {
+        await expect(cardBadge).toBeDisplayed();
+        await expect(cardBadge).toHaveText("Archived");
+      } else {
+        await expect(cardBadge).not.toBeExisting();
+      }
+      await card.click();
+      const dialog = $('[aria-labelledby="session-detail-title"]');
+      await dialog.waitForDisplayed();
+      const detailBadge = dialog.$('[data-testid="session-archived-badge"]');
+      if (isArchived) {
+        await expect(detailBadge).toBeDisplayed();
+        await expect(detailBadge).toHaveText("Archived");
+      } else {
+        await expect(detailBadge).not.toBeExisting();
+      }
+      await $('button=Raw JSONL').click();
+      await expect(dialog.$('pre')).toHaveText(expect.stringContaining(id));
+      await browser.keys("Escape");
+      await dialog.waitForExist({ reverse: true });
+    };
 
-    const initial = (await rescan()).monthly.find((month) => month.month === "2026-09")!;
-    expect(initial.totalTokens).toBe(1300);
-    expect(initial.costUSD).toBeGreaterThan(0);
-    await showMonthlyTotal();
+    const previousLanguage = await browser.execute(() => localStorage.getItem("language"));
+    try {
+      await browser.execute(() => localStorage.setItem("language", "en"));
 
-    copyFileSync(activePath, archivedPath);
-    expect((await rescan()).monthly.find((month) => month.month === "2026-09")!.totalTokens).toBe(1300);
+      const initial = (await rescan()).monthly.find((month) => month.month === "2026-09")!;
+      expect(initial.totalTokens).toBe(1300);
+      expect(initial.costUSD).toBeGreaterThan(0);
+      await showMonthlyTotal();
+      await showSessionStatus(false);
 
-    renameSync(activePath, archivedPath);
-    const after = (await rescan()).monthly.find((month) => month.month === "2026-09")!;
-    expect(after.totalTokens).toBe(initial.totalTokens);
-    expect(after.costUSD).toBe(initial.costUSD);
-    await showMonthlyTotal();
+      copyFileSync(activePath, archivedPath);
+      expect((await rescan()).monthly.find((month) => month.month === "2026-09")!.totalTokens).toBe(1300);
+      await showMonthlyTotal();
+      await showSessionStatus(false);
+
+      renameSync(activePath, archivedPath);
+      const after = (await rescan()).monthly.find((month) => month.month === "2026-09")!;
+      expect(after.totalTokens).toBe(initial.totalTokens);
+      expect(after.costUSD).toBe(initial.costUSD);
+      await showMonthlyTotal();
+      await showSessionStatus(true);
+    } finally {
+      await browser.execute((language) => {
+        if (language === null) localStorage.removeItem("language");
+        else localStorage.setItem("language", language);
+      }, previousLanguage);
+    }
   }).timeout(180_000);
 });

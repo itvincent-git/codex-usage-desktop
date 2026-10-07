@@ -461,6 +461,7 @@
     "btn_apply": "套用範圍"
   },
   "sessions": {
+    "archived": "已封存",
     "title": "工作階段日誌明細",
     "subtitle": "逐條命令或檔案編輯的詳細歷史記錄。",
     "search_placeholder": "搜尋專案路徑、檔案名或命令...",

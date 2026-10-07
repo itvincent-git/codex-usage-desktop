@@ -461,6 +461,7 @@
     "btn_apply": "应用范围"
   },
   "sessions": {
+    "archived": "已归档",
     "title": "会话日志明细",
     "subtitle": "逐条命令或文件编辑的详细历史记录。",
     "search_placeholder": "搜索项目路径、文件名或命令...",
