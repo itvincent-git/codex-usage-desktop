@@ -1,4 +1,8 @@
 {
+  "3.13.1": {
+    "zh": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details\n- fix(homebrew): handle CRLF line endings in cask updates",
+    "en": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details\n- fix(homebrew): handle CRLF line endings in cask updates"
+  },
   "3.13.0": {
     "zh": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details",
     "en": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details"
