@@ -31,7 +31,7 @@ test('migrates a latest cask to a numbered release with checksums for both DMGs'
   const cask = fixture(t);
   const original = cask.read()
     .replace(/^  version .*$/m, '  version :latest')
-    .replace(/^  sha256 .*\n +intel: .*$/m, '  sha256 :no_check')
+    .replace(/^  sha256 .*\r?\n +intel: .*$/m, '  sha256 :no_check')
     .replace('releases/download/app-v#{version}/', 'releases/latest/download/');
   cask.write(original);
   const result = cask.update('app-v3.12.0');
@@ -58,6 +58,22 @@ test('updates numbered releases, compares versions numerically, and is idempoten
   const updated = cask.read();
   assert.equal(cask.update('app-v3.10.0').status, 0);
   assert.equal(cask.read(), updated);
+});
+
+test('updates checksums in CRLF casks while preserving line endings', t => {
+  const cask = fixture(t);
+  const original = cask.read().replace(/\r?\n/g, '\r\n')
+    .replace(/^  version .*$/m, '  version "3.9.0"');
+  cask.write(original);
+  const result = cask.update('app-v3.10.0');
+  assert.equal(result.status, 0, result.stderr);
+  const expected = original
+    .replace('version "3.9.0"', 'version "3.10.0"')
+    .replace(/arm: +"[a-f0-9]{64}"/, `arm:   "${createHash('sha256').update('arm64').digest('hex')}"`)
+    .replace(/intel: "[a-f0-9]{64}"/, `intel: "${createHash('sha256').update('x64').digest('hex')}"`);
+  assert.equal(cask.read(), expected);
+  assert.equal(cask.update('app-v3.10.0').status, 0);
+  assert.equal(cask.read(), expected);
 });
 
 test('does not downgrade the cask when an older release is rerun', t => {

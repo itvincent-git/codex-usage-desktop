@@ -12,6 +12,7 @@ if (process.argv.length !== 4 || !match || !assetsDirectory) {
 const version = match[1];
 const caskPath = path.join(__dirname, '..', 'Casks', 'codex-usage-desktop.rb');
 const cask = fs.readFileSync(caskPath, 'utf8');
+const newline = cask.includes('\r\n') ? '\r\n' : '\n';
 const currentVersion = /^  version "(\d+\.\d+\.\d+)"$/m.exec(cask)?.[1];
 if (currentVersion) {
   const current = currentVersion.split('.').map(Number);
@@ -30,8 +31,8 @@ function checksum(architecture) {
 
 const updated = cask
   .replace(/^  version (?:"\d+\.\d+\.\d+"|:latest)$/m, `  version "${version}"`)
-  .replace(/^  sha256 (?::no_check|arm: +"[a-f0-9]{64}",\n +intel: "[a-f0-9]{64}")$/m,
-    `  sha256 arm:   "${checksum('arm64')}",\n         intel: "${checksum('x64')}"`)
+  .replace(/^  sha256 (?::no_check|arm: +"[a-f0-9]{64}",\r?\n +intel: "[a-f0-9]{64}")$/m,
+    `  sha256 arm:   "${checksum('arm64')}",${newline}         intel: "${checksum('x64')}"`)
   .replace(/releases\/(?:latest\/download|download\/app-v#\{version\})\//,
     'releases/download/app-v#{version}/');
 
