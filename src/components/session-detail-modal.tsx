@@ -637,9 +637,13 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
 
           return (
             <section key={question.id} className="py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{question.header}</div>
-              <div className="mt-1 text-sm font-semibold text-foreground">{question.question}</div>
-              <ol className="mt-3 space-y-2">
+              {question.header ? <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{question.header}</div> : null}
+              <div className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
+                <Suspense fallback={question.question}>
+                  <MarkdownContent content={question.question} />
+                </Suspense>
+              </div>
+              {question.options.length > 0 ? <ol className="mt-3 space-y-2">
                 {question.options.map((option, index) => {
                   const isSelected = selectedAnswers.includes(option.label);
                   return (
@@ -652,12 +656,12 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-medium text-foreground">{option.label}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{option.description}</span>
+                        {option.description ? <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{option.description}</span> : null}
                       </span>
                     </li>
                   );
                 })}
-              </ol>
+              </ol> : null}
               {customAnswers.map((answer) => (
                 <div key={answer} className="mt-2 flex gap-3 rounded-md border border-primary/50 bg-primary/10 px-3 py-2">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground">

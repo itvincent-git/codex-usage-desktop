@@ -7,6 +7,53 @@ import { buildConversation } from "@/lib/session-conversation";
 import type { SessionReplayDetail } from "@/lib/api";
 import { ConversationItem } from "./session-detail-modal";
 
+it("renders async user input titles and optional string choices as readable questions", async () => {
+  await i18n.changeLanguage("en");
+  const title = "当前代码的足球首页路径是 `/`（`/football` 已不再是首页路由）。这次我会测足球首页以及英超、曼城、一个有完整数据的球员详情页；如果你说的 `/football` 是比赛详情页，或有出现 250ms 的具体 URL、日志和机器配置，请补充。";
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [{
+      kind: "toolCall", callId: "call_c1b878e6c86d4fcea9d32aeab086ca8a", name: "request_user_input_async", status: "completed",
+      arguments: JSON.stringify({ questions: [{ title }, { title: "Which **page**?", options: ["Home", "Team"] }] }),
+      output: '{"accepted":true}', stderr: null, startedAt: null, completedAt: null, durationMs: 17, isError: false,
+      rawJsonlLineNumbers: [1],
+    }],
+  };
+  render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={['{"type":"function_call"}']} />);
+
+  expect(screen.getByText("User input request")).toBeInTheDocument();
+  expect((await screen.findAllByText("/football", {}, { timeout: 3000 }))[0].tagName).toBe("CODE");
+  expect(screen.getByText("page").tagName).toBe("STRONG");
+  expect(screen.getByText("Home")).toBeInTheDocument();
+  expect(screen.getByText("Team")).toBeInTheDocument();
+  expect(screen.getAllByRole("list")).toHaveLength(1);
+  expect(screen.queryByText(/accepted/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/request_user_input_async/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "View raw JSONL" }));
+  expect(screen.getByText('{"type":"function_call"}')).toBeInTheDocument();
+});
+
+it("preserves synchronous user input options and selected or custom answers", async () => {
+  await i18n.changeLanguage("en");
+  const turn: SessionReplayDetail["turns"][number] = {
+    turnId: "1", startedAt: null, completedAt: null, durationMs: null,
+    systemMessages: [], userMessages: [], assistantMessages: [], reasoningSummaries: [],
+    toolCalls: [], patchResults: [], tokenEvents: [], errors: [], items: [{
+      kind: "toolCall", callId: "sync", name: "request_user_input", status: "completed",
+      arguments: JSON.stringify({ questions: [{ header: "Scope", id: "scope", question: "Which page?", options: [{ label: "Home", description: "Test the homepage" }] }] }),
+      output: JSON.stringify({ answers: { scope: { answers: ["Home", "Also test the team page"] } } }),
+      stderr: null, startedAt: null, completedAt: null, durationMs: 100, isError: false,
+    }],
+  };
+  render(<ConversationItem block={buildConversation(turn)[0]} rawJsonlLines={[]} />);
+  expect(screen.getByText("Scope")).toBeInTheDocument();
+  expect(await screen.findByText("Which page?")).toBeInTheDocument();
+  expect(screen.getByText("Test the homepage")).toBeInTheDocument();
+  expect(screen.getByText("Home").closest("li")).toHaveClass("border-primary/50");
+  expect(screen.getByText("Also test the team page")).toBeInTheDocument();
+});
+
 it("uses distinct card backgrounds and borders for conversation item types", async () => {
   await i18n.changeLanguage("en");
   const turn: SessionReplayDetail["turns"][number] = {

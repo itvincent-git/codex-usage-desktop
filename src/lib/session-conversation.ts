@@ -563,12 +563,29 @@ export function processSignal(output: string | null) {
 }
 
 
-function parseUserInputQuestions(argumentsJson: string | null): UserInputQuestion[] | null {
+function parseUserInputQuestions(argumentsJson: string | null, isAsync: boolean): UserInputQuestion[] | null {
   if (!argumentsJson) return null;
 
   try {
     const parsed = JSON.parse(argumentsJson) as { questions?: unknown };
     if (!Array.isArray(parsed.questions)) return null;
+
+    if (isAsync) {
+      const questions = parsed.questions.flatMap((question, index): UserInputQuestion[] => {
+        if (!question || typeof question !== "object") return [];
+        const value = question as { title?: unknown; options?: unknown };
+        if (typeof value.title !== "string"
+          || (value.options !== undefined && (!Array.isArray(value.options)
+            || !value.options.every((option) => typeof option === "string")))) return [];
+        return [{
+          header: "",
+          id: `async-question-${index}`,
+          question: value.title,
+          options: ((value.options ?? []) as string[]).map((label) => ({ label, description: "" })),
+        }];
+      });
+      return questions.length > 0 ? questions : null;
+    }
 
     const questions = parsed.questions.filter((question): question is UserInputQuestion => {
       if (!question || typeof question !== "object") return false;
@@ -614,7 +631,8 @@ function buildToolActivity(item: Extract<ReplayItem, { kind: "toolCall" }>) {
   const toolName = nestedWriteStdinArguments ? "write_stdin" : outerToolName;
   const parsedArguments = nestedWriteStdinArguments ?? parseJsonObject(item.arguments);
   const backgroundTerminalInput = parseBackgroundTerminalInput(item.arguments, outerToolName, parsedArguments);
-  const userInputQuestions = toolName === "request_user_input" ? parseUserInputQuestions(item.arguments) : null;
+  const userInputQuestions = toolName === "request_user_input" || toolName === "request_user_input_async"
+    ? parseUserInputQuestions(item.arguments, toolName === "request_user_input_async") : null;
   const isExec = EXEC_TOOL_NAMES.has(outerToolName);
   const webSearchQueries = isExec
     ? parseWebSearchQueries(item.arguments)
