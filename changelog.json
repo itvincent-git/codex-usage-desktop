@@ -1,4 +1,8 @@
 {
+  "3.13.2": {
+    "zh": "- chore(homebrew): update cask to 3.13.1\n- fix(limits): support current Codex CLI approval policy on all platforms\n- fix: render asynchronous user input requests in session details",
+    "en": "- chore(homebrew): update cask to 3.13.1\n- fix(limits): support current Codex CLI approval policy on all platforms\n- fix: render asynchronous user input requests in session details"
+  },
   "3.13.1": {
     "zh": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details\n- fix(homebrew): handle CRLF line endings in cask updates",
     "en": "- feat(homebrew): automate versioned cask updates\n- fix(scanner): preserve usage from archived Codex sessions\n- feat: display archived session status in lists and details\n- fix(homebrew): handle CRLF line endings in cask updates"
