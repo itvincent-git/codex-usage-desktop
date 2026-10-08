@@ -1395,7 +1395,7 @@ fn codex_app_server_args() -> [&'static str; 7] {
         "-s",
         "read-only",
         "-a",
-        "untrusted",
+        "never",
         "app-server",
     ]
 }
@@ -1947,7 +1947,7 @@ mod tests {
     }
 
     #[test]
-    fn app_server_args_disable_mcp_config_for_limits_rpc() {
+    fn app_server_args_use_supported_read_only_policy_for_limits_rpc() {
         assert_eq!(
             codex_app_server_args(),
             [
@@ -1956,7 +1956,7 @@ mod tests {
                 "-s",
                 "read-only",
                 "-a",
-                "untrusted",
+                "never",
                 "app-server",
             ]
         );
