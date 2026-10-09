@@ -4,7 +4,7 @@ import {
   type ConversationBlock, type DisplayTokenUsageItem, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCw, MessageSquare, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCcw, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, rescanSession, revealInFileManager, type ScanResponse, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -1327,8 +1327,8 @@ export function SessionDetailModal({ session, onClose, onScanComplete }: Session
               {t("sessions.detail.details")}
               {showDetails ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
-            <Button variant="secondary" size="sm" onClick={() => void refreshSession()} disabled={refreshing || !detail} aria-busy={refreshing}>
-              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            <Button variant="primary" size="sm" onClick={() => void refreshSession()} disabled={refreshing || !detail} aria-busy={refreshing}>
+              <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               {t("sessions.detail.refresh")}
             </Button>
             <nav className="flex shrink-0 items-center rounded-md bg-muted/70 p-0.5">

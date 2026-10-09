@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ArrowRight, Coins, Database, Folder, RefreshCw, Search, Terminal, X } from "lucide-react";
+import { ArrowRight, Coins, Database, Folder, RefreshCcw, Search, Terminal, X } from "lucide-react";
 import { Area, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   fetchProjectAnalytics,
@@ -203,7 +203,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
           </div>
           <p className="truncate font-mono text-[10px] text-muted-foreground" title={project.project}>{project.project}</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => void reloadProjectData(true)} disabled={refreshing || loadingMore || sessionsLoading || analyticsLoading} aria-busy={refreshing}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{t("project_modal.refresh")}</Button>
+        <Button variant="primary" size="sm" onClick={() => void reloadProjectData(true)} disabled={refreshing || loadingMore || sessionsLoading || analyticsLoading} aria-busy={refreshing}><RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{t("project_modal.refresh")}</Button>
         <Button variant="secondary" size="sm" className="shrink-0 text-xs" onClick={() => onGoToSessions(project.project)}>{t("project_modal.view_in_sessions_tab")}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
         <Button ref={closeButtonRef} variant="secondary" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t("project_modal.close_aria")}><X className="h-4 w-4" /></Button>
       </div>
