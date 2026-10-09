@@ -40,12 +40,12 @@ describe("project day quota summary", () => {
       await expect(summary).toHaveText(expect.stringContaining("周 使用了"));
       expect(await group.getText()).not.toContain("当天额度消耗");
       await expect(group.$$('[data-testid="day-quota-summary"]')).toBeElementsArrayOfSize(1);
-      const layout = await toggle.execute((header) => {
+      const layout = await browser.execute((header) => {
         const date = header.firstElementChild!.getBoundingClientRect();
         const quota = header.querySelector('[data-testid="day-quota-summary"]')!.getBoundingClientRect();
         const totals = header.lastElementChild!.lastElementChild!.getBoundingClientRect();
         return { between: quota.left >= date.right && quota.right <= totals.left, sameLine: quota.top < date.bottom && quota.bottom > date.top };
-      });
+      }, await toggle);
       expect(layout.between).toBe(true);
       expect(layout.sameLine).toBe(true);
       await group.$('[data-testid="session-card"]').waitForDisplayed();
