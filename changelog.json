@@ -1,4 +1,8 @@
 {
+  "3.14.0": {
+    "zh": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header",
+    "en": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header"
+  },
   "3.13.2": {
     "zh": "- chore(homebrew): update cask to 3.13.1\n- fix(limits): support current Codex CLI approval policy on all platforms\n- fix: render asynchronous user input requests in session details",
     "en": "- chore(homebrew): update cask to 3.13.1\n- fix(limits): support current Codex CLI approval policy on all platforms\n- fix: render asynchronous user input requests in session details"
