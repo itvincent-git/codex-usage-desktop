@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { fetchProjectDaySessions, type ProjectSessionDay, type RangeKey, type SessionDetailRow } from "@/lib/api";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
-import { SessionUsageTable } from "./session-usage-table";
+import { SessionDayQuotaSummary, SessionUsageTable } from "./session-usage-table";
 
 type ProjectSessionDayProps = {
   day: ProjectSessionDay;
@@ -48,9 +48,12 @@ export function ProjectSessionDayView({ day, project, range, query, initiallyExp
         <span className="font-bold">{dayjs(day.date).format("YYYY-MM-DD (dddd)")}</span>
         <span className="rounded bg-muted/80 px-2 py-0.5 text-xs text-muted-foreground">{t("sessions.count_sessions", { count: day.sessionCount })}</span>
       </span>
-      <span className="flex gap-4 text-sm tabular-nums">
-        <span>{formatNumber(day.totalTokens)} <span className="text-xs text-muted-foreground">{t("project_modal.total_tokens")}</span></span>
-        <span>{formatCurrency(day.costUSD)}</span>
+      <span className="ml-auto flex flex-wrap items-center justify-end gap-x-8 gap-y-2">
+        {sessions ? <SessionDayQuotaSummary sessions={sessions.flatMap((session) => session.dailyUsage)} showLabel={false} /> : null}
+        <span className="flex gap-4 text-sm tabular-nums">
+          <span>{formatNumber(day.totalTokens)} <span className="text-xs text-muted-foreground">{t("project_modal.total_tokens")}</span></span>
+          <span>{formatCurrency(day.costUSD)}</span>
+        </span>
       </span>
     </button>
     <div id={`project-day-${day.date}`} hidden={!expanded}>

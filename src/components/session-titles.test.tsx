@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
-import { SessionUsageTable } from "./session-usage-table";
+import { SessionDayQuotaSummary, SessionUsageTable } from "./session-usage-table";
 import type { SessionDetailRow, SessionReplayDetail } from "@/lib/api";
 import i18n from "@/i18n";
 
@@ -108,7 +108,10 @@ describe("session daily usage", () => {
       observedStartAt: "2026-07-14T23:00:00Z", observedEndAt: "2026-07-15T08:00:00Z",
       observedStartPercent: 31, observedEndPercent: 37, observedDeltaPercent: 6, belowResolution: false,
     }] };
-    render(<SessionUsageTable sessions={[row]} selectedProject="/repo/app" embedded projectDay />);
+    render(<>
+      <SessionDayQuotaSummary sessions={row.dailyUsage} showLabel={false} />
+      <SessionUsageTable sessions={[row]} selectedProject="/repo/app" embedded projectDay />
+    </>);
     expect(screen.getByTestId("day-quota-summary")).toHaveTextContent("Weekly Used Approx. 6% • 69% → 63%");
     expect(parse).not.toHaveBeenCalled();
   });

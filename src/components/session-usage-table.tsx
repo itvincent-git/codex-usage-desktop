@@ -237,7 +237,7 @@ function rebaseQuotaUsage(sessions: SessionDisplayRow[]) {
   } : session);
 }
 
-function summarizeQuotaUsage(sessions: SessionDisplayRow[], key: "fiveHour" | "weekly") {
+function summarizeQuotaUsage(sessions: Pick<SessionDetailRow, "quotaUsage">[], key: "fiveHour" | "weekly") {
   let observedDeltaPercent = 0;
   let hasBelowResolutionUsage = false;
   let hasUsage = false;
@@ -285,6 +285,37 @@ function formatQuotaRemainingRange(total: ReturnType<typeof summarizeQuotaUsage>
   const start = Math.min(Math.max(100 - total.observedStartPercent, 0), 100);
   const end = Math.min(Math.max(100 - total.observedEndPercent, 0), 100);
   return `${Math.round(start)}% → ${Math.round(end)}%`;
+}
+
+export function SessionDayQuotaSummary({ sessions, showLabel = true }: {
+  sessions: Pick<SessionDetailRow, "quotaUsage">[];
+  showLabel?: boolean;
+}) {
+  const { t } = useTranslation();
+  const fiveHour = summarizeQuotaUsage(sessions, "fiveHour");
+  const weekly = summarizeQuotaUsage(sessions, "weekly");
+  if (!fiveHour.hasUsage && !weekly.hasUsage) return null;
+  const formatQuota = (quota: ReturnType<typeof summarizeQuotaUsage>) => quota.hasUsage
+    ? t("sessions.quota.used_and_remaining_change", {
+        usage: formatQuotaTotal(quota, t("sessions.quota.approx")),
+        remaining: formatQuotaRemainingRange(quota),
+      })
+    : "--";
+  const fiveHourQuota = formatQuota(fiveHour);
+  const weeklyQuota = formatQuota(weekly);
+
+  return <span
+    data-testid="day-quota-summary"
+    className="block space-y-1 text-right text-xs tabular-nums"
+    aria-label={t("sessions.quota.day_usage_label", { fiveHour: fiveHourQuota, weekly: weeklyQuota })}
+    title={t("sessions.quota.day_caveat")}
+  >
+    {showLabel ? <span className="block text-muted-foreground">{t("sessions.quota.day_consumed")}</span> : null}
+    <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 font-semibold text-foreground">
+      <span><span className="text-muted-foreground">{t("sessions.quota.five_hour")}</span> {fiveHourQuota}</span>
+      <span><span className="text-muted-foreground">{t("sessions.quota.weekly")}</span> {weeklyQuota}</span>
+    </span>
+  </span>;
 }
 
 function costTone(cost: number, maxCost: number) {
@@ -396,8 +427,6 @@ export function SessionUsageTable({
         const cachedInputTokens = sortedItems.reduce((sum, item) => sum + item.cachedInputTokens, 0);
         const outputTokens = sortedItems.reduce((sum, item) => sum + item.outputTokens, 0);
         const costUSD = sortedItems.reduce((sum, item) => sum + item.costUSD, 0);
-        const fiveHourQuota = summarizeQuotaUsage(sortedItems, "fiveHour");
-        const weeklyQuota = summarizeQuotaUsage(sortedItems, "weekly");
         
         // Find all unique models and projects used on this date
         const models = Array.from(new Set(sortedItems.flatMap(item => item.models || [])));
@@ -412,8 +441,6 @@ export function SessionUsageTable({
           cachedInputTokens,
           outputTokens,
           costUSD,
-          fiveHourQuota,
-          weeklyQuota,
           models,
           projects,
         };
@@ -547,37 +574,6 @@ export function SessionUsageTable({
           const groupTokenBarWidth = `${Math.max((group.totalTokens / maxGroupTokens) * 100, 6)}%`;
           const groupCostHeat = maxGroupCost > 0 ? group.costUSD / maxGroupCost : 0;
           const groupCostHeatAlpha = 0.08 + groupCostHeat * 0.22;
-          const fiveHourQuota = group.fiveHourQuota.hasUsage
-            ? t("sessions.quota.used_and_remaining_change", {
-                usage: formatQuotaTotal(group.fiveHourQuota, t("sessions.quota.approx")),
-                remaining: formatQuotaRemainingRange(group.fiveHourQuota),
-              })
-            : "--";
-          const weeklyQuota = group.weeklyQuota.hasUsage
-            ? t("sessions.quota.used_and_remaining_change", {
-                usage: formatQuotaTotal(group.weeklyQuota, t("sessions.quota.approx")),
-                remaining: formatQuotaRemainingRange(group.weeklyQuota),
-              })
-            : "--";
-          const hasQuotaUsage = group.fiveHourQuota.hasUsage || group.weeklyQuota.hasUsage;
-
-          const quotaSummary = hasQuotaUsage ? (
-            <div
-              data-testid="day-quota-summary"
-              className="space-y-1 text-right text-xs tabular-nums"
-              aria-label={t("sessions.quota.day_usage_label", {
-                fiveHour: fiveHourQuota,
-                weekly: weeklyQuota,
-              })}
-              title={t("sessions.quota.day_caveat")}
-            >
-              <div className="text-muted-foreground">{t("sessions.quota.day_consumed")}</div>
-              <div className="flex items-center justify-end gap-3 font-semibold text-foreground">
-                <span><span className="text-muted-foreground">{t("sessions.quota.five_hour")}</span> {fiveHourQuota}</span>
-                <span><span className="text-muted-foreground">{t("sessions.quota.weekly")}</span> {weeklyQuota}</span>
-              </div>
-            </div>
-          ) : null;
 
           return (
             <div
@@ -628,7 +624,7 @@ export function SessionUsageTable({
 
                 {/* Right Section: Day summary totals */}
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                  {quotaSummary}
+                  <SessionDayQuotaSummary sessions={group.sessions} />
 
                   {/* Day total tokens indicator */}
                   {group.totalTokens > 0 ? (
@@ -669,7 +665,6 @@ export function SessionUsageTable({
               {/* Accordion Content: compact session cards for this date */}
               {!collapsed && (
                 <div className="space-y-2 border-t border-border/40 bg-black/[0.04] px-3 py-3 dark:bg-black/[0.08] sm:px-4">
-                  {projectDay ? quotaSummary : null}
                   {group.agentGroups.slice(0, visibleGroupCounts[group.date] ?? agentGroupPageSize ?? group.agentGroups.length).map((agentGroup) => {
                     const groupKey = `${group.date}:${agentGroup.key}`;
                     const hasSubagents = agentGroup.sessions.length > 1;
