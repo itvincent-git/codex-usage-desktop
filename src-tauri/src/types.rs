@@ -653,3 +653,11 @@ mod tests {
         assert!(value.get("raw_jsonl_line_numbers").is_none());
     }
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRescanResponse {
+    pub scan: ScanResponse,
+    pub session: SessionDetailRow,
+    pub detail: SessionReplayDetail,
+}

@@ -214,3 +214,106 @@ describe("project session pagination", () => {
     expect(attempts).toBe(2);
   });
 });
+
+
+describe("project refresh", () => {
+  beforeEach(async () => { invoke.mockReset(); await i18n.changeLanguage("en"); });
+
+  it("retains search, extended range, expanded dates and scroll while invalidating day caches", async () => {
+    let complete!: (value: unknown) => void;
+    let refreshed = false;
+    invoke.mockImplementation(async (command: string, args: any) => {
+      if (command === "rescan_project") return new Promise((resolve) => { complete = resolve; });
+      if (command === "fetch_project_analytics") return analytics(args.range, args.range.includes("06-21") ? "2026-06-21" : "2026-07-01");
+      if (command === "fetch_project_session_days") return response(["2026-07-10", "2026-07-09", "2026-07-08"], args.range.includes("06-21") ? "2026-06-21" : "2026-07-01");
+      if (command === "fetch_project_day_sessions") return [session(args.date, refreshed ? 99 : 0)];
+      throw new Error(command);
+    });
+    const { container } = renderModal();
+    await screen.findByText("Task 0");
+    await userEvent.click(screen.getByRole("button", { name: "Load more days" }));
+    await waitFor(() => expect(screen.getByTestId("project-modal-header")).toHaveTextContent("2026-06-21"));
+    const search = screen.getByRole("textbox", { name: "Search project sessions" });
+    await userEvent.type(search, "task");
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("fetch_project_session_days", { project: project.project, range: "custom:2026-06-21_2026-07-10", query: "task", before: null }));
+    await screen.findByText("Task 0");
+    const first = container.querySelector("#date-group-2026-07-10")!;
+    const second = container.querySelector("#date-group-2026-07-09")!;
+    const third = container.querySelector("#date-group-2026-07-08")!;
+    const toggle = (element: Element) => within(element as HTMLElement).getAllByRole("button")[0];
+    await userEvent.click(toggle(second));
+    await userEvent.click(toggle(third));
+    await waitFor(() => expect(within(third as HTMLElement).getByText("Task 0")).toBeInTheDocument());
+    await userEvent.click(toggle(third));
+    const scroll = screen.getByTestId("project-modal-scroll");
+    scroll.scrollTop = 234;
+    invoke.mockClear();
+    const refresh = screen.getByRole("button", { name: "Refresh project sessions" });
+    await userEvent.click(refresh);
+    expect(refresh).toBeDisabled();
+    expect(refresh).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByText("Task 0").length).toBeGreaterThan(0);
+    refreshed = true;
+    await act(async () => complete({ importedDays: 1, scannedAt: "now", timezone: "UTC" }));
+    await screen.findAllByText("Task 99");
+    expect(container.querySelector("#date-group-2026-07-10")).toBe(first);
+    expect(toggle(first)).toHaveAttribute("aria-expanded", "true");
+    expect(toggle(second)).toHaveAttribute("aria-expanded", "true");
+    expect(toggle(third)).toHaveAttribute("aria-expanded", "false");
+    expect(scroll.scrollTop).toBe(234);
+    expect(search).toHaveValue("task");
+    expect(invoke).toHaveBeenCalledWith("fetch_project_analytics", { project: project.project, range: "custom:2026-06-21_2026-07-10" });
+    expect(invoke.mock.calls.filter(([command]) => command === "fetch_project_day_sessions")).toHaveLength(2);
+    await userEvent.click(toggle(third));
+    await waitFor(() => expect(invoke.mock.calls.filter(([command]) => command === "fetch_project_day_sessions")).toHaveLength(3));
+  });
+
+  it("retains data after failure, allows retry and discards results after the search changes", async () => {
+    let complete!: (value: unknown) => void;
+    let attempts = 0;
+    invoke.mockImplementation(async (command: string, args: any) => {
+      if (command === "rescan_project") {
+        if (++attempts === 1) throw new Error("cannot read logs");
+        return new Promise((resolve) => { complete = resolve; });
+      }
+      if (command === "fetch_project_analytics") return analytics(args.range);
+      if (command === "fetch_project_session_days") return response([args.query ? "2026-07-09" : "2026-07-10"]);
+      if (command === "fetch_project_day_sessions") return [session(args.date)];
+      throw new Error(command);
+    });
+    renderModal();
+    await screen.findByText("Task 0");
+    const refresh = screen.getByRole("button", { name: "Refresh project sessions" });
+    await userEvent.click(refresh);
+    expect(await screen.findByRole("alert")).toHaveTextContent("cannot read logs");
+    expect(screen.getByText("Task 0")).toBeInTheDocument();
+    await userEvent.click(refresh);
+    fireEvent.change(screen.getByRole("textbox", { name: "Search project sessions" }), { target: { value: "new" } });
+    await waitFor(() => expect(document.getElementById("date-group-2026-07-09")).toBeInTheDocument());
+    invoke.mockClear();
+    await act(async () => complete({ importedDays: 1, scannedAt: "now", timezone: "UTC" }));
+    expect(document.getElementById("date-group-2026-07-10")).not.toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "fetch_project_session_days")).toHaveLength(0);
+  });
+
+  it("reloads stale project data on return from session detail without remounting dates", async () => {
+    let refreshed = false;
+    invoke.mockImplementation(async (command: string, args: any) => {
+      if (command === "fetch_project_analytics") return analytics(args.range);
+      if (command === "fetch_project_session_days") return response(["2026-07-10"]);
+      if (command === "fetch_project_day_sessions") return [session(args.date, refreshed ? 99 : 0)];
+      throw new Error(command);
+    });
+    const props = { project, range: "custom:2026-07-01_2026-07-10", onClose: vi.fn(), onGoToSessions: vi.fn() };
+    const { rerender } = render(<ProjectSessionsModal {...props} />);
+    await screen.findByText("Task 0");
+    const first = document.getElementById("date-group-2026-07-10");
+    rerender(<ProjectSessionsModal {...props} isActive={false} dataRevision={1} />);
+    refreshed = true;
+    invoke.mockClear();
+    expect(invoke).not.toHaveBeenCalled();
+    rerender(<ProjectSessionsModal {...props} isActive dataRevision={1} />);
+    await screen.findByText("Task 99");
+    expect(document.getElementById("date-group-2026-07-10")).toBe(first);
+  });
+});

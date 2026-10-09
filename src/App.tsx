@@ -37,6 +37,7 @@ export default function App() {
     costUSD: number;
   } | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const [projectDataRevision, setProjectDataRevision] = useState(0);
   const [selectedSession, setSelectedSession] = useState<SessionDetailRow | null>(null);
   const [isResetHistoryOpen, setIsResetHistoryOpen] = useState(false);
   const {
@@ -80,6 +81,7 @@ export default function App() {
     handleViewChange,
     handleRangeChange,
     handlePricingRefreshed,
+    handleLocalScanComplete,
     handleRefresh,
     handleLimitsRefresh,
     handleActivateCodexWindow,
@@ -453,6 +455,8 @@ export default function App() {
           range={range}
           onSessionClick={setSelectedSession}
           isActive={!selectedSession && !isResetHistoryOpen}
+          dataRevision={projectDataRevision}
+          onScanComplete={handleLocalScanComplete}
           onClose={() => setSelectedProjectForModal(null)}
           onGoToSessions={(projectPath) => {
             setSelectedProjectForModal(null);
@@ -465,6 +469,10 @@ export default function App() {
       {selectedSession && (
         <SessionDetailModal
           session={selectedSession}
+          onScanComplete={async (session, previousPath, scan) => {
+            setProjectDataRevision((value) => value + 1);
+            await handleLocalScanComplete(scan, session, previousPath);
+          }}
           onClose={() => setSelectedSession(null)}
         />
       )}

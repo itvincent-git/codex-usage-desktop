@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
 import { SessionDetailModal } from "./session-detail-modal";
 import { SessionUsageTable } from "./session-usage-table";
@@ -1380,5 +1380,93 @@ describe("session titles", () => {
     expect(screen.getByText("使用了 2% • 90% → 88%")).toBeInTheDocument();
     expect(screen.getByText(/列表显示最近一次观测快照时的剩余额度/)).toBeInTheDocument();
     await i18n.changeLanguage("en");
+  });
+});
+
+
+describe("session refresh", () => {
+  beforeEach(() => { invokeMock.mockReset(); });
+  const scan = { importedDays: 1, scannedAt: "2026-09-01", timezone: "UTC" };
+  const turn = (turnId: string): SessionReplayDetail["turns"][number] => ({
+    turnId, startedAt: null, completedAt: null, durationMs: null, systemMessages: [],
+    userMessages: [], assistantMessages: [], reasoningSummaries: [], toolCalls: [],
+    patchResults: [], tokenEvents: [], errors: [], items: [],
+  });
+
+  it("keeps content while busy, retries failure and preserves tab, scroll and turn expansion", async () => {
+    await i18n.changeLanguage("en");
+    let complete!: (value: unknown) => void;
+    const initial = replayDetail({ path: "/tmp/rollout.jsonl", rawJsonl: "before", turns: [turn("old")] });
+    const next = { ...initial, rawJsonl: "after refresh", turns: [turn("old"), turn("new")] };
+    let attempts = 0;
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "fetch_session_detail") return Promise.resolve(initial);
+      if (command === "rescan_session") {
+        if (++attempts === 1) return Promise.reject(new Error("disk unavailable"));
+        return new Promise((resolve) => { complete = resolve; });
+      }
+      throw new Error(command);
+    });
+    const onScanComplete = vi.fn().mockResolvedValue(undefined);
+    render(<SessionDetailModal session={session({})} onClose={vi.fn()} onScanComplete={onScanComplete} />);
+    const oldTurn = await screen.findByRole("button", { name: /Turn old/, expanded: true });
+    await userEvent.click(oldTurn);
+    await userEvent.click(screen.getByRole("button", { name: "Raw JSONL" }));
+    const refresh = screen.getByRole("button", { name: "Refresh this session" });
+    await userEvent.click(refresh);
+    expect(await screen.findByRole("alert")).toHaveTextContent("disk unavailable");
+    expect(screen.getByText("before")).toBeInTheDocument();
+    await userEvent.click(refresh);
+    expect(refresh).toBeDisabled();
+    expect(refresh).toHaveAttribute("aria-busy", "true");
+    expect(refresh.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(screen.getByText("before")).toBeInTheDocument();
+    const scroll = document.querySelector('[class*="overflow-y-auto"][class*="flex-1"]')!;
+    scroll.scrollTop = 123;
+    await act(async () => complete({ scan, session: session({}), detail: next }));
+    expect(screen.getByText("after refresh")).toBeInTheDocument();
+    expect(scroll.scrollTop).toBe(123);
+    expect(refresh).toBeEnabled();
+    expect(onScanComplete).toHaveBeenCalledWith(session({}), initial.path, scan);
+    await userEvent.click(screen.getByRole("button", { name: "Timeline" }));
+    expect(screen.getByRole("button", { name: /Turn old/, expanded: false })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Turn new/, expanded: true })).toBeInTheDocument();
+  });
+
+  it("discards a refresh response after switching sessions", async () => {
+    await i18n.changeLanguage("en");
+    let complete!: (value: unknown) => void;
+    invokeMock.mockImplementation((command: string, args: { path: string }) => {
+      if (command === "fetch_session_detail") return Promise.resolve(replayDetail({ path: args.path, threadName: args.path }));
+      if (command === "rescan_session") return new Promise((resolve) => { complete = resolve; });
+      throw new Error(command);
+    });
+    const { rerender } = render(<SessionDetailModal session={session({})} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh this session" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Refresh this session" }));
+    rerender(<SessionDetailModal session={session({ path: "/tmp/new.jsonl" })} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: "/tmp/new.jsonl" });
+    await act(async () => complete({ scan, session: session({}), detail: replayDetail({ threadName: "stale result" }) }));
+    expect(screen.getByRole("heading", { name: "/tmp/new.jsonl" })).toBeInTheDocument();
+    expect(screen.queryByText("stale result")).not.toBeInTheDocument();
+  });
+
+  it("refreshes only the agent currently shown and ignores responses after closing", async () => {
+    await i18n.changeLanguage("en");
+    let complete!: (value: unknown) => void;
+    const agents = [replayAgent({}), replayAgent({ path: "/tmp/agent.jsonl", sessionId: "agent", parentSessionId: "root-id", depth: 1, nickname: "Worker" })];
+    invokeMock.mockImplementation((command: string, args: { path: string }) => {
+      if (command === "fetch_session_detail") return Promise.resolve(replayDetail({ path: args.path, agents }));
+      if (command === "rescan_session") return new Promise((resolve) => { complete = resolve; });
+      throw new Error(command);
+    });
+    const { unmount } = render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl" })} onClose={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: /Worker/ }));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("fetch_session_detail", { path: "/tmp/agent.jsonl" }));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh this session" }));
+    expect(invokeMock).toHaveBeenCalledWith("rescan_session", { path: "/tmp/agent.jsonl" });
+    unmount();
+    await act(async () => complete({ scan, session: session({ path: "/tmp/agent.jsonl" }), detail: replayDetail({}) }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

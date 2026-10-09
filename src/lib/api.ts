@@ -507,3 +507,17 @@ export type TrayMenuUpdate = {
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
   return invoke<void>("update_tray", { payload });
 }
+
+export type SessionRescanResponse = {
+  scan: ScanResponse;
+  session: SessionDetailRow;
+  detail: SessionReplayDetail;
+};
+
+export async function rescanSession(path: string): Promise<SessionRescanResponse> {
+  return invoke<SessionRescanResponse>("rescan_session", { path });
+}
+
+export async function rescanProject(project: string): Promise<ScanResponse> {
+  return invoke<ScanResponse>("rescan_project", { project });
+}

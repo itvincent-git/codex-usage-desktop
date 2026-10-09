@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ArrowRight, Coins, Database, Folder, Search, Terminal, X } from "lucide-react";
+import { ArrowRight, Coins, Database, Folder, RefreshCw, Search, Terminal, X } from "lucide-react";
 import { Area, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   fetchProjectAnalytics,
+  rescanProject,
   fetchProjectSessionDays,
   type ProjectSessionDaysResponse,
   type OverviewResponse,
   type ProjectAnalyticsResponse,
   type RangeKey,
+  type ScanResponse,
   type SessionDetailRow,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber, formatPercent } from "@/lib/formatters";
@@ -28,6 +30,8 @@ type ProjectSessionsModalProps = {
   onClose: () => void;
   onSessionClick?: (session: SessionDetailRow) => void;
   isActive?: boolean;
+  dataRevision?: number;
+  onScanComplete?: (scan: ScanResponse) => Promise<void>;
   onGoToSessions: (projectPath: string) => void;
 };
 
@@ -46,7 +50,7 @@ function TrendTooltip({ active, payload, label, t }: any) {
   </div>;
 }
 
-export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, onSessionClick, isActive = true }: ProjectSessionsModalProps) {
+export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, onSessionClick, isActive = true, dataRevision = 0, onScanComplete }: ProjectSessionsModalProps) {
   const { t } = useTranslation();
   const [sessionDays, setSessionDays] = useState<ProjectSessionDaysResponse | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -55,6 +59,11 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
   const daysRequest = useRef<{ key: string; promise: Promise<ProjectSessionDaysResponse> } | null>(null);
   const loadedRange = useRef({ project: project.project, initialRange: range, range });
   const requestGeneration = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshInFlight = useRef(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [dayRevision, setDayRevision] = useState(0);
+  const loadedRevision = useRef(dataRevision);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<ProjectAnalyticsResponse | null>(null);
@@ -106,8 +115,49 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
     return () => { active = false; requestGeneration.current += 1; };
   }, [project.project, range, query]);
 
+  async function reloadProjectData(scan: boolean) {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    const generation = ++requestGeneration.current;
+    const revision = dataRevision;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      if (scan) {
+        const result = await rescanProject(project.project);
+        await onScanComplete?.(result);
+      }
+      if (generation !== requestGeneration.current) return;
+      const requestedRange = loadedRange.current.range;
+      const [nextAnalytics, days] = await Promise.all([
+        fetchProjectAnalytics(project.project, requestedRange),
+        fetchProjectSessionDays(project.project, requestedRange, query),
+      ]);
+      if (generation !== requestGeneration.current) return;
+      loadedRevision.current = revision;
+      daysRequest.current = null;
+      setAnalytics(nextAnalytics);
+      setSessionDays(days);
+      setAnalyticsError(null);
+      setSessionsError(null);
+      setDayRevision((value) => value + 1);
+    } catch (error) {
+      if (generation === requestGeneration.current) setRefreshError(error instanceof Error ? error.message : String(error));
+    } finally {
+      refreshInFlight.current = false;
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isActive && !refreshing && loadedRevision.current !== dataRevision) {
+      loadedRevision.current = dataRevision;
+      void reloadProjectData(false);
+    }
+  }, [isActive, dataRevision, refreshing]);
+
   async function loadMoreDays() {
-    if (!sessionDays || loadingMore || analyticsLoading) return;
+    if (!sessionDays || loadingMore || analyticsLoading || refreshing) return;
     const generation = requestGeneration.current;
     const days = dayjs(sessionDays.endDate).diff(dayjs(sessionDays.startDate), "day") + 1;
     const start = dayjs(sessionDays.startDate).subtract(days, "day").format("YYYY-MM-DD");
@@ -153,6 +203,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
           </div>
           <p className="truncate font-mono text-[10px] text-muted-foreground" title={project.project}>{project.project}</p>
         </div>
+        <Button variant="secondary" size="sm" onClick={() => void reloadProjectData(true)} disabled={refreshing || loadingMore || sessionsLoading || analyticsLoading} aria-busy={refreshing}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{t("project_modal.refresh")}</Button>
         <Button variant="secondary" size="sm" className="shrink-0 text-xs" onClick={() => onGoToSessions(project.project)}>{t("project_modal.view_in_sessions_tab")}<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
         <Button ref={closeButtonRef} variant="secondary" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t("project_modal.close_aria")}><X className="h-4 w-4" /></Button>
       </div>
@@ -171,6 +222,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
       </> : null}
     </header>
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]" data-testid="project-modal-scroll">
+      {refreshError ? <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error">{t("project_modal.refresh_error")}: {refreshError}</p> : null}
       {analyticsLoading ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">{t("project_modal.analytics_loading")}</div>
         : analyticsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{t("project_modal.analytics_error")}: {analyticsError}</div>
           : analytics ? (
@@ -210,17 +262,17 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
           </div>
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input aria-label={t("project_modal.search_aria")} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={t("project_modal.search_placeholder")} className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-xs outline-none focus:ring-2 focus:ring-primary/30" />
+            <input aria-label={t("project_modal.search_aria")} value={searchQuery} onChange={(event) => { requestGeneration.current += 1; setSearchQuery(event.target.value); }} placeholder={t("project_modal.search_placeholder")} className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-xs outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
         </div>
         {sessionsLoading ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">{t("loading.loading_sessions")}</div>
           : sessionsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{sessionsError}</div>
             : !sessionDays?.days.length ? <div className="rounded-xl border border-dashed border-border p-8 text-center"><Terminal className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{searchQuery ? t("project_modal.no_matching_sessions") : t("project_modal.no_sessions")}</p></div>
               : <div key={JSON.stringify([project.project, range, query])} className="space-y-3">
-                {sessionDays.days.map((day, index) => <ProjectSessionDayView key={day.date} day={day} project={project.project} range={sessionRange} query={query} initiallyExpanded={index === 0} onSessionClick={onSessionClick} />)}
+                {sessionDays.days.map((day, index) => <ProjectSessionDayView key={day.date} day={day} project={project.project} range={sessionRange} query={query} initiallyExpanded={index === 0} revision={dayRevision} onSessionClick={onSessionClick} />)}
               </div>}
         {moreError ? <p role="alert" className="text-sm text-error">{moreError}</p> : null}
-        {sessionDays ? <div className="flex justify-center py-3"><Button variant="secondary" onClick={() => void loadMoreDays()} disabled={loadingMore || analyticsLoading}>{loadingMore ? t("common.loading") : t("project_modal.load_more_days")}</Button></div> : null}
+        {sessionDays ? <div className="flex justify-center py-3"><Button variant="secondary" onClick={() => void loadMoreDays()} disabled={loadingMore || analyticsLoading || refreshing}>{loadingMore ? t("common.loading") : t("project_modal.load_more_days")}</Button></div> : null}
       </section>
     </div>
   </div>;

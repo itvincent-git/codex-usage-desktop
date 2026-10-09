@@ -211,8 +211,16 @@ fn ensure_column(
     Ok(())
 }
 
-pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<(), String> {
-    let tx = db.transaction().map_err(|error| error.to_string())?;
+pub fn upsert_daily_rows(db: &Connection, rows: &[DailyUsageRow]) -> Result<(), String> {
+    let transaction = if db.is_autocommit() {
+        Some(
+            db.unchecked_transaction()
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
+    let tx = transaction.as_deref().unwrap_or(db);
     {
         let mut statement = tx
             .prepare(
@@ -264,7 +272,10 @@ pub fn upsert_daily_rows(db: &mut Connection, rows: &[DailyUsageRow]) -> Result<
                 .map_err(|error| error.to_string())?;
         }
     }
-    tx.commit().map_err(|error| error.to_string())
+    if let Some(transaction) = transaction {
+        transaction.commit().map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 pub fn record_scan_run(
@@ -366,6 +377,39 @@ pub fn query_session_file_rollup(
     }
 }
 
+pub fn query_all_session_file_rollups(db: &Connection) -> Result<Vec<SessionFileRollup>, String> {
+    let mut statement = db.prepare("SELECT path, modified_at_ms, size_bytes, rows_json, prompt_title, quota_usage_json FROM session_file_rollups")
+        .map_err(|error| error.to_string())?;
+    let records = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+            ))
+        })
+        .map_err(|error| error.to_string())?;
+    records
+        .map(|record| {
+            let (path, modified_at_ms, size_bytes, rows_json, prompt_title, quota_json) =
+                record.map_err(|error| error.to_string())?;
+            Ok(SessionFileRollup {
+                path,
+                modified_at_ms,
+                size_bytes,
+                prompt_title,
+                rows: serde_json::from_str(&rows_json).map_err(|error| error.to_string())?,
+                quota_usage: quota_json
+                    .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
+                    .transpose()?,
+            })
+        })
+        .collect()
+}
+
 pub fn query_session_rollup_record(
     db: &Connection,
     path: &str,
@@ -433,11 +477,19 @@ pub fn query_session_hierarchy_records(
 }
 
 pub fn upsert_session_file_rollups(
-    db: &mut Connection,
+    db: &Connection,
     rollups: &[SessionFileRollup],
     updated_at: &str,
 ) -> Result<(), String> {
-    let tx = db.transaction().map_err(|error| error.to_string())?;
+    let transaction = if db.is_autocommit() {
+        Some(
+            db.unchecked_transaction()
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
+    let tx = transaction.as_deref().unwrap_or(db);
     {
         let mut statement = tx
             .prepare(
@@ -487,7 +539,10 @@ pub fn upsert_session_file_rollups(
                 .map_err(|error| error.to_string())?;
         }
     }
-    tx.commit().map_err(|error| error.to_string())
+    if let Some(transaction) = transaction {
+        transaction.commit().map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 pub fn delete_missing_session_file_rollups(
@@ -608,6 +663,9 @@ pub fn recalculate_daily_costs(
     db: &mut Connection,
     pricing_source: &PricingSource,
 ) -> Result<(), String> {
+    let _guard = crate::scanner::SCAN_MUTEX
+        .lock()
+        .map_err(|error| error.to_string())?;
     let rows = query_all_daily_rows(db)?;
     let tx = db.transaction().map_err(|error| error.to_string())?;
     {

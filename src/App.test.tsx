@@ -1151,7 +1151,10 @@ describe("App", () => {
     expect(loadMoreButton).toHaveFocus();
     await user.tab();
     const sessionsButton = within(projectDialog).getByRole("button", { name: "View in Sessions Tab" });
+    expect(within(projectDialog).getByRole("button", { name: "Refresh project sessions" })).toHaveFocus();
+    await user.tab();
     expect(sessionsButton).toHaveFocus();
+    await user.tab({ shift: true });
     await user.tab({ shift: true });
     expect(loadMoreButton).toHaveFocus();
     await user.tab({ shift: true });

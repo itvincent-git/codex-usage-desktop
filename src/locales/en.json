@@ -399,6 +399,8 @@
     "no_projects": "No project directories tracked in logs yet."
   },
   "project_modal": {
+    "refresh": "Refresh project sessions",
+    "refresh_error": "Refresh failed",
     "title": "Sessions for {{projectName}}",
     "all_projects": "All Projects",
     "tokens_breakdown": "Tokens Breakdown",
@@ -523,6 +525,8 @@
     "caveat": "The list shows quota remaining at the latest observed snapshot. Values are estimated from integer log snapshots; each reset window is shown separately."
   },
   "detail": {
+      "refresh": "Refresh this session",
+      "refresh_error": "Refresh failed",
       "modal_title": "Session Details",
       "close_aria": "Close session detail",
       "timestamp": "Timestamp",

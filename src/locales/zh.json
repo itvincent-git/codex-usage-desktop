@@ -399,6 +399,8 @@
     "no_projects": "日志中尚无追踪的项目目录数据。"
   },
   "project_modal": {
+    "refresh": "刷新项目会话",
+    "refresh_error": "刷新失败",
     "title": "{{projectName}} 项目会话详情",
     "all_projects": "所有项目",
     "tokens_breakdown": "Token 消耗细分",
@@ -524,6 +526,8 @@
     "caveat": "列表显示最近一次观测快照时的剩余额度。数值根据日志中的整数快照估算；跨重置周期分别展示。"
   },
   "detail": {
+      "refresh": "刷新此会话",
+      "refresh_error": "刷新失败",
       "modal_title": "会话详情",
       "close_aria": "关闭会话详情",
       "timestamp": "记录时间",

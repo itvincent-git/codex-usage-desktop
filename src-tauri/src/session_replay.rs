@@ -59,6 +59,16 @@ pub fn fetch_session_detail(db: &Connection, path: &str) -> Result<SessionReplay
     let record = query_session_rollup_record(db, path)?
         .ok_or_else(|| "Session file is not indexed".to_string())?;
     let raw_jsonl = fs::read_to_string(&record.path).map_err(|error| error.to_string())?;
+    fetch_session_detail_with_raw(db, path, raw_jsonl)
+}
+
+pub(crate) fn fetch_session_detail_with_raw(
+    db: &Connection,
+    path: &str,
+    raw_jsonl: String,
+) -> Result<SessionReplayDetail, String> {
+    let record = query_session_rollup_record(db, path)?
+        .ok_or_else(|| "Session file is not indexed".to_string())?;
     let agents = build_agent_hierarchy(db, path)?;
     Ok(parse_session_detail_with_agents(record, raw_jsonl, agents))
 }

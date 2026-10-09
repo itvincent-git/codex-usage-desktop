@@ -12,7 +12,11 @@ let archivedSessionsHome: string | undefined;
 export const config: WebdriverIO.Config = {
   onPrepare() {
     const buildArgs = ["test:e2e:build"];
-    if (process.env.CODEX_USAGE_ARCHIVE_E2E === "1") {
+    if (process.env.CODEX_USAGE_REFRESH_E2E === "1") {
+      archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-refresh-e2e-"));
+      process.env.CODEX_HOME = archivedSessionsHome;
+      buildArgs.push("--config", JSON.stringify({ identifier: `com.codexusage.desktop.e2e.refresh${Date.now()}` }));
+    } else if (process.env.CODEX_USAGE_ARCHIVE_E2E === "1") {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-archive-e2e-"));
       process.env.CODEX_HOME = archivedSessionsHome;
       buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.archives" }));

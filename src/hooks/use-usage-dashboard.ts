@@ -35,6 +35,7 @@ import {
   refreshUsageData,
   setBackgroundRefreshInterval,
   type UsageRefreshResponse,
+  type ScanResponse,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { DashboardView } from "@/components/dashboard-header";
@@ -302,8 +303,16 @@ export function useUsageDashboard() {
   const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
   const windowActivationInFlightRef = useRef(false);
 
+  const overviewGeneration = useRef(0);
+  const sessionsGeneration = useRef(0);
+  const localReloadGeneration = useRef(0);
+  const currentRange = useRef(range);
+  currentRange.current = range;
+
   const loadOverview = useEffectEvent(async (nextRange: RangeKey) => {
+    const generation = ++overviewGeneration.current;
     const data = await fetchOverview(nextRange);
+    if (generation !== overviewGeneration.current || nextRange !== currentRange.current) return;
     setOverview(data);
     setError(null);
   });
@@ -315,7 +324,9 @@ export function useUsageDashboard() {
   });
 
   const loadSessions = useEffectEvent(async () => {
+    const generation = ++sessionsGeneration.current;
     const data = await fetchSessionDetails();
+    if (generation !== sessionsGeneration.current) return;
     setSessions(data);
     setHasLoadedSessions(true);
     setError(null);
@@ -897,6 +908,25 @@ export function useUsageDashboard() {
     }
   }
 
+  async function handleLocalScanComplete(scan: ScanResponse, updatedSession?: SessionDetailRow, previousPath?: string) {
+    if (updatedSession) setSessions((current) => current.map((session) => session.path === previousPath ? updatedSession : session));
+    const generation = ++localReloadGeneration.current;
+    const overviewRequest = ++overviewGeneration.current;
+    const sessionsRequest = ++sessionsGeneration.current;
+    const nextRange = range;
+    const [nextOverview, nextSessions, nextMonthly] = await Promise.all([
+      fetchOverview(nextRange),
+      hasLoadedSessions ? fetchSessionDetails() : Promise.resolve(null),
+      monthlyUsage ? fetchMonthlyUsage() : Promise.resolve(null),
+    ]);
+    if (generation !== localReloadGeneration.current) return;
+    if (overviewRequest === overviewGeneration.current && nextRange === currentRange.current) setOverview(nextOverview);
+    if (nextSessions && sessionsRequest === sessionsGeneration.current) setSessions(nextSessions);
+    if (nextMonthly) setMonthlyUsage(nextMonthly);
+    setLastRescanDurationMs(scan.metrics?.totalMs ?? null);
+    setError(null);
+  }
+
   async function handlePricingRefreshed() {
     await loadOverview(range);
   }
@@ -1150,6 +1180,7 @@ export function useUsageDashboard() {
     handleViewChange,
     handleRangeChange,
     handlePricingRefreshed,
+    handleLocalScanComplete,
     handleRefresh,
     handleLimitsRefresh,
     handleActivateCodexWindow,

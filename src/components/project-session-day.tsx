@@ -13,28 +13,32 @@ type ProjectSessionDayProps = {
   range: RangeKey;
   query: string;
   initiallyExpanded: boolean;
+  revision?: number;
   onSessionClick?: (session: SessionDetailRow) => void;
 };
 
-export function ProjectSessionDayView({ day, project, range, query, initiallyExpanded, onSessionClick }: ProjectSessionDayProps) {
+export function ProjectSessionDayView({ day, project, range, query, initiallyExpanded, revision = 0, onSessionClick }: ProjectSessionDayProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [sessions, setSessions] = useState<SessionDetailRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
-  const request = useRef<Promise<SessionDetailRow[]> | null>(null);
+  const request = useRef<{ key: string; promise: Promise<SessionDetailRow[]> } | null>(null);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const key = JSON.stringify([project, day.date, query, revision]);
 
   useEffect(() => {
-    if (!expanded || sessions) return;
+    if (!expanded || loadedKey === key) return;
     let active = true;
-    request.current ??= fetchProjectDaySessions(project, range, day.date, query);
-    void request.current.then((data) => {
-      if (active) setSessions(data);
+    setError(null);
+    if (request.current?.key !== key) request.current = { key, promise: fetchProjectDaySessions(project, range, day.date, query) };
+    void request.current.promise.then((data) => {
+      if (active) { setSessions(data); setLoadedKey(key); }
     }).catch((error) => {
       if (active) setError(error instanceof Error ? error.message : String(error));
     });
     return () => { active = false; };
-  }, [expanded, sessions, project, range, day.date, query, retry]);
+  }, [expanded, loadedKey, key, project, range, day.date, query, retry]);
 
   return <div id={`date-group-${day.date}`} className="overflow-hidden rounded-xl border border-border/50 bg-card/20 shadow-sm scroll-mt-6">
     <button type="button" aria-expanded={expanded} aria-controls={`project-day-${day.date}`} onClick={() => setExpanded((value) => !value)} className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-muted/30">
@@ -50,13 +54,13 @@ export function ProjectSessionDayView({ day, project, range, query, initiallyExp
       </span>
     </button>
     <div id={`project-day-${day.date}`} hidden={!expanded}>
+      {error ? <div role="alert" className="p-4 text-sm text-error">{error}<Button variant="secondary" size="sm" className="ml-3" onClick={() => {
+        request.current = null;
+        setError(null);
+        setRetry((value) => value + 1);
+      }}>{t("project_modal.retry")}</Button></div> : null}
       {sessions ? <SessionUsageTable sessions={sessions} selectedProject={project} onSessionClick={onSessionClick} embedded projectDay agentGroupPageSize={30} />
-        : error ? <div role="alert" className="p-4 text-sm text-error">{error}<Button variant="secondary" size="sm" className="ml-3" onClick={() => {
-          request.current = null;
-          setError(null);
-          setRetry((value) => value + 1);
-        }}>{t("project_modal.retry")}</Button></div>
-          : expanded ? <p role="status" className="p-4 text-sm text-muted-foreground">{t("loading.loading_sessions")}</p> : null}
+        : expanded && !error ? <p role="status" className="p-4 text-sm text-muted-foreground">{t("loading.loading_sessions")}</p> : null}
     </div>
   </div>;
 }

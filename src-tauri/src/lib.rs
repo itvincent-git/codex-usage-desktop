@@ -173,6 +173,38 @@ async fn scan_usage(state: tauri::State<'_, AppState>) -> Result<ScanResponse, S
 }
 
 #[tauri::command]
+async fn rescan_session(
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> Result<types::SessionRescanResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db = db::open_database(&database_path)?;
+        let pricing = pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path));
+        scanner::rescan_session(&mut db, &pricing, None, None, &path)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn rescan_project(
+    state: tauri::State<'_, AppState>,
+    project: String,
+) -> Result<ScanResponse, String> {
+    let database_path = state.database_path.clone();
+    let pricing_cache_path = state.pricing_cache_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db = db::open_database(&database_path)?;
+        let pricing = pricing::PricingSource::load_cached_or_embedded(Some(pricing_cache_path));
+        scanner::rescan_project(&mut db, &pricing, None, None, &project)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn refresh_usage_data(
     state: tauri::State<'_, AppState>,
     force_limits: bool,
@@ -1102,6 +1134,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             scan_usage,
+            rescan_session,
+            rescan_project,
             refresh_usage_data,
             set_background_refresh_interval,
             fetch_overview,

@@ -399,6 +399,8 @@
     "no_projects": "日誌中尚無追蹤的專案目錄資料。"
   },
   "project_modal": {
+    "refresh": "重新整理專案工作階段",
+    "refresh_error": "重新整理失敗",
     "title": "{{projectName}} 專案工作階段詳細資訊",
     "all_projects": "所有專案",
     "tokens_breakdown": "Token 消耗細分",
@@ -524,6 +526,8 @@
     "caveat": "列表顯示最近一次觀測快照時的剩餘額度。數值根據日誌中的整數快照估算；跨重置週期分別展示。"
   },
   "detail": {
+      "refresh": "重新整理此工作階段",
+      "refresh_error": "重新整理失敗",
       "modal_title": "工作階段詳細資訊",
       "close_aria": "關閉工作階段詳細資訊",
       "timestamp": "記錄時間",

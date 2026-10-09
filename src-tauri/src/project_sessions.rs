@@ -61,9 +61,15 @@ fn revision(codex_home: &Path, timezone: &str) -> String {
 // Backfill existing databases once; later scans and queries only rebuild changed entries.
 pub fn sync_index(db: &Connection, codex_home: &Path, timezone: &str) -> Result<(), String> {
     let revision = revision(codex_home, timezone);
-    let tx = db
-        .unchecked_transaction()
-        .map_err(|error| error.to_string())?;
+    let transaction = if db.is_autocommit() {
+        Some(
+            db.unchecked_transaction()
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
+    let tx = transaction.as_deref().unwrap_or(db);
     tx.execute_batch(
         "DELETE FROM project_session_days WHERE path NOT IN (SELECT path FROM session_file_rollups);
          DELETE FROM project_session_quota WHERE path NOT IN (SELECT path FROM session_file_rollups);
@@ -127,7 +133,10 @@ pub fn sync_index(db: &Connection, codex_home: &Path, timezone: &str) -> Result<
             store_session(&tx, &session, &updated_at, &revision, timezone)?;
         }
     }
-    tx.commit().map_err(|error| error.to_string())
+    if let Some(transaction) = transaction {
+        transaction.commit().map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn store_session(
@@ -371,6 +380,9 @@ pub fn query_day_sessions(
 }
 
 pub fn prepare_index(db: &Connection) -> Result<String, String> {
+    let _guard = crate::scanner::SCAN_MUTEX
+        .lock()
+        .map_err(|error| error.to_string())?;
     let timezone = resolve_app_timezone();
     sync_index(db, &crate::scanner::default_codex_home(), &timezone)?;
     Ok(timezone)

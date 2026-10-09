@@ -4,10 +4,10 @@ import {
   type ConversationBlock, type DisplayTokenUsageItem, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, MessageSquare, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCw, MessageSquare, Terminal, Wrench, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { fetchSessionDetail, revealInFileManager, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
+import { fetchSessionDetail, rescanSession, revealInFileManager, type ScanResponse, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
 import { projectLabel, sessionProjectReferences } from "@/lib/project-reference";
 import { SessionQuotaUsageView } from "./session-quota-usage";
@@ -18,6 +18,7 @@ import { useModalFocus } from "@/hooks/use-modal-focus";
 type SessionDetailModalProps = {
   session: SessionDetailRow;
   onClose: () => void;
+  onScanComplete?: (session: SessionDetailRow, previousPath: string, scan: ScanResponse) => Promise<void>;
 };
 
 type TabKey = "timeline" | "raw";
@@ -1131,10 +1132,15 @@ export function ConversationItem({ block, rawJsonlLines }: { block: Conversation
   );
 }
 
-export function SessionDetailModal({ session, onClose }: SessionDetailModalProps) {
+export function SessionDetailModal({ session, onClose, onScanComplete }: SessionDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
   const [activePath, setActivePath] = useState(session.path);
+  const [refreshedSession, setRefreshedSession] = useState<SessionDetailRow | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const refreshInFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
   const [copied, setCopied] = useState(false);
@@ -1159,6 +1165,9 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   useEffect(() => {
     let cancelled = false;
+    requestGeneration.current += 1;
+    setRefreshedSession(null);
+    setRefreshError(null);
     setDetail(null);
     setError(null);
     setActiveTab("timeline");
@@ -1187,8 +1196,35 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
     return () => {
       cancelled = true;
+      requestGeneration.current += 1;
     };
-  }, [activePath]);
+  }, [activePath, session.path]);
+
+  async function refreshSession() {
+    if (refreshInFlight.current || !detail) return;
+    const generation = requestGeneration.current;
+    const previousPath = detail.path;
+    refreshInFlight.current = true;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const result = await rescanSession(previousPath);
+      const synchronization = onScanComplete?.(result.session, previousPath, result.scan);
+      if (generation === requestGeneration.current) {
+        const previousKeys = new Set(detail.turns.map((turn, index) => `${turn.turnId}-${index}`));
+        setExpandedTurns((current) => new Set(result.detail.turns.map((turn, index) => `${turn.turnId}-${index}`)
+          .filter((key) => !previousKeys.has(key) || current.has(key))));
+        setDetail(result.detail);
+        setRefreshedSession(result.session);
+      }
+      await synchronization;
+    } catch (error) {
+      if (generation === requestGeneration.current) setRefreshError(error instanceof Error ? error.message : String(error));
+    } finally {
+      refreshInFlight.current = false;
+      setRefreshing(false);
+    }
+  }
 
   const cacheRate = useMemo(() => {
     const inputTokens = detail?.summary.inputTokens ?? session.inputTokens;
@@ -1198,7 +1234,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
 
   const models = detail?.summary.models.length ? detail.summary.models : session.models;
   const projects = detail?.summary.projects.length ? detail.summary.projects : session.projects;
-  const sessionProjectsByPath = new Map(sessionProjectReferences(session).map((project) => [project.path, project]));
+  const sessionProjectsByPath = new Map(sessionProjectReferences(refreshedSession ?? session).map((project) => [project.path, project]));
   const displayedProjects = projects.map((path) => sessionProjectsByPath.get(path) ?? {
     path,
     displayName: path.split(/[\\/]/).filter(Boolean).pop() || path,
@@ -1273,7 +1309,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
                     </button>
                   )}
                 </h2>
-                <SessionArchivedBadge path={activePath} />
+                <SessionArchivedBadge path={detail?.path ?? activePath} />
               </div>
             </div>
             <button
@@ -1291,6 +1327,10 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               {t("sessions.detail.details")}
               {showDetails ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
+            <Button variant="secondary" size="sm" onClick={() => void refreshSession()} disabled={refreshing || !detail} aria-busy={refreshing}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              {t("sessions.detail.refresh")}
+            </Button>
             <nav className="flex shrink-0 items-center rounded-md bg-muted/70 p-0.5">
               <button type="button" onClick={() => setActiveTab("timeline")} className={`rounded px-2 py-1 text-xs font-semibold transition ${activeTab === "timeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
                 {t("sessions.detail.timeline")}
@@ -1358,7 +1398,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
               <span>{t("sessions.detail.cli", { value: detail?.summary.cliVersion ?? "--" })}</span>
             </div>
           ) : null}
-          {detail && activePath === session.path ? <div className="mt-1.5 border-t border-border/50 pt-1.5"><SessionQuotaUsageView usage={session.quotaUsage} detailed /></div> : null}
+          {detail && (refreshedSession || activePath === session.path) ? <div className="mt-1.5 border-t border-border/50 pt-1.5"><SessionQuotaUsageView usage={refreshedSession ? refreshedSession.quotaUsage : session.quotaUsage} detailed /></div> : null}
           </section>
           </div>
         </header>
@@ -1391,6 +1431,7 @@ export function SessionDetailModal({ session, onClose }: SessionDetailModalProps
           }}
         >
           <div className="px-4 py-5">
+          {refreshError ? <p role="alert" className="mb-3 rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error">{t("sessions.detail.refresh_error")}: {refreshError}</p> : null}
           {error ? (
             <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
               <AlertTriangle className="h-4 w-4 shrink-0" />

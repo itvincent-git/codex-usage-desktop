@@ -19,9 +19,12 @@ use std::{
     fs,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
+    sync::Mutex,
     time::{Instant, SystemTime},
 };
 use walkdir::WalkDir;
+
+pub(crate) static SCAN_MUTEX: Mutex<()> = Mutex::new(());
 
 const LEGACY_FALLBACK_MODEL: &str = "gpt-5";
 
@@ -65,9 +68,14 @@ pub fn scan_codex_usage(
     codex_home: Option<PathBuf>,
     timezone: Option<String>,
 ) -> Result<ScanResponse, String> {
+    let _guard = SCAN_MUTEX.lock().map_err(|error| error.to_string())?;
+    let tx = db
+        .unchecked_transaction()
+        .map_err(|error| error.to_string())?;
+    let db = &tx;
     let total_started = Instant::now();
     let timezone = timezone.unwrap_or_else(resolve_app_timezone);
-    let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
     let index_home = codex_home.clone().unwrap_or_else(default_codex_home);
     let scan = load_daily_rows(db, codex_home, &timezone, &scanned_at, pricing_source)?;
     let db_started = Instant::now();
@@ -84,6 +92,7 @@ pub fn scan_codex_usage(
     crate::project_sessions::sync_index(db, &index_home, &timezone)?;
     record_scan_run(db, &scanned_at, &timezone, scan.rows.len())?;
 
+    tx.commit().map_err(|error| error.to_string())?;
     let mut metrics = scan.metrics;
     metrics.db_ms = db_started.elapsed().as_millis();
     metrics.total_ms = total_started.elapsed().as_millis();
@@ -92,6 +101,285 @@ pub fn scan_codex_usage(
         imported_days: scan.rows.len(),
         scanned_at,
         timezone,
+        metrics,
+    })
+}
+
+/// Scoped scans only replace selected cache entries. Global totals always use the entire cache.
+pub fn rescan_session(
+    db: &mut Connection,
+    pricing: &PricingSource,
+    codex_home: Option<PathBuf>,
+    timezone: Option<String>,
+    path: &str,
+) -> Result<crate::types::SessionRescanResponse, String> {
+    let _guard = SCAN_MUTEX.lock().map_err(|error| error.to_string())?;
+    let started = Instant::now();
+    let home = codex_home.unwrap_or_else(default_codex_home);
+    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
+    let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    let tx = db
+        .unchecked_transaction()
+        .map_err(|error| error.to_string())?;
+    let cached = crate::db::query_all_session_file_rollups(&tx)?;
+    let id = session_file_id(Path::new(path));
+    if !cached.iter().any(|rollup| {
+        rollup.path == path
+            || id
+                .as_ref()
+                .is_some_and(|id| session_file_id(Path::new(&rollup.path)).as_ref() == Some(id))
+    }) {
+        return Err("Session file is not indexed".into());
+    }
+    let files = find_session_files(Some(home.clone()))?;
+    let file = files
+        .iter()
+        .find(|file| file.cache_key == path)
+        .or_else(|| {
+            id.as_ref().and_then(|id| {
+                files
+                    .iter()
+                    .find(|file| session_file_id(&file.path).as_ref() == Some(id))
+            })
+        })
+        .ok_or_else(|| "Session file no longer exists".to_string())?;
+    let raw = fs::read_to_string(&file.path).map_err(|error| error.to_string())?;
+    let rollup = parse_rollup(file, &raw, &timezone, &scanned_at, pricing)?;
+    remove_duplicate_rollups(&tx, file, &cached)?;
+    upsert_session_file_rollups(&tx, &[rollup], &scanned_at)?;
+    let scan = finish_scoped_scan(
+        &tx,
+        &home,
+        &timezone,
+        &scanned_at,
+        pricing,
+        started,
+        ScanMetrics {
+            files_scanned: files.len(),
+            files_parsed: 1,
+            bytes_read: raw.len() as u64,
+            parse_ms: started.elapsed().as_millis(),
+            ..ScanMetrics::default()
+        },
+    )?;
+    let mut detail =
+        crate::session_replay::fetch_session_detail_with_raw(&tx, &file.cache_key, raw)?;
+    let mut session = crate::db::query_session_detail(&tx, &file.cache_key)?;
+    let names = crate::session_index::read_thread_names(&home).unwrap_or_default();
+    detail.thread_name =
+        crate::session_index::resolve_thread_name(&detail.path, detail.thread_name.take(), &names);
+    session.thread_name = detail.thread_name.clone();
+    if let Some(agent) = detail
+        .agents
+        .iter()
+        .find(|agent| agent.path == session.path)
+    {
+        session.agent_session_id = Some(agent.session_id.clone());
+        session.parent_session_id = agent.parent_session_id.clone();
+        session.agent_depth = agent.depth;
+        session.agent_path = Some(agent.agent_path.clone());
+        session.agent_nickname = agent.nickname.clone();
+        session.agent_role = agent.role.clone();
+    }
+    crate::codex_projects::CodexProjectCatalog::load(&home)
+        .enrich_sessions(std::slice::from_mut(&mut session));
+    tx.commit().map_err(|error| error.to_string())?;
+    Ok(crate::types::SessionRescanResponse {
+        scan,
+        session,
+        detail,
+    })
+}
+
+pub fn rescan_project(
+    db: &mut Connection,
+    pricing: &PricingSource,
+    codex_home: Option<PathBuf>,
+    timezone: Option<String>,
+    project: &str,
+) -> Result<ScanResponse, String> {
+    let _guard = SCAN_MUTEX.lock().map_err(|error| error.to_string())?;
+    let started = Instant::now();
+    let home = codex_home.unwrap_or_else(default_codex_home);
+    let timezone = timezone.unwrap_or_else(resolve_app_timezone);
+    let scanned_at = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    let tx = db
+        .unchecked_transaction()
+        .map_err(|error| error.to_string())?;
+    let cached = crate::db::query_all_session_file_rollups(&tx)?;
+    let files = find_session_files(Some(home.clone()))?;
+    let mut metrics = ScanMetrics {
+        files_scanned: files.len(),
+        ..ScanMetrics::default()
+    };
+    for file in &files {
+        let id = session_file_id(&file.path);
+        let previous = cached
+            .iter()
+            .find(|rollup| rollup.path == file.cache_key)
+            .or_else(|| {
+                id.as_ref().and_then(|id| {
+                    cached.iter().find(|rollup| {
+                        session_file_id(Path::new(&rollup.path)).as_ref() == Some(id)
+                    })
+                })
+            });
+        let belonged = previous.is_some_and(|rollup| rollup_has_project(rollup, project));
+        let unchanged = previous.is_some_and(|rollup| {
+            rollup.modified_at_ms == file.modified_at_ms && rollup.size_bytes == file.size_bytes
+        });
+        // Changed or new files need only a metadata pass to discover project membership.
+        let raw = if belonged || !unchanged || previous.is_some_and(|rollup| rollup.rows.is_empty())
+        {
+            Some(fs::read_to_string(&file.path).map_err(|error| error.to_string())?)
+        } else {
+            None
+        };
+        let belongs = raw
+            .as_deref()
+            .is_some_and(|raw| log_has_project(raw, project));
+        if !belonged && !belongs {
+            continue;
+        }
+        let raw = raw.unwrap_or_default();
+        let rollup = parse_rollup(file, &raw, &timezone, &scanned_at, pricing)?;
+        remove_duplicate_rollups(&tx, file, &cached)?;
+        upsert_session_file_rollups(&tx, &[rollup], &scanned_at)?;
+        metrics.files_parsed += 1;
+        metrics.bytes_read += raw.len() as u64;
+    }
+    for rollup in &cached {
+        if rollup_has_project(rollup, project)
+            && !files.iter().any(|file| file.cache_key == rollup.path)
+        {
+            tx.execute(
+                "DELETE FROM session_file_rollups WHERE path = ?",
+                [&rollup.path],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+    metrics.parse_ms = started.elapsed().as_millis();
+    let response = finish_scoped_scan(
+        &tx,
+        &home,
+        &timezone,
+        &scanned_at,
+        pricing,
+        started,
+        metrics,
+    )?;
+    tx.commit().map_err(|error| error.to_string())?;
+    Ok(response)
+}
+
+fn rollup_has_project(rollup: &SessionFileRollup, project: &str) -> bool {
+    rollup
+        .rows
+        .iter()
+        .any(|row| row.projects.contains_key(project))
+}
+
+fn log_has_project(raw: &str, project: &str) -> bool {
+    let mut current_project = None;
+    for entry in raw
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+    {
+        let payload = entry.get("payload").unwrap_or(&Value::Null);
+        match entry.get("type").and_then(Value::as_str) {
+            Some("session_meta") => current_project = extract_project_path(payload),
+            Some("turn_context") => {
+                if let Some(path) = extract_project_path(payload) {
+                    current_project = Some(path);
+                }
+            }
+            Some("event_msg")
+                if payload.get("type").and_then(Value::as_str) == Some("token_count") =>
+            {
+                if current_project.as_deref().unwrap_or("Unknown") == project {
+                    return true;
+                }
+            }
+            _ => continue,
+        }
+        if current_project.as_deref() == Some(project) {
+            return true;
+        }
+    }
+    false
+}
+
+fn parse_rollup(
+    file: &SessionFile,
+    raw: &str,
+    timezone: &str,
+    updated_at: &str,
+    pricing: &PricingSource,
+) -> Result<SessionFileRollup, String> {
+    let mut events = Vec::new();
+    let (title, quota) = parse_session_file_with_quota(raw, &mut events, timezone)?;
+    Ok(SessionFileRollup {
+        path: file.cache_key.clone(),
+        modified_at_ms: file.modified_at_ms,
+        size_bytes: raw.len() as i64,
+        rows: build_daily_rows(&events, timezone, updated_at, pricing),
+        prompt_title: Some(title),
+        quota_usage: Some(quota),
+    })
+}
+
+fn remove_duplicate_rollups(
+    db: &Connection,
+    file: &SessionFile,
+    cached: &[SessionFileRollup],
+) -> Result<(), String> {
+    let Some(id) = session_file_id(&file.path) else {
+        return Ok(());
+    };
+    for rollup in cached {
+        if rollup.path != file.cache_key
+            && session_file_id(Path::new(&rollup.path)).as_ref() == Some(&id)
+        {
+            db.execute(
+                "DELETE FROM session_file_rollups WHERE path = ?",
+                [&rollup.path],
+            )
+            .map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn finish_scoped_scan(
+    db: &Connection,
+    home: &Path,
+    timezone: &str,
+    scanned_at: &str,
+    pricing: &PricingSource,
+    started: Instant,
+    mut metrics: ScanMetrics,
+) -> Result<ScanResponse, String> {
+    let db_started = Instant::now();
+    let cached = crate::db::query_all_session_file_rollups(db)?;
+    let mut rows = merge_daily_rows(
+        cached.into_iter().flat_map(|rollup| rollup.rows).collect(),
+        scanned_at,
+    );
+    apply_daily_costs(&mut rows, pricing);
+    upsert_daily_rows(db, &rows)?;
+    delete_missing_daily_rows(
+        db,
+        &rows.iter().map(|row| row.date.clone()).collect::<Vec<_>>(),
+    )?;
+    crate::project_sessions::sync_index(db, home, timezone)?;
+    record_scan_run(db, scanned_at, timezone, rows.len())?;
+    metrics.db_ms = db_started.elapsed().as_millis();
+    metrics.total_ms = started.elapsed().as_millis();
+    Ok(ScanResponse {
+        imported_days: rows.len(),
+        scanned_at: scanned_at.into(),
+        timezone: timezone.into(),
         metrics,
     })
 }
@@ -270,6 +558,14 @@ fn load_session_file_with_quota(
     timezone: &str,
 ) -> Result<(String, SessionQuotaRollup), String> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    parse_session_file_with_quota(&content, events, timezone)
+}
+
+fn parse_session_file_with_quota(
+    content: &str,
+    events: &mut Vec<UsageEvent>,
+    timezone: &str,
+) -> Result<(String, SessionQuotaRollup), String> {
     let mut previous_totals: Option<RawUsage> = None;
     let mut current_model: Option<String> = None;
     let mut current_model_is_fallback = false;
@@ -1868,5 +2164,321 @@ mod tests {
             }
         })
         .to_string()
+    }
+    fn scoped_fixture() -> (PathBuf, PathBuf, Connection) {
+        let directory = tempfile_dir();
+        let home = directory.join("codex");
+        fs::create_dir_all(home.join("sessions")).unwrap();
+        let db = crate::db::open_database(&directory.join("usage.sqlite")).unwrap();
+        (directory, home, db)
+    }
+
+    fn scoped_log(project: &str, tokens: i64, message: &str) -> String {
+        [
+            serde_json::json!({"timestamp":"2026-09-01T09:00:00Z", "type":"session_meta", "payload":{"cwd":project}}),
+            serde_json::json!({"timestamp":"2026-09-01T09:00:00Z", "type":"turn_context", "payload":{"model":"gpt-5", "cwd":project}}),
+            serde_json::json!({"timestamp":"2026-09-01T09:00:00Z", "type":"event_msg", "payload":{"type":"user_message", "message":message}}),
+            serde_json::json!({"timestamp":"2026-09-01T09:00:00Z", "type":"event_msg", "payload":{"type":"token_count", "info":{"last_token_usage":{"input_tokens":tokens,"output_tokens":10,"total_tokens":tokens+10}}, "rate_limits":{"primary":{"window_minutes":300,"used_percent":10}}}}),
+            serde_json::json!({"timestamp":"2026-09-01T09:01:00Z", "type":"event_msg", "payload":{"type":"token_count", "rate_limits":{"primary":{"window_minutes":300,"used_percent":12}}}}),
+        ].iter().map(Value::to_string).collect::<Vec<_>>().join("\n")
+    }
+
+    fn scoped_snapshot(db: &Connection) -> Vec<String> {
+        [
+            "SELECT rows_json FROM session_file_rollups ORDER BY path",
+            "SELECT models_json FROM daily_usage_rollups ORDER BY date",
+            "SELECT detail_json FROM project_session_index ORDER BY path",
+        ]
+        .into_iter()
+        .flat_map(|sql| {
+            db.prepare(sql)
+                .unwrap()
+                .query_map([], |row| row.get::<_, String>(0))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap()
+        })
+        .collect()
+    }
+
+    #[test]
+    fn session_rescan_updates_only_target_and_replaces_daily_totals() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let a = home.join("sessions/a.jsonl");
+        let b = home.join("sessions/b.jsonl");
+        fs::write(&a, scoped_log("/repo/a", 100, "before")).unwrap();
+        fs::write(&b, scoped_log("/repo/b", 200, "unrelated")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let original_b = serde_json::to_string(
+            &crate::db::query_session_detail(&db, b.to_str().unwrap()).unwrap(),
+        )
+        .unwrap();
+        fs::write(&a, scoped_log("/repo/a", 500, "after refresh")).unwrap();
+        fs::write(&b, scoped_log("/repo/b", 9999, "must remain cached")).unwrap();
+        for _ in 0..2 {
+            let result = rescan_session(
+                &mut db,
+                &pricing,
+                Some(home.clone()),
+                Some("UTC".into()),
+                a.to_str().unwrap(),
+            )
+            .unwrap();
+            assert_eq!(result.scan.metrics.files_parsed, 1);
+            assert_eq!(result.session.total_tokens, 510);
+            assert_eq!(
+                result.detail.summary.total_tokens,
+                result.session.total_tokens
+            );
+            assert_eq!(result.detail.summary.cost_usd, result.session.cost_usd);
+            assert!(result.detail.raw_jsonl.contains("after refresh"));
+            assert_eq!(
+                result.session.quota_usage.unwrap().five_hour[0].observed_delta_percent,
+                2.0
+            );
+            assert_eq!(
+                crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+                720
+            );
+            assert_eq!(
+                serde_json::to_string(
+                    &crate::db::query_session_detail(&db, b.to_str().unwrap()).unwrap()
+                )
+                .unwrap(),
+                original_b
+            );
+        }
+        let snapshot = scoped_snapshot(&db);
+        fs::remove_file(&a).unwrap();
+        assert!(rescan_session(
+            &mut db,
+            &pricing,
+            Some(home),
+            Some("UTC".into()),
+            a.to_str().unwrap()
+        )
+        .unwrap_err()
+        .contains("no longer exists"));
+        assert_eq!(scoped_snapshot(&db), snapshot);
+    }
+
+    #[test]
+    fn project_rescan_discovers_changes_new_sessions_and_cross_project_contexts() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let a = home.join("sessions/a.jsonl");
+        let b = home.join("sessions/b.jsonl");
+        let moved = home.join("sessions/moved.jsonl");
+        fs::write(&a, scoped_log("/repo/alpha", 100, "delete me")).unwrap();
+        fs::write(&b, scoped_log("/repo/beta", 200, "unrelated")).unwrap();
+        fs::write(&moved, scoped_log("/repo/alpha", 50, "moves to beta")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        fs::remove_file(&a).unwrap();
+        fs::write(&b, scoped_log("/repo/beta", 9999, "unrelated changed")).unwrap();
+        fs::write(&moved, scoped_log("/repo/beta", 75, "now beta")).unwrap();
+        fs::write(
+            home.join("sessions/new.jsonl"),
+            scoped_log("/repo/alpha", 300, "new session"),
+        )
+        .unwrap();
+        let cross = format!(
+            "{}\n{}",
+            scoped_log("/repo/beta", 40, "cross project"),
+            scoped_log("/repo/alpha", 60, "second cwd")
+        );
+        fs::write(home.join("sessions/cross.jsonl"), cross).unwrap();
+        let result = rescan_project(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            "/repo/alpha",
+        )
+        .unwrap();
+        assert_eq!(result.metrics.files_parsed, 3);
+        let sessions = crate::db::query_session_details(&db).unwrap();
+        assert_eq!(sessions.len(), 4);
+        assert_eq!(
+            sessions
+                .iter()
+                .find(|session| session.path == b.to_string_lossy())
+                .unwrap()
+                .total_tokens,
+            210
+        );
+        let daily = crate::db::query_all_daily_rows(&db).unwrap();
+        assert_eq!(daily[0].projects["/repo/alpha"].total_tokens, 380);
+        assert_eq!(daily[0].projects["/repo/beta"].total_tokens, 345);
+        assert_eq!(daily[0].total_tokens, 725);
+        let days = crate::project_sessions::query_days(
+            &db,
+            "/repo/alpha",
+            "custom:2026-09-01_2026-09-01",
+            "",
+            None,
+            "UTC",
+        )
+        .unwrap();
+        assert_eq!(days.total_sessions, 2);
+        rescan_project(
+            &mut db,
+            &pricing,
+            Some(home),
+            Some("UTC".into()),
+            "/repo/alpha",
+        )
+        .unwrap();
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+            725
+        );
+    }
+
+    #[test]
+    fn scoped_scans_resolve_archived_paths_and_deduplicate_copies() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let name = "rollout-2026-09-01T09-00-00-01977e3d-d9f6-72b7-93cf-f3f2f83c382c.jsonl";
+        let active = home.join("sessions").join(name);
+        let archived = home.join("archived_sessions").join(name);
+        fs::create_dir_all(archived.parent().unwrap()).unwrap();
+        fs::write(&active, scoped_log("/repo/a", 100, "active")).unwrap();
+        fs::copy(&active, &archived).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let result = rescan_session(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            active.to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result.session.path, active.to_string_lossy());
+        fs::remove_file(&active).unwrap();
+        fs::write(&archived, scoped_log("/repo/a", 500, "archived update")).unwrap();
+        let result = rescan_session(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            active.to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result.session.path, archived.to_string_lossy());
+        assert_eq!(crate::db::query_session_details(&db).unwrap().len(), 1);
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,
+            510
+        );
+        // A project scan also follows the cached ID when the file moves and its cwd changes.
+        fs::rename(&archived, &active).unwrap();
+        fs::write(&active, scoped_log("/repo/b", 600, "moved project")).unwrap();
+        rescan_project(&mut db, &pricing, Some(home), Some("UTC".into()), "/repo/a").unwrap();
+        assert_eq!(
+            crate::db::query_session_details(&db).unwrap()[0].total_tokens,
+            610
+        );
+        assert_eq!(
+            crate::db::query_all_daily_rows(&db).unwrap()[0].projects["/repo/b"].total_tokens,
+            610
+        );
+    }
+
+    #[test]
+    fn scans_roll_back_cache_totals_and_index_on_write_failure() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let path = home.join("sessions/a.jsonl");
+        fs::write(&path, scoped_log("/repo/a", 100, "initial")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let snapshot = scoped_snapshot(&db);
+        fs::write(&path, scoped_log("/repo/a", 500, "changed")).unwrap();
+        db.execute_batch("CREATE TRIGGER reject_scan BEFORE INSERT ON scan_runs BEGIN SELECT RAISE(ABORT, 'injected failure'); END;").unwrap();
+        assert!(rescan_session(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            path.to_str().unwrap()
+        )
+        .is_err());
+        assert_eq!(scoped_snapshot(&db), snapshot);
+        assert!(rescan_project(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            "/repo/a"
+        )
+        .is_err());
+        assert_eq!(scoped_snapshot(&db), snapshot);
+        assert!(scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into())).is_err());
+        assert_eq!(scoped_snapshot(&db), snapshot);
+    }
+
+    #[test]
+    fn concurrent_full_and_scoped_scans_keep_cache_and_totals_consistent() {
+        let (directory, home, mut db) = scoped_fixture();
+        let path = home.join("sessions/a.jsonl");
+        fs::write(&path, scoped_log("/repo/a", 100, "initial")).unwrap();
+        scan_codex_usage(
+            &mut db,
+            &PricingSource::embedded(),
+            Some(home.clone()),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        fs::write(&path, scoped_log("/repo/a", 500, "changed")).unwrap();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+        let threads = (0..3)
+            .map(|kind| {
+                let mut connection =
+                    crate::db::open_database(&directory.join("usage.sqlite")).unwrap();
+                let (home, path, barrier) = (home.clone(), path.clone(), barrier.clone());
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    match kind {
+                        0 => {
+                            scan_codex_usage(
+                                &mut connection,
+                                &PricingSource::embedded(),
+                                Some(home),
+                                Some("UTC".into()),
+                            )
+                            .unwrap();
+                        }
+                        1 => {
+                            rescan_session(
+                                &mut connection,
+                                &PricingSource::embedded(),
+                                Some(home),
+                                Some("UTC".into()),
+                                path.to_str().unwrap(),
+                            )
+                            .unwrap();
+                        }
+                        _ => {
+                            rescan_project(
+                                &mut connection,
+                                &PricingSource::embedded(),
+                                Some(home),
+                                Some("UTC".into()),
+                                "/repo/a",
+                            )
+                            .unwrap();
+                        }
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().unwrap();
+        }
+        let session = crate::db::query_session_details(&db).unwrap().remove(0);
+        let daily = crate::db::query_all_daily_rows(&db).unwrap().remove(0);
+        assert_eq!(daily.total_tokens, 510);
+        assert_eq!(daily.total_tokens, session.total_tokens);
+        assert_eq!(daily.cost_usd, session.cost_usd);
     }
 }
