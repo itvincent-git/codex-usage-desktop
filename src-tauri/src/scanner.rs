@@ -2204,8 +2204,8 @@ mod tests {
     #[test]
     fn session_rescan_updates_only_target_and_replaces_daily_totals() {
         let (_directory, home, mut db) = scoped_fixture();
-        let a = home.join("sessions/a.jsonl");
-        let b = home.join("sessions/b.jsonl");
+        let a = home.join("sessions").join("a.jsonl");
+        let b = home.join("sessions").join("b.jsonl");
         fs::write(&a, scoped_log("/repo/a", 100, "before")).unwrap();
         fs::write(&b, scoped_log("/repo/b", 200, "unrelated")).unwrap();
         let pricing = PricingSource::embedded();
@@ -2266,9 +2266,9 @@ mod tests {
     #[test]
     fn project_rescan_discovers_changes_new_sessions_and_cross_project_contexts() {
         let (_directory, home, mut db) = scoped_fixture();
-        let a = home.join("sessions/a.jsonl");
-        let b = home.join("sessions/b.jsonl");
-        let moved = home.join("sessions/moved.jsonl");
+        let a = home.join("sessions").join("a.jsonl");
+        let b = home.join("sessions").join("b.jsonl");
+        let moved = home.join("sessions").join("moved.jsonl");
         fs::write(&a, scoped_log("/repo/alpha", 100, "delete me")).unwrap();
         fs::write(&b, scoped_log("/repo/beta", 200, "unrelated")).unwrap();
         fs::write(&moved, scoped_log("/repo/alpha", 50, "moves to beta")).unwrap();
@@ -2278,7 +2278,7 @@ mod tests {
         fs::write(&b, scoped_log("/repo/beta", 9999, "unrelated changed")).unwrap();
         fs::write(&moved, scoped_log("/repo/beta", 75, "now beta")).unwrap();
         fs::write(
-            home.join("sessions/new.jsonl"),
+            home.join("sessions").join("new.jsonl"),
             scoped_log("/repo/alpha", 300, "new session"),
         )
         .unwrap();
@@ -2287,7 +2287,7 @@ mod tests {
             scoped_log("/repo/beta", 40, "cross project"),
             scoped_log("/repo/alpha", 60, "second cwd")
         );
-        fs::write(home.join("sessions/cross.jsonl"), cross).unwrap();
+        fs::write(home.join("sessions").join("cross.jsonl"), cross).unwrap();
         let result = rescan_project(
             &mut db,
             &pricing,
@@ -2388,7 +2388,7 @@ mod tests {
     #[test]
     fn scans_roll_back_cache_totals_and_index_on_write_failure() {
         let (_directory, home, mut db) = scoped_fixture();
-        let path = home.join("sessions/a.jsonl");
+        let path = home.join("sessions").join("a.jsonl");
         fs::write(&path, scoped_log("/repo/a", 100, "initial")).unwrap();
         let pricing = PricingSource::embedded();
         scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
@@ -2402,7 +2402,8 @@ mod tests {
             Some("UTC".into()),
             path.to_str().unwrap()
         )
-        .is_err());
+        .unwrap_err()
+        .contains("injected failure"));
         assert_eq!(scoped_snapshot(&db), snapshot);
         assert!(rescan_project(
             &mut db,
@@ -2411,16 +2412,21 @@ mod tests {
             Some("UTC".into()),
             "/repo/a"
         )
-        .is_err());
+        .unwrap_err()
+        .contains("injected failure"));
         assert_eq!(scoped_snapshot(&db), snapshot);
-        assert!(scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into())).is_err());
+        assert!(
+            scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into()))
+                .unwrap_err()
+                .contains("injected failure")
+        );
         assert_eq!(scoped_snapshot(&db), snapshot);
     }
 
     #[test]
     fn concurrent_full_and_scoped_scans_keep_cache_and_totals_consistent() {
         let (directory, home, mut db) = scoped_fixture();
-        let path = home.join("sessions/a.jsonl");
+        let path = home.join("sessions").join("a.jsonl");
         fs::write(&path, scoped_log("/repo/a", 100, "initial")).unwrap();
         scan_codex_usage(
             &mut db,
