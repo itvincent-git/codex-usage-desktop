@@ -1,4 +1,8 @@
 {
+  "3.14.2": {
+    "zh": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header\n- fix(e2e): preserve quota layout execute result types\n- fix(tests): use native paths in scoped scanner fixtures",
+    "en": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header\n- fix(e2e): preserve quota layout execute result types\n- fix(tests): use native paths in scoped scanner fixtures"
+  },
   "3.14.1": {
     "zh": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header\n- fix(e2e): preserve quota layout execute result types",
     "en": "- chore(homebrew): update cask to 3.13.2\n- feat: add targeted session and project refresh\n- fix: align modal refresh buttons with dashboard style\n- fix(projects): move daily quota summary into date header\n- fix(e2e): preserve quota layout execute result types"
