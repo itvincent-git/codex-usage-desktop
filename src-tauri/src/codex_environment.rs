@@ -175,7 +175,13 @@ fn select_windows_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, time::SystemTime};
+    use std::{
+        fs,
+        sync::atomic::{AtomicU64, Ordering},
+        time::SystemTime,
+    };
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn parses_default_wsl_environment_as_unc_path() {
@@ -270,8 +276,9 @@ mod tests {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = env::temp_dir().join(format!(
-            "codex-usage-environment-{}-{nanos}",
+            "codex-usage-environment-{}-{nanos}-{counter}",
             std::process::id()
         ));
         fs::create_dir_all(&path).unwrap();

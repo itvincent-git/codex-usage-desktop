@@ -1265,7 +1265,10 @@ mod tests {
 
     #[test]
     fn compressed_sessions_preserve_usage_replay_names_and_scoped_refreshes() {
-        for directory in ["sessions/2026/09/01", "archived_sessions"] {
+        for directory in [
+            Path::new("sessions").join("2026").join("09").join("01"),
+            PathBuf::from("archived_sessions"),
+        ] {
             let (_temporary, home, mut db) = scoped_fixture();
             let parent = home.join(directory);
             fs::create_dir_all(&parent).unwrap();
