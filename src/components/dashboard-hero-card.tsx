@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles, Building2 } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles, Building2, Wallet } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,10 @@ export function DashboardHeroCard({
   const membershipLabel = membershipLevel === "team" || membershipLevel === "business"
     ? "Business"
     : codexLimits?.membershipLevel;
+  const credits = codexLimits?.credits;
+  const creditsBalance = credits?.unlimited
+    ? t("limits.credits_unlimited")
+    : credits?.balance?.trim() || (credits?.hasCredits === false ? "0" : t("limits.credits_unavailable"));
 
   const activeTabDrivers = activeTab === "models" 
     ? topModels 
@@ -128,7 +132,7 @@ export function DashboardHeroCard({
               </div>
 
               {/* Account and Membership Info */}
-              {(codexLimits?.account || codexLimits?.workspaceName || codexLimits?.membershipLevel || subscriptionExpiryLabel) && (
+              {codexLimits && (
                 <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border/30 text-xs">
                   {codexLimits?.account && (
                     <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
@@ -168,6 +172,13 @@ export function DashboardHeroCard({
                       )}
                     </div>
                   )}
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-muted-foreground font-medium" data-testid="credits-balance">
+                    <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                    <span className="min-w-0">{t("limits.credits_balance")}: <span className="break-all font-mono text-foreground">{creditsBalance}</span></span>
+                    {codexLimits.creditsIsMock ? (
+                      <span className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">{t("limits.credits_mock")}</span>
+                    ) : null}
+                  </div>
                 </div>
               )}
             </div>

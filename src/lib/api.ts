@@ -152,9 +152,17 @@ export type CodexResetCredit = {
   expiresAt: string | null;
 };
 
+export type CodexCredits = {
+  hasCredits: boolean;
+  unlimited: boolean;
+  balance: string | null;
+};
+
 export type CodexLimitsResponse = {
   session: CodexLimitWindow | null;
   weekly: CodexLimitWindow | null;
+  credits?: CodexCredits | null;
+  creditsIsMock?: boolean;
   resetCreditsAvailableCount?: number | null;
   resetCredits?: CodexResetCredit[] | null;
   updatedAt: string;
