@@ -275,17 +275,6 @@ CODEX_USAGE_DEBUG_WINDOW_ACTIVATION=1 pnpm tauri dev
 
 In this mode, checking limits restores a simulated inactive window and starting it returns a simulated successful activation. The switch is ignored in release builds.
 
-To preview paid Codex credits without purchasing them, use a debug build with one of these overrides:
-
-```bash
-CODEX_USAGE_DEBUG_CREDITS=1250.5 pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=0 pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=unlimited pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=unavailable pnpm tauri dev
-```
-
-The override replaces only credits after a successful limits request and labels them as simulated data beside the account information. A working Codex login is still required. Non-negative finite numeric values preserve their original text; invalid values are ignored with a warning. Unset the variable and restart to restore real data. Release builds ignore this switch. Simulation verifies display and refresh behavior; confirming a funded account's actual server response requires a real funded account.
-
 Run the checks:
 
 ```bash

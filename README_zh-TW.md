@@ -275,17 +275,6 @@ CODEX_USAGE_DEBUG_WINDOW_ACTIVATION=1 pnpm tauri dev
 
 在此模式中，檢查額度會還原模擬的未啟用視窗，啟動視窗則會回傳模擬的成功啟用結果。正式發行版本會忽略此開關。
 
-若要在未購買 credits 的情況下預覽 Codex 付費餘額，可使用開發版本的模擬開關：
-
-```bash
-CODEX_USAGE_DEBUG_CREDITS=1250.5 pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=0 pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=unlimited pnpm tauri dev
-CODEX_USAGE_DEBUG_CREDITS=unavailable pnpm tauri dev
-```
-
-開關只會在額度查詢成功後覆寫 credits，並在帳號資訊旁標示「模擬資料」，仍需有效的 Codex 登入。接受非負有限數值並保留原始文字；無效值會記錄警告並保留真實資料。移除環境變數並重新啟動即可恢復真實餘額，正式發行版本會忽略此開關。模擬可驗證顯示與重新整理，已儲值帳號的實際伺服器回應仍需實測。
-
 執行檢查：
 
 ```bash
