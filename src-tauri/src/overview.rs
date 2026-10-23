@@ -1,8 +1,11 @@
 use crate::{
-    date::{date_key_in_timezone, list_date_keys, resolve_app_timezone, shift_date_key},
+    date::{
+        date_key_in_timezone, list_date_keys, list_hour_buckets_until, resolve_app_timezone,
+        shift_date_key,
+    },
     db::{
-        query_daily_quota_percents, query_daily_rows, query_latest_update_at,
-        query_model_quota_samples, ModelQuotaAggregate,
+        hourly_rollups_ready, query_all_session_file_rollups, query_daily_quota_percents,
+        query_daily_rows, query_latest_update_at, query_model_quota_samples, ModelQuotaAggregate,
     },
     pricing::{calculate_cost_usd, PricingSource},
     types::{
@@ -91,6 +94,61 @@ pub fn get_overview(
             }
         })
         .collect::<Vec<_>>();
+    let hourly = if matches!(range, "1d" | "2d") && hourly_rollups_ready(db, &timezone)? {
+        let buckets = list_hour_buckets_until(&start_date, &timezone, Utc::now())?;
+        let start_hour = buckets.first().map(|bucket| bucket.key.as_str()).unwrap_or_default();
+        let end_hour = buckets.last().map(|bucket| bucket.key.as_str()).unwrap_or_default();
+        let mut rows_by_hour = BTreeMap::<String, OverviewDailyRow>::new();
+        for row in query_all_session_file_rollups(db)?
+            .into_iter()
+            .flat_map(|rollup| rollup.hourly_rows)
+            .filter(|row| row.hour.as_str() >= start_hour && row.hour.as_str() <= end_hour)
+        {
+            let summary =
+                rows_by_hour
+                    .entry(row.hour.clone())
+                    .or_insert_with(|| OverviewDailyRow {
+                        date: row.hour,
+                        input_tokens: 0,
+                        cached_input_tokens: 0,
+                        output_tokens: 0,
+                        total_tokens: 0,
+                        cost_usd: 0.0,
+                        five_hour_percent: None,
+                        weekly_percent: None,
+                    });
+            summary.input_tokens += row.input_tokens;
+            summary.cached_input_tokens += row.cached_input_tokens;
+            summary.output_tokens += row.output_tokens;
+            summary.total_tokens += row.total_tokens;
+            summary.cost_usd += row
+                .models
+                .iter()
+                .map(|(model, usage)| {
+                    calculate_cost_usd(usage, pricing_source.pricing_for_model(model))
+                })
+                .sum::<f64>();
+        }
+        buckets.into_iter()
+            .map(|bucket| {
+                rows_by_hour.remove(&bucket.key).map(|mut row| {
+                    row.date = bucket.label.clone();
+                    row
+                }).unwrap_or(OverviewDailyRow {
+                    date: bucket.label,
+                    input_tokens: 0,
+                    cached_input_tokens: 0,
+                    output_tokens: 0,
+                    total_tokens: 0,
+                    cost_usd: 0.0,
+                    five_hour_percent: None,
+                    weekly_percent: None,
+                })
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     let input_tokens = daily.iter().map(|day| day.input_tokens).sum::<i64>();
     let cached_input_tokens = daily.iter().map(|day| day.cached_input_tokens).sum::<i64>();
@@ -202,6 +260,7 @@ pub fn get_overview(
         end_date,
         updated_at: query_latest_update_at(db)?,
         daily,
+        hourly,
         totals: OverviewTotals {
             input_tokens,
             cached_input_tokens,
@@ -552,9 +611,10 @@ fn project_display_name(project: &str) -> String {
 mod tests {
     use super::*;
     use crate::{
-        db::{open_database, upsert_daily_rows},
-        types::{DailyUsageRow, PricingStatus},
+        db::{open_database, upsert_daily_rows, upsert_session_file_rollups, SessionFileRollup},
+        types::{DailyUsageRow, HourlyUsageRow, PricingStatus},
     };
+    use chrono::Timelike;
 
     #[test]
     fn model_rows_expose_pricing_and_effective_cost_without_treating_unknown_as_free() {
@@ -587,6 +647,102 @@ mod tests {
         assert_eq!(unknown.pricing_status, PricingStatus::Unavailable);
         assert_eq!(unknown.input_cost_per_million_tokens, None);
         assert_eq!(unknown.effective_cost_per_million_tokens, None);
+    }
+
+    #[test]
+    fn one_day_overview_includes_continuous_hourly_usage_through_the_current_hour() {
+        let path = temp_db_path("hourly-overview");
+        let mut db = open_database(&path).unwrap();
+        let now = Utc::now();
+        let date = date_key_in_timezone(now, "UTC");
+        let hour = crate::date::local_hour_key(now, "UTC");
+        let usage = ModelUsage {
+            input_tokens: 1_000,
+            cached_input_tokens: 200,
+            output_tokens: 300,
+            total_tokens: 1_300,
+            ..Default::default()
+        };
+        let mut daily = daily_row(&date, 1_000, 200, 300, 1_300, 0.0);
+        daily.models = BTreeMap::from([("gpt-5".to_string(), usage.clone())]);
+        upsert_daily_rows(&mut db, &[daily.clone()]).unwrap();
+        upsert_session_file_rollups(
+            &mut db,
+            &[SessionFileRollup {
+                path: "/tmp/hourly.jsonl".to_string(),
+                modified_at_ms: 1,
+                size_bytes: 1,
+                rows: vec![daily],
+                hourly_rows: vec![HourlyUsageRow {
+                    hour: hour.clone(),
+                    input_tokens: usage.input_tokens,
+                    cached_input_tokens: usage.cached_input_tokens,
+                    output_tokens: usage.output_tokens,
+                    reasoning_output_tokens: usage.reasoning_output_tokens,
+                    total_tokens: usage.total_tokens,
+                    models: BTreeMap::from([("gpt-5".to_string(), usage)]),
+                }],
+                timezone: "UTC".to_string(),
+                prompt_title: None,
+                turn_count: 0,
+                quota_usage: None,
+            }],
+            &now.to_rfc3339(),
+        )
+        .unwrap();
+
+        let response = get_overview(
+            &db,
+            "1d",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap();
+
+        assert_eq!(response.hourly.len(), now.hour() as usize + 1);
+        assert_eq!(
+            response.hourly.first().unwrap().date,
+            format!("{date}T00:00+00:00")
+        );
+        let current = response.hourly.last().unwrap();
+        assert_eq!(current.date, format!("{date}T{:02}:00+00:00", now.hour()));
+        assert_eq!(current.total_tokens, 1_300);
+        assert!(current.cost_usd < 1.0);
+        assert_eq!(response.daily.len(), 1);
+        assert_eq!(response.totals.total_tokens, 1_300);
+
+        let two_day_response = get_overview(
+            &db,
+            "2d",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap();
+        assert_eq!(two_day_response.hourly.len(), now.hour() as usize + 25);
+        assert_eq!(
+            two_day_response.hourly.first().unwrap().date,
+            format!("{}T00:00+00:00", shift_date_key(&date, -1).unwrap())
+        );
+        assert_eq!(
+            two_day_response.hourly.last().unwrap().date,
+            format!("{date}T{:02}:00+00:00", now.hour())
+        );
+
+        db.execute(
+            "UPDATE session_file_rollups SET quota_parser_version = quota_parser_version - 1",
+            [],
+        )
+        .unwrap();
+        let stale_response = get_overview(
+            &db,
+            "1d",
+            Some("UTC".to_string()),
+            &PricingSource::embedded(),
+        )
+        .unwrap();
+        assert!(stale_response.hourly.is_empty());
+        assert_eq!(stale_response.totals.total_tokens, 1_300);
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

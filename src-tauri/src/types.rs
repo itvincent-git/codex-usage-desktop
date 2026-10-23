@@ -29,6 +29,18 @@ pub struct DailyUsageRow {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HourlyUsageRow {
+    pub hour: String,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub reasoning_output_tokens: i64,
+    pub total_tokens: i64,
+    pub models: BTreeMap<String, ModelUsage>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectUsage {
@@ -197,6 +209,7 @@ pub struct OverviewResponse {
     pub end_date: String,
     pub updated_at: Option<String>,
     pub daily: Vec<OverviewDailyRow>,
+    pub hourly: Vec<OverviewDailyRow>,
     pub totals: OverviewTotals,
     pub models: Vec<OverviewModelRow>,
     pub projects: Vec<OverviewProjectRow>,

@@ -20,6 +20,7 @@ export type OverviewResponse = {
     fiveHourPercent?: number | null;
     weeklyPercent?: number | null;
   }>;
+  hourly?: OverviewResponse["daily"];
   totals: {
     inputTokens: number;
     cachedInputTokens: number;

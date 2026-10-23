@@ -18,6 +18,7 @@ type UsageTrendsCardProps = {
   className?: string;
   title?: string;
   compact?: boolean;
+  hourly?: boolean;
 };
 
 const summaryStyles: Record<MetricCardKind, { accent: string; dot: string }> = {
@@ -94,14 +95,14 @@ export const UsageTrendTooltip = ({ active, payload, label, t, compact = false }
   return null;
 };
 
-export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className, title, compact = false }: UsageTrendsCardProps) {
+export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 300, className, title, compact = false, hourly = false }: UsageTrendsCardProps) {
   const { t } = useTranslation();
   const gradientId = useId().replace(/:/g, "");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<ChartSeriesKey>>(() => new Set());
   const trendData = daily.map((day) => ({
     date: day.date,
-    shortDate: formatTrendDateLabel(day.date),
+    shortDate: formatTrendDateLabel(day.date, hourly),
     inputTokens: Math.max(day.inputTokens - day.cachedInputTokens, 0),
     cachedInputTokens: day.cachedInputTokens,
     outputTokens: day.outputTokens,
@@ -143,6 +144,8 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const card = (
     <Card
       data-testid="usage-trends-card"
+      data-chart-granularity={hourly ? "hour" : "day"}
+      data-chart-points={trendData.length}
       className={cn(
         "rounded-lg h-full flex flex-col",
         className,

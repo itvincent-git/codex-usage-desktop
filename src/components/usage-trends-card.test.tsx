@@ -4,8 +4,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { UsageTrendsCard, UsageTrendTooltip } from "./usage-trends-card";
+import { formatTrendDateLabel } from "@/lib/usage-dashboard";
 
 describe("UsageTrendTooltip", () => {
+  it("formats hourly trend labels with the date and hour", () => {
+    expect(formatTrendDateLabel("2026-10-23T17:00+08:00", true)).toBe("10-23 17:00+08:00");
+    expect(formatTrendDateLabel("2026-10-23", false)).toBe("10-23");
+  });
+
   it("uses an opaque surface so dashboard content does not show through", () => {
     const { container } = render(
       <UsageTrendTooltip

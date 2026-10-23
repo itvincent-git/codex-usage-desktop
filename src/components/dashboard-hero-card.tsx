@@ -237,7 +237,8 @@ export function DashboardHeroCard({
 
           <div className="min-w-0 lg:h-full flex flex-col">
             <UsageTrendsCard
-              daily={overview.daily}
+              daily={overview.hourly?.length ? overview.hourly : overview.daily}
+              hourly={Boolean(overview.hourly?.length)}
               metrics={metrics}
               cacheHitRate={overview.totals.cacheHitRate}
               chartHeight="100%"
