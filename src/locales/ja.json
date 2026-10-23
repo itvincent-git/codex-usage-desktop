@@ -1,4 +1,14 @@
 {
+  "floating": {
+    "open": "利用枠フロート",
+    "title": "Codex 利用枠",
+    "drag": "ドラッグして移動",
+    "collapse": "利用枠ボールに縮小",
+    "expand": "利用枠を展開",
+    "ball_hint": "クリックで展開 · ドラッグで移動",
+    "resets": "{{time}} リセット",
+    "refresh_failed": "更新失敗 · データが古い可能性があります"
+  },
   "common": {
     "back": "戻る",
     "dashboard": "ダッシュボード",

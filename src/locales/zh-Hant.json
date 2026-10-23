@@ -1,4 +1,14 @@
 {
+  "floating": {
+    "open": "額度浮動視窗",
+    "title": "Codex 額度",
+    "drag": "拖曳以移動視窗",
+    "collapse": "收合為浮動球",
+    "expand": "展開額度浮動視窗",
+    "ball_hint": "點擊展開 · 拖曳移動",
+    "resets": "{{time}} 重設",
+    "refresh_failed": "重新整理失敗 · 目前資料可能已過期"
+  },
   "common": {
     "back": "返回",
     "dashboard": "儀表板",

@@ -2,7 +2,7 @@ import { createTauriCapabilities } from "@wdio/tauri-service";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const binaryName = process.platform === "win32" ? "codex-usage-desktop.exe" : "codex-usage-desktop";
 const appBinaryPath = `./src-tauri/target/debug/${binaryName}`;
@@ -12,9 +12,13 @@ let archivedSessionsHome: string | undefined;
 export const config: WebdriverIO.Config = {
   onPrepare() {
     const buildArgs = ["test:e2e:build"];
-    if (process.env.CODEX_USAGE_REFRESH_E2E === "1") {
+    if (process.env.CODEX_USAGE_REFRESH_E2E === "1" || process.env.CODEX_USAGE_QUOTA_E2E === "1") {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-refresh-e2e-"));
       process.env.CODEX_HOME = archivedSessionsHome;
+      if (process.env.CODEX_USAGE_QUOTA_E2E === "1") {
+        process.env.CODEX_CLI_PATH = resolve(`e2e/fixtures/quota-codex-cli.${process.platform === "win32" ? "cmd" : "cjs"}`);
+        process.env.CODEX_USAGE_QUOTA_RESET_BASE = String(Math.floor(Date.now() / 1000));
+      }
       buildArgs.push("--config", JSON.stringify({ identifier: `com.codexusage.desktop.e2e.refresh${Date.now()}` }));
     } else if (process.env.CODEX_USAGE_ARCHIVE_E2E === "1") {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-archive-e2e-"));

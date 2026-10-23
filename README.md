@@ -58,6 +58,8 @@ You can also show limit information directly in the **macOS menu bar or Windows 
 
 Live limits use your existing local Codex login.
 
+Click **Quota overlay** at the top of the main window for a compact pair of quota rings with local reset times. Collapse it to a floating ball showing only the remaining 5-hour quota; click the ball to expand, or drag it to move. Both modes stay on top, including macOS full-screen Spaces, and refresh every minute. The overlay continues working while the main window is hidden; hiding and reopening it preserves its position and mode for the current app session.
+
 ![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
 
 ### 🔍 Find what is using your tokens

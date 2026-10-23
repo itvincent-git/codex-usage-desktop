@@ -1,4 +1,14 @@
 {
+  "floating": {
+    "open": "额度悬浮窗",
+    "title": "Codex 额度",
+    "drag": "拖动以移动窗口",
+    "collapse": "收起为悬浮球",
+    "expand": "展开额度悬浮窗",
+    "ball_hint": "点击展开 · 拖动移动",
+    "resets": "{{time}} 重置",
+    "refresh_failed": "刷新失败 · 当前数据可能已过期"
+  },
   "common": {
     "back": "返回",
     "dashboard": "仪表盘",

@@ -1,4 +1,14 @@
 {
+  "floating": {
+    "open": "Quota overlay",
+    "title": "Codex quota",
+    "drag": "Drag to move",
+    "collapse": "Collapse to quota ball",
+    "expand": "Expand quota overlay",
+    "ball_hint": "Click to expand · Drag to move",
+    "resets": "Resets {{time}}",
+    "refresh_failed": "Refresh failed · Data may be out of date"
+  },
   "common": {
     "back": "Back",
     "dashboard": "Dashboard",

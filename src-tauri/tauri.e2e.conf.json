@@ -7,10 +7,11 @@
     "security": {
       "capabilities": [
         "default",
+        "quota",
         {
           "identifier": "e2e",
-          "windows": ["main"],
-          "permissions": ["wdio:default", "wdio-webdriver:default", "core:window:allow-set-focus"]
+          "windows": ["main", "quota"],
+          "permissions": ["wdio:default", "wdio-webdriver:default", "core:window:allow-set-focus", "core:window:allow-set-position", "core:window:allow-show", "core:window:allow-hide", "core:window:allow-set-fullscreen"]
         }
       ]
     }

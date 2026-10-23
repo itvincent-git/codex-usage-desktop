@@ -5,6 +5,13 @@
 @tailwind components;
 @tailwind utilities;
 
+html[data-quota-window="true"],
+html[data-quota-window="true"] body,
+html[data-quota-window="true"] #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
 @layer base {
   :root {
     --background: 250 250 250;
