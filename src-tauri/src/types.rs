@@ -308,25 +308,29 @@ pub enum CodexWindowActivationStatus {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
-    pub probability_24h: i64,
-    pub probability_48h: i64,
+    pub probability_24h: Option<i64>,
+    pub probability_48h: Option<i64>,
     pub updated_at: String,
     pub confidence: Option<String>,
     pub last_reset_at: Option<String>,
+    pub has_official_signal: bool,
     pub latest_alert: Option<CodexForecastAlert>,
-    pub recent_posts: Option<Vec<CodexForecastPost>>,
-    pub posts_stale: bool,
-    pub posts_updated_at: Option<String>,
+    pub evidence_posts: Option<Vec<CodexForecastPost>>,
+    pub evidence_stale: bool,
+    pub evidence_updated_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct CodexForecastPost {
     pub id: String,
     pub text: String,
     pub url: String,
     pub at: String,
-    pub signal: Option<String>,
+    #[serde(default)]
+    pub is_reply: bool,
+    #[serde(rename(deserialize = "in_reply_to_tweet_id", serialize = "replyToId"))]
+    pub reply_to_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -349,8 +353,10 @@ pub struct CodexForecastAlert {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct CodexForecastWindow {
+    pub label: Option<String>,
     pub start_at: Option<String>,
     pub end_at: Option<String>,
+    pub time_zone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

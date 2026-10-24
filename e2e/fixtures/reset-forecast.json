@@ -1,60 +1,44 @@
 {
   "probability24h": 39,
   "probability48h": 63,
-  "updatedAt": "2026-10-24T00:00:00.000Z",
+  "updatedAt": "2026-10-24T01:00:00.000Z",
   "confidence": "low",
   "lastResetAt": "2026-10-23T17:40:51.000Z",
+  "hasOfficialSignal": true,
   "latestAlert": {
-    "id": "forecast-fixture",
+    "id": "2113492502355562875",
     "kind": "watch",
     "state": "active",
-    "summary": "A global reset is planned for the announced window.",
+    "summary": "Tibo has announced a global reset within the next three hours.",
     "localizedSummary": null,
     "sourceAt": "2026-10-24T00:00:00.000Z",
     "url": "https://x.com/thsottiaux/status/2113492502355562875",
     "score": 93,
     "window": {
-      "startAt": "2026-10-24T01:00:00.000Z",
-      "endAt": "2026-10-24T03:00:00.000Z"
+      "label": "Within the next three hours",
+      "startAt": "2026-10-24T00:00:00.000Z",
+      "endAt": "2026-10-24T03:00:00.000Z",
+      "timeZone": "UTC"
     }
   },
-  "recentPosts": [
+  "evidencePosts": [
     {
-      "id": "1",
-      "text": "Codex CLI updates are now available.",
-      "url": "https://x.com/thsottiaux/status/1",
-      "at": "2026-10-24T00:04:00.000Z",
-      "signal": null
-    },
-    {
-      "id": "2",
-      "text": "Landing tomorrow before 10am PST.",
-      "url": "https://x.com/thsottiaux/status/2",
-      "at": "2026-10-24T00:03:00.000Z",
-      "signal": "expected"
-    },
-    {
-      "id": "3",
-      "text": "Today is reset day.",
-      "url": "https://x.com/thsottiaux/status/3",
-      "at": "2026-10-24T00:02:00.000Z",
-      "signal": "reset"
-    },
-    {
-      "id": "4",
-      "text": "We will see.",
-      "url": "https://x.com/thsottiaux/status/4",
-      "at": "2026-10-24T00:01:00.000Z",
-      "signal": "hint"
-    },
-    {
-      "id": "5",
-      "text": "More improvements to the CLI.",
-      "url": "https://x.com/thsottiaux/status/5",
+      "id": "2113492502355562875",
+      "text": "Landing within the next three hours.",
+      "url": "https://x.com/thsottiaux/status/2113492502355562875",
       "at": "2026-10-24T00:00:00.000Z",
-      "signal": null
+      "isReply": true,
+      "replyToId": "2113492187770175603"
+    },
+    {
+      "id": "2113492187770175603",
+      "text": "A global Codex reset is coming.",
+      "url": "https://x.com/thsottiaux/status/2113492187770175603",
+      "at": "2026-10-23T23:59:00.000Z",
+      "isReply": false,
+      "replyToId": null
     }
   ],
-  "postsStale": false,
-  "postsUpdatedAt": "2026-10-24T00:00:00.000Z"
+  "evidenceStale": false,
+  "evidenceUpdatedAt": "2026-10-24T01:00:00.000Z"
 }

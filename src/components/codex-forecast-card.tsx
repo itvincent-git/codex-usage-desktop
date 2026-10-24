@@ -3,11 +3,12 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { openUrl, type CodexQuotaForecastResponse } from "@/lib/api";
+import { openUrl, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const SOURCE_URL = "https://codex-reset.com/";
 const METHOD_URL = "https://codex-reset.com/forecast-method";
+const MAX_SIGNAL_AGE_MS = 5 * 60_000;
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
   return <a className="text-primary underline-offset-4 hover:underline" href={href} target="_blank" rel="noreferrer" onClick={(event) => {
@@ -16,39 +17,55 @@ function ExternalLink({ href, children }: { href: string; children: ReactNode })
   }}>{children}</a>;
 }
 
-export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
+export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets }: {
   data: CodexQuotaForecastResponse | null;
   error: string | null;
   isRefreshing: boolean;
   onRefresh: () => void;
+  resets?: CodexResetAnnouncement[] | null;
 }) {
   const { t, i18n } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const [now, setNow] = useState(Date.now);
+  const [, refreshClock] = useState(0);
+  const now = Date.now();
   const alert = data?.latestAlert;
-  const end = alert?.window?.endAt ? Date.parse(alert.window.endAt) : NaN;
-  const windowEnded = Number.isFinite(end) && end <= now;
-  const confirmed = alert?.kind === "reset" && alert.state === "confirmed";
-  const expired = alert?.state === "expired";
+  const end = Date.parse(alert?.window?.endAt ?? "");
+  const start = Date.parse(alert?.window?.startAt ?? "");
+  const sourceAt = Date.parse(alert?.sourceAt ?? "");
+  const updatedAt = Date.parse(data?.updatedAt ?? "");
+  const stale = !!error || !Number.isFinite(updatedAt) || now - updatedAt >= MAX_SIGNAL_AGE_MS;
+  const answered = Number.isFinite(sourceAt) && (
+    Date.parse(data?.lastResetAt ?? "") >= sourceAt
+    || resets?.some((reset) => reset.resetType === "regular" && Date.parse(reset.announcedAt) >= sourceAt)
+  );
   const pending = alert?.pending === "done" || alert?.pending === "on_its_way";
-  const active = alert?.kind === "watch" && (alert.state === "active" || pending) && !expired;
-  const waiting = active && (pending || windowEnded);
-  const status = waiting ? "waiting" : active ? "official" : confirmed ? "confirmed" : "no_signal";
-  const lastReset = data?.lastResetAt ?? (confirmed ? alert.observedAt ?? alert.confirmedAt : null);
+  const windowEnded = Number.isFinite(end) && end <= now;
+  const validWindow = Number.isFinite(end) && !windowEnded && (!Number.isFinite(start) || start <= end);
+  const watch = alert?.kind === "watch" && alert.state === "active" && !!alert.url
+    && Number.isFinite(sourceAt) && sourceAt <= now && !answered;
+  const promised = watch && data?.hasOfficialSignal && !pending && !windowEnded
+    && (alert.score === 83 || (alert.score === 93 && validWindow));
+  const status = stale ? "stale" : watch && pending ? "pending"
+    : promised ? validWindow ? "timed" : "untimed" : "no_signal";
+  const showEvidence = watch && (pending || promised);
+  const posts = data?.evidencePosts;
+  const original = posts?.find((post) => post.id === alert?.id || post.url === alert?.url);
+  const contextMissing = !original || posts?.some((post) => post.isReply
+    && (!post.replyToId || !posts.some((parent) => parent.id === post.replyToId)));
+  const evidenceStale = data?.evidenceStale || !Number.isFinite(Date.parse(data?.evidenceUpdatedAt ?? ""))
+    || now - Date.parse(data?.evidenceUpdatedAt ?? "") >= MAX_SIGNAL_AGE_MS;
   const formatDate = (value?: string | null) => {
     if (!value || !Number.isFinite(Date.parse(value))) return t("forecast.unknown");
     return new Date(value).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "short" });
   };
 
   useEffect(() => {
-    if (!active || !Number.isFinite(end)) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [active, end]);
+    if (!data) return;
+    const delay = end > now ? Math.min(30_000, end - now) : 30_000;
+    const timer = window.setTimeout(() => refreshClock((tick) => tick + 1), delay);
+    return () => window.clearTimeout(timer);
+  }, [data, end, now]);
 
-  const seconds = Math.max(0, Math.ceil((end - now) / 1000));
-  const countdown = `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const confidence = data?.confidence && ["low", "moderate", "medium", "high"].includes(data.confidence)
     ? t(`forecast.confidence_${data.confidence}`) : t("forecast.unknown");
 
@@ -56,10 +73,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
     <Card data-testid="global-reset-forecast" className="min-w-0 rounded-lg">
       <CardContent className="space-y-4 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-semibold">{t("forecast.title")}</h2>
-            {data ? <span data-testid="forecast-status" className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", active ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>{t(`forecast.status_${status}`)}</span> : null}
-          </div>
+          <h2 className="text-sm font-semibold">{t("forecast.title")}</h2>
           <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isRefreshing} aria-label={t(error && !data ? "forecast.retry" : "forecast.refresh")}>
             <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefreshing && "animate-spin")} aria-hidden="true" />
             {t(error && !data ? "forecast.retry" : "forecast.refresh")}
@@ -68,47 +82,38 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
         {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
         {!data && !error ? <p role="status" className="text-xs text-muted-foreground">{t("forecast.loading")}</p> : null}
         {data ? <>
-          <div data-testid="forecast-announcement" className={cn("space-y-2 rounded-md border p-3 text-xs leading-relaxed", active ? "border-warning/30 bg-warning/5" : "border-border bg-muted/20")}>
-            {alert ? <>
-              <p className="font-semibold">{t(confirmed ? "forecast.confirmed" : expired ? "forecast.expired" : active ? "forecast.status_official" : "forecast.latest_alert")}</p>
-              {alert.localizedSummary || alert.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
-              {alert.window && (alert.window.startAt || alert.window.endAt) ? <p>{t("forecast.window", { start: formatDate(alert.window.startAt), end: formatDate(alert.window.endAt) })}</p> : null}
-              {waiting ? <p className="text-warning">{t(windowEnded ? "forecast.window_ended" : "forecast.pending")}</p> : active && Number.isFinite(end) ? <p className="font-mono tabular-nums">{t("forecast.countdown", { time: countdown })}</p> : null}
-              {confirmed ? <p>{t("forecast.confirmed_at", { time: formatDate(alert.observedAt ?? alert.confirmedAt ?? data.lastResetAt) })}</p> : null}
-              {alert.url ? <ExternalLink href={alert.url}>{t("forecast.source")}</ExternalLink> : null}
-            </> : <p className="text-muted-foreground">{t("forecast.no_alert")}</p>}
+          <div data-testid="forecast-announcement" className={cn("space-y-2 rounded-md border p-3 text-xs leading-relaxed", promised && !stale ? "border-warning/30 bg-warning/5" : "border-border bg-muted/20")}>
+            <p data-testid="forecast-status" role="status" className="text-sm font-semibold">{t(`forecast.status_${status}`)}</p>
+            <p className="text-muted-foreground">{t(`forecast.description_${status}`)}</p>
+            {showEvidence ? <>
+              {alert?.localizedSummary || alert?.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
+              {!pending && validWindow ? <p>{t("forecast.window", { start: formatDate(alert?.window?.startAt), end: formatDate(alert?.window?.endAt) })}</p> : null}
+            </> : !stale && (windowEnded || alert?.state === "expired") && !answered ? <p className="text-muted-foreground">{t("forecast.expired")}</p> : null}
           </div>
-          <section aria-label={t("forecast.posts_title")} className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <h3 className="font-semibold">{t("forecast.posts_title")}</h3>
-              <ExternalLink href="https://x.com/thsottiaux">@thsottiaux ↗</ExternalLink>
-            </div>
-            <p className="text-[11px] text-muted-foreground">{t("forecast.posts_via")}</p>
-            {data.postsStale ? <p role="status" className="text-xs text-warning">{t("forecast.posts_stale")}</p> : null}
-            {data.recentPosts == null ? <p className="text-xs text-muted-foreground">{t("forecast.posts_unavailable")}</p> : data.recentPosts.length === 0 ? <p className="text-xs text-muted-foreground">{t("forecast.posts_empty")}</p> : <ul className="space-y-2">
-              {data.recentPosts.map((post) => <li key={post.id} data-post-signal={post.signal ?? "none"} className={cn("space-y-1.5 rounded-md border p-2.5 text-xs", post.signal ? "border-warning/25 bg-warning/5" : "border-border/60")}>
+          {showEvidence ? <section aria-label={t("forecast.evidence_title")} className="space-y-2 text-xs">
+            <h3 className="font-semibold">{t("forecast.evidence_title")}</h3>
+            <p className="text-[11px] text-muted-foreground">{t("forecast.evidence_via")}</p>
+            <dl className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
+              <div><dt className="text-muted-foreground">{t("forecast.published")}</dt><dd className="mt-1">{formatDate(alert?.sourceAt)}</dd></div>
+              <div><dt className="text-muted-foreground">{t("forecast.source")}</dt><dd className="mt-1"><ExternalLink href={alert!.url!}>@thsottiaux ↗</ExternalLink></dd></div>
+            </dl>
+            {!pending && alert?.window ? <p className="text-muted-foreground">{t("forecast.original_window", { label: alert.window.label ?? t("forecast.unknown"), zone: alert.window.timeZone ?? t("forecast.unknown") })}</p> : null}
+            {evidenceStale ? <p role="status" className="text-warning">{t("forecast.evidence_stale")}</p> : null}
+            {contextMissing ? <p className="text-warning">{t(posts == null ? "forecast.evidence_unavailable" : "forecast.context_missing")}</p> : null}
+            {original ? <ul className="space-y-2">
+              {posts!.map((post) => <li key={post.id} className="space-y-1.5 rounded-md border border-border/60 p-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {post.signal ? <span className="rounded bg-warning/10 px-1.5 py-0.5 font-medium text-warning">{t(`forecast.post_${post.signal}`)}</span> : null}
-                    <time dateTime={post.at} className="text-muted-foreground">{formatDate(post.at)}</time>
-                  </div>
-                  <ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink>
+                  <span className="font-medium">{t(post.id === original.id ? "forecast.original_post" : "forecast.context_post")}</span>
+                  <time dateTime={post.at} className="text-muted-foreground">{formatDate(post.at)}</time>
                 </div>
-                <p className="line-clamp-3 whitespace-pre-wrap break-words">{post.text}</p>
+                <blockquote className="whitespace-pre-wrap break-words">{post.text}</blockquote>
+                <ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink>
               </li>)}
-            </ul>}
-            {data.postsUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.posts_updated", { time: formatDate(data.postsUpdatedAt) })}</p> : null}
-          </section>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-            {([24, 48] as const).map((hours) => {
-              const probability = hours === 24 ? data.probability24h : data.probability48h;
-              return <span key={hours} data-forecast-horizon={`${hours}h`}>{t("forecast.horizon", { hours })} <span className="font-mono tabular-nums">{probability}%</span></span>;
-            })}
-          </div>
-          <dl className="grid gap-x-5 gap-y-2 text-[11px] sm:grid-cols-2">
-            <div><dt className="text-muted-foreground">{t("forecast.last_reset")}</dt><dd className="mt-1">{formatDate(lastReset)}</dd></div>
-            <div><dt className="text-muted-foreground">{t("forecast.updated")}</dt><dd className="mt-1">{formatDate(data.updatedAt)}</dd></div>
-          </dl>
+            </ul> : null}
+            {data.evidenceUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.evidence_updated", { time: formatDate(data.evidenceUpdatedAt) })}</p> : null}
+            {!pending && alert?.score != null ? <p className="text-[11px] text-muted-foreground">{t("forecast.signal_score", { score: alert.score })}</p> : null}
+          </section> : null}
+          <p className="text-[11px] text-muted-foreground">{t("forecast.updated", { time: formatDate(data.updatedAt) })}</p>
         </> : null}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-[11px]">
           <span>Data: <ExternalLink href={SOURCE_URL}>codex-reset.com</ExternalLink></span>
@@ -118,8 +123,14 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
         </div>
         {expanded && data ? <div id="forecast-details" className="space-y-3 border-t border-border/60 pt-3 text-xs leading-relaxed">
           <p className="text-muted-foreground">{t("forecast.scope")}</p>
-          <p>{t("forecast.confidence")}: {confidence}</p>
-          {alert?.score != null ? <p>{t("forecast.signal_score", { score: alert.score })}</p> : null}
+          {data.probability24h != null && data.probability48h != null ? <>
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              {([24, 48] as const).map((hours) => <span key={hours} data-forecast-horizon={`${hours}h`}>
+                {t("forecast.horizon", { hours })} <span className="font-mono tabular-nums">{hours === 24 ? data.probability24h : data.probability48h}%</span>
+              </span>)}
+            </div>
+            <p>{t("forecast.confidence")}: {confidence}</p>
+          </> : <p>{t("forecast.model_unavailable")}</p>}
           <p className="text-muted-foreground">{t("forecast.method")}</p>
           <ExternalLink href={METHOD_URL}>{t("forecast.method_link")}</ExternalLink>
         </div> : null}

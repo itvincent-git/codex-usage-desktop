@@ -15,10 +15,12 @@ const USER_AGENT: &str = concat!(
 
 #[derive(Deserialize)]
 struct Forecast {
+    mode: Option<String>,
     probabilities: Probabilities,
     updated_at: String,
     confidence: Option<String>,
     last_reset_at: Option<String>,
+    official_signal: Option<serde_json::Value>,
     latest_alert: Option<CodexForecastAlert>,
 }
 
@@ -26,79 +28,66 @@ struct Forecast {
 struct Probabilities {
     rounded_24h: i64,
     rounded_48h: i64,
+    model_24h: Option<i64>,
+    model_48h: Option<i64>,
 }
 
 fn parse(body: &str) -> Result<CodexQuotaForecastResponse, String> {
     let response: Forecast = serde_json::from_str(body)
         .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
     Ok(CodexQuotaForecastResponse {
-        probability_24h: response.probabilities.rounded_24h,
-        probability_48h: response.probabilities.rounded_48h,
+        // Scored Watch percentages must never be presented as a historical model.
+        probability_24h: response.probabilities.model_24h.or_else(|| {
+            (response.mode.as_deref() == Some("model"))
+                .then_some(response.probabilities.rounded_24h)
+        }),
+        probability_48h: response.probabilities.model_48h.or_else(|| {
+            (response.mode.as_deref() == Some("model"))
+                .then_some(response.probabilities.rounded_48h)
+        }),
         updated_at: response.updated_at,
-        confidence: response.confidence,
+        confidence: (response.mode.as_deref() == Some("model"))
+            .then_some(response.confidence)
+            .flatten(),
         last_reset_at: response.last_reset_at,
+        has_official_signal: response
+            .official_signal
+            .is_some_and(|signal| signal.is_object()),
         latest_alert: response.latest_alert,
-        recent_posts: None,
-        posts_stale: false,
-        posts_updated_at: None,
+        evidence_posts: None,
+        evidence_stale: false,
+        evidence_updated_at: None,
     })
 }
 
 #[derive(Deserialize)]
 struct Feed {
-    tweets: Vec<FeedPost>,
+    tweets: Vec<CodexForecastPost>,
     fetched_at: Option<String>,
     #[serde(default)]
     stale: bool,
 }
 
-#[derive(Deserialize)]
-struct FeedPost {
-    id: String,
-    text: String,
-    url: String,
-    at: String,
-    kind: Option<String>,
-    #[serde(default)]
-    explicit_reset_claim: bool,
-    tease_classification: Option<TeaseClassification>,
-}
-
-#[derive(Deserialize)]
-struct TeaseClassification {
-    #[serde(default)]
-    teasing: bool,
-}
-
-fn recent_posts(mut feed: Feed) -> Vec<CodexForecastPost> {
-    feed.tweets.sort_by(|a, b| b.at.cmp(&a.at));
-    feed.tweets
-        .into_iter()
-        .take(5)
-        .map(|post| {
-            let kind = post.kind.as_deref();
-            let text = post.text.to_ascii_lowercase();
-            let signal = if kind == Some("signal")
-                || (kind == Some("candidate")
-                    && (text.starts_with("landing ") || text.starts_with("lands ")))
-            {
-                Some("expected")
-            } else if matches!(kind, Some("reset" | "candidate")) || post.explicit_reset_claim {
-                Some("reset")
-            } else if post.tease_classification.is_some_and(|value| value.teasing) {
-                Some("hint")
-            } else {
-                None
-            };
-            CodexForecastPost {
-                id: post.id,
-                text: post.text,
-                url: post.url,
-                at: post.at,
-                signal: signal.map(str::to_string),
-            }
-        })
-        .collect()
+fn evidence_posts(
+    alert: &CodexForecastAlert,
+    posts: &[CodexForecastPost],
+) -> Vec<CodexForecastPost> {
+    let mut current = posts.iter().find(|post| {
+        alert.id.as_deref() == Some(post.id.as_str())
+            || alert.url.as_deref() == Some(post.url.as_str())
+    });
+    let mut evidence: Vec<CodexForecastPost> = Vec::new();
+    while let Some(post) = current {
+        if evidence.iter().any(|seen| seen.id == post.id) {
+            break;
+        }
+        evidence.push(post.clone());
+        current = post
+            .reply_to_id
+            .as_ref()
+            .and_then(|parent| posts.iter().find(|candidate| &candidate.id == parent));
+    }
+    evidence
 }
 
 fn request_feed(url: &str) -> Result<Feed, reqwest::Error> {
@@ -128,14 +117,7 @@ impl Cache {
         request: impl FnOnce() -> (Result<CodexQuotaForecastResponse, String>, Duration),
     ) -> Result<CodexQuotaForecastResponse, String> {
         if self.next_request.is_none_or(|next| now >= next) {
-            let (mut result, retry_after) = request();
-            if let (Ok(data), Some(Ok(previous))) = (&mut result, &self.result) {
-                if data.recent_posts.is_none() && previous.recent_posts.is_some() {
-                    data.recent_posts = previous.recent_posts.clone();
-                    data.posts_updated_at = previous.posts_updated_at.clone();
-                    data.posts_stale = true;
-                }
-            }
+            let (result, retry_after) = request();
             self.next_request = Some(now + retry_after.max(MIN_INTERVAL));
             self.locale = locale.to_string();
             self.result = Some(result);
@@ -170,13 +152,22 @@ pub fn fetch(locale: &str) -> Result<CodexQuotaForecastResponse, String> {
         .get_or_fetch(locale, Instant::now(), || {
             let (mut result, delay) = request(FORECAST_URL, locale);
             if let Ok(data) = &mut result {
-                match request_feed(FEED_URL) {
-                    Ok(feed) => {
-                        data.posts_stale = feed.stale;
-                        data.posts_updated_at = feed.fetched_at.clone();
-                        data.recent_posts = Some(recent_posts(feed));
+                if let Some(alert) = &data.latest_alert {
+                    if alert.kind.as_deref() == Some("watch")
+                        && alert.state.as_deref() == Some("active")
+                    {
+                        match request_feed(FEED_URL) {
+                            Ok(feed) => {
+                                data.evidence_stale = feed.stale;
+                                data.evidence_updated_at = feed.fetched_at;
+                                data.evidence_posts = Some(evidence_posts(alert, &feed.tweets));
+                            }
+                            Err(error) => {
+                                data.evidence_stale = true;
+                                log::warn!("Failed to load reset signal evidence: {error}");
+                            }
+                        }
                     }
-                    Err(error) => log::warn!("Failed to load Tibo posts: {error}"),
                 }
             }
             (result, delay)
@@ -255,7 +246,7 @@ mod tests {
     };
 
     fn fixture(alert: serde_json::Value) -> String {
-        json!({"probabilities":{"rounded_24h":0,"rounded_48h":100},
+        json!({"mode":"model", "official_signal":null, "probabilities":{"rounded_24h":0,"rounded_48h":100},
             "updated_at":"2026-10-24T00:00:00Z", "confidence":"low",
             "last_reset_at":"2026-10-23T00:00:00Z", "latest_alert":alert})
         .to_string()
@@ -264,7 +255,10 @@ mod tests {
     #[test]
     fn maps_documented_probabilities_and_null_signals() {
         let data = parse(&fixture(serde_json::Value::Null)).unwrap();
-        assert_eq!((data.probability_24h, data.probability_48h), (0, 100));
+        assert_eq!(
+            (data.probability_24h, data.probability_48h),
+            (Some(0), Some(100))
+        );
         assert_eq!(data.confidence.as_deref(), Some("low"));
         assert_eq!(data.updated_at, "2026-10-24T00:00:00Z");
         assert_eq!(data.last_reset_at.as_deref(), Some("2026-10-23T00:00:00Z"));
@@ -272,77 +266,96 @@ mod tests {
     }
 
     #[test]
-    fn maps_five_recent_posts_and_provider_signals_without_claiming_confirmation() {
-        let posts: Vec<_> = [
-            ("other", "I demand a reset", false),
-            ("codex", "We'll see", true),
-            ("candidate", "Today is reset day", false),
-            ("candidate", "Landing tomorrow before 10am PST", false),
-            ("signal", "Within the next two hours", false),
-            ("boost", "CLI updates", false),
-        ]
-        .into_iter()
-        .enumerate()
-        .map(|(i, (kind, text, teasing))| {
+    fn links_only_the_alert_and_its_reply_chain_even_outside_recent_posts() {
+        let mut tweets = vec![
             json!({
-                "id": i.to_string(), "text": text,
-                "url": format!("https://x.com/thsottiaux/status/{i}"),
-                "at": format!("2026-10-24T00:0{i}:00Z"), "kind": kind,
-                "reset_verification_status": "expired",
-                "tease_classification": { "teasing": teasing }
-            })
-        })
-        .collect();
-        let feed: Feed = serde_json::from_value(json!({ "tweets": posts })).unwrap();
-        let posts = recent_posts(feed);
-        assert_eq!(posts.len(), 5);
+                "id":"parent", "text":"A global reset is coming", "at":"2026-10-23T23:59:00Z",
+                "url":"https://x.com/thsottiaux/status/parent", "is_reply":false
+            }),
+            json!({
+                "id":"timing", "text":"Within two hours", "at":"2026-10-24T00:00:00Z",
+                "url":"https://x.com/thsottiaux/status/timing", "is_reply":true,
+                "in_reply_to_tweet_id":"parent", "explicit_reset_claim":false
+            }),
+        ];
+        for i in 0..8 {
+            tweets.push(json!({"id":i.to_string(), "text":"Unrelated update",
+                "at":"2026-10-24T01:00:00Z", "url":format!("https://x.com/thsottiaux/status/{i}"),
+                "kind":"signal", "explicit_reset_claim":true}));
+        }
+        let feed: Feed = serde_json::from_value(json!({"tweets":tweets})).unwrap();
+        let data = parse(&fixture(json!({"id":"timing"}))).unwrap();
+        let mut alert = data.latest_alert.unwrap();
+        let posts = evidence_posts(&alert, &feed.tweets);
         assert_eq!(
-            posts
-                .iter()
-                .map(|p| p.signal.as_deref())
-                .collect::<Vec<_>>(),
-            vec![
-                None,
-                Some("expected"),
-                Some("expected"),
-                Some("reset"),
-                Some("hint")
-            ]
+            posts.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+            vec!["timing", "parent"]
         );
-        assert_eq!(posts[0].id, "5");
-        assert_eq!(posts[1].url, "https://x.com/thsottiaux/status/4");
-        let feed: Feed = serde_json::from_value(json!({"tweets": [{
-            "id": "1", "text": "I demand a reset", "url": "https://x.com/thsottiaux/status/1",
-            "at": "2026-10-24T00:00:00Z", "kind": "other"
-        }]}))
-        .unwrap();
-        assert!(recent_posts(feed)[0].signal.is_none());
+        assert!(posts[0].is_reply);
+        assert_eq!(posts[0].reply_to_id.as_deref(), Some("parent"));
+        let encoded = serde_json::to_value(&posts).unwrap();
+        assert_eq!(encoded[0]["replyToId"], "parent");
+        alert.id = Some("different-id".into());
+        alert.url = Some("https://x.com/thsottiaux/status/timing".into());
+        assert_eq!(evidence_posts(&alert, &feed.tweets), posts);
+        alert.url = None;
+        assert!(evidence_posts(&alert, &feed.tweets).is_empty());
     }
 
     #[test]
-    fn retains_previous_posts_as_stale_when_only_the_feed_fails() {
+    fn stops_at_missing_parents_and_reply_cycles() {
+        let mut feed: Feed = serde_json::from_value(json!({"tweets":[{
+            "id":"1", "text":"Tomorrow", "at":"2026-10-24T00:00:00Z",
+            "url":"https://x.com/thsottiaux/status/1", "is_reply":true,
+            "in_reply_to_tweet_id":"missing"
+        }]}))
+        .unwrap();
+        let alert = parse(&fixture(json!({"id":"1"})))
+            .unwrap()
+            .latest_alert
+            .unwrap();
+        assert_eq!(evidence_posts(&alert, &feed.tweets).len(), 1);
+        feed.tweets[0].reply_to_id = Some("1".into());
+        assert_eq!(evidence_posts(&alert, &feed.tweets).len(), 1);
+    }
+
+    #[test]
+    fn separates_model_probabilities_from_rule_scores_and_preserves_active_signal() {
+        let mut body: serde_json::Value =
+            serde_json::from_str(&fixture(serde_json::Value::Null)).unwrap();
+        body["mode"] = json!("signal");
+        body["official_signal"] = json!({"summary":"Reset tomorrow"});
+        body["probabilities"] = json!({"rounded_24h":93,"rounded_48h":93});
+        let data = parse(&body.to_string()).unwrap();
+        assert!(data.has_official_signal);
+        assert!(data.confidence.is_none());
+        assert_eq!((data.probability_24h, data.probability_48h), (None, None));
+        body["probabilities"]["model_24h"] = json!(39);
+        body["probabilities"]["model_48h"] = json!(63);
+        let data = parse(&body.to_string()).unwrap();
+        assert_eq!(
+            (data.probability_24h, data.probability_48h),
+            (Some(39), Some(63))
+        );
+    }
+
+    #[test]
+    fn does_not_reuse_evidence_for_a_new_watch_when_the_feed_fails() {
         let now = Instant::now();
         let mut cache = Cache::default();
-        let mut first = parse(&fixture(serde_json::Value::Null)).unwrap();
-        first.recent_posts = Some(vec![CodexForecastPost {
-            id: "1".into(),
-            text: "Post".into(),
-            url: "https://x.com/thsottiaux/status/1".into(),
-            at: "2026-10-24T00:00:00Z".into(),
-            signal: None,
-        }]);
-        first.posts_updated_at = Some("2026-10-24T00:00:00Z".into());
+        let mut first = parse(&fixture(json!({"id":"old"}))).unwrap();
+        first.evidence_posts = Some(vec![]);
+        first.evidence_updated_at = Some("2026-10-24T00:00:00Z".into());
         cache
-            .get_or_fetch("en", now, || (Ok(first.clone()), MIN_INTERVAL))
+            .get_or_fetch("en", now, || (Ok(first), MIN_INTERVAL))
             .unwrap();
         let refreshed = cache
             .get_or_fetch("en", now + MIN_INTERVAL, || {
-                (parse(&fixture(serde_json::Value::Null)), MIN_INTERVAL)
+                (parse(&fixture(json!({"id":"new"}))), MIN_INTERVAL)
             })
             .unwrap();
-        assert_eq!(refreshed.recent_posts, first.recent_posts);
-        assert_eq!(refreshed.posts_updated_at, first.posts_updated_at);
-        assert!(refreshed.posts_stale);
+        assert!(refreshed.evidence_posts.is_none());
+        assert!(refreshed.evidence_updated_at.is_none());
     }
 
     #[test]
@@ -363,7 +376,7 @@ mod tests {
         handle.join().unwrap();
         assert!(feed.stale);
         assert_eq!(feed.fetched_at.as_deref(), Some("2026-10-24T00:00:00Z"));
-        assert!(recent_posts(feed).is_empty());
+        assert!(feed.tweets.is_empty());
     }
 
     #[test]
@@ -383,7 +396,10 @@ mod tests {
                 "observed_at":"2026-10-23T00:00:00Z"}),
             ))
             .unwrap();
-            assert_eq!((data.probability_24h, data.probability_48h), (0, 100));
+            assert_eq!(
+                (data.probability_24h, data.probability_48h),
+                (Some(0), Some(100))
+            );
             let encoded = serde_json::to_value(&data).unwrap();
             assert_eq!(encoded["probability24h"], 0);
             assert_eq!(encoded["probability48h"], 100);

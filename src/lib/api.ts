@@ -174,15 +174,16 @@ export type CodexWindowActivationResponse = {
 };
 
 export type CodexQuotaForecastResponse = {
-  probability24h: number;
-  probability48h: number;
+  probability24h: number | null;
+  probability48h: number | null;
   updatedAt: string;
   confidence: string | null;
   lastResetAt: string | null;
+  hasOfficialSignal: boolean;
   latestAlert: CodexForecastAlert | null;
-  recentPosts?: CodexForecastPost[] | null;
-  postsStale?: boolean;
-  postsUpdatedAt?: string | null;
+  evidencePosts: CodexForecastPost[] | null;
+  evidenceStale: boolean;
+  evidenceUpdatedAt: string | null;
 };
 
 export type CodexForecastPost = {
@@ -190,7 +191,8 @@ export type CodexForecastPost = {
   text: string;
   url: string;
   at: string;
-  signal: "reset" | "expected" | "hint" | (string & {}) | null;
+  isReply: boolean;
+  replyToId: string | null;
 };
 
 export type CodexForecastAlert = {
@@ -203,7 +205,7 @@ export type CodexForecastAlert = {
   localizedSummary?: string | null;
   url?: string | null;
   score?: number | null;
-  window?: { startAt?: string | null; endAt?: string | null } | null;
+  window?: { label?: string | null; startAt?: string | null; endAt?: string | null; timeZone?: string | null } | null;
   observedAt?: string | null;
   confirmedAt?: string | null;
 };

@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexForecastCard } from "./codex-forecast-card";
-import { openUrl, type CodexForecastAlert, type CodexQuotaForecastResponse } from "@/lib/api";
+import { openUrl, type CodexForecastAlert, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
 import fixture from "../../e2e/fixtures/reset-forecast.json";
 import i18n from "@/i18n";
 import { languageCodes, languages } from "@/lib/languages";
@@ -11,134 +11,161 @@ vi.mock("@/lib/api", () => ({ openUrl: vi.fn().mockResolvedValue(undefined) }));
 const props = { error: null, isRefreshing: false, onRefresh: vi.fn() };
 const data: CodexQuotaForecastResponse = fixture;
 const withAlert = (alert: CodexForecastAlert | null) => ({ ...data, latestAlert: alert });
-const expand = () => fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+const expand = () => fireEvent.click(screen.getByRole("button", { name: "Show historical reference" }));
+const status = () => screen.getByTestId("forecast-status");
 
 describe("CodexForecastCard", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-10-24T02:59:59Z"));
+    vi.setSystemTime(new Date("2026-10-24T01:00:00Z"));
   });
   afterEach(() => vi.useRealTimers());
 
-  it("shows historical probabilities including 0 and 100, local dates, and collapsed details", () => {
-    render(<CodexForecastCard {...props} data={{ ...data, probability24h: 0, probability48h: 100, latestAlert: null }} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  it("shows no reliable announcement for past resets and keeps history collapsed", () => {
+    render(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, probability24h: 0, probability48h: 100, latestAlert: {
+      kind: "reset", state: "confirmed", summary: "Old reset confirmed",
+    } }} />);
+    expect(status()).toHaveTextContent("No reliable announcement");
+    expect(screen.queryByText("Old reset confirmed")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    expect(screen.queryByText("100%")).not.toBeInTheDocument();
+    expand();
     expect(screen.getByText("0%")).toBeInTheDocument();
     expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.getByText(new Date(data.updatedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }), { selector: "dd" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show details" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(/The historical model uses/)).not.toBeInTheDocument();
-    expand();
-    expect(screen.getByText("No current announcement.")).toBeInTheDocument();
     expect(screen.getByText(/Waiting longer does not increase/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide details" }));
-    expect(screen.getByText("No current announcement.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide historical reference" }));
+    expect(screen.queryByText("100%")).not.toBeInTheDocument();
+    expect(status()).toHaveTextContent("No reliable announcement");
   });
 
-  it("separates official signal scores and opens source, original and method links", () => {
+  it("prioritizes an explicit timed promise and its full original evidence", () => {
     render(<CodexForecastCard {...props} data={data} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Official announcement");
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    for (const post of data.evidencePosts!) expect(screen.getByText(post.text)).toBeInTheDocument();
+    expect(screen.getByText("Reply context")).toBeInTheDocument();
+    expect(screen.getByText(/Original timing: Within the next three hours · UTC/)).toBeInTheDocument();
+    expect(screen.getByText(/Provider rule score: 93/)).toHaveTextContent("not a measured success rate");
+    expect(screen.queryByText("93%")).not.toBeInTheDocument();
+    expect(screen.queryByText("39%")).not.toBeInTheDocument();
+    expect(screen.queryByText(/context is missing/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "@thsottiaux ↗" }));
+    expect(openUrl).toHaveBeenCalledWith(data.latestAlert!.url);
+    fireEvent.click(screen.getAllByRole("link", { name: "View on X ↗" })[1]);
+    expect(openUrl).toHaveBeenCalledWith(data.evidencePosts![1].url);
+    fireEvent.click(screen.getByRole("link", { name: "codex-reset.com" }));
+    expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/");
+    expand();
     expect(screen.getByText("39%")).toBeInTheDocument();
     expect(screen.getByText("63%")).toBeInTheDocument();
-    const source = screen.getByRole("link", { name: "codex-reset.com" });
-    expect(source).toHaveAttribute("href", "https://codex-reset.com/");
-    fireEvent.click(source);
-    expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/");
-    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
-    expand();
-    expect(screen.getByText("Signal score: 93 (not a 24h / 48h probability)")).toBeInTheDocument();
-    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "View original post" }));
-    expect(openUrl).toHaveBeenCalledWith(data.latestAlert!.url);
     fireEvent.click(screen.getByRole("link", { name: "Forecast method and accuracy" }));
     expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/forecast-method");
   });
 
-  it("changes an ended window to waiting without confirming a reset", () => {
-    render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, window: { startAt: "2026-10-24T01:00:00Z", endAt: "2026-10-24T03:00:00Z" } })} />);
-    expand();
-    expect(screen.getByText("Window ends in 0:00:01")).toBeInTheDocument();
+  it("accepts an active untimed promise without inventing a date or success percentage", () => {
+    render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, score: 83, window: null })} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time unknown");
+    expect(screen.queryByText(/Expected window/)).not.toBeInTheDocument();
+    expect(screen.queryByText("83%")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { hasOfficialSignal: false },
+    { latestAlert: { ...data.latestAlert, state: "expired" } },
+    { latestAlert: { ...data.latestAlert, score: 50 } },
+    { latestAlert: { ...data.latestAlert, score: 93, window: null } },
+    { latestAlert: { ...data.latestAlert, sourceAt: "invalid" } },
+    { latestAlert: { ...data.latestAlert, sourceAt: "2026-10-24T02:00:00Z" } },
+    { latestAlert: { ...data.latestAlert, kind: "unknown" } },
+    { latestAlert: { ...data.latestAlert, url: null } },
+    { latestAlert: { ...data.latestAlert, window: { startAt: "2026-10-25T00:00:00Z", endAt: "2026-10-24T03:00:00Z" } } },
+    { lastResetAt: "2026-10-24T00:30:00Z" },
+  ])("does not promote inactive, unsupported or already answered signals: %j", (patch) => {
+    render(<CodexForecastCard {...props} data={{ ...data, ...patch }} />);
+    expect(status()).toHaveTextContent("No reliable announcement");
+    expect(screen.queryByText(data.latestAlert!.summary!)).not.toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+  });
+
+  it("expires a time window while the app stays open", () => {
+    render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, window: { endAt: "2026-10-24T01:00:01Z" } })} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
     act(() => vi.advanceTimersByTime(1000));
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Awaiting confirmation");
-    expect(screen.getByText("Announcement window ended; awaiting confirmation.")).toBeInTheDocument();
-    expect(screen.queryByText("Confirmed reset")).not.toBeInTheDocument();
-    expect(screen.getByText("39%")).toBeInTheDocument();
-    expect(screen.getByText(new Date(data.lastResetAt!).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }))).toBeInTheDocument();
+    expect(status()).toHaveTextContent("No reliable announcement");
+    expect(screen.getByText(/previous announcement has expired/)).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
-  it.each(["done", "on_its_way"])("shows pending %s as awaiting monitoring confirmation", (pending) => {
-    render(<CodexForecastCard {...props} data={withAlert({ kind: "watch", state: "active", pending })} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Awaiting confirmation");
-    expand();
+  it.each(["done", "on_its_way"])("treats pending %s as taking effect, outside the future prediction", (pending) => {
+    render(<CodexForecastCard {...props} data={{ ...withAlert({ ...data.latestAlert, pending, score: null, window: null }), hasOfficialSignal: false }} />);
+    expect(status()).toHaveTextContent("Taking effect");
     expect(screen.getByText(/awaiting monitoring confirmation/)).toBeInTheDocument();
-    expect(screen.queryByText("Confirmed reset")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Provider rule score/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Expected window/)).not.toBeInTheDocument();
   });
 
-  it("retains expired announcements and shows confirmed resets only from API confirmation", () => {
-    const { rerender } = render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, state: "expired" })} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
-    expand();
-    expect(screen.getByText("Expired announcement")).toBeInTheDocument();
-    const observedAt = "2026-10-24T02:00:00Z";
-    rerender(<CodexForecastCard {...props} data={{ ...data, lastResetAt: observedAt, latestAlert: { kind: "reset", state: "confirmed", observedAt } }} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Reset confirmed · codex-reset");
-    expect(screen.getByText(/Confirmed reset time:/)).toHaveTextContent(new Date(observedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }));
-    expect(screen.queryByText("Expired announcement")).not.toBeInTheDocument();
+  it("closes a promise using the existing regular reset source but ignores banked grants", () => {
+    const reset: CodexResetAnnouncement = { id: "existing-source", resetType: "banked", announcedAt: "2026-10-24T00:30:00Z", text: "Grant", source: { url: "https://example.com" } };
+    const { rerender } = render(<CodexForecastCard {...props} data={data} resets={[reset]} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+    rerender(<CodexForecastCard {...props} data={data} resets={[{ ...reset, resetType: "regular" }]} />);
+    expect(status()).toHaveTextContent("No reliable announcement");
+    expect(screen.queryByText("Grant")).not.toBeInTheDocument();
   });
 
-  it("keeps probabilities and dates when optional fields or alert states are unknown", () => {
-    render(<CodexForecastCard {...props} data={withAlert({ kind: "new", state: "new", summary: "Future API state" })} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
-    expect(screen.getByText("39%")).toBeInTheDocument();
-    expand();
-    expect(screen.getByText("Future API state")).toBeInTheDocument();
-    expect(screen.queryByText(/Confirmed reset time:/)).not.toBeInTheDocument();
+  it("labels missing, partial and stale evidence without substituting unrelated posts", () => {
+    const { rerender } = render(<CodexForecastCard {...props} data={{ ...data, evidencePosts: null }} />);
+    expect(screen.getByText(/original posts could not be loaded/)).toBeInTheDocument();
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+    rerender(<CodexForecastCard {...props} data={{ ...data, evidencePosts: [data.evidencePosts![0]] }} />);
+    expect(screen.getByText(/reply context is missing/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    rerender(<CodexForecastCard {...props} data={{ ...data, evidenceStale: true }} />);
+    expect(screen.getByText(/Evidence is out of date/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 
-  it("offers first-load retry and preserves data during refresh and later errors", () => {
+  it("marks an old snapshot as unknown and automatically rechecks freshness in the view", () => {
+    render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, score: 83, window: null })} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time unknown");
+    act(() => vi.advanceTimersByTime(5 * 60_000));
+    expect(status()).toHaveTextContent("Signal needs rechecking");
+    expect(screen.getByText(/Current validity is unknown/)).toBeInTheDocument();
+  });
+
+  it("uses the current wall clock after a clock adjustment and a fresh response", () => {
+    vi.setSystemTime(new Date("2026-10-24T01:10:00Z"));
+    const { rerender } = render(<CodexForecastCard {...props} data={data} />);
+    expect(status()).toHaveTextContent("Signal needs rechecking");
+    vi.setSystemTime(new Date("2026-10-24T01:00:00Z"));
+    rerender(<CodexForecastCard {...props} data={{ ...data }} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+  });
+
+  it("offers first-load retry and marks retained data as unverified after refresh failure", () => {
     const { rerender } = render(<CodexForecastCard {...props} data={null} error="offline" />);
     expect(screen.getByRole("alert")).toHaveTextContent("Unable to load");
-    expect(screen.getByRole("link", { name: "codex-reset.com" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry forecast" }));
     expect(props.onRefresh).toHaveBeenCalledTimes(1);
     rerender(<CodexForecastCard {...props} data={data} isRefreshing />);
-    expect(screen.getByText("39%")).toBeInTheDocument();
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
     expect(screen.getByRole("button", { name: "Refresh forecast" })).toBeDisabled();
     rerender(<CodexForecastCard {...props} data={data} error="offline" />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Showing the last available forecast");
-    expect(screen.getByText("39%")).toBeInTheDocument();
+    expect(status()).toHaveTextContent("Signal needs rechecking");
+    expect(screen.getByText(data.evidencePosts![0].text)).toBeInTheDocument();
+    rerender(<CodexForecastCard {...props} data={data} />);
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
   });
 
-  it("shows recent posts and reset labels before expanding, and opens their original links", () => {
-    render(<CodexForecastCard {...props} data={data} />);
-    expect(screen.getByRole("heading", { name: "Will Codex reset?" })).toBeInTheDocument();
-    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(5);
-    for (const post of data.recentPosts!) {
-      expect(screen.getByText(post.text)).toBeInTheDocument();
-    }
-    expect(screen.getByText("Expected reset")).toBeInTheDocument();
-    expect(screen.getByText("Reset signal")).toBeInTheDocument();
-    expect(screen.getByText("Reset hint")).toBeInTheDocument();
-    expect(screen.queryByText("Confirmed reset")).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("link", { name: "View on X ↗" })[1]);
-    expect(openUrl).toHaveBeenCalledWith(data.recentPosts![1].url);
-    fireEvent.click(screen.getByRole("link", { name: "@thsottiaux ↗" }));
-    expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux");
-  });
-
-  it("distinguishes unavailable, empty and stale feeds while retaining the announcement", () => {
-    const { rerender } = render(<CodexForecastCard {...props} data={{ ...data, recentPosts: null }} />);
-    expect(screen.getByText(/Tibo posts are unavailable/)).toBeInTheDocument();
-    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
-    rerender(<CodexForecastCard {...props} data={{ ...data, recentPosts: [] }} />);
-    expect(screen.getByText("No recent posts.")).toBeInTheDocument();
-    rerender(<CodexForecastCard {...props} data={{ ...data, postsStale: true }} />);
-    expect(screen.getByText(/Showing older posts/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+  it("does not label an unavailable model as historical probability", () => {
+    render(<CodexForecastCard {...props} data={{ ...data, probability24h: null, probability48h: null }} />);
+    expand();
+    expect(screen.getByText(/separate historical baseline is unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText("93%")).not.toBeInTheDocument();
   });
 
   it.each(languageCodes)("provides all labels and localized summaries in %s", async (language) => {
@@ -146,7 +173,7 @@ describe("CodexForecastCard", () => {
     expect(Object.keys(languages[language].translations.forecast).sort()).toEqual(Object.keys(languages.en.translations.forecast).sort());
     render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, localizedSummary: "Localized fixture" })} />);
     expect(screen.getByText(languages[language].translations.forecast.title)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: languages[language].translations.forecast.details }));
     expect(screen.getByText("Localized fixture")).toBeInTheDocument();
+    expect(screen.getByText(data.evidencePosts![0].text)).toBeInTheDocument();
   });
 });

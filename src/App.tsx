@@ -386,7 +386,7 @@ export default function App() {
                   onOpenResetCredits={() => void handleOpenResetCredits()}
                 />
               </div>
-              <CodexForecastCard {...forecast} onRefresh={() => void forecast.refresh()} />
+              <CodexForecastCard {...forecast} resets={recentCodexResets} onRefresh={() => void forecast.refresh()} />
             </div>
           ) : null}
 

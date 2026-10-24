@@ -1,24 +1,27 @@
 import { $, browser, expect } from "@wdio/globals";
-import type { CodexQuotaForecastResponse } from "../src/lib/api";
+import type { CodexQuotaForecastResponse, CodexResetAnnouncement } from "../src/lib/api";
 import fixture from "./fixtures/reset-forecast.json";
 
-async function setRemoteForecast(data: CodexQuotaForecastResponse | null) {
+async function setRemoteForecast(data: CodexQuotaForecastResponse | null, resets: CodexResetAnnouncement[] = []) {
   // Only remote responses are fixed; local usage still comes through native IPC.
   // Intercept the transport because Tauri's invoke property is read-only.
-  await browser.execute((data) => {
+  await browser.execute(({ data, resets }) => {
     const runtime = (window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string, protocol: string) => string } }).__TAURI_INTERNALS__;
     const forecastUrl = runtime.convertFileSrc("fetch_codex_quota_forecast", "ipc");
     const limitsUrl = runtime.convertFileSrc("fetch_codex_limits", "ipc");
+    const historyUrl = runtime.convertFileSrc("fetch_codex_reset_history", "ipc");
+    const latestUrl = runtime.convertFileSrc("fetch_latest_codex_reset", "ipc");
     const fetch = window.fetch.bind(window);
     window.fetch = (input, options) => {
       const url = String(input);
-      if (url !== forecastUrl && url !== limitsUrl) return fetch(input, options);
-      const error = url === limitsUrl || data === null;
-      return Promise.resolve(new Response(JSON.stringify(error ? "Forecast fixture unavailable / unauthorized" : data), {
+      if (![forecastUrl, limitsUrl, historyUrl, latestUrl].includes(url)) return fetch(input, options);
+      const error = url === limitsUrl || (url === forecastUrl && data === null);
+      const response = url === historyUrl ? resets : url === latestUrl ? resets[0] ?? null : data;
+      return Promise.resolve(new Response(JSON.stringify(error ? "Forecast fixture unavailable / unauthorized" : response), {
         headers: { "Content-Type": "application/json", "Tauri-Response": error ? "error" : "ok" },
       }));
     };
-  }, data);
+  }, { data, resets });
 }
 
 async function refreshForecast() {
@@ -47,15 +50,15 @@ describe("global reset forecast", () => {
     // responses, so a late native completion cannot overwrite the fixture.
     const rescan = $('button=Rescan local logs');
     await rescan.waitForEnabled({ timeout: 90_000 });
-    await rescan.click();
-    await rescan.waitForEnabled({ timeout: 90_000 });
     await browser.execute(() => { Date.now = () => Date.parse("2026-10-24T01:00:00Z"); });
     await setRemoteForecast(fixture);
+    await rescan.click();
+    await rescan.waitForEnabled({ timeout: 90_000 });
     const card = $('[data-testid="global-reset-forecast"]');
     const refresh = card.$('button');
     await refresh.click();
     await $('[data-testid="forecast-status"]').waitForDisplayed();
-    await expect($('[data-testid="forecast-status"]')).toHaveText("Official announcement");
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
   });
 
   after(async () => {
@@ -67,92 +70,97 @@ describe("global reset forecast", () => {
     await browser.refresh();
   });
 
-  it("shows both probabilities and independent data when the account request fails", async () => {
+  it("prioritizes the explicit promise and evidence independently of account access", async () => {
     await $('button=Check limits').waitForEnabled();
     await $('button=Check limits').click();
-    await expect($('[data-testid="global-reset-forecast"]')).toHaveText(expect.stringContaining("39%"));
-    await expect($('[data-testid="global-reset-forecast"]')).toHaveText(expect.stringContaining("63%"));
-    await expect($('[data-testid="global-reset-forecast"] [role="progressbar"]')).not.toExist();
+    const card = $('[data-testid="global-reset-forecast"]');
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
+    await expect(card).not.toHaveText(expect.stringContaining("39%"));
+    await expect(card).not.toHaveText(expect.stringContaining("63%"));
+    await expect(card).not.toHaveText(expect.stringContaining("93%"));
     await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining(fixture.latestAlert.summary));
-    const loginNotice = $('span=Not Logged In / 尚未登录');
-    await loginNotice.waitForExist();
-    await loginNotice.scrollIntoView({ block: "center" });
-    await expect(loginNotice).toBeDisplayed();
-    await $('[data-testid="global-reset-forecast"]').scrollIntoView({ block: "center" });
+    const evidence = $('[aria-label="Evidence for this signal"]');
+    await expect(evidence.$$('li')).toBeElementsArrayOfSize(2);
+    await expect(evidence).toHaveText(expect.stringContaining(fixture.evidencePosts[0].text));
+    await expect(evidence).toHaveText(expect.stringContaining(fixture.evidencePosts[1].text));
+    await expect(evidence).toHaveText(expect.stringContaining("not a measured success rate"));
+    await expect(evidence).toHaveText(expect.stringContaining("Within the next three hours · UTC"));
+    await expect($('a=@thsottiaux ↗')).toHaveAttribute("href", fixture.latestAlert.url);
     await expect($('[data-testid="quota-forecast"]')).not.toExist();
     await expect($('a=codex-reset.com')).toHaveAttribute("href", "https://codex-reset.com/");
-    await expect($('button=Show details')).toHaveAttribute("aria-expanded", "false");
+    await expect($('button=Show historical reference')).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("keeps the announcement visible and expands the supporting forecast details", async () => {
-    await $('button=Show details').scrollIntoView({ block: "center" });
-    await $('button=Show details').click();
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining(fixture.latestAlert.summary));
-    await expect($('#forecast-details')).toHaveText(expect.stringContaining("Signal score: 93 (not a 24h / 48h probability)"));
-    await expect($('a=View original post')).toHaveAttribute("href", fixture.latestAlert.url);
+  it("expands background history without hiding the signal or its evidence", async () => {
+    await $('button=Show historical reference').click();
+    await expect($('[data-forecast-horizon="24h"]')).toHaveText(expect.stringContaining("39%"));
+    await expect($('[data-forecast-horizon="48h"]')).toHaveText(expect.stringContaining("63%"));
+    await expect($('[aria-label="Evidence for this signal"]')).toHaveText(expect.stringContaining(fixture.evidencePosts[0].text));
     await expect($('a=Forecast method and accuracy')).toHaveAttribute("href", "https://codex-reset.com/forecast-method");
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("Window ends in 2:00:00"));
-    await $('button=Hide details').click();
+    await $('button=Hide historical reference').click();
     await expect($('#forecast-details')).not.toExist();
   });
 
-  it("shows recent Tibo posts and distinguishes reset signals from expected times", async () => {
-    const posts = $('[aria-label="Latest from Tibo on X"]');
-    await expect(posts.$$('li')).toBeElementsArrayOfSize(5);
-    await expect(posts.$('[data-post-signal="expected"]')).toHaveText(expect.stringContaining("Expected reset"));
-    await expect(posts.$('[data-post-signal="reset"]')).toHaveText(expect.stringContaining("Reset signal"));
-    await expect(posts.$('[data-post-signal="hint"]')).toHaveText(expect.stringContaining("Reset hint"));
-    await expect(posts.$('[data-post-signal="none"]')).not.toHaveText(expect.stringContaining("Reset signal"));
-    await expect(posts.$('[data-post-signal="expected"] a')).toHaveAttribute("href", fixture.recentPosts[1].url);
-    await expect(posts.$('a=@thsottiaux ↗')).toHaveAttribute("href", "https://x.com/thsottiaux");
-    await expect($('button=Show details')).toHaveAttribute("aria-expanded", "false");
-    await setRemoteForecast({ ...fixture, postsStale: true });
+  it("distinguishes untimed promises and incomplete or stale evidence", async () => {
+    await setRemoteForecast({ ...fixture, latestAlert: { ...fixture.latestAlert, score: 83, window: null } });
     await refreshForecast();
-    await expect(posts).toHaveText(expect.stringContaining("Showing older posts"));
-    await expect(posts.$$('li')).toBeElementsArrayOfSize(5);
-    await setRemoteForecast({ ...fixture, recentPosts: null });
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time unknown");
+    const evidence = $('[aria-label="Evidence for this signal"]');
+    await setRemoteForecast({ ...fixture, evidencePosts: [fixture.evidencePosts[0]] });
     await refreshForecast();
-    await expect(posts).toHaveText(expect.stringContaining("Tibo posts are unavailable"));
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining(fixture.latestAlert.summary));
+    await expect(evidence).toHaveText(expect.stringContaining("reply context is missing"));
+    await expect(evidence.$$('li')).toBeElementsArrayOfSize(1);
+    await setRemoteForecast({ ...fixture, evidencePosts: null, evidenceStale: true });
+    await refreshForecast();
+    await expect(evidence).toHaveText(expect.stringContaining("original posts could not be loaded"));
+    await expect(evidence).toHaveText(expect.stringContaining("Evidence is out of date"));
+    await expect(evidence.$$('li')).toBeElementsArrayOfSize(0);
+  });
+
+  it("rejects stale feed labels, expired windows, fulfilled promises and past reset alerts", async () => {
+    const cases: CodexQuotaForecastResponse[] = [
+      { ...fixture, hasOfficialSignal: false },
+      { ...fixture, latestAlert: { ...fixture.latestAlert, state: "expired" } },
+      { ...fixture, latestAlert: { ...fixture.latestAlert, window: { endAt: "2026-10-24T00:00:00Z" } } },
+      { ...fixture, lastResetAt: "2026-10-24T00:30:00Z" },
+      { ...fixture, latestAlert: { kind: "reset", state: "confirmed", summary: "Old reset confirmed" } },
+    ];
+    for (const data of cases) {
+      await setRemoteForecast(data);
+      await refreshForecast();
+      await expect($('[data-testid="forecast-status"]')).toHaveText("No reliable announcement");
+      await expect($('[aria-label="Evidence for this signal"]')).not.toExist();
+      await expect($('[data-testid="forecast-announcement"]')).not.toHaveText(expect.stringContaining("Old reset confirmed"));
+    }
+  });
+
+  it("separates taking effect from a future prediction and marks outdated snapshots", async () => {
+    await setRemoteForecast({ ...fixture, hasOfficialSignal: false, latestAlert: { ...fixture.latestAlert, pending: "done", window: null, score: null } });
+    await refreshForecast();
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Taking effect");
+    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("awaiting monitoring confirmation"));
+    await setRemoteForecast({ ...fixture, updatedAt: "2026-10-24T00:50:00Z" });
+    await refreshForecast();
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Signal needs rechecking");
+    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("Current validity is unknown"));
+  });
+
+  it("retains evidence after a failed refresh but revalidates before restoring a strong signal", async () => {
     await setRemoteForecast(fixture);
     await refreshForecast();
-  });
-
-  it("renders pending, ended, expired and confirmed states without changing probabilities", async () => {
-    await setRemoteForecast({ ...fixture, latestAlert: { ...fixture.latestAlert, pending: "done", window: null, score: null } });
-    await refreshForecast();
-    await expect($('[data-testid="forecast-status"]')).toHaveText("Awaiting confirmation");
-    await $('button=Show details').click();
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("awaiting monitoring confirmation"));
-
-    await setRemoteForecast({ ...fixture, latestAlert: { ...fixture.latestAlert, window: { endAt: "2026-10-24T00:00:00Z" } } });
-    await refreshForecast();
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("Announcement window ended; awaiting confirmation."));
-    await expect($('[data-testid="forecast-announcement"]')).not.toHaveText(expect.stringContaining("Confirmed reset time:"));
-
-    await setRemoteForecast({ ...fixture, latestAlert: { ...fixture.latestAlert, state: "expired" } });
-    await refreshForecast();
-    await expect($('[data-testid="forecast-status"]')).toHaveText("No official reset signal");
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("Expired announcement"));
-
-    await setRemoteForecast({ ...fixture, latestAlert: { kind: "reset", state: "confirmed", observedAt: fixture.lastResetAt } });
-    await refreshForecast();
-    await expect($('[data-testid="forecast-announcement"]')).toHaveText(expect.stringContaining("Confirmed reset time:"));
-    await expect($('[data-forecast-horizon="24h"]')).toHaveText(expect.stringContaining("39%"));
-    await $('button=Hide details').click();
-  });
-
-  it("retains the last data after a failed refresh", async () => {
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
     await setRemoteForecast(null);
     await refreshForecast();
-    await expect($('[data-testid="global-reset-forecast"] [role="alert"]')).toHaveText("Update failed. Showing the last available forecast.");
-    await expect($('[data-forecast-horizon="48h"]')).toHaveText(expect.stringContaining("63%"));
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Signal needs rechecking");
+    await expect($('[data-testid="global-reset-forecast"] [role="alert"]')).toHaveText("Update failed. The previous signal needs rechecking.");
+    await expect($('[aria-label="Evidence for this signal"]')).toHaveText(expect.stringContaining(fixture.evidencePosts[0].text));
     await setRemoteForecast(fixture);
     await refreshForecast();
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
     await expect($('[data-testid="global-reset-forecast"] [role="alert"]')).not.toExist();
   });
 
-  it("fits below the quota card at minimum and common desktop widths", async () => {
+  it("fits below the quota card with evidence visible at minimum and common widths", async () => {
     for (const width of [1100, 1440]) {
       await browser.setWindowSize(width, 960);
       const card = $('[data-testid="global-reset-forecast"]');
@@ -160,15 +168,15 @@ describe("global reset forecast", () => {
       const layout = await card.execute((element) => {
         const bounds = element.getBoundingClientRect();
         const quota = element.previousElementSibling!.getBoundingClientRect();
-        return { below: bounds.top >= quota.bottom, fits: element.scrollWidth <= element.clientWidth, inWindow: bounds.right <= window.innerWidth, columns: element.querySelectorAll('[data-forecast-horizon]').length };
+        return { below: bounds.top >= quota.bottom, fits: element.scrollWidth <= element.clientWidth, inWindow: bounds.right <= window.innerWidth };
       });
-      expect(layout).toEqual({ below: true, fits: true, inWindow: true, columns: 2 });
+      expect(layout).toEqual({ below: true, fits: true, inWindow: true });
       await browser.saveScreenshot(`/tmp/codex-reset-forecast-${width}.png`);
-      await $('button=Show details').click();
+      await $('button=Show historical reference').click();
       expect(await $('#forecast-details').execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       await $("#forecast-details").scrollIntoView({ block: "end" });
       await browser.saveScreenshot(`/tmp/codex-reset-forecast-${width}-details.png`);
-      await $('button=Hide details').click();
+      await $('button=Hide historical reference').click();
     }
   });
 });
