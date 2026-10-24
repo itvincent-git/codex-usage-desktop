@@ -175,8 +175,26 @@ export type CodexWindowActivationResponse = {
 
 export type CodexQuotaForecastResponse = {
   probability24h: number;
-  score: number;
-  fetchedAt: string;
+  probability48h: number;
+  updatedAt: string;
+  confidence: string | null;
+  lastResetAt: string | null;
+  latestAlert: CodexForecastAlert | null;
+};
+
+export type CodexForecastAlert = {
+  id?: string | null;
+  kind?: "watch" | "reset" | (string & {}) | null;
+  state?: "active" | "expired" | "confirmed" | (string & {}) | null;
+  pending?: "done" | "on_its_way" | (string & {}) | null;
+  sourceAt?: string | null;
+  summary?: string | null;
+  localizedSummary?: string | null;
+  url?: string | null;
+  score?: number | null;
+  window?: { startAt?: string | null; endAt?: string | null } | null;
+  observedAt?: string | null;
+  confirmedAt?: string | null;
 };
 
 export type CodexResetAnnouncement = {
@@ -238,8 +256,8 @@ export async function activateCodexWindow(): Promise<CodexWindowActivationRespon
   return invoke<CodexWindowActivationResponse>("activate_codex_window");
 }
 
-export async function fetchCodexQuotaForecast(): Promise<CodexQuotaForecastResponse> {
-  return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast");
+export async function fetchCodexQuotaForecast(locale: string): Promise<CodexQuotaForecastResponse> {
+  return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast", { locale });
 }
 
 export async function fetchLatestCodexReset(): Promise<CodexResetAnnouncement | null> {

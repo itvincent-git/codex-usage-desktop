@@ -567,11 +567,14 @@ describe("App", () => {
     expect(await screen.findByText("cached quota schema mismatch")).toBeInTheDocument();
   });
 
-  it("opens the external quota forecast when the forecast badge is clicked", async () => {
+  it("opens the codex-reset source from the independent forecast card", async () => {
     forecastInvokeMock.mockResolvedValue({
       probability24h: 61,
-      score: 73,
-      fetchedAt: "2026-06-25T09:00:19.499Z",
+      probability48h: 73,
+      updatedAt: "2026-06-25T09:00:19.499Z",
+      confidence: "low",
+      lastResetAt: null,
+      latestAlert: null,
     });
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
@@ -595,9 +598,9 @@ describe("App", () => {
 
     render(<App />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Open Codex quota reset forecast" }));
+    await userEvent.click(await screen.findByRole("link", { name: "codex-reset.com" }));
 
-    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codexreset.app/" });
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codex-reset.com/" });
   });
 
   it("opens ChatGPT Usage when reset credits are clicked", async () => {

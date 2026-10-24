@@ -309,8 +309,35 @@ pub enum CodexWindowActivationStatus {
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
     pub probability_24h: i64,
-    pub score: i64,
-    pub fetched_at: String,
+    pub probability_48h: i64,
+    pub updated_at: String,
+    pub confidence: Option<String>,
+    pub last_reset_at: Option<String>,
+    pub latest_alert: Option<CodexForecastAlert>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CodexForecastAlert {
+    pub id: Option<String>,
+    pub kind: Option<String>,
+    pub state: Option<String>,
+    pub pending: Option<String>,
+    pub source_at: Option<String>,
+    pub summary: Option<String>,
+    pub localized_summary: Option<String>,
+    pub url: Option<String>,
+    pub score: Option<i64>,
+    pub window: Option<CodexForecastWindow>,
+    pub observed_at: Option<String>,
+    pub confirmed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CodexForecastWindow {
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,0 +1,21 @@
+{
+  "probability24h": 39,
+  "probability48h": 63,
+  "updatedAt": "2026-10-24T00:00:00.000Z",
+  "confidence": "low",
+  "lastResetAt": "2026-10-23T17:40:51.000Z",
+  "latestAlert": {
+    "id": "forecast-fixture",
+    "kind": "watch",
+    "state": "active",
+    "summary": "A global reset is planned for the announced window.",
+    "localizedSummary": null,
+    "sourceAt": "2026-10-24T00:00:00.000Z",
+    "url": "https://x.com/thsottiaux/status/2113492502355562875",
+    "score": 93,
+    "window": {
+      "startAt": "2026-10-24T01:00:00.000Z",
+      "endAt": "2026-10-24T03:00:00.000Z"
+    }
+  }
+}

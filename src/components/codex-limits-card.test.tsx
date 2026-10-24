@@ -255,22 +255,15 @@ describe("CodexLimitsCard component", () => {
           membershipLevel: "plus",
         }}
         error={null}
-        quotaForecast={{
-          probability24h: 61,
-          score: 73,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
       />,
     );
 
     const resetArea = screen.getByTestId("reset-area");
     const weeklyLimit = screen.getByTestId("limit-row-weekly");
-    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
     const creditCount = screen.getByTestId("reset-credit-count");
 
     expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
-    expect(resetArea).toContainElement(forecastButton);
     expect(resetArea).toContainElement(creditCount);
     expect(resetArea.parentElement).toHaveClass("grid-cols-1", "md:grid-cols-[minmax(0,3fr)_minmax(0,3fr)_minmax(0,4fr)]");
     expect(weeklyLimit).not.toContainElement(creditCount);
@@ -293,12 +286,11 @@ describe("CodexLimitsCard component", () => {
           membershipLevel: "plus",
         }}
         error={null}
-        quotaForecast={null}
       />,
     );
 
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("2 available");
-    expect(screen.queryByRole("button", { name: "Open Codex quota reset forecast" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
 
     rerender(
       <CodexLimitsCard
@@ -311,15 +303,10 @@ describe("CodexLimitsCard component", () => {
           membershipLevel: "plus",
         }}
         error={null}
-        quotaForecast={{
-          probability24h: 35,
-          score: 55,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toBeInTheDocument();
+    expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
   });
 
@@ -505,31 +492,7 @@ describe("CodexLimitsCard component", () => {
     expect(onOpenResetCredits).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the forecast explanation below the percentage", () => {
-    render(
-      <CodexLimitsCard onOpenResetCredits={() => {}}
-        limits={null}
-        error={null}
-        quotaForecast={{
-          probability24h: 61,
-          score: 73,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
-      />,
-    );
-
-    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
-
-    expect(screen.getByRole("img", { name: "61% reset probability in 24h" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "73% reset probability in 48h" })).toBeInTheDocument();
-    expect(screen.getByText("24h")).toBeInTheDocument();
-    expect(screen.getByText("48h")).toBeInTheDocument();
-    expect(forecastButton).toHaveTextContent("Reset likely in 24/48h");
-    expect(forecastButton).toHaveClass("flex-col");
-    expect(forecastButton).toHaveClass("border-error/30");
-  });
-
-  it("renders the latest token reset to the left of the forecast and opens its history", () => {
+  it("renders the latest token reset and opens its history", () => {
     const onOpenResetHistory = vi.fn();
 
     render(
@@ -548,20 +511,13 @@ describe("CodexLimitsCard component", () => {
             url: "https://x.com/thsottiaux/status/2091688655828246890",
           },
         }}
-        quotaForecast={{
-          probability24h: 61,
-          score: 73,
-          fetchedAt: "2026-08-25T09:00:19.499Z",
-        }}
       />,
     );
 
     const latestResetButton = screen.getByRole("button", { name: "View token resets from the last 30 days" });
-    const forecastButton = screen.getByRole("button", { name: "Open Codex quota reset forecast" });
 
     expect(latestResetButton).toHaveTextContent("Latest token reset");
-    expect(latestResetButton.parentElement).toHaveClass("grid-cols-[minmax(0,1fr)_auto]");
-    expect(latestResetButton.compareDocumentPosition(forecastButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(latestResetButton.parentElement).toHaveClass("grid-cols-1");
 
     fireEvent.click(latestResetButton);
     expect(onOpenResetHistory).toHaveBeenCalledTimes(1);
@@ -641,62 +597,5 @@ describe("CodexLimitsCard component", () => {
     expect(days[13]).toHaveAttribute("title", "2026-08-28: Regular reset");
 
     vi.useRealTimers();
-  });
-
-  it("changes quota forecast color by probability", () => {
-    const { rerender } = render(
-      <CodexLimitsCard onOpenResetCredits={() => {}}
-        limits={null}
-        error={null}
-        quotaForecast={{
-          probability24h: 12,
-          score: 18,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-success/30");
-
-    rerender(
-      <CodexLimitsCard onOpenResetCredits={() => {}}
-        limits={null}
-        error={null}
-        quotaForecast={{
-          probability24h: 35,
-          score: 55,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Open Codex quota reset forecast" })).toHaveClass("border-warning/35");
-  });
-
-  it("opens the quota forecast URL from the forecast badge", () => {
-    const onOpenQuotaForecast = vi.fn();
-
-    render(
-      <CodexLimitsCard onOpenResetCredits={() => {}}
-        limits={null}
-        error={null}
-        quotaForecast={{
-          probability24h: 35,
-          score: 55,
-          fetchedAt: "2026-06-25T09:00:19.499Z",
-        }}
-        onOpenQuotaForecast={onOpenQuotaForecast}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Open Codex quota reset forecast" }));
-
-    expect(onOpenQuotaForecast).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not render the quota forecast pill without forecast data", () => {
-    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={null} quotaForecast={null} />);
-
-    expect(screen.queryByRole("button", { name: "Open Codex quota reset forecast" })).not.toBeInTheDocument();
   });
 });

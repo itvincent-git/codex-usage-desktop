@@ -1,3 +1,4 @@
+import { useCodexForecast } from "@/hooks/use-codex-forecast";
 import { save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
@@ -7,14 +8,12 @@ import {
   activateCodexWindow,
   exportUsage,
   fetchCodexLimits,
-  fetchCodexQuotaForecast,
   fetchLatestCodexReset,
   fetchCodexResetHistory,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
   type CodexLimitsResponse,
-  type CodexQuotaForecastResponse,
   type CodexResetAnnouncement,
   type ExportFormat,
   type MonthlyUsageResponse,
@@ -68,7 +67,6 @@ export type AutoRefreshIntervalMinutes = (typeof AUTO_REFRESH_INTERVAL_OPTIONS)[
 const DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES: AutoRefreshIntervalMinutes = 5;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
-const CODEX_QUOTA_FORECAST_URL = "https://codexreset.app/";
 const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
 
 function hasExpiredLimitWindow(window: CodexLimitWindow | null | undefined): boolean {
@@ -118,7 +116,7 @@ function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgress
 }
 
 export function useUsageDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -129,7 +127,7 @@ export function useUsageDashboard() {
   const [isWindowActivating, setIsWindowActivating] = useState(false);
   const [windowActivationStatus, setWindowActivationStatus] = useState<CodexWindowActivationStatus | null>(null);
   const [windowActivationError, setWindowActivationError] = useState<string | null>(null);
-  const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
+  const forecast = useCodexForecast(view === "dashboard", i18n.language);
   const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
   const [recentCodexResets, setRecentCodexResets] = useState<CodexResetAnnouncement[] | null>(null);
   const [scanMessage, setScanMessage] = useState<ScanMessage>({ key: "hero.sync_logs_to_cache_desc" });
@@ -351,15 +349,6 @@ export function useUsageDashboard() {
       setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
     } finally {
       limitsFetchInFlightRef.current = false;
-    }
-  });
-
-  const loadCodexQuotaForecast = useEffectEvent(async () => {
-    try {
-      const data = await fetchCodexQuotaForecast();
-      setCodexQuotaForecast(data);
-    } catch (_) {
-      setCodexQuotaForecast(null);
     }
   });
 
@@ -586,7 +575,6 @@ export function useUsageDashboard() {
     try {
       // Do not block initial render on limits fetch
       void loadCodexLimits();
-      void loadCodexQuotaForecast();
       void loadLatestCodexReset();
       void loadRecentCodexResets();
       await loadOverview(range);
@@ -934,10 +922,11 @@ export function useUsageDashboard() {
   async function handleRefresh() {
     setIsRefreshing(true);
     const startedAt = performance.now();
+    void forecast.refresh();
 
     try {
       await scanAndReloadOverview(startedAt, { force: true });
-      await Promise.all([loadCodexQuotaForecast(), loadLatestCodexReset(), loadRecentCodexResets()]);
+      await Promise.all([loadLatestCodexReset(), loadRecentCodexResets()]);
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
@@ -1123,14 +1112,6 @@ export function useUsageDashboard() {
     }
   };
 
-  const handleOpenCodexQuotaForecast = async () => {
-    try {
-      await openUrl(CODEX_QUOTA_FORECAST_URL);
-    } catch (e) {
-      console.error("Failed to open Codex quota forecast URL", e);
-    }
-  };
-
   const handleOpenResetCredits = async () => {
     try {
       await openUrl(CHATGPT_USAGE_URL);
@@ -1150,7 +1131,7 @@ export function useUsageDashboard() {
     isWindowActivating,
     windowActivationStatus,
     windowActivationError,
-    codexQuotaForecast,
+    forecast,
     latestCodexReset,
     recentCodexResets,
     scanMessage: t(scanMessage.key, scanMessage.values),
@@ -1190,7 +1171,6 @@ export function useUsageDashboard() {
     handleManualUpdateCheck,
     handleUpgrade,
     handleOpenUpdateRelease,
-    handleOpenCodexQuotaForecast,
     handleOpenResetCredits,
     handleLaunchAtLoginChange,
     trayTitleShow,

@@ -1,4 +1,5 @@
 mod codex_environment;
+mod codex_forecast;
 mod codex_limits;
 mod codex_projects;
 mod codex_resets;
@@ -332,8 +333,10 @@ async fn activate_codex_window(
 }
 
 #[tauri::command]
-async fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
-    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_quota_forecast)
+async fn fetch_codex_quota_forecast(
+    locale: Option<String>,
+) -> Result<CodexQuotaForecastResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || codex_forecast::fetch(locale.as_deref().unwrap_or("en")))
         .await
         .map_err(|error| error.to_string())?
 }

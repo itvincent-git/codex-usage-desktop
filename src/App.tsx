@@ -1,3 +1,4 @@
+import { CodexForecastCard } from "@/components/codex-forecast-card";
 import { CodexLimitsCard } from "@/components/codex-limits-card";
 import { CodexResetHistoryModal } from "@/components/codex-reset-history";
 import { DailyUsageTable } from "@/components/daily-usage-table";
@@ -68,7 +69,7 @@ export default function App() {
     isWindowActivating,
     windowActivationStatus,
     windowActivationError,
-    codexQuotaForecast,
+    forecast,
     latestCodexReset,
     recentCodexResets,
     scanMessage,
@@ -108,7 +109,6 @@ export default function App() {
     handleManualUpdateCheck,
     handleUpgrade,
     handleOpenUpdateRelease,
-    handleOpenCodexQuotaForecast,
     handleOpenResetCredits,
     handleLaunchAtLoginChange,
     trayTitleShow,
@@ -374,7 +374,6 @@ export default function App() {
                 <CodexLimitsCard
                   limits={codexLimits}
                   error={codexLimitsError}
-                  quotaForecast={codexQuotaForecast}
                   latestReset={latestCodexReset}
                   recentResets={recentCodexResets}
                   isLimitsRefreshing={isLimitsRefreshing}
@@ -383,11 +382,11 @@ export default function App() {
                   windowActivationError={windowActivationError}
                   onRefreshLimits={() => void handleLimitsRefresh()}
                   onActivateWindow={() => void handleActivateCodexWindow()}
-                  onOpenQuotaForecast={() => void handleOpenCodexQuotaForecast()}
                   onOpenResetHistory={() => setIsResetHistoryOpen(true)}
                   onOpenResetCredits={() => void handleOpenResetCredits()}
                 />
               </div>
+              <CodexForecastCard {...forecast} onRefresh={() => void forecast.refresh()} />
             </div>
           ) : null}
 

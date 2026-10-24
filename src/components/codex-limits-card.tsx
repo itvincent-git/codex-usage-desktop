@@ -2,7 +2,7 @@ import { ChevronDown, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, Rotate
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LatestResetButton } from "@/components/codex-reset-history";
-import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
+import type { CodexLimitWindow, CodexLimitsResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 type CodexLimitsCardProps = {
   limits: CodexLimitsResponse | null;
   error: string | null;
-  quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
   isLimitsRefreshing?: boolean;
@@ -20,7 +19,6 @@ type CodexLimitsCardProps = {
   windowActivationError?: string | null;
   onRefreshLimits?: () => void;
   onActivateWindow?: () => void;
-  onOpenQuotaForecast?: () => void;
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
 };
@@ -30,13 +28,6 @@ export const RECENT_RESET_OVERVIEW_DAYS = 14;
 type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
-};
-
-type QuotaForecastTone = {
-  label: string;
-  className: string;
-  scoreClassName: string;
-  ringColor: string;
 };
 
 function isOAuthLoginError(err: string | null): boolean {
@@ -58,12 +49,8 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "prolite", "team", "business", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, error, latestReset, recentResets, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   const { t } = useTranslation();
-  const quotaForecast24hScore = quotaForecast ? Math.round(clampPercent(quotaForecast.probability24h)) : null;
-  const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
-  const quotaForecast24hTone = quotaForecast24hScore === null ? null : getQuotaForecastTone(quotaForecast24hScore, t);
-  const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
 
   return (
     <Card className="h-full flex flex-col rounded-lg">
@@ -120,16 +107,10 @@ export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, rec
               <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
             )}
             <ResetArea
-              quotaForecast={quotaForecast}
               latestReset={latestReset}
               recentResets={recentResets}
-              quotaForecast24hScore={quotaForecast24hScore}
-              quotaForecast24hTone={quotaForecast24hTone}
-              quotaForecastScore={quotaForecastScore}
-              quotaForecastTone={quotaForecastTone}
               resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
               resetCredits={limits?.resetCredits}
-              onOpenQuotaForecast={onOpenQuotaForecast}
               onOpenResetHistory={onOpenResetHistory}
               onOpenResetCredits={onOpenResetCredits}
             />
@@ -194,106 +175,21 @@ function LimitActions({
   );
 }
 
-function formatQuotaForecast(score: number, t: any) {
-  const roundedScore = Math.round(clampPercent(score));
-  if (roundedScore >= 70) {
-    return t("limits.quota_forecast_likely", { score: roundedScore });
-  }
-  if (roundedScore >= 40) {
-    return t("limits.quota_forecast_possible", { score: roundedScore });
-  }
-  return t("limits.quota_forecast_low", { score: roundedScore });
-}
-
-function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
-  if (score >= 70) {
-    return {
-      label: t("limits.quota_forecast_likely_label"),
-      className: "border-error/30 bg-error/10 hover:border-error/45 hover:bg-error/15",
-      scoreClassName: "text-error",
-      ringColor: "rgb(var(--error))",
-    };
-  }
-
-  if (score >= 40) {
-    return {
-      label: t("limits.quota_forecast_possible_label"),
-      className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
-      scoreClassName: "text-warning",
-      ringColor: "rgb(var(--warning))",
-    };
-  }
-
-  return {
-    label: t("limits.quota_forecast_low_label"),
-    className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
-    scoreClassName: "text-success",
-    ringColor: "rgb(var(--success))",
-  };
-}
-
-function QuotaForecastRing({ score, tone, horizon }: { score: number; tone: QuotaForecastTone; horizon: "24h" | "48h" }) {
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-
-  return (
-    <span data-forecast-horizon={horizon} className="flex flex-col items-center gap-0.5">
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/55">
-        <svg viewBox="0 0 48 48" className="h-10 w-10" role="img" aria-label={`${score}% reset probability in ${horizon}`}>
-          <circle cx="24" cy="24" r={radius} fill="none" stroke="rgb(var(--border) / 0.65)" strokeWidth="4" />
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            fill="none"
-            stroke={tone.ringColor}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            strokeWidth="4"
-            transform="rotate(-90 24 24)"
-            className="transition-all duration-500 ease-out"
-          />
-        </svg>
-        <span className={cn("absolute font-mono text-[11px] font-bold leading-none tabular-nums", tone.scoreClassName)}>
-          {score}
-        </span>
-      </span>
-      <span className="font-mono text-[9px] font-semibold leading-none text-foreground/70">{horizon}</span>
-    </span>
-  );
-}
-
 function ResetArea({
-  quotaForecast,
   latestReset,
   recentResets,
-  quotaForecast24hScore,
-  quotaForecast24hTone,
-  quotaForecastScore,
-  quotaForecastTone,
   resetCreditsAvailableCount,
   resetCredits,
-  onOpenQuotaForecast,
   onOpenResetHistory,
   onOpenResetCredits,
 }: {
-  quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
-  quotaForecast24hScore: number | null;
-  quotaForecast24hTone: QuotaForecastTone | null;
-  quotaForecastScore: number | null;
-  quotaForecastTone: QuotaForecastTone | null;
   resetCreditsAvailableCount?: number | null;
   resetCredits?: CodexResetCredit[] | null;
-  onOpenQuotaForecast?: () => void;
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
 }) {
-  const { t } = useTranslation();
-  const showQuotaForecast = quotaForecast && quotaForecast24hScore !== null && quotaForecast24hTone && quotaForecastScore !== null && quotaForecastTone;
   const showResetCredits = resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
 
   return (
@@ -301,7 +197,7 @@ function ResetArea({
       data-testid="reset-area"
       className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
     >
-      <div className={cn("grid gap-2", latestReset && showQuotaForecast ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
+      <div className="grid grid-cols-1 gap-2">
         {latestReset ? (
           <LatestResetButton
             reset={latestReset}
@@ -310,33 +206,13 @@ function ResetArea({
             onOpen={() => onOpenResetHistory?.()}
           />
         ) : null}
-        {showQuotaForecast ? (
-          <button
-            type="button"
-            data-testid="quota-forecast"
-            className={cn(
-              "flex flex-col items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              quotaForecastTone.className,
-            )}
-            onClick={onOpenQuotaForecast}
-            aria-label={t("limits.quota_forecast_open")}
-          >
-            <span className="flex items-center gap-2">
-              <QuotaForecastRing score={quotaForecast24hScore} tone={quotaForecast24hTone} horizon="24h" />
-              <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} horizon="48h" />
-            </span>
-            <span className="text-[10px] font-semibold leading-tight text-foreground/80">
-              {quotaForecastTone.label}
-            </span>
-          </button>
-        ) : null}
       </div>
       {showResetCredits ? (
         <ResetCreditsPanel
           availableCount={resetCreditsAvailableCount}
           credits={resetCredits}
           onOpen={onOpenResetCredits}
-          separated={Boolean(latestReset || showQuotaForecast)}
+          separated={Boolean(latestReset)}
         />
       ) : null}
     </div>
