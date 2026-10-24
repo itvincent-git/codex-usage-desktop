@@ -15,45 +15,23 @@ const USER_AGENT: &str = concat!(
 
 #[derive(Deserialize)]
 struct Forecast {
-    mode: Option<String>,
-    probabilities: Probabilities,
     updated_at: String,
-    confidence: Option<String>,
     last_reset_at: Option<String>,
     official_signal: Option<serde_json::Value>,
     latest_alert: Option<CodexForecastAlert>,
-}
-
-#[derive(Deserialize)]
-struct Probabilities {
-    rounded_24h: i64,
-    rounded_48h: i64,
-    model_24h: Option<i64>,
-    model_48h: Option<i64>,
 }
 
 fn parse(body: &str) -> Result<CodexQuotaForecastResponse, String> {
     let response: Forecast = serde_json::from_str(body)
         .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
     Ok(CodexQuotaForecastResponse {
-        // Scored Watch percentages must never be presented as a historical model.
-        probability_24h: response.probabilities.model_24h.or_else(|| {
-            (response.mode.as_deref() == Some("model"))
-                .then_some(response.probabilities.rounded_24h)
-        }),
-        probability_48h: response.probabilities.model_48h.or_else(|| {
-            (response.mode.as_deref() == Some("model"))
-                .then_some(response.probabilities.rounded_48h)
-        }),
         updated_at: response.updated_at,
-        confidence: (response.mode.as_deref() == Some("model"))
-            .then_some(response.confidence)
-            .flatten(),
         last_reset_at: response.last_reset_at,
         has_official_signal: response
             .official_signal
             .is_some_and(|signal| signal.is_object()),
         latest_alert: response.latest_alert,
+        recent_posts: None,
         evidence_posts: None,
         evidence_stale: false,
         evidence_updated_at: None,
@@ -88,6 +66,17 @@ fn evidence_posts(
             .and_then(|parent| posts.iter().find(|candidate| &candidate.id == parent));
     }
     evidence
+}
+
+fn attach_feed(data: &mut CodexQuotaForecastResponse, mut feed: Feed) {
+    data.evidence_stale = feed.stale;
+    data.evidence_updated_at = feed.fetched_at;
+    data.evidence_posts = data
+        .latest_alert
+        .as_ref()
+        .map(|alert| evidence_posts(alert, &feed.tweets));
+    feed.tweets.sort_by(|a, b| b.at.cmp(&a.at));
+    data.recent_posts = Some(feed.tweets.into_iter().take(5).collect());
 }
 
 fn request_feed(url: &str) -> Result<Feed, reqwest::Error> {
@@ -152,21 +141,11 @@ pub fn fetch(locale: &str) -> Result<CodexQuotaForecastResponse, String> {
         .get_or_fetch(locale, Instant::now(), || {
             let (mut result, delay) = request(FORECAST_URL, locale);
             if let Ok(data) = &mut result {
-                if let Some(alert) = &data.latest_alert {
-                    if alert.kind.as_deref() == Some("watch")
-                        && alert.state.as_deref() == Some("active")
-                    {
-                        match request_feed(FEED_URL) {
-                            Ok(feed) => {
-                                data.evidence_stale = feed.stale;
-                                data.evidence_updated_at = feed.fetched_at;
-                                data.evidence_posts = Some(evidence_posts(alert, &feed.tweets));
-                            }
-                            Err(error) => {
-                                data.evidence_stale = true;
-                                log::warn!("Failed to load reset signal evidence: {error}");
-                            }
-                        }
+                match request_feed(FEED_URL) {
+                    Ok(feed) => attach_feed(data, feed),
+                    Err(error) => {
+                        data.evidence_stale = true;
+                        log::warn!("Failed to load reset signal feed: {error}");
                     }
                 }
             }
@@ -246,20 +225,14 @@ mod tests {
     };
 
     fn fixture(alert: serde_json::Value) -> String {
-        json!({"mode":"model", "official_signal":null, "probabilities":{"rounded_24h":0,"rounded_48h":100},
-            "updated_at":"2026-10-24T00:00:00Z", "confidence":"low",
+        json!({"official_signal":null, "updated_at":"2026-10-24T00:00:00Z",
             "last_reset_at":"2026-10-23T00:00:00Z", "latest_alert":alert})
         .to_string()
     }
 
     #[test]
-    fn maps_documented_probabilities_and_null_signals() {
+    fn maps_reset_signal_without_historical_model_fields() {
         let data = parse(&fixture(serde_json::Value::Null)).unwrap();
-        assert_eq!(
-            (data.probability_24h, data.probability_48h),
-            (Some(0), Some(100))
-        );
-        assert_eq!(data.confidence.as_deref(), Some("low"));
         assert_eq!(data.updated_at, "2026-10-24T00:00:00Z");
         assert_eq!(data.last_reset_at.as_deref(), Some("2026-10-23T00:00:00Z"));
         assert!(data.latest_alert.is_none());
@@ -320,23 +293,52 @@ mod tests {
     }
 
     #[test]
-    fn separates_model_probabilities_from_rule_scores_and_preserves_active_signal() {
-        let mut body: serde_json::Value =
-            serde_json::from_str(&fixture(serde_json::Value::Null)).unwrap();
-        body["mode"] = json!("signal");
-        body["official_signal"] = json!({"summary":"Reset tomorrow"});
-        body["probabilities"] = json!({"rounded_24h":93,"rounded_48h":93});
-        let data = parse(&body.to_string()).unwrap();
-        assert!(data.has_official_signal);
-        assert!(data.confidence.is_none());
-        assert_eq!((data.probability_24h, data.probability_48h), (None, None));
-        body["probabilities"]["model_24h"] = json!(39);
-        body["probabilities"]["model_48h"] = json!(63);
-        let data = parse(&body.to_string()).unwrap();
-        assert_eq!(
-            (data.probability_24h, data.probability_48h),
-            (Some(39), Some(63))
-        );
+    fn attaches_latest_five_posts_without_a_watch_and_keeps_the_full_evidence_chain() {
+        let tweets: Vec<_> = (0..8)
+            .map(|i| {
+                json!({
+                    "id":i.to_string(), "text":format!("Feed post {i}"),
+                    "at":format!("2026-10-24T00:0{i}:00Z"),
+                    "url":format!("https://x.com/thsottiaux/status/{i}"),
+                    "is_reply":i == 1, "in_reply_to_tweet_id":if i == 1 { Some("0") } else { None },
+                    "kind":"signal", "explicit_reset_claim":true
+                })
+            })
+            .collect();
+        for alert in [serde_json::Value::Null, json!({"id":"1"})] {
+            let mut data = parse(&fixture(alert)).unwrap();
+            let feed: Feed = serde_json::from_value(json!({
+                "tweets":tweets, "stale":true, "fetched_at":"2026-10-24T01:00:00Z"
+            }))
+            .unwrap();
+            attach_feed(&mut data, feed);
+            assert_eq!(
+                data.recent_posts
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|p| p.id.as_str())
+                    .collect::<Vec<_>>(),
+                vec!["7", "6", "5", "4", "3"]
+            );
+            assert!(data.evidence_stale);
+            assert_eq!(
+                data.evidence_updated_at.as_deref(),
+                Some("2026-10-24T01:00:00Z")
+            );
+            if data.latest_alert.is_some() {
+                assert_eq!(
+                    data.evidence_posts
+                        .unwrap()
+                        .iter()
+                        .map(|p| p.id.as_str())
+                        .collect::<Vec<_>>(),
+                    vec!["1", "0"]
+                );
+            } else {
+                assert!(data.evidence_posts.is_none());
+            }
+        }
     }
 
     #[test]
@@ -380,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn retains_alert_states_without_inventing_confirmation_or_probabilities() {
+    fn retains_alert_states_without_inventing_confirmation() {
         for (kind, state, pending) in [
             ("watch", "active", None),
             ("watch", "active", Some("done")),
@@ -396,13 +398,7 @@ mod tests {
                 "observed_at":"2026-10-23T00:00:00Z"}),
             ))
             .unwrap();
-            assert_eq!(
-                (data.probability_24h, data.probability_48h),
-                (Some(0), Some(100))
-            );
             let encoded = serde_json::to_value(&data).unwrap();
-            assert_eq!(encoded["probability24h"], 0);
-            assert_eq!(encoded["probability48h"], 100);
             assert_eq!(encoded["latestAlert"]["localizedSummary"], "摘要");
             assert_eq!(
                 encoded["latestAlert"]["window"]["endAt"],
@@ -419,10 +415,7 @@ mod tests {
                 Some("2026-10-24T02:00:00Z")
             );
         }
-        assert!(parse(
-            r#"{"probabilities":{"rounded_24h":39,"rounded_48h":63},"updated_at":"now"}"#
-        )
-        .is_ok());
+        assert!(parse(r#"{"updated_at":"now"}"#).is_ok());
     }
 
     #[test]

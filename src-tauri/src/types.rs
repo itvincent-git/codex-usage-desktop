@@ -308,13 +308,11 @@ pub enum CodexWindowActivationStatus {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
-    pub probability_24h: Option<i64>,
-    pub probability_48h: Option<i64>,
     pub updated_at: String,
-    pub confidence: Option<String>,
     pub last_reset_at: Option<String>,
     pub has_official_signal: bool,
     pub latest_alert: Option<CodexForecastAlert>,
+    pub recent_posts: Option<Vec<CodexForecastPost>>,
     pub evidence_posts: Option<Vec<CodexForecastPost>>,
     pub evidence_stale: bool,
     pub evidence_updated_at: Option<String>,

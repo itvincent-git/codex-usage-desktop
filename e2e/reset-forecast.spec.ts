@@ -88,17 +88,31 @@ describe("global reset forecast", () => {
     await expect($('a=@thsottiaux ↗')).toHaveAttribute("href", fixture.latestAlert.url);
     await expect($('[data-testid="quota-forecast"]')).not.toExist();
     await expect($('a=codex-reset.com')).toHaveAttribute("href", "https://codex-reset.com/");
-    await expect($('button=Show historical reference')).toHaveAttribute("aria-expanded", "false");
+    await expect($('button=Show historical reference')).not.toExist();
   });
 
-  it("expands background history without hiding the signal or its evidence", async () => {
-    await $('button=Show historical reference').click();
-    await expect($('[data-forecast-horizon="24h"]')).toHaveText(expect.stringContaining("39%"));
-    await expect($('[data-forecast-horizon="48h"]')).toHaveText(expect.stringContaining("63%"));
-    await expect($('[aria-label="Evidence for this signal"]')).toHaveText(expect.stringContaining(fixture.evidencePosts[0].text));
-    await expect($('a=Forecast method and accuracy')).toHaveAttribute("href", "https://codex-reset.com/forecast-method");
-    await $('button=Hide historical reference').click();
+  it("shows the latest five feed posts, original links and feed availability", async () => {
+    const feed = $('[aria-label="Latest 5 feed posts"]');
+    await expect(feed.$$('li')).toBeElementsArrayOfSize(5);
+    for (let i = 0; i < fixture.recentPosts.length; i++) {
+      const item = (await feed.$$('li'))[i];
+      await expect(item).toHaveText(expect.stringContaining(fixture.recentPosts[i].text));
+      await expect(item.$('a')).toHaveAttribute("href", fixture.recentPosts[i].url);
+      await expect(item.$('time')).toHaveAttribute("datetime", fixture.recentPosts[i].at);
+    }
     await expect($('#forecast-details')).not.toExist();
+    await setRemoteForecast({ ...fixture, recentPosts: null });
+    await refreshForecast();
+    await expect(feed).toHaveText(expect.stringContaining("The feed is unavailable."));
+    await setRemoteForecast({ ...fixture, recentPosts: [] });
+    await refreshForecast();
+    await expect(feed).toHaveText(expect.stringContaining("No recent feed posts."));
+    await setRemoteForecast({ ...fixture, evidenceStale: true });
+    await refreshForecast();
+    await expect(feed).toHaveText(expect.stringContaining("Showing older feed data"));
+    await expect(feed.$$('li')).toBeElementsArrayOfSize(5);
+    await setRemoteForecast(fixture);
+    await refreshForecast();
   });
 
   it("distinguishes untimed promises and incomplete or stale evidence", async () => {
@@ -130,6 +144,7 @@ describe("global reset forecast", () => {
       await refreshForecast();
       await expect($('[data-testid="forecast-status"]')).toHaveText("No reliable announcement");
       await expect($('[aria-label="Evidence for this signal"]')).not.toExist();
+      await expect($('[aria-label="Latest 5 feed posts"]').$$("li")).toBeElementsArrayOfSize(5);
       await expect($('[data-testid="forecast-announcement"]')).not.toHaveText(expect.stringContaining("Old reset confirmed"));
     }
   });
@@ -172,11 +187,10 @@ describe("global reset forecast", () => {
       });
       expect(layout).toEqual({ below: true, fits: true, inWindow: true });
       await browser.saveScreenshot(`/tmp/codex-reset-forecast-${width}.png`);
-      await $('button=Show historical reference').click();
-      expect(await $('#forecast-details').execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-      await $("#forecast-details").scrollIntoView({ block: "end" });
-      await browser.saveScreenshot(`/tmp/codex-reset-forecast-${width}-details.png`);
-      await $('button=Hide historical reference').click();
+      const feed = $('[aria-label="Latest 5 feed posts"]');
+      expect(await feed.execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await feed.scrollIntoView({ block: "end" });
+      await browser.saveScreenshot(`/tmp/codex-reset-forecast-${width}-feed.png`);
     }
   });
 });

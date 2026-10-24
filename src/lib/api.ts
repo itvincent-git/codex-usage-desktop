@@ -174,13 +174,11 @@ export type CodexWindowActivationResponse = {
 };
 
 export type CodexQuotaForecastResponse = {
-  probability24h: number | null;
-  probability48h: number | null;
   updatedAt: string;
-  confidence: string | null;
   lastResetAt: string | null;
   hasOfficialSignal: boolean;
   latestAlert: CodexForecastAlert | null;
+  recentPosts: CodexForecastPost[] | null;
   evidencePosts: CodexForecastPost[] | null;
   evidenceStale: boolean;
   evidenceUpdatedAt: string | null;

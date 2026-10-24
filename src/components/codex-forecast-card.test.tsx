@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexForecastCard } from "./codex-forecast-card";
 import { openUrl, type CodexForecastAlert, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
@@ -11,7 +11,7 @@ vi.mock("@/lib/api", () => ({ openUrl: vi.fn().mockResolvedValue(undefined) }));
 const props = { error: null, isRefreshing: false, onRefresh: vi.fn() };
 const data: CodexQuotaForecastResponse = fixture;
 const withAlert = (alert: CodexForecastAlert | null) => ({ ...data, latestAlert: alert });
-const expand = () => fireEvent.click(screen.getByRole("button", { name: "Show historical reference" }));
+const evidence = () => within(screen.getByRole("region", { name: "Evidence for this signal" }));
 const status = () => screen.getByTestId("forecast-status");
 
 describe("CodexForecastCard", () => {
@@ -23,29 +23,28 @@ describe("CodexForecastCard", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("shows no reliable announcement for past resets and keeps history collapsed", () => {
-    render(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, probability24h: 0, probability48h: 100, latestAlert: {
+  it("keeps the recent feed visible without promoting posts or retaining historical reference", () => {
+    render(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, latestAlert: {
       kind: "reset", state: "confirmed", summary: "Old reset confirmed",
     } }} />);
     expect(status()).toHaveTextContent("No reliable announcement");
     expect(screen.queryByText("Old reset confirmed")).not.toBeInTheDocument();
-    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
-    expect(screen.queryByText("0%")).not.toBeInTheDocument();
-    expect(screen.queryByText("100%")).not.toBeInTheDocument();
-    expand();
-    expect(screen.getByText("0%")).toBeInTheDocument();
-    expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.getByText(/Waiting longer does not increase/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide historical reference" }));
-    expect(screen.queryByText("100%")).not.toBeInTheDocument();
-    expect(status()).toHaveTextContent("No reliable announcement");
+    expect(screen.queryByRole("region", { name: "Evidence for this signal" })).not.toBeInTheDocument();
+    const feed = within(screen.getByRole("region", { name: "Latest 5 feed posts" }));
+    expect(feed.getAllByRole("listitem")).toHaveLength(5);
+    expect(feed.getAllByRole("listitem").map((item) => item.textContent)).toEqual(data.recentPosts!.map((post) => expect.stringContaining(post.text)));
+    expect(feed.getAllByRole("time").map((time) => time.getAttribute("datetime"))).toEqual(data.recentPosts!.map((post) => post.at));
+    fireEvent.click(feed.getAllByRole("link", { name: "View on X ↗" })[0]);
+    expect(openUrl).toHaveBeenCalledWith(data.recentPosts![0].url);
+    expect(screen.queryByRole("button", { name: /historical/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Historical probability/)).not.toBeInTheDocument();
   });
 
   it("prioritizes an explicit timed promise and its full original evidence", () => {
     render(<CodexForecastCard {...props} data={data} />);
     expect(status()).toHaveTextContent("Explicit announcement · time window");
     expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(evidence().getAllByRole("listitem")).toHaveLength(2);
     for (const post of data.evidencePosts!) expect(screen.getByText(post.text)).toBeInTheDocument();
     expect(screen.getByText("Reply context")).toBeInTheDocument();
     expect(screen.getByText(/Original timing: Within the next three hours · UTC/)).toBeInTheDocument();
@@ -59,11 +58,6 @@ describe("CodexForecastCard", () => {
     expect(openUrl).toHaveBeenCalledWith(data.evidencePosts![1].url);
     fireEvent.click(screen.getByRole("link", { name: "codex-reset.com" }));
     expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/");
-    expand();
-    expect(screen.getByText("39%")).toBeInTheDocument();
-    expect(screen.getByText("63%")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Forecast method and accuracy" }));
-    expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/forecast-method");
   });
 
   it("accepts an active untimed promise without inventing a date or success percentage", () => {
@@ -88,7 +82,7 @@ describe("CodexForecastCard", () => {
     render(<CodexForecastCard {...props} data={{ ...data, ...patch }} />);
     expect(status()).toHaveTextContent("No reliable announcement");
     expect(screen.queryByText(data.latestAlert!.summary!)).not.toBeInTheDocument();
-    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Evidence for this signal" })).not.toBeInTheDocument();
   });
 
   it("expires a time window while the app stays open", () => {
@@ -97,7 +91,7 @@ describe("CodexForecastCard", () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(status()).toHaveTextContent("No reliable announcement");
     expect(screen.getByText(/previous announcement has expired/)).toBeInTheDocument();
-    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Evidence for this signal" })).not.toBeInTheDocument();
   });
 
   it.each(["done", "on_its_way"])("treats pending %s as taking effect, outside the future prediction", (pending) => {
@@ -123,10 +117,10 @@ describe("CodexForecastCard", () => {
     expect(status()).toHaveTextContent("Explicit announcement · time window");
     rerender(<CodexForecastCard {...props} data={{ ...data, evidencePosts: [data.evidencePosts![0]] }} />);
     expect(screen.getByText(/reply context is missing/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(evidence().getAllByRole("listitem")).toHaveLength(1);
     rerender(<CodexForecastCard {...props} data={{ ...data, evidenceStale: true }} />);
     expect(screen.getByText(/Evidence is out of date/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(evidence().getAllByRole("listitem")).toHaveLength(2);
   });
 
   it("marks an old snapshot as unknown and automatically rechecks freshness in the view", () => {
@@ -161,11 +155,17 @@ describe("CodexForecastCard", () => {
     expect(status()).toHaveTextContent("Explicit announcement · time window");
   });
 
-  it("does not label an unavailable model as historical probability", () => {
-    render(<CodexForecastCard {...props} data={{ ...data, probability24h: null, probability48h: null }} />);
-    expand();
-    expect(screen.getByText(/separate historical baseline is unavailable/)).toBeInTheDocument();
-    expect(screen.queryByText("93%")).not.toBeInTheDocument();
+  it("handles unavailable, empty and stale feeds independently of the current promise", () => {
+    const { rerender } = render(<CodexForecastCard {...props} data={{ ...data, recentPosts: null }} />);
+    expect(screen.getByText("The feed is unavailable.")).toBeInTheDocument();
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+    rerender(<CodexForecastCard {...props} data={{ ...data, recentPosts: [] }} />);
+    expect(screen.getByText("No recent feed posts.")).toBeInTheDocument();
+    rerender(<CodexForecastCard {...props} data={{ ...data, evidenceStale: true }} />);
+    const feed = within(screen.getByRole("region", { name: "Latest 5 feed posts" }));
+    expect(feed.getByText(/Showing older feed data/)).toBeInTheDocument();
+    expect(feed.getAllByRole("listitem")).toHaveLength(5);
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
   });
 
   it.each(languageCodes)("provides all labels and localized summaries in %s", async (language) => {

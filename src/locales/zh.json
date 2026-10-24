@@ -809,22 +809,16 @@
     "refresh_failed": "更新失败，上次信号需要重新核实。",
     "load_failed": "预测加载失败，请重试。",
     "loading": "正在检查重置预告…",
-    "horizon": "历史概率 · 未来 {{hours}}h",
-    "confidence": "模型置信度",
-    "confidence_low": "低",
-    "confidence_moderate": "中",
-    "confidence_medium": "中",
-    "confidence_high": "高",
     "updated": "信号检查时间：{{time}}",
     "unknown": "未知",
-    "details": "展开历史参考",
-    "hide_details": "收起历史参考",
-    "scope": "历史估计仅作为全局额外重置的背景参考，不代表有明确预告，也不是个人重置时间。",
     "expired": "上次预告已过期，不作为下一次重置的预测。",
     "signal_score": "站点规则评分：{{score}}。不是经验证的兑现率，也不是 24h／48h 概率。",
     "window": "预计窗口（本地时间）：{{start}} – {{end}}",
-    "model_unavailable": "暂无独立的历史基准数据。",
-    "method": "实验性模型根据最近最多 8 个完整重置间隔估计概率。等待更久不会提高概率，普通推文和暗示不增加权重。历史概率不触发可靠信号。",
-    "method_link": "预测方法与准确性说明"
+    "feed_title": "最近 5 条 Feed 动态",
+    "feed_note": "动态由 codex-reset.com 汇总，动态本身不代表可靠重置预告。",
+    "feed_unavailable": "暂时无法加载 Feed 动态。",
+    "feed_empty": "暂无近期 Feed 动态。",
+    "feed_stale": "正在显示旧 Feed 数据，需要刷新。",
+    "feed_updated": "Feed 检查时间：{{time}}"
   }
 }

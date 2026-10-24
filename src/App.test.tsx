@@ -569,12 +569,14 @@ describe("App", () => {
 
   it("opens the codex-reset source from the independent forecast card", async () => {
     forecastInvokeMock.mockResolvedValue({
-      probability24h: 61,
-      probability48h: 73,
       updatedAt: "2026-06-25T09:00:19.499Z",
-      confidence: "low",
       lastResetAt: null,
       latestAlert: null,
+      hasOfficialSignal: false,
+      recentPosts: [],
+      evidencePosts: null,
+      evidenceStale: false,
+      evidenceUpdatedAt: null,
     });
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {

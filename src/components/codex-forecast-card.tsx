@@ -1,13 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { openUrl, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const SOURCE_URL = "https://codex-reset.com/";
-const METHOD_URL = "https://codex-reset.com/forecast-method";
 const MAX_SIGNAL_AGE_MS = 5 * 60_000;
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
@@ -25,7 +24,6 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
   resets?: CodexResetAnnouncement[] | null;
 }) {
   const { t, i18n } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
   const [, refreshClock] = useState(0);
   const now = Date.now();
   const alert = data?.latestAlert;
@@ -65,9 +63,6 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
     const timer = window.setTimeout(() => refreshClock((tick) => tick + 1), delay);
     return () => window.clearTimeout(timer);
   }, [data, end, now]);
-
-  const confidence = data?.confidence && ["low", "moderate", "medium", "high"].includes(data.confidence)
-    ? t(`forecast.confidence_${data.confidence}`) : t("forecast.unknown");
 
   return (
     <Card data-testid="global-reset-forecast" className="min-w-0 rounded-lg">
@@ -115,25 +110,28 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
           </section> : null}
           <p className="text-[11px] text-muted-foreground">{t("forecast.updated", { time: formatDate(data.updatedAt) })}</p>
         </> : null}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-[11px]">
-          <span>Data: <ExternalLink href={SOURCE_URL}>codex-reset.com</ExternalLink></span>
-          {data ? <button type="button" className="flex items-center gap-1 text-muted-foreground hover:text-foreground" aria-expanded={expanded} aria-controls="forecast-details" onClick={() => setExpanded(!expanded)}>
-            {t(expanded ? "forecast.hide_details" : "forecast.details")}<ChevronDown className={cn("h-3.5 w-3.5", expanded && "rotate-180")} aria-hidden="true" />
-          </button> : null}
+        {data ? <section aria-label={t("forecast.feed_title")} className="space-y-2 border-t border-border/60 pt-3 text-xs">
+          <h3 className="font-semibold">{t("forecast.feed_title")}</h3>
+          <p className="text-[11px] text-muted-foreground">{t("forecast.feed_note")}</p>
+          {data.recentPosts == null ? <p className="text-muted-foreground">{t("forecast.feed_unavailable")}</p>
+            : data.recentPosts.length === 0 ? <p className="text-muted-foreground">{t("forecast.feed_empty")}</p>
+            : <>
+              {evidenceStale || error ? <p role="status" className="text-warning">{t("forecast.feed_stale")}</p> : null}
+              <ul className="space-y-2">
+                {data.recentPosts.map((post) => <li key={post.id} className="space-y-1.5 rounded-md border border-border/60 p-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <time dateTime={post.at} className="text-muted-foreground">{formatDate(post.at)}</time>
+                    <ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink>
+                  </div>
+                  <p className="whitespace-pre-wrap break-words">{post.text}</p>
+                </li>)}
+              </ul>
+            </>}
+          {data.evidenceUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.feed_updated", { time: formatDate(data.evidenceUpdatedAt) })}</p> : null}
+        </section> : null}
+        <div className="border-t border-border/60 pt-3 text-[11px]">
+          Data: <ExternalLink href={SOURCE_URL}>codex-reset.com</ExternalLink>
         </div>
-        {expanded && data ? <div id="forecast-details" className="space-y-3 border-t border-border/60 pt-3 text-xs leading-relaxed">
-          <p className="text-muted-foreground">{t("forecast.scope")}</p>
-          {data.probability24h != null && data.probability48h != null ? <>
-            <div className="flex flex-wrap gap-x-5 gap-y-1">
-              {([24, 48] as const).map((hours) => <span key={hours} data-forecast-horizon={`${hours}h`}>
-                {t("forecast.horizon", { hours })} <span className="font-mono tabular-nums">{hours === 24 ? data.probability24h : data.probability48h}%</span>
-              </span>)}
-            </div>
-            <p>{t("forecast.confidence")}: {confidence}</p>
-          </> : <p>{t("forecast.model_unavailable")}</p>}
-          <p className="text-muted-foreground">{t("forecast.method")}</p>
-          <ExternalLink href={METHOD_URL}>{t("forecast.method_link")}</ExternalLink>
-        </div> : null}
       </CardContent>
     </Card>
   );

@@ -803,22 +803,16 @@
     "refresh_failed": "Update failed. The previous signal needs rechecking.",
     "load_failed": "Unable to load the forecast. Please retry.",
     "loading": "Checking reset announcements…",
-    "horizon": "Historical probability · next {{hours}}h",
-    "confidence": "Model confidence",
-    "confidence_low": "Low",
-    "confidence_moderate": "Moderate",
-    "confidence_medium": "Moderate",
-    "confidence_high": "High",
     "updated": "Signal checked: {{time}}",
     "unknown": "Unknown",
-    "details": "Show historical reference",
-    "hide_details": "Hide historical reference",
-    "scope": "Historical estimates are background context for extra global resets. They do not establish an announcement or your personal reset time.",
     "expired": "The previous announcement has expired; it is not a prediction of the next reset.",
     "signal_score": "Provider rule score: {{score}}. This is not a measured success rate or a 24h / 48h probability.",
     "window": "Expected window (local time): {{start}} – {{end}}",
-    "model_unavailable": "A separate historical baseline is unavailable.",
-    "method": "The experimental model uses up to eight completed reset intervals. Waiting longer does not increase the probability; ordinary posts and hints add no weight. Historical probabilities do not trigger a reliable signal.",
-    "method_link": "Forecast method and accuracy"
+    "feed_title": "Latest 5 feed posts",
+    "feed_note": "Posts via codex-reset.com. Feed activity alone does not establish a reliable reset announcement.",
+    "feed_unavailable": "The feed is unavailable.",
+    "feed_empty": "No recent feed posts.",
+    "feed_stale": "Showing older feed data; it needs refreshing.",
+    "feed_updated": "Feed checked: {{time}}"
   }
 }

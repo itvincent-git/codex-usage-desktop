@@ -9,7 +9,7 @@ import fixture from "../../e2e/fixtures/reset-forecast.json";
 vi.mock("@/lib/api", () => ({ fetchCodexQuotaForecast: vi.fn() }));
 function Harness({ active = true, language = "en" }: { active?: boolean; language?: string }) {
   const forecast = useCodexForecast(active, language);
-  return <><button onClick={() => void forecast.refresh()}>refresh</button><span>{forecast.data?.probability24h}</span><span>{forecast.error}</span><span>{forecast.isRefreshing ? "refreshing" : "idle"}</span></>;
+  return <><button onClick={() => void forecast.refresh()}>refresh</button><span>{forecast.data?.recentPosts?.[0]?.text}</span><span>{forecast.error}</span><span>{forecast.isRefreshing ? "refreshing" : "idle"}</span></>;
 }
 async function settle() { await act(async () => { await Promise.resolve(); }); }
 
@@ -30,7 +30,7 @@ describe("useCodexForecast", () => {
     fireEvent(window, new Event("focus"));
     expect(fetchCodexQuotaForecast).toHaveBeenCalledTimes(1);
     await act(async () => resolve(fixture));
-    expect(screen.getByText("39")).toBeInTheDocument();
+    expect(screen.getByText(fixture.recentPosts[0].text)).toBeInTheDocument();
     expect(screen.getByText("idle")).toBeInTheDocument();
   });
 
@@ -67,12 +67,12 @@ describe("useCodexForecast", () => {
     expect(screen.getByText("offline")).toBeInTheDocument();
     fireEvent.click(screen.getByText("refresh"));
     await settle();
-    expect(screen.getByText("39")).toBeInTheDocument();
+    expect(screen.getByText(fixture.recentPosts[0].text)).toBeInTheDocument();
     expect(screen.queryByText("offline")).not.toBeInTheDocument();
     vi.mocked(fetchCodexQuotaForecast).mockRejectedValueOnce("rate limited");
     fireEvent.click(screen.getByText("refresh"));
     await settle();
-    expect(screen.getByText("39")).toBeInTheDocument();
+    expect(screen.getByText(fixture.recentPosts[0].text)).toBeInTheDocument();
     expect(screen.getByText("rate limited")).toBeInTheDocument();
   });
 
@@ -88,8 +88,8 @@ describe("useCodexForecast", () => {
     const { rerender } = render(<Harness />);
     rerender(<Harness language="ja" />);
     await settle();
-    await act(async () => resolve({ ...fixture, probability24h: 99 }));
-    expect(screen.getByText("39")).toBeInTheDocument();
-    expect(screen.queryByText("99")).not.toBeInTheDocument();
+    await act(async () => resolve({ ...fixture, recentPosts: [{ ...fixture.recentPosts[0], text: "Older language response" }] }));
+    expect(screen.getByText(fixture.recentPosts[0].text)).toBeInTheDocument();
+    expect(screen.queryByText("Older language response")).not.toBeInTheDocument();
   });
 });
