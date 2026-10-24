@@ -180,6 +180,17 @@ export type CodexQuotaForecastResponse = {
   confidence: string | null;
   lastResetAt: string | null;
   latestAlert: CodexForecastAlert | null;
+  recentPosts?: CodexForecastPost[] | null;
+  postsStale?: boolean;
+  postsUpdatedAt?: string | null;
+};
+
+export type CodexForecastPost = {
+  id: string;
+  text: string;
+  url: string;
+  at: string;
+  signal: "reset" | "expected" | "hint" | (string & {}) | null;
 };
 
 export type CodexForecastAlert = {

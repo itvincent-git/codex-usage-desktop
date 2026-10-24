@@ -314,6 +314,19 @@ pub struct CodexQuotaForecastResponse {
     pub confidence: Option<String>,
     pub last_reset_at: Option<String>,
     pub latest_alert: Option<CodexForecastAlert>,
+    pub recent_posts: Option<Vec<CodexForecastPost>>,
+    pub posts_stale: bool,
+    pub posts_updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexForecastPost {
+    pub id: String,
+    pub text: String,
+    pub url: String,
+    pub at: String,
+    pub signal: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

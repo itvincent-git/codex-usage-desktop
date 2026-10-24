@@ -24,19 +24,18 @@ describe("CodexForecastCard", () => {
 
   it("shows historical probabilities including 0 and 100, local dates, and collapsed details", () => {
     render(<CodexForecastCard {...props} data={{ ...data, probability24h: 0, probability48h: 100, latestAlert: null }} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Historical model");
-    expect(screen.getByRole("progressbar", { name: "Historical probability · next 24h" })).toHaveAttribute("aria-valuenow", "0");
-    expect(screen.getByRole("progressbar", { name: "Historical probability · next 48h" })).toHaveAttribute("aria-valuenow", "100");
+    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.getByText("0%")).toBeInTheDocument();
     expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.getByText(new Date(data.updatedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }))).toBeInTheDocument();
+    expect(screen.getByText(new Date(data.updatedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }), { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show details" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText(/The historical model uses/)).not.toBeInTheDocument();
     expand();
     expect(screen.getByText("No current announcement.")).toBeInTheDocument();
     expect(screen.getByText(/Waiting longer does not increase/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide details" }));
-    expect(screen.queryByText("No current announcement.")).not.toBeInTheDocument();
+    expect(screen.getByText("No current announcement.")).toBeInTheDocument();
   });
 
   it("separates official signal scores and opens source, original and method links", () => {
@@ -48,6 +47,7 @@ describe("CodexForecastCard", () => {
     expect(source).toHaveAttribute("href", "https://codex-reset.com/");
     fireEvent.click(source);
     expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/");
+    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
     expand();
     expect(screen.getByText("Signal score: 93 (not a 24h / 48h probability)")).toBeInTheDocument();
     expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
@@ -79,19 +79,19 @@ describe("CodexForecastCard", () => {
 
   it("retains expired announcements and shows confirmed resets only from API confirmation", () => {
     const { rerender } = render(<CodexForecastCard {...props} data={withAlert({ ...data.latestAlert, state: "expired" })} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Historical model");
+    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
     expand();
     expect(screen.getByText("Expired announcement")).toBeInTheDocument();
     const observedAt = "2026-10-24T02:00:00Z";
     rerender(<CodexForecastCard {...props} data={{ ...data, lastResetAt: observedAt, latestAlert: { kind: "reset", state: "confirmed", observedAt } }} />);
-    expect(screen.getByText("Confirmed reset")).toBeInTheDocument();
+    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Reset confirmed · codex-reset");
     expect(screen.getByText(/Confirmed reset time:/)).toHaveTextContent(new Date(observedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }));
     expect(screen.queryByText("Expired announcement")).not.toBeInTheDocument();
   });
 
   it("keeps probabilities and dates when optional fields or alert states are unknown", () => {
     render(<CodexForecastCard {...props} data={withAlert({ kind: "new", state: "new", summary: "Future API state" })} />);
-    expect(screen.getByTestId("forecast-status")).toHaveTextContent("Historical model");
+    expect(screen.getByTestId("forecast-status")).toHaveTextContent("No official reset signal");
     expect(screen.getByText("39%")).toBeInTheDocument();
     expand();
     expect(screen.getByText("Future API state")).toBeInTheDocument();
@@ -110,6 +110,35 @@ describe("CodexForecastCard", () => {
     rerender(<CodexForecastCard {...props} data={data} error="offline" />);
     expect(screen.getByRole("alert")).toHaveTextContent("Showing the last available forecast");
     expect(screen.getByText("39%")).toBeInTheDocument();
+  });
+
+  it("shows recent posts and reset labels before expanding, and opens their original links", () => {
+    render(<CodexForecastCard {...props} data={data} />);
+    expect(screen.getByRole("heading", { name: "Will Codex reset?" })).toBeInTheDocument();
+    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    for (const post of data.recentPosts!) {
+      expect(screen.getByText(post.text)).toBeInTheDocument();
+    }
+    expect(screen.getByText("Expected reset")).toBeInTheDocument();
+    expect(screen.getByText("Reset signal")).toBeInTheDocument();
+    expect(screen.getByText("Reset hint")).toBeInTheDocument();
+    expect(screen.queryByText("Confirmed reset")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("link", { name: "View on X ↗" })[1]);
+    expect(openUrl).toHaveBeenCalledWith(data.recentPosts![1].url);
+    fireEvent.click(screen.getByRole("link", { name: "@thsottiaux ↗" }));
+    expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux");
+  });
+
+  it("distinguishes unavailable, empty and stale feeds while retaining the announcement", () => {
+    const { rerender } = render(<CodexForecastCard {...props} data={{ ...data, recentPosts: null }} />);
+    expect(screen.getByText(/Tibo posts are unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(data.latestAlert!.summary!)).toBeInTheDocument();
+    rerender(<CodexForecastCard {...props} data={{ ...data, recentPosts: [] }} />);
+    expect(screen.getByText("No recent posts.")).toBeInTheDocument();
+    rerender(<CodexForecastCard {...props} data={{ ...data, postsStale: true }} />);
+    expect(screen.getByText(/Showing older posts/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
   });
 
   it.each(languageCodes)("provides all labels and localized summaries in %s", async (language) => {

@@ -17,5 +17,44 @@
       "startAt": "2026-10-24T01:00:00.000Z",
       "endAt": "2026-10-24T03:00:00.000Z"
     }
-  }
+  },
+  "recentPosts": [
+    {
+      "id": "1",
+      "text": "Codex CLI updates are now available.",
+      "url": "https://x.com/thsottiaux/status/1",
+      "at": "2026-10-24T00:04:00.000Z",
+      "signal": null
+    },
+    {
+      "id": "2",
+      "text": "Landing tomorrow before 10am PST.",
+      "url": "https://x.com/thsottiaux/status/2",
+      "at": "2026-10-24T00:03:00.000Z",
+      "signal": "expected"
+    },
+    {
+      "id": "3",
+      "text": "Today is reset day.",
+      "url": "https://x.com/thsottiaux/status/3",
+      "at": "2026-10-24T00:02:00.000Z",
+      "signal": "reset"
+    },
+    {
+      "id": "4",
+      "text": "We will see.",
+      "url": "https://x.com/thsottiaux/status/4",
+      "at": "2026-10-24T00:01:00.000Z",
+      "signal": "hint"
+    },
+    {
+      "id": "5",
+      "text": "More improvements to the CLI.",
+      "url": "https://x.com/thsottiaux/status/5",
+      "at": "2026-10-24T00:00:00.000Z",
+      "signal": null
+    }
+  ],
+  "postsStale": false,
+  "postsUpdatedAt": "2026-10-24T00:00:00.000Z"
 }

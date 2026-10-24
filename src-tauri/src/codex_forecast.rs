@@ -1,10 +1,11 @@
-use crate::types::{CodexForecastAlert, CodexQuotaForecastResponse};
+use crate::types::{CodexForecastAlert, CodexForecastPost, CodexQuotaForecastResponse};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const FORECAST_URL: &str = "https://codex-reset.com/api/forecast";
+const FEED_URL: &str = "https://codex-reset.com/api/feed";
 const MIN_INTERVAL: Duration = Duration::from_secs(60);
 const USER_AGENT: &str = concat!(
     "codex-usage-desktop/",
@@ -37,7 +38,79 @@ fn parse(body: &str) -> Result<CodexQuotaForecastResponse, String> {
         confidence: response.confidence,
         last_reset_at: response.last_reset_at,
         latest_alert: response.latest_alert,
+        recent_posts: None,
+        posts_stale: false,
+        posts_updated_at: None,
     })
+}
+
+#[derive(Deserialize)]
+struct Feed {
+    tweets: Vec<FeedPost>,
+    fetched_at: Option<String>,
+    #[serde(default)]
+    stale: bool,
+}
+
+#[derive(Deserialize)]
+struct FeedPost {
+    id: String,
+    text: String,
+    url: String,
+    at: String,
+    kind: Option<String>,
+    #[serde(default)]
+    explicit_reset_claim: bool,
+    tease_classification: Option<TeaseClassification>,
+}
+
+#[derive(Deserialize)]
+struct TeaseClassification {
+    #[serde(default)]
+    teasing: bool,
+}
+
+fn recent_posts(mut feed: Feed) -> Vec<CodexForecastPost> {
+    feed.tweets.sort_by(|a, b| b.at.cmp(&a.at));
+    feed.tweets
+        .into_iter()
+        .take(5)
+        .map(|post| {
+            let kind = post.kind.as_deref();
+            let text = post.text.to_ascii_lowercase();
+            let signal = if kind == Some("signal")
+                || (kind == Some("candidate")
+                    && (text.starts_with("landing ") || text.starts_with("lands ")))
+            {
+                Some("expected")
+            } else if matches!(kind, Some("reset" | "candidate")) || post.explicit_reset_claim {
+                Some("reset")
+            } else if post.tease_classification.is_some_and(|value| value.teasing) {
+                Some("hint")
+            } else {
+                None
+            };
+            CodexForecastPost {
+                id: post.id,
+                text: post.text,
+                url: post.url,
+                at: post.at,
+                signal: signal.map(str::to_string),
+            }
+        })
+        .collect()
+}
+
+fn request_feed(url: &str) -> Result<Feed, reqwest::Error> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(6))
+        .user_agent(USER_AGENT)
+        .build()?
+        .get(url)
+        .header("Accept", "application/json")
+        .send()?
+        .error_for_status()?
+        .json()
 }
 
 #[derive(Default)]
@@ -55,7 +128,14 @@ impl Cache {
         request: impl FnOnce() -> (Result<CodexQuotaForecastResponse, String>, Duration),
     ) -> Result<CodexQuotaForecastResponse, String> {
         if self.next_request.is_none_or(|next| now >= next) {
-            let (result, retry_after) = request();
+            let (mut result, retry_after) = request();
+            if let (Ok(data), Some(Ok(previous))) = (&mut result, &self.result) {
+                if data.recent_posts.is_none() && previous.recent_posts.is_some() {
+                    data.recent_posts = previous.recent_posts.clone();
+                    data.posts_updated_at = previous.posts_updated_at.clone();
+                    data.posts_stale = true;
+                }
+            }
             self.next_request = Some(now + retry_after.max(MIN_INTERVAL));
             self.locale = locale.to_string();
             self.result = Some(result);
@@ -87,7 +167,20 @@ pub fn fetch(locale: &str) -> Result<CodexQuotaForecastResponse, String> {
         .get_or_init(Default::default)
         .lock()
         .map_err(|error| error.to_string())?
-        .get_or_fetch(locale, Instant::now(), || request(FORECAST_URL, locale))
+        .get_or_fetch(locale, Instant::now(), || {
+            let (mut result, delay) = request(FORECAST_URL, locale);
+            if let Ok(data) = &mut result {
+                match request_feed(FEED_URL) {
+                    Ok(feed) => {
+                        data.posts_stale = feed.stale;
+                        data.posts_updated_at = feed.fetched_at.clone();
+                        data.recent_posts = Some(recent_posts(feed));
+                    }
+                    Err(error) => log::warn!("Failed to load Tibo posts: {error}"),
+                }
+            }
+            (result, delay)
+        })
 }
 
 fn retry_delay(value: Option<&str>, now: DateTime<Utc>) -> Duration {
@@ -176,6 +269,101 @@ mod tests {
         assert_eq!(data.updated_at, "2026-10-24T00:00:00Z");
         assert_eq!(data.last_reset_at.as_deref(), Some("2026-10-23T00:00:00Z"));
         assert!(data.latest_alert.is_none());
+    }
+
+    #[test]
+    fn maps_five_recent_posts_and_provider_signals_without_claiming_confirmation() {
+        let posts: Vec<_> = [
+            ("other", "I demand a reset", false),
+            ("codex", "We'll see", true),
+            ("candidate", "Today is reset day", false),
+            ("candidate", "Landing tomorrow before 10am PST", false),
+            ("signal", "Within the next two hours", false),
+            ("boost", "CLI updates", false),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (kind, text, teasing))| {
+            json!({
+                "id": i.to_string(), "text": text,
+                "url": format!("https://x.com/thsottiaux/status/{i}"),
+                "at": format!("2026-10-24T00:0{i}:00Z"), "kind": kind,
+                "reset_verification_status": "expired",
+                "tease_classification": { "teasing": teasing }
+            })
+        })
+        .collect();
+        let feed: Feed = serde_json::from_value(json!({ "tweets": posts })).unwrap();
+        let posts = recent_posts(feed);
+        assert_eq!(posts.len(), 5);
+        assert_eq!(
+            posts
+                .iter()
+                .map(|p| p.signal.as_deref())
+                .collect::<Vec<_>>(),
+            vec![
+                None,
+                Some("expected"),
+                Some("expected"),
+                Some("reset"),
+                Some("hint")
+            ]
+        );
+        assert_eq!(posts[0].id, "5");
+        assert_eq!(posts[1].url, "https://x.com/thsottiaux/status/4");
+        let feed: Feed = serde_json::from_value(json!({"tweets": [{
+            "id": "1", "text": "I demand a reset", "url": "https://x.com/thsottiaux/status/1",
+            "at": "2026-10-24T00:00:00Z", "kind": "other"
+        }]}))
+        .unwrap();
+        assert!(recent_posts(feed)[0].signal.is_none());
+    }
+
+    #[test]
+    fn retains_previous_posts_as_stale_when_only_the_feed_fails() {
+        let now = Instant::now();
+        let mut cache = Cache::default();
+        let mut first = parse(&fixture(serde_json::Value::Null)).unwrap();
+        first.recent_posts = Some(vec![CodexForecastPost {
+            id: "1".into(),
+            text: "Post".into(),
+            url: "https://x.com/thsottiaux/status/1".into(),
+            at: "2026-10-24T00:00:00Z".into(),
+            signal: None,
+        }]);
+        first.posts_updated_at = Some("2026-10-24T00:00:00Z".into());
+        cache
+            .get_or_fetch("en", now, || (Ok(first.clone()), MIN_INTERVAL))
+            .unwrap();
+        let refreshed = cache
+            .get_or_fetch("en", now + MIN_INTERVAL, || {
+                (parse(&fixture(serde_json::Value::Null)), MIN_INTERVAL)
+            })
+            .unwrap();
+        assert_eq!(refreshed.recent_posts, first.recent_posts);
+        assert_eq!(refreshed.posts_updated_at, first.posts_updated_at);
+        assert!(refreshed.posts_stale);
+    }
+
+    #[test]
+    fn loads_feed_from_http_and_preserves_source_freshness() {
+        let server = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/api/feed", server.local_addr().unwrap());
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = server.accept().unwrap();
+            let mut buffer = [0; 4096];
+            let n = stream.read(&mut buffer).unwrap();
+            let received = String::from_utf8_lossy(&buffer[..n]);
+            assert!(received.contains("/api/feed"));
+            assert!(received.contains(USER_AGENT));
+            let body = r#"{"tweets":[],"stale":true,"fetched_at":"2026-10-24T00:00:00Z"}"#;
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+        });
+        let feed = request_feed(&url).unwrap();
+        handle.join().unwrap();
+        assert!(feed.stale);
+        assert_eq!(feed.fetched_at.as_deref(), Some("2026-10-24T00:00:00Z"));
+        assert!(recent_posts(feed).is_empty());
     }
 
     #[test]

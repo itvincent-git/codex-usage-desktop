@@ -33,7 +33,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
   const pending = alert?.pending === "done" || alert?.pending === "on_its_way";
   const active = alert?.kind === "watch" && (alert.state === "active" || pending) && !expired;
   const waiting = active && (pending || windowEnded);
-  const status = waiting ? "waiting" : active ? "official" : "model";
+  const status = waiting ? "waiting" : active ? "official" : confirmed ? "confirmed" : "no_signal";
   const lastReset = data?.lastResetAt ?? (confirmed ? alert.observedAt ?? alert.confirmedAt : null);
   const formatDate = (value?: string | null) => {
     if (!value || !Number.isFinite(Date.parse(value))) return t("forecast.unknown");
@@ -58,7 +58,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold">{t("forecast.title")}</h2>
-            {data ? <span data-testid="forecast-status" className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", status === "model" ? "bg-muted text-muted-foreground" : "bg-warning/10 text-warning")}>{t(`forecast.status_${status}`)}</span> : null}
+            {data ? <span data-testid="forecast-status" className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", active ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground")}>{t(`forecast.status_${status}`)}</span> : null}
           </div>
           <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isRefreshing} aria-label={t(error && !data ? "forecast.retry" : "forecast.refresh")}>
             <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefreshing && "animate-spin")} aria-hidden="true" />
@@ -68,22 +68,44 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
         {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
         {!data && !error ? <p role="status" className="text-xs text-muted-foreground">{t("forecast.loading")}</p> : null}
         {data ? <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div data-testid="forecast-announcement" className={cn("space-y-2 rounded-md border p-3 text-xs leading-relaxed", active ? "border-warning/30 bg-warning/5" : "border-border bg-muted/20")}>
+            {alert ? <>
+              <p className="font-semibold">{t(confirmed ? "forecast.confirmed" : expired ? "forecast.expired" : active ? "forecast.status_official" : "forecast.latest_alert")}</p>
+              {alert.localizedSummary || alert.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
+              {alert.window && (alert.window.startAt || alert.window.endAt) ? <p>{t("forecast.window", { start: formatDate(alert.window.startAt), end: formatDate(alert.window.endAt) })}</p> : null}
+              {waiting ? <p className="text-warning">{t(windowEnded ? "forecast.window_ended" : "forecast.pending")}</p> : active && Number.isFinite(end) ? <p className="font-mono tabular-nums">{t("forecast.countdown", { time: countdown })}</p> : null}
+              {confirmed ? <p>{t("forecast.confirmed_at", { time: formatDate(alert.observedAt ?? alert.confirmedAt ?? data.lastResetAt) })}</p> : null}
+              {alert.url ? <ExternalLink href={alert.url}>{t("forecast.source")}</ExternalLink> : null}
+            </> : <p className="text-muted-foreground">{t("forecast.no_alert")}</p>}
+          </div>
+          <section aria-label={t("forecast.posts_title")} className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <h3 className="font-semibold">{t("forecast.posts_title")}</h3>
+              <ExternalLink href="https://x.com/thsottiaux">@thsottiaux ↗</ExternalLink>
+            </div>
+            <p className="text-[11px] text-muted-foreground">{t("forecast.posts_via")}</p>
+            {data.postsStale ? <p role="status" className="text-xs text-warning">{t("forecast.posts_stale")}</p> : null}
+            {data.recentPosts == null ? <p className="text-xs text-muted-foreground">{t("forecast.posts_unavailable")}</p> : data.recentPosts.length === 0 ? <p className="text-xs text-muted-foreground">{t("forecast.posts_empty")}</p> : <ul className="space-y-2">
+              {data.recentPosts.map((post) => <li key={post.id} data-post-signal={post.signal ?? "none"} className={cn("space-y-1.5 rounded-md border p-2.5 text-xs", post.signal ? "border-warning/25 bg-warning/5" : "border-border/60")}>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {post.signal ? <span className="rounded bg-warning/10 px-1.5 py-0.5 font-medium text-warning">{t(`forecast.post_${post.signal}`)}</span> : null}
+                    <time dateTime={post.at} className="text-muted-foreground">{formatDate(post.at)}</time>
+                  </div>
+                  <ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink>
+                </div>
+                <p className="line-clamp-3 whitespace-pre-wrap break-words">{post.text}</p>
+              </li>)}
+            </ul>}
+            {data.postsUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.posts_updated", { time: formatDate(data.postsUpdatedAt) })}</p> : null}
+          </section>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
             {([24, 48] as const).map((hours) => {
               const probability = hours === 24 ? data.probability24h : data.probability48h;
-              return <div key={hours} data-forecast-horizon={`${hours}h`} className="space-y-2">
-                <div className="flex items-baseline justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">{t("forecast.horizon", { hours })}</span>
-                  <span className="font-mono text-xl font-semibold tabular-nums">{probability}%</span>
-                </div>
-                <div role="progressbar" aria-label={t("forecast.horizon", { hours })} aria-valuemin={0} aria-valuemax={100} aria-valuenow={probability} className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${probability}%` }} />
-                </div>
-              </div>;
+              return <span key={hours} data-forecast-horizon={`${hours}h`}>{t("forecast.horizon", { hours })} <span className="font-mono tabular-nums">{probability}%</span></span>;
             })}
           </div>
-          <dl className="grid gap-x-5 gap-y-2 text-[11px] sm:grid-cols-3">
-            <div><dt className="text-muted-foreground">{t("forecast.confidence")}</dt><dd className="mt-1">{confidence}</dd></div>
+          <dl className="grid gap-x-5 gap-y-2 text-[11px] sm:grid-cols-2">
             <div><dt className="text-muted-foreground">{t("forecast.last_reset")}</dt><dd className="mt-1">{formatDate(lastReset)}</dd></div>
             <div><dt className="text-muted-foreground">{t("forecast.updated")}</dt><dd className="mt-1">{formatDate(data.updatedAt)}</dd></div>
           </dl>
@@ -96,15 +118,8 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh }: {
         </div>
         {expanded && data ? <div id="forecast-details" className="space-y-3 border-t border-border/60 pt-3 text-xs leading-relaxed">
           <p className="text-muted-foreground">{t("forecast.scope")}</p>
-          {alert ? <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-            <p className="font-medium">{t(confirmed ? "forecast.confirmed" : expired ? "forecast.expired" : active ? "forecast.status_official" : "forecast.latest_alert")}</p>
-            {alert.localizedSummary || alert.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
-            {alert.score != null ? <p>{t("forecast.signal_score", { score: alert.score })}</p> : null}
-            {alert.window && (alert.window.startAt || alert.window.endAt) ? <p>{t("forecast.window", { start: formatDate(alert.window.startAt), end: formatDate(alert.window.endAt) })}</p> : null}
-            {waiting ? <p className="text-warning">{t(windowEnded ? "forecast.window_ended" : "forecast.pending")}</p> : active && Number.isFinite(end) ? <p className="font-mono tabular-nums">{t("forecast.countdown", { time: countdown })}</p> : null}
-            {confirmed ? <p>{t("forecast.confirmed_at", { time: formatDate(alert.observedAt ?? alert.confirmedAt ?? data.lastResetAt) })}</p> : null}
-            {alert.url ? <ExternalLink href={alert.url}>{t("forecast.source")}</ExternalLink> : null}
-          </div> : <p className="text-muted-foreground">{t("forecast.no_alert")}</p>}
+          <p>{t("forecast.confidence")}: {confidence}</p>
+          {alert?.score != null ? <p>{t("forecast.signal_score", { score: alert.score })}</p> : null}
           <p className="text-muted-foreground">{t("forecast.method")}</p>
           <ExternalLink href={METHOD_URL}>{t("forecast.method_link")}</ExternalLink>
         </div> : null}
