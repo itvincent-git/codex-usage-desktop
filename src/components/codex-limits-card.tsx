@@ -251,6 +251,7 @@ function LimitRow({ label, window, now }: LimitRowProps & { now: number }) {
   const { t } = useTranslation();
   const friendlyLabel = t(label === "monthly" ? "limits.sidebar_monthly" : label === "Weekly" ? "limits.sidebar_weekly" : "limits.sidebar_5hour");
   const remaining = window && Number.isFinite(window.remainingPercent) ? Math.min(100, Math.max(0, window.remainingPercent)) : 0;
+  const outlineClass = remaining < 30 ? "stroke-error" : remaining < 70 ? "stroke-warning" : "stroke-success";
   const countdown = formatSidebarCountdown(window?.resetsAt ?? null, now);
   const reset = countdown !== null ? dayjs(window!.resetsAt).format(label === "5 hour" ? "HH:mm" : "MM/DD HH:mm") : null;
 
@@ -258,7 +259,7 @@ function LimitRow({ label, window, now }: LimitRowProps & { now: number }) {
     <div data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`} className="relative rounded-xl bg-primary/[0.025] px-3 pb-2.5 pt-3.5">
       <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible fill-none">
         <rect x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
-        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} pathLength="100" strokeDasharray={`${remaining} 100`} className="stroke-primary transition-[stroke-dasharray] duration-300" strokeWidth="1.5" /> : null}
+        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} pathLength="100" strokeDasharray={`${remaining} 100`} className={cn("transition-[stroke-dasharray] duration-300", outlineClass)} strokeWidth="1.5" /> : null}
       </svg>
       <span className="absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 text-[9px] font-medium leading-none text-primary">{friendlyLabel}</span>
       <div className="flex items-baseline gap-1.5">

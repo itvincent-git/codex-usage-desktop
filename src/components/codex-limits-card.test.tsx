@@ -139,6 +139,25 @@ describe("sidebar reset countdown", () => {
   });
 });
 
+describe("sidebar quota colors", () => {
+  it("restores the original thresholds as mocked quota values change", () => {
+    const { rerender } = render(<CodexSidebarLimits limits={null} error={null} />);
+    for (const [remaining, color] of [[100, "success"], [70, "success"], [69.9, "warning"], [30, "warning"], [29.9, "error"], [0, "error"], [75, "success"]] as const) {
+      const window = { usedPercent: 100 - remaining, remainingPercent: remaining, windowMinutes: 300, resetsAt: null };
+      rerender(<CodexSidebarLimits limits={{ session: window, weekly: window, updatedAt: new Date().toISOString(), source: "mock", membershipLevel: "plus" }} error={null} />);
+      for (const id of ["limit-row-5-hour", "limit-row-weekly"]) {
+        const row = screen.getByTestId(id);
+        expect(row.querySelector("[data-quota-outline]")).toHaveClass(`stroke-${color}`);
+        expect(row.querySelector(".text-xl")).toHaveClass("text-primary");
+        expect(row.querySelector("span.absolute")).toHaveClass("text-primary", "border-primary/20");
+        expect(row.querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", `${remaining} 100`);
+      }
+    }
+    rerender(<CodexSidebarLimits limits={null} error={null} />);
+    expect(screen.getByTestId("limit-row-monthly").querySelector("[data-quota-outline]")).toBeNull();
+  });
+});
+
 describe("CodexLimitsCard component", () => {
   it("enables activation at zero usage and disables it after usage starts", () => {
     vi.useFakeTimers();
