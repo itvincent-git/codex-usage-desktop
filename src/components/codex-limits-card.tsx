@@ -5,7 +5,7 @@ import { LatestResetButton } from "@/components/codex-reset-history";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type CodexLimitsCardProps = {
@@ -249,6 +249,21 @@ export function formatSidebarCountdown(resetsAt: string | null, now: number): st
 
 function LimitRow({ label, window, now }: LimitRowProps & { now: number }) {
   const { t } = useTranslation();
+  const outlineTrackRef = useRef<SVGRectElement>(null);
+  useLayoutEffect(() => {
+    const track = outlineTrackRef.current!;
+    const updateStart = () => {
+      const { width, height } = track.getBBox();
+      if (!width || !height) return;
+      // Shift the clockwise dash to the top center so its gap grows to the left.
+      const offset = -100 * (width / 2 - 11) / track.getTotalLength();
+      track.parentElement!.style.setProperty("--quota-start-offset", String(offset));
+    };
+    updateStart();
+    const observer = new ResizeObserver(updateStart);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, []);
   const friendlyLabel = t(label === "monthly" ? "limits.sidebar_monthly" : label === "Weekly" ? "limits.sidebar_weekly" : "limits.sidebar_5hour");
   const remaining = window && Number.isFinite(window.remainingPercent) ? Math.min(100, Math.max(0, window.remainingPercent)) : 0;
   const outlineClass = remaining < 30 ? "stroke-error" : remaining < 70 ? "stroke-warning" : "stroke-success";
@@ -258,8 +273,8 @@ function LimitRow({ label, window, now }: LimitRowProps & { now: number }) {
   return (
     <div data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`} className="relative rounded-xl bg-primary/[0.025] px-3 pb-2.5 pt-3.5">
       <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible fill-none">
-        <rect x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
-        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} pathLength="100" strokeDasharray={`${remaining} 100`} className={cn("transition-[stroke-dasharray] duration-300", outlineClass)} strokeWidth="1.5" /> : null}
+        <rect ref={outlineTrackRef} x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
+        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)", strokeDashoffset: "var(--quota-start-offset)" }} pathLength="100" strokeDasharray={`${remaining} ${100 - remaining}`} className={cn("transition-[stroke-dasharray] duration-300", outlineClass)} strokeWidth="1.5" /> : null}
       </svg>
       <span className="absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 text-[9px] font-medium leading-none text-primary">{friendlyLabel}</span>
       <div className="flex items-baseline gap-1.5">

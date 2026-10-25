@@ -4,7 +4,7 @@ import type { CodexLimitsResponse } from "../src/lib/api";
 describe("sidebar quota color reminders", () => {
   const run = process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
 
-  run("changes only the quota outline color in the sidebar and popover", async () => {
+  run("anchors quota depletion at the top center and changes only the outline color", async () => {
     const previous = await browser.execute(() => {
       const keys = ["language", "sidebar_width", "sidebar_collapsed"];
       const previous = Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
@@ -37,7 +37,7 @@ describe("sidebar quota color reminders", () => {
       const expectColor = async (id: string, remaining: number, tone: string) => {
         const row = $(`[data-testid="limit-row-${id}"]`);
         await expect(row).toHaveText(expect.stringContaining(`${Math.round(remaining)}%`));
-        await expect(row.$('[data-quota-outline]')).toHaveAttribute("stroke-dasharray", `${remaining} 100`);
+        await expect(row.$('[data-quota-outline]')).toHaveAttribute("stroke-dasharray", `${remaining} ${100 - remaining}`);
         const colors = await row.execute((element, tone) => {
           const rgb = getComputedStyle(document.documentElement).getPropertyValue(`--${tone}`).trim().split(/\s+/).join(", ");
           const expected = `rgb(${rgb})`;
@@ -50,10 +50,25 @@ describe("sidebar quota color reminders", () => {
           };
         }, tone);
         expect(colors).toEqual({ outline: true, value: true, label: true, countdown: true });
+        await browser.waitUntil(async () => row.$('[data-quota-outline]').execute((element) => {
+          const outline = element as unknown as SVGRectElement;
+          const bounds = outline.getBBox();
+          const length = outline.getTotalLength();
+          const offset = Number.parseFloat(getComputedStyle(outline).strokeDashoffset);
+          const start = ((-offset % 100) + 100) % 100;
+          const point = outline.getPointAtLength(start * length / 100);
+          const remaining = Number(outline.getAttribute("stroke-dasharray")!.split(" ")[0]);
+          const end = outline.getPointAtLength(((start + remaining) % 100) * length / 100);
+          return Math.abs(point.x - (bounds.x + bounds.width / 2)) < 0.2
+            && Math.abs(point.y - bounds.y) < 0.2
+            // At 99% and 98%, the growing gap must sit immediately left of the center.
+            && (!(remaining >= 98 && remaining < 100) || (end.x < point.x && Math.abs(end.y - bounds.y) < 0.2));
+        }), { timeoutMsg: "Quota outline must start at the top center and deplete to the left" });
       };
 
       for (const [session, weekly, sessionTone, weeklyTone] of [
         [100, 0, "success", "error"],
+        [99, 98, "success", "success"],
         [70, 30, "success", "warning"],
         [69.9, 29.9, "warning", "error"],
         [0, 100, "error", "success"],
@@ -74,6 +89,19 @@ describe("sidebar quota color reminders", () => {
       await browser.saveScreenshot("/tmp/codex-sidebar-quota-colors-popover.png");
       await browser.keys("Escape");
       await $('button[aria-label="展开侧栏"]').click();
+      for (const width of [160, 240, 360]) {
+        const resize = $('[role="separator"][aria-orientation="vertical"]');
+        await resize.click();
+        const current = Number(await resize.getAttribute("aria-valuenow"));
+        for (let step = current; step !== width; step += step < width ? 8 : -8) {
+          await browser.keys(step < width ? "ArrowRight" : "ArrowLeft");
+        }
+        await expect(resize).toHaveAttribute("aria-valuenow", String(width));
+        await installLimits(99, 98);
+        await expectColor("5-hour", 99, "success");
+        await expectColor("weekly", 98, "success");
+        await browser.saveScreenshot(`/tmp/codex-quota-origin-${width}.png`);
+      }
       for (const [remaining, tone] of [[70, "success"], [30, "warning"], [0, "error"]] as const) {
         await installLimits(100, remaining, "free");
         await expectColor("monthly", remaining, tone);

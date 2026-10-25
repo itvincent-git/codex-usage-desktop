@@ -117,7 +117,7 @@ describe("sidebar reset countdown", () => {
     const onRefreshLimits = vi.fn();
     const { unmount } = render(<CodexSidebarLimits limits={limits} error={null} onRefreshLimits={onRefreshLimits} />);
     expect(screen.getByText("4h55m")).toBeInTheDocument();
-    expect(screen.getByTestId("limit-row-5-hour").querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", "75 100");
+    expect(screen.getByTestId("limit-row-5-hour").querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", "75 25");
     act(() => { vi.advanceTimersByTime(60_000); });
     expect(screen.getByText("4h54m")).toBeInTheDocument();
     expect(onRefreshLimits).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe("sidebar quota colors", () => {
         expect(row.querySelector("[data-quota-outline]")).toHaveClass(`stroke-${color}`);
         expect(row.querySelector(".text-xl")).toHaveClass("text-primary");
         expect(row.querySelector("span.absolute")).toHaveClass("text-primary", "border-primary/20");
-        expect(row.querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", `${remaining} 100`);
+        expect(row.querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", `${remaining} ${100 - remaining}`);
       }
     }
     rerender(<CodexSidebarLimits limits={null} error={null} />);

@@ -82,7 +82,7 @@ describe("dashboard layout", () => {
     expect(await readLayout()).toEqual(expected);
     await expect($('[data-app-sidebar] [data-testid="limit-row-5-hour"]')).toBeDisplayed();
     await expect($('[data-app-sidebar] button[aria-label="Check limits"]')).toBeDisplayed();
-    await expect($('[data-app-sidebar] [data-testid="limit-row-5-hour"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "75 100");
+    await expect($('[data-app-sidebar] [data-testid="limit-row-5-hour"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "75 25");
     await expect($('[data-app-sidebar] [data-testid="limit-row-5-hour"] [data-quota-countdown]')).toHaveText("4h55m");
     await expect($('[data-app-sidebar] [data-testid="limit-row-weekly"] [data-quota-countdown]')).toHaveText("6d23h");
     await $('[data-testid="models-nav-tab"]').click();
@@ -182,7 +182,7 @@ describe("dashboard layout", () => {
     await expect(activate).toBeDisabled();
     await expect($('.sidebar-limits [role="status"]')).toBeDisplayed();
     expect(await browser.execute(() => document.body.dataset.activationRequests)).toBe("1");
-    await expect($('[data-testid="limit-row-5-hour"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "100 100");
+    await expect($('[data-testid="limit-row-5-hour"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "100 0");
   });
 
   run("shows Chinese quota labels and the monthly limit for a free account", async () => {
@@ -219,7 +219,7 @@ describe("dashboard layout", () => {
     await browser.saveScreenshot("/tmp/codex-sidebar-quota-zh.png");
     await installLimits({ ...limits, membershipLevel: "free", session: null, weekly: { usedPercent: 65, remainingPercent: 35, windowMinutes: 43200, resetsAt: new Date(Date.now() + 30 * 86_400_000).toISOString() } });
     await expect($('[data-app-sidebar] [data-testid="limit-row-monthly"]')).toHaveText(expect.stringContaining("月限制"));
-    await expect($('[data-testid="limit-row-monthly"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "35 100");
+    await expect($('[data-testid="limit-row-monthly"] [data-quota-outline]')).toHaveAttribute("stroke-dasharray", "35 65");
     await expect($('[data-testid="limit-row-5-hour"]')).not.toExist();
     await expect($('[data-testid="limit-row-weekly"]')).not.toExist();
     await expect($('button[aria-label="启动额度窗口"]')).not.toExist();
