@@ -255,21 +255,21 @@ describe("App", () => {
     const user = userEvent.setup();
     const app = render(<StrictMode><App /></StrictMode>);
     const handle = screen.getByRole("separator", { name: "Resize sidebar" });
-    expect(handle).toHaveAttribute("aria-valuenow", "160");
+    expect(handle).toHaveAttribute("aria-valuenow", "240");
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(handle).toHaveAttribute("aria-valuenow", "168");
+    expect(handle).toHaveAttribute("aria-valuenow", "248");
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     app.unmount();
 
     const restored = render(<StrictMode><App /></StrictMode>);
     expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
     await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
-    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "168");
+    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "248");
     restored.unmount();
 
     render(<StrictMode><App /></StrictMode>);
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "168");
+    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "248");
   });
 
   it("checks for updates again after the app stays open for 24 hours", async () => {
@@ -1187,6 +1187,8 @@ describe("App", () => {
     // jsdom does not skip the inert background during native Tab traversal.
     screen.getByRole("button", { name: "Settings" }).focus();
     expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Check limits" })).toHaveFocus();
     await user.tab({ shift: true });
     expect(screen.getByRole("tab", { name: "Project" })).toHaveFocus();
     loadMoreButton.focus();

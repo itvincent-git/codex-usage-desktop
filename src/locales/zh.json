@@ -113,6 +113,15 @@
     }
   },
   "limits": {
+    "sidebar_title": "额度概览",
+    "sidebar_updated": "已更新",
+    "sidebar_5hour": "5小时限制",
+    "sidebar_weekly": "周限制",
+    "sidebar_monthly": "月限制",
+    "sidebar_activate": "启动窗口",
+    "sidebar_reset": "重置",
+    "sidebar_reset_at": "{{time}} 重置",
+    "sidebar_countdown": "距离重置",
     "title": "Codex 额度限制",
     "description": "来自本地 Codex CLI 的实时账户额度限制状态。",
     "updated": "更新于 {{time}}",

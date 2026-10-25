@@ -113,6 +113,15 @@
     }
   },
   "limits": {
+    "sidebar_title": "上限の概要",
+    "sidebar_updated": "更新済み",
+    "sidebar_5hour": "5時間の上限",
+    "sidebar_weekly": "週間上限",
+    "sidebar_monthly": "月間上限",
+    "sidebar_activate": "枠を開始",
+    "sidebar_reset": "リセット",
+    "sidebar_reset_at": "{{time}} にリセット",
+    "sidebar_countdown": "リセットまで",
     "title": "Codexの利用上限",
     "description": "ローカルCodex CLIから取得したアカウントのリアルタイム利用上限。",
     "updated": "最終更新: {{time}}",

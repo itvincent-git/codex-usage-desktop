@@ -113,6 +113,15 @@
     }
   },
   "limits": {
+    "sidebar_title": "한도 개요",
+    "sidebar_updated": "업데이트됨",
+    "sidebar_5hour": "5시간 한도",
+    "sidebar_weekly": "주간 한도",
+    "sidebar_monthly": "월간 한도",
+    "sidebar_activate": "창 시작",
+    "sidebar_reset": "초기화",
+    "sidebar_reset_at": "{{time}} 초기화",
+    "sidebar_countdown": "초기화까지",
     "title": "Codex 사용 한도",
     "description": "로컬 Codex CLI에서 가져온 실시간 계정 사용 한도입니다.",
     "updated": "업데이트 {{time}}",

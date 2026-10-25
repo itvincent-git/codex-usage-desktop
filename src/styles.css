@@ -97,6 +97,25 @@
 }
 
 @layer utilities {
+  .sidebar-limits {
+    container: sidebar-quota / inline-size;
+  }
+
+  @container sidebar-quota (max-width: 190px) {
+    .quota-reset-row {
+      font-size: 9px;
+      letter-spacing: -0.025em;
+    }
+
+    .quota-reset-row svg {
+      display: none;
+    }
+
+    .quota-reset-word {
+      display: none;
+    }
+  }
+
   .session-markdown {
     @apply break-words text-sm leading-relaxed text-foreground;
   }

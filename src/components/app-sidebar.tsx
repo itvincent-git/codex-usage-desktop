@@ -1,7 +1,8 @@
-import { CalendarDays, ChartColumn, Folder, LayoutDashboard, Logs, PanelLeftClose, PanelLeftOpen, Settings, Terminal, Wallet } from "lucide-react";
+import { CalendarDays, ChartColumn, Folder, Gauge, LayoutDashboard, Logs, PanelLeftClose, PanelLeftOpen, Settings, Terminal, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DashboardView } from "@/components/dashboard-header";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type AppSidebarProps = {
   view: DashboardView;
@@ -11,6 +12,7 @@ type AppSidebarProps = {
   width: number;
   onWidthChange: (width: number) => void;
   showLogsTab: boolean;
+  limits: ReactNode;
 };
 
 const pages = [
@@ -29,7 +31,7 @@ const MAX_WIDTH = 360;
 const COLLAPSED_WIDTH = 80;
 export const clampSidebarWidth = (width: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width));
 
-export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, width, onWidthChange, showLogsTab }: AppSidebarProps) {
+export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, width, onWidthChange, showLogsTab, limits }: AppSidebarProps) {
   const { t } = useTranslation();
   const toggleLabel = t(collapsed ? "header.expand_sidebar" : "header.collapse_sidebar");
   const [resizingWidth, setResizingWidth] = useState<number | null>(null);
@@ -78,6 +80,18 @@ export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, w
           ))}
         </div>
       </nav>
+      {collapsed ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button type="button" aria-label={t("limits.sidebar_title")} title={t("limits.sidebar_title")} className="mx-auto mb-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">
+              <Gauge className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="end" className="w-64 p-3">{limits}</PopoverContent>
+        </Popover>
+      ) : (
+        <div className="mx-2 max-h-[55%] shrink-0 overflow-y-auto border-t border-border/80 px-1 pb-4 pt-3">{limits}</div>
+      )}
       <div className="shrink-0 border-t border-border/80 p-2">
         <button type="button" onClick={() => onViewChange("settings")} aria-label={t("common.settings")} title={collapsed ? t("common.settings") : undefined} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"}`}>
           <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />

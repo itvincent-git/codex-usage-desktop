@@ -113,6 +113,15 @@
     }
   },
   "limits": {
+    "sidebar_title": "Quota overview",
+    "sidebar_updated": "Updated",
+    "sidebar_5hour": "5-Hour Limit",
+    "sidebar_weekly": "Weekly Limit",
+    "sidebar_monthly": "Monthly usage limit",
+    "sidebar_activate": "Start window",
+    "sidebar_reset": "reset",
+    "sidebar_reset_at": "Resets {{time}}",
+    "sidebar_countdown": "Time until reset",
     "title": "Codex Limits",
     "description": "Live account limits from the local Codex CLI.",
     "updated": "Updated {{time}}",

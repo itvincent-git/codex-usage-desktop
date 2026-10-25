@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { formatResetTime, CodexLimitsCard } from "./codex-limits-card";
+import { formatResetTime, CodexLimitsCard, CodexSidebarLimits, formatSidebarCountdown } from "./codex-limits-card";
 import dayjs from "dayjs";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import i18n from "../i18n";
 
 describe("formatResetTime", () => {
@@ -95,6 +95,50 @@ describe("formatResetTime", () => {
   });
 });
 
+describe("sidebar reset countdown", () => {
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  it.each([
+    [null, null],
+    ["invalid", null],
+    ["2026-10-25T11:59:00Z", "0m"],
+    ["2026-10-25T12:00:01Z", "0h1m"],
+    ["2026-10-25T16:55:00Z", "4h55m"],
+    ["2026-10-26T11:59:00Z", "23h59m"],
+    ["2026-10-26T12:00:00Z", "1d0h"],
+    ["2026-11-01T11:55:00Z", "6d23h"],
+  ])("formats %s as %s", (resetsAt, expected) => {
+    expect(formatSidebarCountdown(resetsAt, now)).toBe(expected);
+  });
+
+  it("refreshes the countdown without fetching limits and draws only the remaining border", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const limits = { session: { usedPercent: 25, remainingPercent: 75, windowMinutes: 300, resetsAt: "2026-10-25T16:55:00Z" }, weekly: null, updatedAt: "2026-10-25T12:00:00Z", source: "oauth", membershipLevel: "plus" };
+    const onRefreshLimits = vi.fn();
+    const { unmount } = render(<CodexSidebarLimits limits={limits} error={null} onRefreshLimits={onRefreshLimits} />);
+    expect(screen.getByText("4h55m")).toBeInTheDocument();
+    expect(screen.getByTestId("limit-row-5-hour").querySelector("[data-quota-outline]")).toHaveAttribute("stroke-dasharray", "75 100");
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText("4h54m")).toBeInTheDocument();
+    expect(onRefreshLimits).not.toHaveBeenCalled();
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("uses the current time when fresh limits arrive between countdown ticks", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const { rerender, unmount } = render(<CodexSidebarLimits limits={null} error={null} />);
+    vi.setSystemTime(now + 20_000);
+    rerender(<CodexSidebarLimits limits={{ session: { usedPercent: 0, remainingPercent: 100, windowMinutes: 300, resetsAt: new Date(Date.now() + 295 * 60_000).toISOString() }, weekly: null, updatedAt: new Date().toISOString(), source: "oauth", membershipLevel: "plus" }} error={null} />);
+    expect(screen.getByText("4h55m")).toBeInTheDocument();
+    expect(screen.queryByText("4h56m")).not.toBeInTheDocument();
+    unmount();
+    vi.useRealTimers();
+  });
+});
+
 describe("CodexLimitsCard component", () => {
   it("enables activation at zero usage and disables it after usage starts", () => {
     vi.useFakeTimers();
@@ -110,12 +154,11 @@ describe("CodexLimitsCard component", () => {
     };
 
     const { rerender } = render(
-      <CodexLimitsCard
+      <CodexSidebarLimits
         limits={baseLimits}
         error={null}
         onRefreshLimits={onRefreshLimits}
         onActivateWindow={onActivateWindow}
-        onOpenResetCredits={() => {}}
       />,
     );
 
@@ -129,7 +172,7 @@ describe("CodexLimitsCard component", () => {
     expect(onActivateWindow).toHaveBeenCalledOnce();
 
     rerender(
-      <CodexLimitsCard
+      <CodexSidebarLimits
         limits={{
           ...baseLimits,
           session: { ...baseLimits.session, usedPercent: 1, remainingPercent: 99, resetsAt: "2026-09-10T05:00:00.000Z" },
@@ -137,31 +180,28 @@ describe("CodexLimitsCard component", () => {
         error={null}
         onRefreshLimits={onRefreshLimits}
         onActivateWindow={onActivateWindow}
-        onOpenResetCredits={() => {}}
       />,
     );
     expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
 
     rerender(
-      <CodexLimitsCard
+      <CodexSidebarLimits
         limits={baseLimits}
         error={null}
         windowActivationStatus="started"
         onRefreshLimits={onRefreshLimits}
         onActivateWindow={onActivateWindow}
-        onOpenResetCredits={() => {}}
       />,
     );
     expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
 
     rerender(
-      <CodexLimitsCard
+      <CodexSidebarLimits
         limits={baseLimits}
         error={null}
         windowActivationStatus="recentlyRequested"
         onRefreshLimits={onRefreshLimits}
         onActivateWindow={onActivateWindow}
-        onOpenResetCredits={() => {}}
       />,
     );
     expect(screen.getByRole("button", { name: "Start limit window" })).toBeDisabled();
@@ -170,7 +210,7 @@ describe("CodexLimitsCard component", () => {
 
   it("renders friendly tip for OAuth login / no credentials error", () => {
     const errorMsg = "OAuth unavailable: Failed to read Codex auth at /Users/vincent/.codex/auth.json: No such file or directory (os error 2); CLI RPC unavailable: Codex CLI not found.";
-    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={errorMsg} />);
+    render(<CodexSidebarLimits limits={null} error={errorMsg} />);
 
     expect(screen.getByText("Not Logged In / 尚未登录")).toBeInTheDocument();
     expect(screen.getByText("codex auth login")).toBeInTheDocument();
@@ -179,7 +219,7 @@ describe("CodexLimitsCard component", () => {
 
   it("renders default error message for other errors", () => {
     const errorMsg = "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.";
-    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} error={errorMsg} />);
+    render(<CodexSidebarLimits limits={null} error={errorMsg} />);
 
     expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
     expect(screen.getByText("Unable to get Codex limits right now. Please check your network and Codex login status, then try again.")).toBeInTheDocument();
@@ -206,11 +246,9 @@ describe("CodexLimitsCard component", () => {
       membershipLevel: "free",
     };
 
-    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={freeLimits} error={null} />);
+    render(<CodexSidebarLimits limits={freeLimits} error={null} />);
 
     expect(screen.getByText("Monthly usage limit")).toBeInTheDocument();
-    expect(screen.getByTestId("reset-area")).toBeInTheDocument();
-    expect(screen.getByTestId("reset-area").parentElement).toHaveClass("grid-cols-1", "md:grid-cols-2");
     expect(screen.queryByText("5-Hour Limit")).not.toBeInTheDocument();
     expect(screen.queryByText("Weekly Limit")).not.toBeInTheDocument();
   });
@@ -234,42 +272,18 @@ describe("CodexLimitsCard component", () => {
       membershipLevel: "prolite",
     };
 
-    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={proLiteLimits} error={null} />);
+    render(<CodexSidebarLimits limits={proLiteLimits} error={null} />);
 
     expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
     expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.queryByText("Monthly usage limit")).not.toBeInTheDocument();
   });
 
-  it("renders all limit sections without the outer title, description, or update time", () => {
-    render(
-      <CodexLimitsCard
-        onOpenResetCredits={() => {}}
-        limits={{
-          session: { usedPercent: 10, remainingPercent: 90, windowMinutes: 300, resetsAt: null },
-          weekly: { usedPercent: 45, remainingPercent: 55, windowMinutes: 10080, resetsAt: null },
-          resetCreditsAvailableCount: 1,
-          resetCredits: [],
-          updatedAt: "2026-07-15T00:00:00.000Z",
-          source: "oauth",
-          membershipLevel: "plus",
-        }}
-        error={null}
-      />,
-    );
-
-    const resetArea = screen.getByTestId("reset-area");
-    const weeklyLimit = screen.getByTestId("limit-row-weekly");
-    const creditCount = screen.getByTestId("reset-credit-count");
-
-    expect(screen.getByText("5-Hour Limit")).toBeInTheDocument();
-    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
-    expect(resetArea).toContainElement(creditCount);
-    expect(resetArea.parentElement).toHaveClass("grid-cols-1", "md:grid-cols-[minmax(0,3fr)_minmax(0,3fr)_minmax(0,4fr)]");
-    expect(weeklyLimit).not.toContainElement(creditCount);
-    expect(screen.queryByText("Codex Limits")).not.toBeInTheDocument();
-    expect(screen.queryByText("Live limits from your Codex account")).not.toBeInTheDocument();
-    expect(screen.queryByText("Updated 08:00:00")).not.toBeInTheDocument();
+  it("keeps reset data in the dashboard without duplicating sidebar windows or actions", () => {
+    render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={{ session: null, weekly: null, resetCreditsAvailableCount: 1, resetCredits: [], updatedAt: "2026-07-15T00:00:00.000Z", source: "oauth", membershipLevel: "plus" }} />);
+    expect(screen.getByTestId("reset-area")).toContainElement(screen.getByTestId("reset-credit-count"));
+    expect(screen.queryByTestId("limit-row-weekly")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check limits" })).not.toBeInTheDocument();
   });
 
   it("renders whichever reset data is available", () => {
@@ -285,7 +299,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -302,7 +315,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -339,9 +351,8 @@ describe("CodexLimitsCard component", () => {
     };
 
     const onOpenResetCredits = vi.fn();
-    render(<CodexLimitsCard onOpenResetCredits={onOpenResetCredits} limits={limits} error={null} />);
+    render(<CodexLimitsCard onOpenResetCredits={onOpenResetCredits} limits={limits} />);
 
-    expect(screen.getByText("Weekly Limit")).toBeInTheDocument();
     expect(screen.getByText("Reset credits")).toBeInTheDocument();
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("3 available");
     expect(screen.getByTestId("reset-credit-count")).toHaveClass("bg-muted", "text-muted-foreground", "tabular-nums");
@@ -385,7 +396,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -411,7 +421,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -437,7 +446,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -460,7 +468,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -481,7 +488,6 @@ describe("CodexLimitsCard component", () => {
           source: "oauth",
           membershipLevel: "plus",
         }}
-        error={null}
       />,
     );
 
@@ -500,7 +506,6 @@ describe("CodexLimitsCard component", () => {
         onOpenResetCredits={() => {}}
         onOpenResetHistory={onOpenResetHistory}
         limits={null}
-        error={null}
         latestReset={{
           id: "2091688655828246890",
           resetType: "regular",
@@ -531,7 +536,6 @@ describe("CodexLimitsCard component", () => {
       <CodexLimitsCard
         onOpenResetCredits={() => {}}
         limits={null}
-        error={null}
         latestReset={{
           id: "recent-reset",
           resetType: "regular",
@@ -561,7 +565,6 @@ describe("CodexLimitsCard component", () => {
       <CodexLimitsCard
         onOpenResetCredits={() => {}}
         limits={null}
-        error={null}
         latestReset={{
           id: "latest-reset",
           resetType: "regular",

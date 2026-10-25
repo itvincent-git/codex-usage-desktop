@@ -1,5 +1,5 @@
 import { CodexForecastCard } from "@/components/codex-forecast-card";
-import { CodexLimitsCard } from "@/components/codex-limits-card";
+import { CodexLimitsCard, CodexSidebarLimits } from "@/components/codex-limits-card";
 import { CodexResetHistoryModal } from "@/components/codex-reset-history";
 import { DailyUsageTable } from "@/components/daily-usage-table";
 import { DashboardHeroCard } from "@/components/dashboard-hero-card";
@@ -37,10 +37,10 @@ export default function App() {
   });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
-      const saved = Number(localStorage.getItem("sidebar_width"));
-      return Number.isFinite(saved) ? clampSidebarWidth(saved) : 160;
+      const saved = localStorage.getItem("sidebar_width");
+      return saved !== null && Number.isFinite(Number(saved)) ? clampSidebarWidth(Number(saved)) : 240;
     } catch {
-      return 160;
+      return 240;
     }
   });
   const [settingsReturnView, setSettingsReturnView] = useState<DashboardView>("dashboard");
@@ -189,6 +189,18 @@ export default function App() {
           width={sidebarWidth}
           onWidthChange={setSidebarWidth}
           showLogsTab={showLogsTab}
+          limits={
+            <CodexSidebarLimits
+              limits={codexLimits}
+              error={codexLimitsError}
+              isLimitsRefreshing={isLimitsRefreshing}
+              isWindowActivating={isWindowActivating}
+              windowActivationStatus={windowActivationStatus}
+              windowActivationError={windowActivationError}
+              onRefreshLimits={() => void handleLimitsRefresh()}
+              onActivateWindow={() => void handleActivateCodexWindow()}
+            />
+          }
         />
       ) : null}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
@@ -373,15 +385,8 @@ export default function App() {
               <div className="min-w-0">
                 <CodexLimitsCard
                   limits={codexLimits}
-                  error={codexLimitsError}
                   latestReset={latestCodexReset}
                   recentResets={recentCodexResets}
-                  isLimitsRefreshing={isLimitsRefreshing}
-                  isWindowActivating={isWindowActivating}
-                  windowActivationStatus={windowActivationStatus}
-                  windowActivationError={windowActivationError}
-                  onRefreshLimits={() => void handleLimitsRefresh()}
-                  onActivateWindow={() => void handleActivateCodexWindow()}
                   onOpenResetHistory={() => setIsResetHistoryOpen(true)}
                   onOpenResetCredits={() => void handleOpenResetCredits()}
                 />
