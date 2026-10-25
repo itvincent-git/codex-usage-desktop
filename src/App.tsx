@@ -191,6 +191,7 @@ export default function App() {
           showLogsTab={showLogsTab}
           limits={
             <CodexSidebarLimits
+              compact={sidebarCollapsed}
               limits={codexLimits}
               error={codexLimitsError}
               isLimitsRefreshing={isLimitsRefreshing}

@@ -34,21 +34,21 @@ describe("sidebar quota color reminders", () => {
         await $('button[aria-label="查询限额"]').click();
         await $('button[aria-label="查询限额"]').waitForEnabled();
       };
-      const expectColor = async (id: string, remaining: number, tone: string) => {
+      const expectColor = async (id: string, remaining: number, tone: string, compact = false) => {
         const row = $(`[data-testid="limit-row-${id}"]`);
         await expect(row).toHaveText(expect.stringContaining(`${Math.round(remaining)}%`));
         await expect(row.$('[data-quota-outline]')).toHaveAttribute("stroke-dasharray", `${remaining} ${100 - remaining}`);
-        const colors = await row.execute((element, tone) => {
+        const colors = await row.execute((element, tone, compact) => {
           const rgb = getComputedStyle(document.documentElement).getPropertyValue(`--${tone}`).trim().split(/\s+/).join(", ");
           const expected = `rgb(${rgb})`;
           const primary = `rgb(${getComputedStyle(document.documentElement).getPropertyValue("--primary").trim().split(/\s+/).join(", ")})`;
           return {
             outline: getComputedStyle(element.querySelector('[data-quota-outline]')!).stroke === expected,
             value: getComputedStyle(element.querySelector('.text-xl')!).color === primary,
-            label: getComputedStyle(element.querySelector('span.absolute')!).color === primary,
-            countdown: getComputedStyle(element.querySelector('[data-quota-countdown]')!).color === primary,
+            label: getComputedStyle(element.querySelector('[data-quota-label]')!).color === primary,
+            countdown: compact ? !element.querySelector('[data-quota-countdown]') : getComputedStyle(element.querySelector('[data-quota-countdown]')!).color === primary,
           };
-        }, tone);
+        }, tone, compact);
         expect(colors).toEqual({ outline: true, value: true, label: true, countdown: true });
         await browser.waitUntil(async () => row.$('[data-quota-outline]').execute((element) => {
           const outline = element as unknown as SVGRectElement;
@@ -65,6 +65,24 @@ describe("sidebar quota color reminders", () => {
             && (!(remaining >= 98 && remaining < 100) || (end.x < point.x && Math.abs(end.y - bounds.y) < 0.2));
         }), { timeoutMsg: "Quota outline must start at the top center and deplete to the left" });
       };
+      const expectCompact = async (rows: [string, string, number, string][]) => {
+        await expect($('button[aria-label="展开侧栏"]')).toBeDisplayed();
+        await expect($('button[aria-label="查询限额"]')).not.toExist();
+        await expect($('button[aria-label="额度概览"]')).not.toExist();
+        for (const [id, label, remaining, tone] of rows) {
+          await expectColor(id, remaining, tone, true);
+          const row = $(`[data-testid="limit-row-${id}"]`);
+          await expect(row).toHaveText(`${label}${remaining}%`);
+          const fits = await row.execute((element) => {
+            const sidebar = document.querySelector('[data-app-sidebar]')!.getBoundingClientRect();
+            return element.scrollWidth <= element.clientWidth && Array.from(element.querySelectorAll('span')).every((span) => {
+              const bounds = span.getBoundingClientRect();
+              return bounds.left >= sidebar.left && bounds.right <= sidebar.right;
+            });
+          });
+          expect(fits).toBe(true);
+        }
+      };
 
       for (const [session, weekly, sessionTone, weeklyTone] of [
         [100, 0, "success", "error"],
@@ -80,14 +98,12 @@ describe("sidebar quota color reminders", () => {
       }
       await browser.saveScreenshot("/tmp/codex-sidebar-quota-colors.png");
       await $('button[aria-label="收起侧栏"]').click();
-      await $('button[aria-label="额度概览"]').click();
-      await expectColor("5-hour", 75, "success");
-      await expectColor("weekly", 50, "warning");
+      await expectCompact([["5-hour", "5小时限制", 75, "success"], ["weekly", "周限制", 50, "warning"]]);
+      await browser.saveScreenshot("/tmp/codex-sidebar-quota-collapsed.png");
+      await $('button[aria-label="展开侧栏"]').click();
       await installLimits(20, 70);
-      await expectColor("5-hour", 20, "error");
-      await expectColor("weekly", 70, "success");
-      await browser.saveScreenshot("/tmp/codex-sidebar-quota-colors-popover.png");
-      await browser.keys("Escape");
+      await $('button[aria-label="收起侧栏"]').click();
+      await expectCompact([["5-hour", "5小时限制", 20, "error"], ["weekly", "周限制", 70, "success"]]);
       await $('button[aria-label="展开侧栏"]').click();
       for (const width of [160, 240, 360]) {
         const resize = $('[role="separator"][aria-orientation="vertical"]');
@@ -107,6 +123,10 @@ describe("sidebar quota color reminders", () => {
         await expectColor("monthly", remaining, tone);
         await expect($('[data-testid="limit-row-5-hour"]')).not.toExist();
         await expect($('[data-testid="limit-row-weekly"]')).not.toExist();
+        await $('button[aria-label="收起侧栏"]').click();
+        await expectCompact([["monthly", "月限制", remaining, tone]]);
+        await browser.saveScreenshot(`/tmp/codex-sidebar-quota-monthly-${remaining}-collapsed.png`);
+        await $('button[aria-label="展开侧栏"]').click();
       }
     } finally {
       await browser.execute((preferences) => {
