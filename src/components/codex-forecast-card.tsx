@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw } from "lucide-react";
+import { ArrowUpRight, RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { openUrl, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
@@ -52,10 +52,14 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
     && (!post.replyToId || !posts.some((parent) => parent.id === post.replyToId)));
   const evidenceStale = data?.evidenceStale || !Number.isFinite(Date.parse(data?.evidenceUpdatedAt ?? ""))
     || now - Date.parse(data?.evidenceUpdatedAt ?? "") >= MAX_SIGNAL_AGE_MS;
-  const formatDate = (value?: string | null) => {
+  const formatDate = (value?: string | null, options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" }) => {
     if (!value || !Number.isFinite(Date.parse(value))) return t("forecast.unknown");
-    return new Date(value).toLocaleString(i18n.language, { dateStyle: "medium", timeStyle: "short" });
+    return new Date(value).toLocaleString(i18n.language, options);
   };
+  const compactDate: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false };
+  const feedDate = data?.recentPosts?.length && data.recentPosts.every((post) =>
+    formatDate(post.at, { dateStyle: "medium" }) === formatDate(data.recentPosts![0].at, { dateStyle: "medium" })
+  ) ? formatDate(data.recentPosts[0].at, { dateStyle: "medium" }) : null;
 
   useEffect(() => {
     if (!data) return;
@@ -66,10 +70,10 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
 
   return (
     <Card data-testid="global-reset-forecast" className="min-w-0 rounded-lg">
-      <CardContent className="space-y-4 p-3 sm:p-4">
+      <CardContent className="space-y-3 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">{t("forecast.title")}</h2>
-          <Button variant="ghost" size="sm" onClick={onRefresh} disabled={isRefreshing} aria-label={t(error && !data ? "forecast.retry" : "forecast.refresh")}>
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><RotateCcw className="h-5 w-5 text-primary" aria-hidden="true" />{t("forecast.title")}</h2>
+          <Button variant="ghost" size="sm" className="bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary" onClick={onRefresh} disabled={isRefreshing} aria-label={t(error && !data ? "forecast.retry" : "forecast.refresh")}>
             <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefreshing && "animate-spin")} aria-hidden="true" />
             {t(error && !data ? "forecast.retry" : "forecast.refresh")}
           </Button>
@@ -77,15 +81,40 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
         {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
         {!data && !error ? <p role="status" className="text-xs text-muted-foreground">{t("forecast.loading")}</p> : null}
         {data ? <>
-          <div data-testid="forecast-announcement" className={cn("space-y-2 rounded-md border p-3 text-xs leading-relaxed", promised && !stale ? "border-warning/30 bg-warning/5" : "border-border bg-muted/20")}>
-            <p data-testid="forecast-status" role="status" className="text-sm font-semibold">{t(`forecast.status_${status}`)}</p>
-            <p className="text-muted-foreground">{t(`forecast.description_${status}`)}</p>
-            {showEvidence ? <>
-              {alert?.localizedSummary || alert?.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
-              {!pending && validWindow ? <p>{t("forecast.window", { start: formatDate(alert?.window?.startAt), end: formatDate(alert?.window?.endAt) })}</p> : null}
-            </> : !stale && (windowEnded || alert?.state === "expired") && !answered ? <p className="text-muted-foreground">{t("forecast.expired")}</p> : null}
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
+            <div data-testid="forecast-announcement" className={cn("min-w-0 space-y-3 rounded-xl border p-4 text-xs leading-relaxed", stale ? "border-border bg-muted/20" : pending && watch ? "border-success/30 bg-success/5" : promised ? "border-primary/25 bg-primary/5" : "border-warning/30 bg-warning/5")}>
+              <p className="text-muted-foreground">{t("forecast.status_label")}</p>
+              <p data-testid="forecast-status" role="status" className={cn("flex items-start gap-2 text-base font-semibold", stale ? "text-muted-foreground" : pending && watch ? "text-success" : promised ? "text-primary" : "text-amber-700 dark:text-amber-400")}>
+                <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", stale ? "bg-muted-foreground" : pending && watch ? "bg-success" : promised ? "bg-primary" : "bg-warning")} aria-hidden="true" />
+                {t(`forecast.status_${status}`)}
+              </p>
+              <p className="text-muted-foreground">{t(`forecast.description_${status}`)}</p>
+              {showEvidence ? <>
+                {alert?.localizedSummary || alert?.summary ? <p className="whitespace-pre-wrap break-words">{alert.localizedSummary || alert.summary}</p> : null}
+                {!pending && validWindow ? <p className="font-medium text-primary">{t("forecast.window", { start: formatDate(alert?.window?.startAt), end: formatDate(alert?.window?.endAt) })}</p> : null}
+              </> : !stale && (windowEnded || alert?.state === "expired") && !answered ? <p className="text-muted-foreground">{t("forecast.expired")}</p> : null}
+              <p className="border-t border-border/60 pt-3 text-[11px] text-muted-foreground">{t("forecast.updated", { time: formatDate(data.updatedAt, compactDate) })}</p>
+            </div>
+            <section aria-label={t("forecast.feed_title")} className="min-w-0 space-y-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold">{t("forecast.feed_title")}</h3>
+                {feedDate ? <span className="text-[11px] text-muted-foreground">{feedDate}</span> : null}
+              </div>
+              {data.recentPosts == null ? <p className="text-muted-foreground">{t("forecast.feed_unavailable")}</p>
+                : data.recentPosts.length === 0 ? <p className="text-muted-foreground">{t("forecast.feed_empty")}</p>
+                : <>
+                  {evidenceStale || error ? <p role="status" className="text-warning">{t("forecast.feed_stale")}</p> : null}
+                  <ul className="divide-y divide-border/60">
+                    {data.recentPosts.map((post) => <li key={post.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-2 py-2.5 leading-5 first:rounded-md first:bg-primary/5">
+                      <time dateTime={post.at} title={formatDate(post.at)} className="whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">{formatDate(post.at, feedDate ? { hour: "2-digit", minute: "2-digit", hour12: false } : compactDate)}</time>
+                      <p className="whitespace-pre-wrap break-words">{post.text}</p>
+                      <span className="whitespace-nowrap"><ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink></span>
+                    </li>)}
+                  </ul>
+                </>}
+            </section>
           </div>
-          {showEvidence ? <section aria-label={t("forecast.evidence_title")} className="space-y-2 text-xs">
+          {showEvidence ? <section aria-label={t("forecast.evidence_title")} className="space-y-2 border-t border-border/60 pt-3 text-xs">
             <h3 className="font-semibold">{t("forecast.evidence_title")}</h3>
             <p className="text-[11px] text-muted-foreground">{t("forecast.evidence_via")}</p>
             <dl className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
@@ -108,29 +137,10 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
             {data.evidenceUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.evidence_updated", { time: formatDate(data.evidenceUpdatedAt) })}</p> : null}
             {!pending && alert?.score != null ? <p className="text-[11px] text-muted-foreground">{t("forecast.signal_score", { score: alert.score })}</p> : null}
           </section> : null}
-          <p className="text-[11px] text-muted-foreground">{t("forecast.updated", { time: formatDate(data.updatedAt) })}</p>
         </> : null}
-        {data ? <section aria-label={t("forecast.feed_title")} className="space-y-2 border-t border-border/60 pt-3 text-xs">
-          <h3 className="font-semibold">{t("forecast.feed_title")}</h3>
-          <p className="text-[11px] text-muted-foreground">{t("forecast.feed_note")}</p>
-          {data.recentPosts == null ? <p className="text-muted-foreground">{t("forecast.feed_unavailable")}</p>
-            : data.recentPosts.length === 0 ? <p className="text-muted-foreground">{t("forecast.feed_empty")}</p>
-            : <>
-              {evidenceStale || error ? <p role="status" className="text-warning">{t("forecast.feed_stale")}</p> : null}
-              <ul className="space-y-2">
-                {data.recentPosts.map((post) => <li key={post.id} className="space-y-1.5 rounded-md border border-border/60 p-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                    <time dateTime={post.at} className="text-muted-foreground">{formatDate(post.at)}</time>
-                    <ExternalLink href={post.url}>{t("forecast.post_link")} ↗</ExternalLink>
-                  </div>
-                  <p className="whitespace-pre-wrap break-words">{post.text}</p>
-                </li>)}
-              </ul>
-            </>}
-          {data.evidenceUpdatedAt ? <p className="text-[11px] text-muted-foreground">{t("forecast.feed_updated", { time: formatDate(data.evidenceUpdatedAt) })}</p> : null}
-        </section> : null}
-        <div className="border-t border-border/60 pt-3 text-[11px]">
-          Data: <ExternalLink href={SOURCE_URL}>codex-reset.com</ExternalLink>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
+          {data?.evidenceUpdatedAt ? <p>{t("forecast.feed_updated", { time: formatDate(data.evidenceUpdatedAt, compactDate) })}</p> : null}
+          <span className="ml-auto whitespace-nowrap">Data: <ExternalLink href={SOURCE_URL}>codex-reset.com<ArrowUpRight className="ml-0.5 inline h-3 w-3" aria-hidden="true" /></ExternalLink></span>
         </div>
       </CardContent>
     </Card>

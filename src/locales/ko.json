@@ -785,6 +785,7 @@
   },
   "forecast": {
     "title": "다음 Codex 초기화",
+    "status_label": "예측 상태",
     "status_no_signal": "신뢰할 수 있는 예고 없음",
     "status_timed": "명확한 예고 · 예상 시간대",
     "status_untimed": "명확한 예고 · 시간 미정",
@@ -818,7 +819,6 @@
     "signal_score": "사이트 규칙 점수: {{score}}. 실측 적중률이나 24시간/48시간 확률이 아닙니다.",
     "window": "예상 시간대(현지 시간): {{start}} – {{end}}",
     "feed_title": "최근 피드 게시물 5개",
-    "feed_note": "codex-reset.com이 수집한 게시물입니다. 피드 활동만으로는 신뢰할 수 있는 초기화 예고가 되지 않습니다.",
     "feed_unavailable": "피드를 불러올 수 없습니다.",
     "feed_empty": "최근 피드 게시물이 없습니다.",
     "feed_stale": "이전 피드 데이터를 표시하고 있습니다. 새로고침이 필요합니다.",

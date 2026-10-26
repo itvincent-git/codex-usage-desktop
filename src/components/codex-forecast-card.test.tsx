@@ -38,6 +38,22 @@ describe("CodexForecastCard", () => {
     expect(openUrl).toHaveBeenCalledWith(data.recentPosts![0].url);
     expect(screen.queryByRole("button", { name: /historical/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Historical probability/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Feed activity alone/)).not.toBeInTheDocument();
+  });
+
+  it("shares the feed date only when all posts fall on the same local day", () => {
+    const recentPosts = data.recentPosts!.map((post, index) => ({ ...post, at: new Date(2026, 9, 24, 13, 31 - index).toISOString() }));
+    const { rerender } = render(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, recentPosts }} />);
+    const feed = within(screen.getByRole("region", { name: "Latest 5 feed posts" }));
+    expect(feed.getByText("Oct 24, 2026")).toBeInTheDocument();
+    expect(feed.getAllByRole("time")[0]).toHaveTextContent("13:31");
+    expect(feed.getAllByRole("time")[0]).toHaveAttribute("title", expect.stringContaining("2026"));
+    rerender(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, recentPosts: [
+      recentPosts[0], { ...recentPosts[1], at: new Date(2026, 9, 23, 23, 59).toISOString() },
+    ] }} />);
+    expect(feed.queryByText("Oct 24, 2026")).not.toBeInTheDocument();
+    expect(feed.getAllByRole("time")[0]).toHaveTextContent("Oct 24");
+    expect(feed.getAllByRole("time")[1]).toHaveTextContent("Oct 23");
   });
 
   it("prioritizes an explicit timed promise and its full original evidence", () => {
@@ -54,7 +70,7 @@ describe("CodexForecastCard", () => {
     expect(screen.queryByText(/context is missing/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "@thsottiaux ↗" }));
     expect(openUrl).toHaveBeenCalledWith(data.latestAlert!.url);
-    fireEvent.click(screen.getAllByRole("link", { name: "View on X ↗" })[1]);
+    fireEvent.click(evidence().getAllByRole("link", { name: "View on X ↗" })[1]);
     expect(openUrl).toHaveBeenCalledWith(data.evidencePosts![1].url);
     fireEvent.click(screen.getByRole("link", { name: "codex-reset.com" }));
     expect(openUrl).toHaveBeenCalledWith("https://codex-reset.com/");

@@ -791,6 +791,7 @@
   },
   "forecast": {
     "title": "下一次 Codex 重設",
+    "status_label": "預測狀態",
     "status_no_signal": "暫無可靠預告",
     "status_timed": "明確預告 · 預計時間範圍",
     "status_untimed": "明確預告 · 時間未定",
@@ -818,16 +819,15 @@
     "refresh_failed": "更新失敗，上次訊號需要重新核實。",
     "load_failed": "預測載入失敗，請重試。",
     "loading": "正在檢查重設預告…",
-    "updated": "訊號檢查時間：{{time}}",
+    "updated": "訊號檢查：{{time}}",
     "unknown": "未知",
     "expired": "上次預告已過期，不作為下一次重設的預測。",
     "signal_score": "站點規則評分：{{score}}。不是經驗證的兌現率，也不是 24h／48h 機率。",
     "window": "預計範圍（本地時間）：{{start}} – {{end}}",
     "feed_title": "最近 5 則 Feed 動態",
-    "feed_note": "動態由 codex-reset.com 彙整，動態本身不代表可靠重設預告。",
     "feed_unavailable": "暫時無法載入 Feed 動態。",
     "feed_empty": "暫無近期 Feed 動態。",
     "feed_stale": "正在顯示舊 Feed 資料，需要重新整理。",
-    "feed_updated": "Feed 檢查時間：{{time}}"
+    "feed_updated": "Feed 檢查：{{time}}"
   }
 }

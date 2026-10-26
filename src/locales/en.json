@@ -785,6 +785,7 @@
   },
   "forecast": {
     "title": "Next Codex reset",
+    "status_label": "Forecast status",
     "status_no_signal": "No reliable announcement",
     "status_timed": "Explicit announcement · time window",
     "status_untimed": "Explicit announcement · time unknown",
@@ -818,7 +819,6 @@
     "signal_score": "Provider rule score: {{score}}. This is not a measured success rate or a 24h / 48h probability.",
     "window": "Expected window (local time): {{start}} – {{end}}",
     "feed_title": "Latest 5 feed posts",
-    "feed_note": "Posts via codex-reset.com. Feed activity alone does not establish a reliable reset announcement.",
     "feed_unavailable": "The feed is unavailable.",
     "feed_empty": "No recent feed posts.",
     "feed_stale": "Showing older feed data; it needs refreshing.",

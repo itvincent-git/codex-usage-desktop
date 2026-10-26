@@ -791,6 +791,7 @@
   },
   "forecast": {
     "title": "下一次 Codex 重置",
+    "status_label": "预测状态",
     "status_no_signal": "暂无可靠预告",
     "status_timed": "明确预告 · 预计时间窗口",
     "status_untimed": "明确预告 · 时间未定",
@@ -818,16 +819,15 @@
     "refresh_failed": "更新失败，上次信号需要重新核实。",
     "load_failed": "预测加载失败，请重试。",
     "loading": "正在检查重置预告…",
-    "updated": "信号检查时间：{{time}}",
+    "updated": "信号检查：{{time}}",
     "unknown": "未知",
     "expired": "上次预告已过期，不作为下一次重置的预测。",
     "signal_score": "站点规则评分：{{score}}。不是经验证的兑现率，也不是 24h／48h 概率。",
     "window": "预计窗口（本地时间）：{{start}} – {{end}}",
     "feed_title": "最近 5 条 Feed 动态",
-    "feed_note": "动态由 codex-reset.com 汇总，动态本身不代表可靠重置预告。",
     "feed_unavailable": "暂时无法加载 Feed 动态。",
     "feed_empty": "暂无近期 Feed 动态。",
     "feed_stale": "正在显示旧 Feed 数据，需要刷新。",
-    "feed_updated": "Feed 检查时间：{{time}}"
+    "feed_updated": "Feed 检查：{{time}}"
   }
 }

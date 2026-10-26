@@ -175,6 +175,38 @@ describe("global reset forecast", () => {
     await expect($('[data-testid="global-reset-forecast"] [role="alert"]')).not.toExist();
   });
 
+  it("keeps the no-signal view compact with a side-by-side feed and bottom-right attribution", async () => {
+    await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
+    await setRemoteForecast({ ...fixture, hasOfficialSignal: false });
+    await refreshForecast();
+    await expect($('[data-testid="forecast-status"]')).toHaveText("No reliable announcement");
+    const card = $('[data-testid="global-reset-forecast"]');
+    await expect(card).not.toHaveText(expect.stringContaining("Feed activity alone"));
+    await expect($('[aria-label="Evidence for this signal"]')).not.toExist();
+    for (const width of [1100, 1440]) {
+      await browser.setWindowSize(width, 960);
+      await card.scrollIntoView({ block: "center" });
+      const layout = await card.execute((element) => {
+        const bounds = element.getBoundingClientRect();
+        const status = element.querySelector('[data-testid="forecast-announcement"]')!.getBoundingClientRect();
+        const feed = element.querySelector('section[aria-label="Latest 5 feed posts"]')!;
+        const feedBounds = feed.getBoundingClientRect();
+        const source = element.querySelector('a[href="https://codex-reset.com/"]')!.getBoundingClientRect();
+        return {
+          sideBySide: feedBounds.left > status.right && Math.abs(feedBounds.top - status.top) < 1,
+          compact: bounds.height < 380,
+          sourceAtBottomRight: bounds.right - source.right < 24 && source.top > feedBounds.bottom,
+          fits: element.scrollWidth <= element.clientWidth && feed.scrollWidth <= feed.clientWidth,
+        };
+      });
+      expect(layout).toEqual({ sideBySide: true, compact: true, sourceAtBottomRight: true, fits: true });
+      await expect($('[aria-label="Latest 5 feed posts"]').$$('li')).toBeElementsArrayOfSize(5);
+      await card.saveScreenshot(`/tmp/codex-reset-forecast-compact-${width}.png`);
+    }
+    await setRemoteForecast(fixture);
+    await refreshForecast();
+  });
+
   it("fits below the quota card with evidence visible at minimum and common widths", async () => {
     for (const width of [1100, 1440]) {
       await browser.setWindowSize(width, 960);
