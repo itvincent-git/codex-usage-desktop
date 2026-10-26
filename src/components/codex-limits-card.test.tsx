@@ -634,9 +634,9 @@ describe("CodexLimitsCard component", () => {
     expect(days[3]).toHaveClass("bg-orange-500");
     expect(days[3].firstElementChild).toHaveClass("bg-sky-300");
     expect(days[26]).toHaveAttribute("data-reset-type", "banked");
-    expect(days[26]).toHaveClass("bg-sky-300", "rounded-[1px]");
+    expect(days[26]).toHaveClass("bg-sky-300", "rounded-[3px]");
     expect(days[29]).toHaveAttribute("data-reset-type", "regular");
-    expect(days[29]).toHaveClass("bg-orange-500", "rounded-[1px]");
+    expect(days[29]).toHaveClass("bg-orange-500", "rounded-[3px]");
     expect(days[29]).toHaveAttribute("title", "2026-08-28: Regular reset");
     expect(days[29]).toBeEmptyDOMElement();
     expect(overview).toHaveTextContent("");

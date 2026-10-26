@@ -73,7 +73,7 @@ describe("Codex Reset timeline history", () => {
           blocksOnly: days.every((day) => {
             const box = day.getBoundingClientRect();
             const style = getComputedStyle(day);
-            return day.textContent === "" && box.width > box.height && style.borderRadius === "1px" && style.borderWidth === "0px";
+            return day.textContent === "" && box.width > box.height && style.borderRadius === "3px" && style.borderWidth === "0px";
           }),
         };
       }) as { columns: number; weeklyRows: boolean; firstDay: string; lastDay: string; blocksOnly: boolean };

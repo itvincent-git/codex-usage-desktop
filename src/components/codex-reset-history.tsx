@@ -121,7 +121,7 @@ function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[
             role="listitem"
             data-reset-overview-day
             data-reset-type={resetType ?? "none"}
-            className={`h-2.5 w-full overflow-hidden rounded-[1px] ${color}`}
+            className={`h-2.5 w-full overflow-hidden rounded-[3px] ${color}`}
             aria-label={label}
             title={label}
           >
