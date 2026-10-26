@@ -28,7 +28,7 @@ type CodexSidebarLimitsProps = {
   onActivateWindow?: () => void;
 };
 
-export const RECENT_RESET_OVERVIEW_DAYS = 14;
+export const RECENT_RESET_OVERVIEW_DAYS = 30;
 
 type LimitRowProps = {
   label: string;

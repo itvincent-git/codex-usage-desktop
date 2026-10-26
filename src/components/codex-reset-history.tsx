@@ -95,18 +95,12 @@ function formatRelativeTime(timestamp: string, locale: string, now = dayjs()) {
 
 function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[]; days: number }) {
   const { t } = useTranslation();
-  const recentDays = buildResetHistorySummary(resets).calendarDays
-    .filter((day) => day.inRange)
-    .slice(-days);
+  const recentDays = buildResetHistorySummary(resets).calendarDays;
 
   return (
-    <span
-      role="list"
-      aria-label={t("limits.reset_overview_label", { days })}
-      className="col-span-3 mt-1.5 grid items-center"
-      style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
-    >
+    <span role="list" aria-label={t("limits.reset_overview_label", { days })} className="col-span-3 mt-2 grid grid-cols-7 gap-1.5">
       {recentDays.map((day) => {
+        if (!day.inRange) return <span key={day.date.format("YYYY-MM-DD")} className="h-2.5" aria-hidden="true" />;
         const resetType = day.resetType;
         const status = resetType === "mixed"
           ? `${t("limits.reset_type_regular")}, ${t("limits.reset_type_banked")}`
@@ -115,13 +109,11 @@ function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[
           date: day.date.format("YYYY-MM-DD"),
           status,
         });
-        const color = resetType === "mixed"
-          ? "border-orange-500 bg-gradient-to-br from-orange-500 from-50% to-sky-300 to-50%"
-          : resetType === "regular"
-            ? "border-orange-500 bg-orange-500"
-            : resetType === "banked"
-              ? "border-sky-400 bg-sky-300"
-              : "border-muted-foreground/45 bg-transparent";
+        const color = resetType === "regular" || resetType === "mixed"
+          ? "bg-orange-500"
+          : resetType === "banked"
+            ? "bg-sky-300"
+            : "bg-muted-foreground/15";
 
         return (
           <span
@@ -129,10 +121,12 @@ function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[
             role="listitem"
             data-reset-overview-day
             data-reset-type={resetType ?? "none"}
-            className={`h-1.5 w-1.5 justify-self-center rounded-full border ${color}`}
+            className={`h-2.5 w-full overflow-hidden rounded-[1px] ${color}`}
             aria-label={label}
             title={label}
-          />
+          >
+            {resetType === "mixed" ? <span className="ml-auto block h-full w-1/2 bg-sky-300" aria-hidden="true" /> : null}
+          </span>
         );
       })}
     </span>
@@ -184,7 +178,6 @@ export function LatestResetButton({
         <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
         {recentResets ? <RecentResetOverview resets={recentResets} days={recentDays} /> : null}
       </button>
-      <span className="-mt-1 text-right leading-none"><ResetDataSource /></span>
     </>
   );
 }

@@ -1958,7 +1958,7 @@ describe("App", () => {
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(latestResetInvokeMock).toHaveBeenCalledTimes(1);
-    expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 14 });
+    expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 30 });
     expect(resetHistoryInvokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });

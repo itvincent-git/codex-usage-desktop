@@ -576,7 +576,7 @@ describe("CodexLimitsCard component", () => {
     vi.useRealTimers();
   });
 
-  it("shows the reset status for the last 14 days", () => {
+  it("shows 30 days of reset blocks in a calendar without headings or a source link", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-28T12:00:00.000Z"));
 
@@ -592,6 +592,20 @@ describe("CodexLimitsCard component", () => {
           source: { url: "https://example.com/latest" },
         }}
         recentResets={[
+          {
+            id: "earlier-reset",
+            resetType: "regular",
+            announcedAt: "2026-08-02T05:00:00.000Z",
+            text: "Earlier regular reset.",
+            source: { url: "https://example.com/earlier" },
+          },
+          {
+            id: "earlier-banked-reset",
+            resetType: "banked",
+            announcedAt: "2026-08-02T06:00:00.000Z",
+            text: "Earlier banked reset.",
+            source: { url: "https://example.com/earlier-banked" },
+          },
           {
             id: "latest-reset",
             resetType: "regular",
@@ -610,13 +624,23 @@ describe("CodexLimitsCard component", () => {
       />,
     );
 
-    const overview = screen.getByRole("list", { name: "Token resets over the last 14 days" });
+    const overview = screen.getByRole("list", { name: "Token resets over the last 30 days" });
     const days = overview.querySelectorAll("[data-reset-overview-day]");
-    expect(days).toHaveLength(14);
+    expect(days).toHaveLength(30);
     expect(days[0]).toHaveAttribute("data-reset-type", "none");
-    expect(days[10]).toHaveAttribute("data-reset-type", "banked");
-    expect(days[13]).toHaveAttribute("data-reset-type", "regular");
-    expect(days[13]).toHaveAttribute("title", "2026-08-28: Regular reset");
+    expect(days[0]).toHaveAttribute("title", "2026-07-30: No reset");
+    expect(days[0]).toBeEmptyDOMElement();
+    expect(days[3]).toHaveAttribute("data-reset-type", "mixed");
+    expect(days[3]).toHaveClass("bg-orange-500");
+    expect(days[3].firstElementChild).toHaveClass("bg-sky-300");
+    expect(days[26]).toHaveAttribute("data-reset-type", "banked");
+    expect(days[26]).toHaveClass("bg-sky-300", "rounded-[1px]");
+    expect(days[29]).toHaveAttribute("data-reset-type", "regular");
+    expect(days[29]).toHaveClass("bg-orange-500", "rounded-[1px]");
+    expect(days[29]).toHaveAttribute("title", "2026-08-28: Regular reset");
+    expect(days[29]).toBeEmptyDOMElement();
+    expect(overview).toHaveTextContent("");
+    expect(screen.queryByText("codex-reset.com")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });
