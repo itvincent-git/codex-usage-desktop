@@ -541,13 +541,15 @@ describe("CodexLimitsCard component", () => {
     const latestResetButton = screen.getByRole("button", { name: "View token resets from the last 30 days" });
 
     expect(latestResetButton).toHaveTextContent("Latest token reset");
+    expect(screen.getByTestId("latest-reset-status")).toHaveClass("text-muted-foreground");
+    expect(screen.getByTestId("latest-reset-relative-time")).toHaveClass("text-foreground/75");
     expect(latestResetButton.parentElement).toHaveClass("grid-cols-1");
 
     fireEvent.click(latestResetButton);
     expect(onOpenResetHistory).toHaveBeenCalledTimes(1);
   });
 
-  it("highlights a token reset announced within the last 24 hours", () => {
+  it.each(["regular", "banked"] as const)("highlights a %s reset announced within the last 24 hours", (resetType) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-25T12:00:00.000Z"));
 
@@ -557,7 +559,7 @@ describe("CodexLimitsCard component", () => {
         limits={null}
         latestReset={{
           id: "recent-reset",
-          resetType: "regular",
+          resetType,
           announcedAt: "2026-08-25T10:00:00.000Z",
           text: "Reset has been propagated.",
           source: { author: "thsottiaux", url: "https://example.com/reset" },
@@ -570,8 +572,11 @@ describe("CodexLimitsCard component", () => {
     expect(latestResetButton).toHaveTextContent("2 hours ago");
     expect(latestResetButton).toHaveClass("border-primary/35", "bg-primary/[0.07]");
     expect(screen.getByText("Token reset within 24h")).toHaveClass("truncate");
+    expect(screen.getByTestId("latest-reset-status")).toHaveClass("bg-success/10", "text-emerald-700");
     expect(screen.getByTestId("recent-reset-indicator")).toHaveClass("bg-success");
-    expect(screen.getByText(/2 hours ago/)).toHaveClass("text-[9px]", "font-normal", "text-muted-foreground");
+    expect(screen.getByTestId("latest-reset-relative-time")).toHaveClass("font-semibold", "text-emerald-700");
+    expect(screen.getByTestId("latest-reset-relative-time").parentElement?.querySelector("time")).toHaveClass("text-primary/80");
+    expect(screen.getByTestId("latest-reset-type")).toHaveClass(resetType === "banked" ? "text-sky-700" : "text-orange-700");
 
     vi.useRealTimers();
   });

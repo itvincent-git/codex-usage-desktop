@@ -167,12 +167,16 @@ export function LatestResetButton({
           <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
         </span>
         <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-none text-foreground/80">
+          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-none">
             {isRecentReset ? <span data-testid="recent-reset-indicator" className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" /> : null}
-            <span className="truncate">{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
+            <span data-testid="latest-reset-status" className={`truncate rounded px-1.5 py-1 ${isRecentReset ? "bg-success/10 text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
           </span>
           <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
-            {relativeResetTime} · {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
+            <span data-testid="latest-reset-relative-time" className={isRecentReset ? "font-semibold text-emerald-700 dark:text-emerald-400" : "font-medium text-foreground/75"}>{relativeResetTime}</span>
+            <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
+            <time dateTime={reset.announcedAt} className="text-primary/80">{dayjs(reset.announcedAt).format("MM-DD HH:mm")}</time>
+            <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
+            <span data-testid="latest-reset-type" className={`font-medium ${reset.resetType === "banked" ? "text-sky-700 dark:text-sky-300" : "text-orange-700 dark:text-orange-400"}`}>{t(`limits.reset_type_${reset.resetType}`)}</span>
           </span>
         </span>
         <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />

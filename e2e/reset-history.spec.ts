@@ -80,6 +80,22 @@ describe("Codex Reset timeline history", () => {
       expect(layout.columns).toBe(7);
       expect(layout.weeklyRows).toBe(true);
       expect(layout.blocksOnly).toBe(true);
+      const textColors = await openHistory.execute((element) => {
+        const status = element.querySelector('[data-testid="latest-reset-status"]')!;
+        const relative = element.querySelector('[data-testid="latest-reset-relative-time"]')!;
+        const timestamp = element.querySelector("time")!;
+        const type = element.querySelector('[data-testid="latest-reset-type"]')!;
+        const elapsed = Date.now() - Date.parse(timestamp.dateTime);
+        const recent = elapsed >= 0 && elapsed <= 24 * 60 * 60 * 1000;
+        return {
+          distinctDetails: new Set([relative, timestamp, type].map((part) => getComputedStyle(part).color)).size === 3,
+          statusMatchesRecency: status.classList.contains(recent ? "text-emerald-700" : "text-muted-foreground"),
+          recentStatusEmphasized: !recent || (getComputedStyle(status).color === getComputedStyle(relative).color && getComputedStyle(status).backgroundColor !== "rgba(0, 0, 0, 0)"),
+        };
+      }) as { distinctDetails: boolean; statusMatchesRecency: boolean; recentStatusEmphasized: boolean };
+      expect(textColors.distinctDetails).toBe(true);
+      expect(textColors.statusMatchesRecency).toBe(true);
+      expect(textColors.recentStatusEmphasized).toBe(true);
       await expect(calendar).toHaveText("");
       const range = await browser.execute(() => {
         const today = new Date();
