@@ -112,7 +112,7 @@ describe("Codex Reset timeline history", () => {
 
     const dialog = $('[role="dialog"][aria-labelledby="codex-reset-history-title"]');
     await dialog.waitForDisplayed();
-    await expect(dialog.$('a=codex-reset.com')).toHaveAttribute("href", "https://codex-reset.com/");
+    await expect(dialog).not.toHaveText(expect.stringContaining("codex-reset.com"));
     await expect(dialog.$('ol li')).toHaveText(expect.stringContaining(data.history[0].text));
     await expect(dialog.$$('[data-testid="reset-history-day"]')).toBeElementsArrayOfSize(30);
     await browser.saveScreenshot("/tmp/codex-reset-history.png");

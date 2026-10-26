@@ -567,7 +567,7 @@ describe("App", () => {
     expect(await screen.findByText("cached quota schema mismatch")).toBeInTheDocument();
   });
 
-  it("shows the codex-reset source as plain text in the independent forecast card", async () => {
+  it("moves the reset data attribution from the dashboard to third-party settings", async () => {
     forecastInvokeMock.mockResolvedValue({
       updatedAt: "2026-06-25T09:00:19.499Z",
       lastResetAt: null,
@@ -600,8 +600,16 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Data: codex-reset.com")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "codex-reset.com" })).not.toBeInTheDocument();
+    expect(await screen.findByTestId("global-reset-forecast")).toBeInTheDocument();
+    expect(screen.queryByText(/codex-reset\.com/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Third Party" }));
+    expect(screen.getByRole("tab", { name: "Third Party" })).toHaveAttribute("aria-selected", "true");
+    const source = screen.getByRole("link", { name: "codex-reset.com" });
+    expect(source).toHaveAttribute("href", "https://codex-reset.com/");
+    expect(source.closest("p")).toHaveTextContent("Reset history, announcements and feed data are provided by codex-reset.com.");
+    await userEvent.click(source);
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codex-reset.com/" });
   });
 
   it("opens ChatGPT Usage when reset credits are clicked", async () => {

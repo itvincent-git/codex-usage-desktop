@@ -76,7 +76,7 @@ describe("CodexResetHistoryModal", () => {
     render(<StrictMode><CodexResetHistoryModal onClose={() => {}} /></StrictMode>);
 
     expect(await screen.findByText(/\d+ days? ago/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "codex-reset.com" })).toHaveAttribute("href", "https://codex-reset.com/");
+    expect(screen.queryByText(/codex-reset\.com/)).not.toBeInTheDocument();
     expect(fetchCodexResetHistory).toHaveBeenCalledWith(30);
     expect(fetchCodexResetHistory).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("5");

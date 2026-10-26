@@ -72,7 +72,7 @@ describe("CodexForecastCard", () => {
     expect(openUrl).toHaveBeenCalledWith(data.latestAlert!.url);
     fireEvent.click(evidence().getAllByRole("link", { name: "View on X ↗" })[1]);
     expect(openUrl).toHaveBeenCalledWith(data.evidencePosts![1].url);
-    expect(screen.getByText("Data: codex-reset.com")).toBeInTheDocument();
+    expect(screen.queryByText(/codex-reset\.com/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "codex-reset.com" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Feed checked:/)).not.toBeInTheDocument();
   });

@@ -1,7 +1,7 @@
 import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { UpdateCheckResponse, CodexLimitsResponse } from "@/lib/api";
+import { openUrl, type UpdateCheckResponse, type CodexLimitsResponse } from "@/lib/api";
 import {
   AUTO_REFRESH_INTERVAL_OPTIONS,
   type AutoRefreshIntervalMinutes,
@@ -10,7 +10,7 @@ import {
 } from "@/hooks/use-usage-dashboard";
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
 import { getReleaseNotes } from "@/lib/release-notes";
 import { getLanguage, languageCodes, languages } from "@/lib/languages";
@@ -62,9 +62,9 @@ const TRAY_OPTION_KEYS = {
   cost: "cost",
 } as const;
 
-type SettingsSection = "general" | "menuBar" | "maintenance";
+type SettingsSection = "general" | "menuBar" | "maintenance" | "third_party";
 
-const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance"];
+const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance", "third_party"];
 
 export function SettingsPage({
   isResetting,
@@ -575,6 +575,31 @@ export function SettingsPage({
             className="scroll-mt-4 space-y-4"
           >
             {maintenanceContent}
+          </section>
+          <section
+            id="settings-section-third_party"
+            aria-labelledby="settings-tab-third_party"
+            className="scroll-mt-4"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("settings.nav_third_party")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  <Trans
+                    i18nKey="settings.codex_reset_desc"
+                    components={{
+                      provider: <a
+                        href="https://codex-reset.com/"
+                        className="hover:underline focus-visible:underline"
+                        onClick={(event) => { event.preventDefault(); void openUrl(event.currentTarget.href); }}
+                      />,
+                    }}
+                  />
+                </p>
+              </CardContent>
+            </Card>
           </section>
         </div>
       </div>

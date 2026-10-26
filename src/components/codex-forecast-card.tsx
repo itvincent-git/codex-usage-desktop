@@ -137,9 +137,6 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
             {!pending && alert?.score != null ? <p className="text-[11px] text-muted-foreground">{t("forecast.signal_score", { score: alert.score })}</p> : null}
           </section> : null}
         </> : null}
-        <div className="border-t border-border/60 pt-3 text-right text-[11px] text-muted-foreground">
-          <span>Data: codex-reset.com</span>
-        </div>
       </CardContent>
     </Card>
   );

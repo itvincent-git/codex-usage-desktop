@@ -87,7 +87,7 @@ describe("global reset forecast", () => {
     await expect(evidence).toHaveText(expect.stringContaining("Within the next three hours · UTC"));
     await expect($('a=@thsottiaux ↗')).toHaveAttribute("href", fixture.latestAlert.url);
     await expect($('[data-testid="quota-forecast"]')).not.toExist();
-    await expect(card).toHaveText(expect.stringContaining("Data: codex-reset.com"));
+    await expect(card).not.toHaveText(expect.stringContaining("codex-reset.com"));
     await expect($('a=codex-reset.com')).not.toExist();
     await expect($('button=Show historical reference')).not.toExist();
   });
@@ -176,7 +176,7 @@ describe("global reset forecast", () => {
     await expect($('[data-testid="global-reset-forecast"] [role="alert"]')).not.toExist();
   });
 
-  it("keeps the no-signal view compact with a side-by-side feed and bottom-right attribution", async () => {
+  it("keeps the no-signal view compact with a side-by-side feed", async () => {
     await expect($('[data-testid="forecast-status"]')).toHaveText("Explicit announcement · time window");
     await setRemoteForecast({ ...fixture, hasOfficialSignal: false });
     await refreshForecast();
@@ -193,15 +193,13 @@ describe("global reset forecast", () => {
         const status = element.querySelector('[data-testid="forecast-announcement"]')!.getBoundingClientRect();
         const feed = element.querySelector('section[aria-label="Latest 5 feed posts"]')!;
         const feedBounds = feed.getBoundingClientRect();
-        const source = Array.from(element.querySelectorAll("span")).find((span) => span.textContent === "Data: codex-reset.com")!.getBoundingClientRect();
         return {
           sideBySide: feedBounds.left > status.right && Math.abs(feedBounds.top - status.top) < 1,
           compact: bounds.height < 380,
-          sourceAtBottomRight: bounds.right - source.right < 24 && source.top > feedBounds.bottom,
           fits: element.scrollWidth <= element.clientWidth && feed.scrollWidth <= feed.clientWidth,
         };
       });
-      expect(layout).toEqual({ sideBySide: true, compact: true, sourceAtBottomRight: true, fits: true });
+      expect(layout).toEqual({ sideBySide: true, compact: true, fits: true });
       await expect($('[aria-label="Latest 5 feed posts"]').$$('li')).toBeElementsArrayOfSize(5);
       await card.saveScreenshot(`/tmp/codex-reset-forecast-compact-${width}.png`);
     }

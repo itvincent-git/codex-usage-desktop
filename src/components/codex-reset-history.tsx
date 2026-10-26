@@ -8,18 +8,6 @@ const HISTORY_DAYS = 30;
 const DEFAULT_VISIBLE_RESETS = 5;
 const RECENT_RESET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-function ResetDataSource() {
-  return (
-    <a
-      href="https://codex-reset.com/"
-      className="text-[9px] text-muted-foreground hover:underline"
-      onClick={(event) => { event.preventDefault(); void openUrl(event.currentTarget.href); }}
-    >
-      codex-reset.com
-    </a>
-  );
-}
-
 type CalendarDay = {
   date: Dayjs;
   inRange: boolean;
@@ -427,7 +415,6 @@ export function CodexResetHistoryModal({ onClose }: { onClose: () => void }) {
           <div>
             <h3 id="codex-reset-history-title" className="text-lg font-bold text-foreground">{t("limits.reset_history_title")}</h3>
             <p className="mt-1 text-xs text-muted-foreground">{t("limits.reset_history_description")}</p>
-            <ResetDataSource />
           </div>
           <button
             type="button"
