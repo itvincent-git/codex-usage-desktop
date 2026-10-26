@@ -76,10 +76,11 @@ describe("CodexResetHistoryModal", () => {
     render(<StrictMode><CodexResetHistoryModal onClose={() => {}} /></StrictMode>);
 
     expect(await screen.findByText(/\d+ days? ago/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "codex-reset.com" })).toHaveAttribute("href", "https://codex-reset.com/");
     expect(fetchCodexResetHistory).toHaveBeenCalledWith(30);
     expect(fetchCodexResetHistory).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("6");
-    expect(screen.getByText("Average interval").nextElementSibling).toHaveTextContent("3d");
+    expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("5");
+    expect(screen.getByText("Average interval").nextElementSibling).toHaveTextContent("3.8d");
     expect(screen.getAllByTestId("reset-history-day")).toHaveLength(30);
     expect(document.querySelectorAll('[data-reset-type="regular"]').length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-reset-type="banked"]')).toHaveLength(1);
@@ -117,6 +118,26 @@ describe("CodexResetHistoryModal", () => {
     expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux/status/2092311059197808936");
   });
 
+  it("keeps a newer banked grant out of the latest reset and cadence", async () => {
+    vi.mocked(fetchCodexResetHistory).mockResolvedValue([
+      {
+        id: "grant", resetType: "banked", announcedAt: "2026-08-25T00:00:00Z",
+        text: "Banked grant", source: { url: "https://codex-reset.com/" },
+      },
+      {
+        id: "reset", resetType: "regular", announcedAt: "2026-08-24T00:00:00Z",
+        text: "Confirmed reset", source: { url: "https://x.com/thsottiaux/status/1" },
+      },
+    ]);
+
+    render(<CodexResetHistoryModal onClose={() => {}} />);
+    expect(await screen.findByText("Banked grant")).toBeInTheDocument();
+    expect(screen.getByText("Resets").nextElementSibling).toHaveTextContent("1");
+    expect(screen.getByText("Average interval").nextElementSibling).toHaveTextContent("—");
+    fireEvent.click(screen.getAllByRole("button", { name: "View source" })[0]);
+    expect(openUrl).toHaveBeenCalledWith("https://x.com/thsottiaux/status/1");
+  });
+
   it("calculates adjacent reset intervals and mixed days", () => {
     const summary = buildResetHistorySummary([
       {
@@ -142,8 +163,8 @@ describe("CodexResetHistoryModal", () => {
       },
     ], dayjs("2026-08-25T00:46:51.000Z"));
 
-    expect(summary.averageIntervalDays).toBe(2.25);
-    expect(summary.longestIntervalDays).toBe(4);
+    expect(summary.averageIntervalDays).toBe(4.5);
+    expect(summary.longestIntervalDays).toBe(4.5);
     expect(summary.calendarDays.find((day) => day.date.format("YYYY-MM-DD") === "2026-08-24")?.resetType).toBe("mixed");
   });
 

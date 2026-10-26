@@ -189,7 +189,7 @@
     "reset_type_regular": "Regular reset",
     "reset_type_banked": "Banked reset",
     "reset_history_title": "Token resets in the last 30 days",
-    "reset_history_description": "Public reset announcements from Codex Resets. Times shown are announcement times.",
+    "reset_history_description": "Public reset announcements from codex-reset.com. Times shown are announcement or confirmation times.",
     "reset_history_loading": "Loading reset history...",
     "reset_history_error": "Unable to load reset history right now.",
     "reset_history_empty": "No reset announcements in the last 30 days.",

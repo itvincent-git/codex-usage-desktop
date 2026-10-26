@@ -189,7 +189,7 @@
     "reset_type_regular": "通常リセット",
     "reset_type_banked": "バンクリセット",
     "reset_history_title": "過去30日間のトークンリセット",
-    "reset_history_description": "Codex Resets の公開リセット告知です。表示時刻は告知の投稿時刻です。",
+    "reset_history_description": "codex-reset.com の公開リセット記録です。表示時刻は告知または確認の時刻です。",
     "reset_history_loading": "リセット履歴を読み込んでいます...",
     "reset_history_error": "現在、リセット履歴を読み込めません。",
     "reset_history_empty": "過去30日間にリセット告知はありません。",

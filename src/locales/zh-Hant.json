@@ -189,7 +189,7 @@
     "reset_type_regular": "常規重置",
     "reset_type_banked": "儲存式重置",
     "reset_history_title": "最近 30 天的 Token 重置",
-    "reset_history_description": "資料來自 Codex Resets 的公開重置公告，顯示時間為公告發布時間。",
+    "reset_history_description": "資料來自 codex-reset.com 的公開重置記錄，顯示時間為公告或確認時間。",
     "reset_history_loading": "正在載入重置記錄...",
     "reset_history_error": "暫時無法載入重置記錄。",
     "reset_history_empty": "最近 30 天沒有重置公告。",

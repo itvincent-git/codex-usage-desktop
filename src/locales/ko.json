@@ -189,7 +189,7 @@
     "reset_type_regular": "일반 초기화",
     "reset_type_banked": "적립 크레딧 초기화",
     "reset_history_title": "최근 30일의 토큰 한도 초기화",
-    "reset_history_description": "Codex Resets의 공개 초기화 공지입니다. 표시된 시각은 공지 시각입니다.",
+    "reset_history_description": "codex-reset.com의 공개 초기화 기록입니다. 표시된 시각은 공지 또는 확인 시각입니다.",
     "reset_history_loading": "초기화 내역 불러오는 중...",
     "reset_history_error": "현재 초기화 내역을 불러올 수 없습니다.",
     "reset_history_empty": "최근 30일의 초기화 공지가 없습니다.",
