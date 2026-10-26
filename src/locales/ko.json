@@ -153,7 +153,6 @@
     "window": "기간",
     "reset_credits": "한도 초기화 크레딧",
     "reset_credits_open": "ChatGPT 사용량 페이지에서 초기화 크레딧 보기",
-    "reset_credits_toggle": "초기화 크레딧 만료 정보 표시 또는 숨기기",
     "reset_credits_available": "{{count}}개 사용 가능",
     "reset_credit_number": "크레딧 {{index}}",
     "reset_credit_expires_at": "만료 {{date}}",

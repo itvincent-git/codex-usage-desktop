@@ -341,7 +341,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
   });
 
-  it("collapses reset credits to the earliest expiry and expands the sorted detail list", () => {
+  it("shows all reset credits sorted by expiry without a collapse toggle", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-15T00:00:00+08:00"));
     const limits = {
@@ -378,26 +378,14 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByText("Credit 1")).toBeInTheDocument();
     expect(screen.getByText(`Expires ${dayjs("2026-08-01T18:00:00+08:00").format("YYYY-MM-DD HH:mm")}`)).toBeInTheDocument();
     expect(screen.getByText("18 days left")).toBeInTheDocument();
-    expect(screen.queryByText("Credit 2")).not.toBeInTheDocument();
-    expect(screen.queryByText("Does not expire")).not.toBeInTheDocument();
-
-    const toggle = screen.getByRole("button", { name: "Show or hide reset credit expiration details" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
-
     expect(onOpenResetCredits).not.toHaveBeenCalled();
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: "Show or hide reset credit expiration details" })).not.toBeInTheDocument();
     expect(screen.getByText("Credit 2")).toBeInTheDocument();
     expect(screen.getByText(`Expires ${dayjs("2026-08-03T18:00:00+08:00").format("YYYY-MM-DD HH:mm")}`)).toBeInTheDocument();
     expect(screen.getByText("20 days left")).toBeInTheDocument();
     expect(screen.getByText("Credit 3")).toBeInTheDocument();
     expect(screen.getByText("Does not expire")).toBeInTheDocument();
 
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Credit 2")).not.toBeInTheDocument();
-    expect(screen.queryByText("Does not expire")).not.toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -453,7 +441,7 @@ describe("CodexLimitsCard component", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("reports partial expiration details only when expanded", () => {
+  it("reports partial expiration details immediately", () => {
     render(
       <CodexLimitsCard onOpenResetCredits={() => {}}
         limits={{
@@ -467,10 +455,6 @@ describe("CodexLimitsCard component", () => {
         }}
       />,
     );
-
-    expect(screen.queryByText("Expiration details were not returned for 2 more credits")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Show or hide reset credit expiration details" }));
 
     expect(screen.getByText("Expiration details were not returned for 2 more credits")).toBeInTheDocument();
   });

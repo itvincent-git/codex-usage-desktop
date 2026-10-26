@@ -1,4 +1,4 @@
-import { ChevronDown, Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LatestResetButton } from "@/components/codex-reset-history";
@@ -304,7 +304,6 @@ function ResetCreditsPanel({
   separated: boolean;
 }) {
   const { t } = useTranslation();
-  const [isExpanded, setIsExpanded] = useState(false);
   const count = Math.max(0, Math.trunc(availableCount));
   const sortedCredits = [...(credits ?? [])]
     .sort((left, right) => {
@@ -313,7 +312,6 @@ function ResetCreditsPanel({
       return new Date(left.expiresAt).getTime() - new Date(right.expiresAt).getTime();
     })
     .slice(0, count);
-  const visibleCredits = isExpanded ? sortedCredits : sortedCredits.slice(0, 1);
 
   return (
     <div className={cn(separated && "border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0")}>
@@ -336,27 +334,20 @@ function ResetCreditsPanel({
             {t("limits.reset_credits_available", { count })}
           </span>
         </button>
-        <button
-          type="button"
-          className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={t("limits.reset_credits_toggle")}
-          aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((expanded) => !expanded)}
-        >
-          <ChevronDown
-            className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
-            aria-hidden="true"
-          />
-        </button>
       </div>
-      <div className="mt-2 border-t border-border/40 text-[10px] leading-normal text-foreground/85">
+      <div
+        role="region"
+        aria-label={t("limits.reset_credits")}
+        tabIndex={0}
+        className="mt-2 max-h-40 overflow-y-auto overscroll-contain border-t border-border/40 text-[10px] leading-normal text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         {count === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>
         ) : sortedCredits.length === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
         ) : (
           <>
-            {visibleCredits.map((credit, index) => (
+            {sortedCredits.map((credit, index) => (
               <div
                 key={credit.id}
                 className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-border/40 py-2 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
@@ -376,7 +367,7 @@ function ResetCreditsPanel({
                 )}
               </div>
             ))}
-            {isExpanded && sortedCredits.length < count ? (
+            {sortedCredits.length < count ? (
               <p className="border-t border-border/40 pt-2 text-muted-foreground">
                 {t("limits.reset_credits_details_partial", { count: count - sortedCredits.length })}
               </p>

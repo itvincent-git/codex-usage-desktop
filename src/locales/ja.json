@@ -153,7 +153,6 @@
     "window": "期間",
     "reset_credits": "リセットクレジット",
     "reset_credits_open": "ChatGPT でリセット クレジットを開く",
-    "reset_credits_toggle": "リセットクレジットの有効期限詳細を表示/非表示",
     "reset_credits_available": "{{count}}件利用可能",
     "reset_credit_number": "クレジット {{index}}",
     "reset_credit_expires_at": "有効期限 {{date}}",

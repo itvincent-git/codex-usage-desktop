@@ -34,8 +34,11 @@ describe("dashboard layout", () => {
     const limits: CodexLimitsResponse = {
       session: { usedPercent: 25, remainingPercent: 75, windowMinutes: 300, resetsAt: new Date(Date.now() + 295 * 60_000).toISOString() },
       weekly: { usedPercent: 40, remainingPercent: 60, windowMinutes: 10080, resetsAt: new Date(Date.now() + (6 * 24 + 23) * 3_600_000 + 55 * 60_000).toISOString() },
-      resetCreditsAvailableCount: 2,
-      resetCredits: [{ id: "first", expiresAt: new Date(Date.now() + 5 * 86_400_000).toISOString() }, { id: "second", expiresAt: new Date(Date.now() + 10 * 86_400_000).toISOString() }],
+      resetCreditsAvailableCount: 12,
+      resetCredits: Array.from({ length: 12 }, (_, index) => ({
+        id: `credit-${index}`,
+        expiresAt: new Date(Date.now() + (index + 1) * 86_400_000).toISOString(),
+      })),
       membershipLevel: "plus",
       updatedAt: timestamp,
       source: "dashboard-layout-e2e",
@@ -115,6 +118,41 @@ describe("dashboard layout", () => {
       }));
       expect(layout).toEqual({ columns: 4, rows: 1, count: 4 });
       await browser.saveScreenshot(`/tmp/codex-dashboard-layout-${width}.png`);
+    }
+  });
+
+  run("shows all reset credits in a bounded list that scrolls independently", async () => {
+    for (const width of [1100, 1440]) {
+      await browser.setWindowSize(width, 960);
+      const list = $('[role="region"][aria-label="Reset credits"]');
+      await list.scrollIntoView({ block: "center" });
+      await expect($('[data-testid="reset-credit-count"]')).toHaveText("12 available");
+      await expect($('button[aria-label="Show or hide reset credit expiration details"]')).not.toExist();
+      await expect(list.$$("div")).toBeElementsArrayOfSize(12);
+      await expect(list.$("div:last-child")).toHaveText(expect.stringContaining("Credit 12"));
+      const layout = await list.execute((element) => {
+        element.scrollTop = 0;
+        return {
+          height: element.getBoundingClientRect().height,
+          overflows: element.scrollHeight > element.clientHeight,
+          overflowY: getComputedStyle(element).overflowY,
+          overscrollY: getComputedStyle(element).overscrollBehaviorY,
+        };
+      }) as { height: number; overflows: boolean; overflowY: string; overscrollY: string };
+      expect(layout.height).toBeLessThanOrEqual(160);
+      expect(layout.overflows).toBe(true);
+      expect(layout.overflowY).toBe("auto");
+      expect(layout.overscrollY).toBe("contain");
+      const pageScroll = await browser.execute(() => document.querySelector('[data-app-content] > div')!.scrollTop);
+      // The embedded driver synthesizes key events without default scrolling.
+      await list.execute((element) => element.scrollTo({ top: element.scrollHeight, behavior: "instant" }));
+      await browser.waitUntil(async () => list.execute((element) => {
+        const last = element.lastElementChild!.getBoundingClientRect();
+        const bounds = element.getBoundingClientRect();
+        return element.scrollTop > 0 && last.bottom <= bounds.bottom + 1 && last.top >= bounds.top;
+      }));
+      expect(await browser.execute(() => document.querySelector('[data-app-content] > div')!.scrollTop)).toBe(pageScroll);
+      await list.saveScreenshot(`/tmp/codex-reset-credits-${width}.png`);
     }
   });
 

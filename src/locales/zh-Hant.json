@@ -153,7 +153,6 @@
     "window": "時段時長",
     "reset_credits": "重置次數",
     "reset_credits_open": "在 ChatGPT 用量設定中查看重置次數",
-    "reset_credits_toggle": "展開或收起重置次數有效期明細",
     "reset_credits_available": "{{count}} 次可用",
     "reset_credit_number": "第 {{index}} 次",
     "reset_credit_expires_at": "{{date}} 到期",
