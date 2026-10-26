@@ -821,7 +821,6 @@
     "feed_title": "Latest 5 feed posts",
     "feed_unavailable": "The feed is unavailable.",
     "feed_empty": "No recent feed posts.",
-    "feed_stale": "Showing older feed data; it needs refreshing.",
-    "feed_updated": "Feed checked: {{time}}"
+    "feed_stale": "Showing older feed data; it needs refreshing."
   }
 }

@@ -827,7 +827,6 @@
     "feed_title": "最近 5 条 Feed 动态",
     "feed_unavailable": "暂时无法加载 Feed 动态。",
     "feed_empty": "暂无近期 Feed 动态。",
-    "feed_stale": "正在显示旧 Feed 数据，需要刷新。",
-    "feed_updated": "Feed 检查：{{time}}"
+    "feed_stale": "正在显示旧 Feed 数据，需要刷新。"
   }
 }

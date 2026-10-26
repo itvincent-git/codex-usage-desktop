@@ -1,12 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUpRight, RefreshCw, RotateCcw } from "lucide-react";
+import { RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { openUrl, type CodexQuotaForecastResponse, type CodexResetAnnouncement } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const SOURCE_URL = "https://codex-reset.com/";
 const MAX_SIGNAL_AGE_MS = 5 * 60_000;
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
@@ -138,9 +137,8 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
             {!pending && alert?.score != null ? <p className="text-[11px] text-muted-foreground">{t("forecast.signal_score", { score: alert.score })}</p> : null}
           </section> : null}
         </> : null}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-          {data?.evidenceUpdatedAt ? <p>{t("forecast.feed_updated", { time: formatDate(data.evidenceUpdatedAt, compactDate) })}</p> : null}
-          <span className="ml-auto whitespace-nowrap">Data: <ExternalLink href={SOURCE_URL}>codex-reset.com<ArrowUpRight className="ml-0.5 inline h-3 w-3" aria-hidden="true" /></ExternalLink></span>
+        <div className="border-t border-border/60 pt-3 text-right text-[11px] text-muted-foreground">
+          <span>Data: codex-reset.com</span>
         </div>
       </CardContent>
     </Card>

@@ -827,7 +827,6 @@
     "feed_title": "最近 5 則 Feed 動態",
     "feed_unavailable": "暫時無法載入 Feed 動態。",
     "feed_empty": "暫無近期 Feed 動態。",
-    "feed_stale": "正在顯示舊 Feed 資料，需要重新整理。",
-    "feed_updated": "Feed 檢查：{{time}}"
+    "feed_stale": "正在顯示舊 Feed 資料，需要重新整理。"
   }
 }

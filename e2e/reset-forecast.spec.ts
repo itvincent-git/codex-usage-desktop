@@ -87,7 +87,8 @@ describe("global reset forecast", () => {
     await expect(evidence).toHaveText(expect.stringContaining("Within the next three hours · UTC"));
     await expect($('a=@thsottiaux ↗')).toHaveAttribute("href", fixture.latestAlert.url);
     await expect($('[data-testid="quota-forecast"]')).not.toExist();
-    await expect($('a=codex-reset.com')).toHaveAttribute("href", "https://codex-reset.com/");
+    await expect(card).toHaveText(expect.stringContaining("Data: codex-reset.com"));
+    await expect($('a=codex-reset.com')).not.toExist();
     await expect($('button=Show historical reference')).not.toExist();
   });
 
@@ -182,6 +183,7 @@ describe("global reset forecast", () => {
     await expect($('[data-testid="forecast-status"]')).toHaveText("No reliable announcement");
     const card = $('[data-testid="global-reset-forecast"]');
     await expect(card).not.toHaveText(expect.stringContaining("Feed activity alone"));
+    await expect(card).not.toHaveText(expect.stringContaining("Feed checked:"));
     await expect($('[aria-label="Evidence for this signal"]')).not.toExist();
     for (const width of [1100, 1440]) {
       await browser.setWindowSize(width, 960);
@@ -191,7 +193,7 @@ describe("global reset forecast", () => {
         const status = element.querySelector('[data-testid="forecast-announcement"]')!.getBoundingClientRect();
         const feed = element.querySelector('section[aria-label="Latest 5 feed posts"]')!;
         const feedBounds = feed.getBoundingClientRect();
-        const source = element.querySelector('a[href="https://codex-reset.com/"]')!.getBoundingClientRect();
+        const source = Array.from(element.querySelectorAll("span")).find((span) => span.textContent === "Data: codex-reset.com")!.getBoundingClientRect();
         return {
           sideBySide: feedBounds.left > status.right && Math.abs(feedBounds.top - status.top) < 1,
           compact: bounds.height < 380,
