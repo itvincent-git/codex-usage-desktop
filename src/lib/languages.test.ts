@@ -78,6 +78,17 @@ describe("language configuration", () => {
     }
   });
 
+  it.each(Object.entries(languages))("includes all trend translations in %s and preserves interpolation parameters", (_code, language) => {
+    const english = Object.fromEntries(translationEntries(languages.en.translations.trends));
+    const translated = Object.fromEntries(translationEntries(language.translations.trends));
+    expect(Object.keys(translated).sort()).toEqual(Object.keys(english).sort());
+    for (const [key, value] of Object.entries(translated)) {
+      expect(value.trim(), key).not.toBe("");
+      const parameters = (text: string) => (text.match(/\{\{[^}]+\}\}/g) ?? []).sort();
+      expect(parameters(value), key).toEqual(parameters(english[key]));
+    }
+  });
+
   it("selects Korean release notes and falls back to English when missing", () => {
     const notes = JSON.stringify({ en: "English notes", ko: "한국어 업데이트 내역" });
     expect(getReleaseNotes(notes, "ko")).toBe("한국어 업데이트 내역");

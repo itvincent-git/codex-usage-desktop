@@ -802,6 +802,17 @@
     "waiting": "ログを待っています..."
   },
   "trends": {
+    "view_label": "傾向の表示",
+    "legend_label": "傾向の凡例",
+    "view_cost": "料金",
+    "view_quota": "クォータ",
+    "quota_trend": "日別クォータ使用量",
+    "five_hour_usage": "5時間の使用量",
+    "weekly_monthly_usage": "週間/月間の使用量",
+    "no_data": "データなし",
+    "quota_no_data": "この期間のクォータデータはありません",
+    "approx_percent": "約 {{value}}",
+    "quota_note": "観測された日別クォータ使用量です。リセット期間をまたぐ合計は100%を超えることがあります。",
     "title_tokens": "トークンの使用傾向",
     "title_cost": "推定コストの傾向",
     "tab_tokens": "トークン",

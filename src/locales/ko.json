@@ -766,6 +766,17 @@
     "waiting": "로그 대기 중..."
   },
   "trends": {
+    "view_label": "추이 보기",
+    "legend_label": "추이 범례",
+    "view_cost": "비용",
+    "view_quota": "한도",
+    "quota_trend": "일별 한도 사용량",
+    "five_hour_usage": "5시간 사용량",
+    "weekly_monthly_usage": "주간/월간 사용량",
+    "no_data": "데이터 없음",
+    "quota_no_data": "이 기간의 한도 데이터가 없습니다",
+    "approx_percent": "약 {{value}}",
+    "quota_note": "관측된 일별 한도 사용량입니다. 초기화 기간에 걸친 합계는 100%를 초과할 수 있습니다.",
     "title_tokens": "토큰 사용량 추이",
     "title_cost": "추정 비용 추이",
     "tab_tokens": "토큰",
