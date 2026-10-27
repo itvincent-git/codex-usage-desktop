@@ -772,6 +772,17 @@
     "waiting": "正在等待系统日志输出..."
   },
   "trends": {
+    "view_label": "趋势视图",
+    "legend_label": "趋势图例",
+    "view_cost": "费用",
+    "view_quota": "额度",
+    "quota_trend": "每日额度消耗",
+    "five_hour_usage": "5h 消耗",
+    "weekly_monthly_usage": "周/月消耗",
+    "no_data": "无数据",
+    "quota_no_data": "所选时段暂无额度数据",
+    "approx_percent": "约 {{value}}",
+    "quota_note": "当天观测到的额度消耗，跨重置窗口累计可超过 100%。",
     "title_tokens": "Token 消耗趋势",
     "title_cost": "预估成本趋势",
     "tab_tokens": "Tokens 消耗",

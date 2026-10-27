@@ -772,6 +772,17 @@
     "waiting": "正在等待系統日誌輸出..."
   },
   "trends": {
+    "view_label": "趨勢檢視",
+    "legend_label": "趨勢圖例",
+    "view_cost": "費用",
+    "view_quota": "額度",
+    "quota_trend": "每日額度消耗",
+    "five_hour_usage": "5h 消耗",
+    "weekly_monthly_usage": "週/月消耗",
+    "no_data": "無資料",
+    "quota_no_data": "所選時段暫無額度資料",
+    "approx_percent": "約 {{value}}",
+    "quota_note": "當天觀測到的額度消耗，跨重設視窗累計可超過 100%。",
     "title_tokens": "Token 消耗趨勢",
     "title_cost": "預估成本趨勢",
     "tab_tokens": "Tokens 消耗",

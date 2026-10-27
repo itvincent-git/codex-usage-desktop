@@ -766,6 +766,17 @@
     "waiting": "Waiting for logs..."
   },
   "trends": {
+    "view_label": "Trend view",
+    "legend_label": "Trend series",
+    "view_cost": "Cost",
+    "view_quota": "Quota",
+    "quota_trend": "Daily quota consumption",
+    "five_hour_usage": "5h usage",
+    "weekly_monthly_usage": "Weekly/monthly usage",
+    "no_data": "No data",
+    "quota_no_data": "No quota data for this period",
+    "approx_percent": "Approx. {{value}}",
+    "quota_note": "Observed daily quota consumption. Totals across reset windows can exceed 100%.",
     "title_tokens": "Token Usage Trends",
     "title_cost": "Estimated Cost Trends",
     "tab_tokens": "Tokens",
