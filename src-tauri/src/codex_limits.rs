@@ -1217,7 +1217,7 @@ impl CodexRpcProcess {
     }
 
     fn fetch_rate_limits(&mut self) -> Result<RpcRateLimitSnapshot, String> {
-        let value = self.request("account/rateLimits/read", None, Duration::from_secs(3))?;
+        let value = self.request("account/rateLimits/read", None, Duration::from_secs(30))?;
         let response = serde_json::from_value::<RpcRateLimitsResponse>(value)
             .map_err(|error| format!("Failed to parse Codex rate limits: {error}"))?;
         Ok(response.rate_limits)
