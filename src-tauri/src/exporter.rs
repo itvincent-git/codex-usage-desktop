@@ -401,6 +401,7 @@ mod tests {
                 five_hour_percent: None,
                 weekly_percent: None,
             }],
+            hourly: vec![],
             totals: OverviewTotals {
                 input_tokens: 1200,
                 cached_input_tokens: 200,

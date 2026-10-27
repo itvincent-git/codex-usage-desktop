@@ -1,13 +1,13 @@
 use crate::pricing::{calculate_cost_usd, PricingSource};
 use crate::types::{
-    DailyUsageRow, ModelUsage, ProjectUsage, SessionDailyUsageRow, SessionDetailRow,
-    SessionQuotaUsage,
+    DailyUsageRow, HourlyUsageRow, ModelUsage, ProjectUsage, SessionDailyUsageRow,
+    SessionDetailRow, SessionQuotaUsage,
 };
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 
-const QUOTA_PARSER_VERSION: i64 = 4;
+const QUOTA_PARSER_VERSION: i64 = 7;
 
 pub fn open_database(database_path: &Path) -> Result<Connection, String> {
     let db = Connection::open(database_path).map_err(|error| error.to_string())?;
@@ -42,6 +42,8 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
           modified_at_ms INTEGER NOT NULL,
           size_bytes INTEGER NOT NULL,
           rows_json TEXT NOT NULL,
+          hourly_rows_json TEXT NOT NULL DEFAULT '[]',
+          rollup_timezone TEXT NOT NULL DEFAULT '',
           prompt_title TEXT,
           turn_count INTEGER NOT NULL DEFAULT 0,
           quota_usage_json TEXT,
@@ -56,6 +58,18 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "daily_usage_rollups",
         "projects_json",
         "ALTER TABLE daily_usage_rollups ADD COLUMN projects_json TEXT NOT NULL DEFAULT '{}'",
+    )?;
+    ensure_column(
+        &db,
+        "session_file_rollups",
+        "hourly_rows_json",
+        "ALTER TABLE session_file_rollups ADD COLUMN hourly_rows_json TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        &db,
+        "session_file_rollups",
+        "rollup_timezone",
+        "ALTER TABLE session_file_rollups ADD COLUMN rollup_timezone TEXT NOT NULL DEFAULT ''",
     )?;
     ensure_column(
         &db,
@@ -91,6 +105,8 @@ pub struct SessionFileRollup {
     pub modified_at_ms: i64,
     pub size_bytes: i64,
     pub rows: Vec<DailyUsageRow>,
+    pub hourly_rows: Vec<HourlyUsageRow>,
+    pub timezone: String,
     pub prompt_title: Option<String>,
     pub turn_count: usize,
     pub quota_usage: Option<SessionQuotaRollup>,
@@ -351,7 +367,7 @@ pub fn query_session_file_rollup(
 ) -> Result<Option<SessionFileRollup>, String> {
     let result = db.query_row(
         r#"
-        SELECT rows_json, prompt_title, quota_usage_json, turn_count
+        SELECT rows_json, hourly_rows_json, rollup_timezone, prompt_title, quota_usage_json, turn_count
         FROM session_file_rollups
         WHERE path = ? AND modified_at_ms = ? AND size_bytes = ? AND quota_parser_version = ?
         "#,
@@ -359,16 +375,20 @@ pub fn query_session_file_rollup(
         |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, Option<String>>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, usize>(3)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, usize>(5)?,
             ))
         },
     );
 
     match result {
-        Ok((rows_json, prompt_title, quota_usage_json, turn_count)) => {
+        Ok((rows_json, hourly_rows_json, timezone, prompt_title, quota_usage_json, turn_count)) => {
             let rows = serde_json::from_str(&rows_json).map_err(|error| error.to_string())?;
+            let hourly_rows =
+                serde_json::from_str(&hourly_rows_json).map_err(|error| error.to_string())?;
             let quota_usage = quota_usage_json
                 .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
                 .transpose()?;
@@ -377,6 +397,8 @@ pub fn query_session_file_rollup(
                 modified_at_ms,
                 size_bytes,
                 rows,
+                hourly_rows,
+                timezone,
                 prompt_title,
                 turn_count,
                 quota_usage,
@@ -388,7 +410,7 @@ pub fn query_session_file_rollup(
 }
 
 pub fn query_all_session_file_rollups(db: &Connection) -> Result<Vec<SessionFileRollup>, String> {
-    let mut statement = db.prepare("SELECT path, modified_at_ms, size_bytes, rows_json, prompt_title, quota_usage_json, turn_count FROM session_file_rollups")
+    let mut statement = db.prepare("SELECT path, modified_at_ms, size_bytes, rows_json, hourly_rows_json, rollup_timezone, prompt_title, quota_usage_json, turn_count FROM session_file_rollups")
         .map_err(|error| error.to_string())?;
     let records = statement
         .query_map([], |row| {
@@ -397,16 +419,27 @@ pub fn query_all_session_file_rollups(db: &Connection) -> Result<Vec<SessionFile
                 row.get::<_, i64>(1)?,
                 row.get::<_, i64>(2)?,
                 row.get::<_, String>(3)?,
-                row.get::<_, Option<String>>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, usize>(6)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, usize>(8)?,
             ))
         })
         .map_err(|error| error.to_string())?;
     records
         .map(|record| {
-            let (path, modified_at_ms, size_bytes, rows_json, prompt_title, quota_json, turn_count) =
-                record.map_err(|error| error.to_string())?;
+            let (
+                path,
+                modified_at_ms,
+                size_bytes,
+                rows_json,
+                hourly_rows_json,
+                timezone,
+                prompt_title,
+                quota_json,
+                turn_count,
+            ) = record.map_err(|error| error.to_string())?;
             Ok(SessionFileRollup {
                 path,
                 modified_at_ms,
@@ -414,12 +447,35 @@ pub fn query_all_session_file_rollups(db: &Connection) -> Result<Vec<SessionFile
                 prompt_title,
                 turn_count,
                 rows: serde_json::from_str(&rows_json).map_err(|error| error.to_string())?,
+                hourly_rows: serde_json::from_str(&hourly_rows_json)
+                    .map_err(|error| error.to_string())?,
+                timezone,
                 quota_usage: quota_json
                     .map(|json| serde_json::from_str(&json).map_err(|error| error.to_string()))
                     .transpose()?,
             })
         })
         .collect()
+}
+
+pub fn hourly_rollups_ready(db: &Connection, timezone: &str) -> Result<bool, String> {
+    db.query_row(
+        r#"
+        SELECT
+          NOT EXISTS (
+            SELECT 1
+            FROM session_file_rollups
+            WHERE quota_parser_version != ? OR rollup_timezone != ?
+          )
+          AND (
+            NOT EXISTS (SELECT 1 FROM daily_usage_rollups)
+            OR EXISTS (SELECT 1 FROM session_file_rollups)
+          )
+        "#,
+        params![QUOTA_PARSER_VERSION, timezone],
+        |row| row.get(0),
+    )
+    .map_err(|error| error.to_string())
 }
 
 pub fn query_session_rollup_record(
@@ -511,16 +567,20 @@ pub fn upsert_session_file_rollups(
                   modified_at_ms,
                   size_bytes,
                   rows_json,
+                  hourly_rows_json,
+                  rollup_timezone,
                   prompt_title,
                   quota_usage_json,
                   turn_count,
                   quota_parser_version,
                   updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(path) DO UPDATE SET
                   modified_at_ms = excluded.modified_at_ms,
                   size_bytes = excluded.size_bytes,
                   rows_json = excluded.rows_json,
+                  hourly_rows_json = excluded.hourly_rows_json,
+                  rollup_timezone = excluded.rollup_timezone,
                   prompt_title = excluded.prompt_title,
                   quota_usage_json = excluded.quota_usage_json,
                   turn_count = excluded.turn_count,
@@ -533,6 +593,8 @@ pub fn upsert_session_file_rollups(
         for rollup in rollups {
             let rows_json =
                 serde_json::to_string(&rollup.rows).map_err(|error| error.to_string())?;
+            let hourly_rows_json =
+                serde_json::to_string(&rollup.hourly_rows).map_err(|error| error.to_string())?;
             let quota_usage_json = rollup
                 .quota_usage
                 .as_ref()
@@ -545,6 +607,8 @@ pub fn upsert_session_file_rollups(
                     rollup.modified_at_ms,
                     rollup.size_bytes,
                     rows_json,
+                    hourly_rows_json,
+                    rollup.timezone,
                     rollup.prompt_title,
                     quota_usage_json,
                     rollup.turn_count,
@@ -1060,6 +1124,16 @@ mod tests {
             .any(|column| column == "projects_json");
 
         assert!(has_projects_json);
+        let has_hourly_rows_json = db
+            .prepare("PRAGMA table_info(session_file_rollups)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .iter()
+            .any(|column| column == "hourly_rows_json");
+        assert!(has_hourly_rows_json);
         let has_prompt_title = db
             .prepare("PRAGMA table_info(session_file_rollups)")
             .unwrap()
@@ -1091,6 +1165,38 @@ mod tests {
             .iter()
             .any(|column| column == "quota_parser_version");
         assert!(has_quota_parser_version);
+
+        let hourly_row = HourlyUsageRow {
+            hour: "2026-08-21T09:00:00Z".to_string(),
+            input_tokens: 100,
+            cached_input_tokens: 20,
+            output_tokens: 30,
+            reasoning_output_tokens: 5,
+            total_tokens: 130,
+            models: BTreeMap::new(),
+        };
+        upsert_session_file_rollups(
+            &db,
+            &[SessionFileRollup {
+                path: "/tmp/hourly.jsonl".to_string(),
+                modified_at_ms: 3,
+                size_bytes: 4,
+                rows: vec![],
+                hourly_rows: vec![hourly_row.clone()],
+                timezone: "UTC".to_string(),
+                prompt_title: None,
+                turn_count: 0,
+                quota_usage: None,
+            }],
+            "2026-08-21T09:00:00.000Z",
+        )
+        .unwrap();
+        let migrated_rollup = query_session_file_rollup(&db, "/tmp/hourly.jsonl", 3, 4)
+            .unwrap()
+            .unwrap();
+        assert_eq!(migrated_rollup.hourly_rows.len(), 1);
+        assert_eq!(migrated_rollup.hourly_rows[0].hour, hourly_row.hour);
+        assert_eq!(migrated_rollup.hourly_rows[0].total_tokens, 130);
 
         db.execute(
             r#"
@@ -1132,6 +1238,8 @@ mod tests {
                     modified_at_ms: 2,
                     size_bytes: 2,
                     rows: vec![],
+                    hourly_rows: vec![],
+                    timezone: "UTC".to_string(),
                     prompt_title: Some("First real request".to_string()),
                     quota_usage: None,
                 },
@@ -1141,6 +1249,8 @@ mod tests {
                     modified_at_ms: 1,
                     size_bytes: 1,
                     rows: vec![],
+                    hourly_rows: vec![],
+                    timezone: "UTC".to_string(),
                     prompt_title: Some(String::new()),
                     quota_usage: None,
                 },
@@ -1199,6 +1309,8 @@ mod tests {
                 modified_at_ms: 2,
                 size_bytes: 200,
                 rows: vec![daily_row("2026-07-01", 1), daily_row("2026-07-02", 2)],
+                hourly_rows: vec![],
+                timezone: "UTC".to_string(),
                 prompt_title: None,
                 quota_usage: None,
             }],

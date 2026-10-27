@@ -425,6 +425,8 @@ mod tests {
                     modified_at_ms: 1782864000000,
                     size_bytes: 100,
                     rows,
+                    hourly_rows: vec![],
+                    timezone: "UTC".to_string(),
                     prompt_title: Some(name.to_string()),
                     turn_count: 0,
                     quota_usage: None,

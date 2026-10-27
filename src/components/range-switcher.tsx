@@ -93,6 +93,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-testid="range-switcher"
             className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "min-w-[11rem] justify-between")}
             aria-label={t("range_switcher.aria_select_range")}
           >
@@ -103,7 +104,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
         <DropdownMenuContent align="end" className="min-w-[11rem]">
           <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as RangeKey)}>
             {ranges.map((range) => (
-              <DropdownMenuRadioItem key={range.value} value={range.value}>
+              <DropdownMenuRadioItem key={range.value} value={range.value} data-testid={`range-option-${range.value}`}>
                 {t(`ranges.${range.value}`, { defaultValue: range.label })}
               </DropdownMenuRadioItem>
             ))}

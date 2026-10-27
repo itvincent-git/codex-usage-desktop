@@ -36,8 +36,8 @@ export function getRangeLabel(range: RangeKey, t?: (key: string, options?: any) 
   return rangeLabels[range] || `Last ${range}`;
 }
 
-export function formatTrendDateLabel(date: string) {
-  return date.slice(5);
+export function formatTrendDateLabel(date: string, hourly = false) {
+  return hourly ? date.slice(5).replace("T", " ") : date.slice(5);
 }
 
 export function getYAxisWidth(maxValue: number, formatter: (value: number) => string, minWidth: number) {

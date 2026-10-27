@@ -1,6 +1,6 @@
 use crate::{
     codex_environment::selected_codex_environment,
-    date::{date_key_in_timezone, resolve_app_timezone},
+    date::{date_key_in_timezone, local_hour_key, resolve_app_timezone},
     db::{
         delete_missing_daily_rows, delete_missing_session_file_rollups, query_session_file_rollup,
         record_scan_run, upsert_daily_rows, upsert_session_file_rollups, ModelQuotaSample,
@@ -9,7 +9,8 @@ use crate::{
     pricing::{calculate_cost_usd, PricingSource},
     session_file::{is_session_file, open_session_file, read_session_file},
     types::{
-        DailyUsageRow, ModelUsage, ProjectUsage, ScanMetrics, ScanResponse, SessionQuotaWindowUsage,
+        DailyUsageRow, HourlyUsageRow, ModelUsage, ProjectUsage, ScanMetrics, ScanResponse,
+        SessionQuotaWindowUsage,
     },
 };
 use chrono::{DateTime, Utc};
@@ -122,6 +123,8 @@ pub fn rescan_session(
     let tx = db
         .unchecked_transaction()
         .map_err(|error| error.to_string())?;
+    let timezone_metrics =
+        reparse_cache_for_timezone(&tx, &home, &timezone, &scanned_at, pricing)?;
     let cached = crate::db::query_all_session_file_rollups(&tx)?;
     let id = session_file_id(Path::new(path));
     if !cached.iter().any(|rollup| {
@@ -157,8 +160,8 @@ pub fn rescan_session(
         started,
         ScanMetrics {
             files_scanned: files.len(),
-            files_parsed: 1,
-            bytes_read: file.size_bytes as u64,
+            files_parsed: timezone_metrics.files_parsed + 1,
+            bytes_read: timezone_metrics.bytes_read + file.size_bytes as u64,
             parse_ms: started.elapsed().as_millis(),
             ..ScanMetrics::default()
         },
@@ -207,10 +210,14 @@ pub fn rescan_project(
     let tx = db
         .unchecked_transaction()
         .map_err(|error| error.to_string())?;
+    let timezone_metrics =
+        reparse_cache_for_timezone(&tx, &home, &timezone, &scanned_at, pricing)?;
     let cached = crate::db::query_all_session_file_rollups(&tx)?;
     let files = find_session_files(Some(home.clone()))?;
     let mut metrics = ScanMetrics {
         files_scanned: files.len(),
+        files_parsed: timezone_metrics.files_parsed,
+        bytes_read: timezone_metrics.bytes_read,
         ..ScanMetrics::default()
     };
     for file in &files {
@@ -325,6 +332,8 @@ fn parse_rollup(
         modified_at_ms: file.modified_at_ms,
         size_bytes: file.size_bytes,
         rows: build_daily_rows(&events, timezone, updated_at, pricing),
+        hourly_rows: build_hourly_rows(&events, timezone),
+        timezone: timezone.to_string(),
         prompt_title: Some(title),
         turn_count,
         quota_usage: Some(quota),
@@ -386,6 +395,39 @@ fn finish_scoped_scan(
     })
 }
 
+fn reparse_cache_for_timezone(
+    db: &Connection,
+    home: &Path,
+    timezone: &str,
+    scanned_at: &str,
+    pricing: &PricingSource,
+) -> Result<ScanMetrics, String> {
+    let cached = crate::db::query_all_session_file_rollups(db)?;
+    if cached.iter().all(|rollup| rollup.timezone == timezone) {
+        return Ok(ScanMetrics::default());
+    }
+
+    let scan = load_daily_rows(
+        db,
+        Some(home.to_path_buf()),
+        timezone,
+        scanned_at,
+        pricing,
+    )?;
+    upsert_daily_rows(db, &scan.rows)?;
+    delete_missing_daily_rows(
+        db,
+        &scan
+            .rows
+            .iter()
+            .map(|row| row.date.clone())
+            .collect::<Vec<_>>(),
+    )?;
+    upsert_session_file_rollups(db, &scan.changed_rollups, scanned_at)?;
+    delete_missing_session_file_rollups(db, &scan.active_paths)?;
+    Ok(scan.metrics)
+}
+
 pub(crate) fn default_codex_home() -> PathBuf {
     selected_codex_environment().home.clone()
 }
@@ -430,6 +472,27 @@ fn load_daily_rows(
         if let Some(mut rollup) =
             query_session_file_rollup(db, &file.cache_key, file.modified_at_ms, file.size_bytes)?
         {
+            if rollup.timezone != timezone {
+                let mut events = Vec::new();
+                let (prompt_title, quota_usage, turn_count) =
+                    load_session_file_with_quota(&file.path, &mut events, timezone)?;
+                let rows = build_daily_rows(&events, timezone, updated_at, pricing_source);
+                metrics.files_parsed += 1;
+                metrics.bytes_read += file.size_bytes as u64;
+                changed_rollups.push(SessionFileRollup {
+                    path: file.cache_key,
+                    modified_at_ms: file.modified_at_ms,
+                    size_bytes: file.size_bytes,
+                    rows: rows.clone(),
+                    hourly_rows: build_hourly_rows(&events, timezone),
+                    timezone: timezone.to_string(),
+                    prompt_title: Some(prompt_title),
+                    turn_count,
+                    quota_usage: Some(quota_usage),
+                });
+                all_rows.extend(rows);
+                continue;
+            }
             metrics.files_reused += 1;
             if rollup
                 .prompt_title
@@ -457,6 +520,8 @@ fn load_daily_rows(
             modified_at_ms: file.modified_at_ms,
             size_bytes: file.size_bytes,
             rows: rows.clone(),
+            hourly_rows: build_hourly_rows(&events, timezone),
+            timezone: timezone.to_string(),
             prompt_title: Some(prompt_title),
             turn_count,
             quota_usage: Some(quota_usage),
@@ -1107,6 +1172,38 @@ fn build_daily_rows(
     let mut rows = build_daily_rows_without_cost(events, timezone, updated_at);
     apply_daily_costs(&mut rows, pricing_source);
     rows
+}
+
+fn build_hourly_rows(events: &[UsageEvent], timezone: &str) -> Vec<HourlyUsageRow> {
+    let mut summaries = BTreeMap::<String, HourlyUsageRow>::new();
+
+    for event in events {
+        let hour = local_hour_key(event.timestamp, timezone);
+        let summary = summaries
+            .entry(hour.clone())
+            .or_insert_with(|| HourlyUsageRow {
+                hour,
+                input_tokens: 0,
+                cached_input_tokens: 0,
+                output_tokens: 0,
+                reasoning_output_tokens: 0,
+                total_tokens: 0,
+                models: BTreeMap::new(),
+            });
+        summary.input_tokens += event.usage.input_tokens;
+        summary.cached_input_tokens += event.usage.cached_input_tokens;
+        summary.output_tokens += event.usage.output_tokens;
+        summary.reasoning_output_tokens += event.usage.reasoning_output_tokens;
+        summary.total_tokens += event.usage.total_tokens;
+
+        let model_usage = summary.models.entry(event.model.clone()).or_default();
+        add_usage(model_usage, &event.usage);
+        if event.is_fallback_model {
+            model_usage.is_fallback = Some(true);
+        }
+    }
+
+    summaries.into_values().collect()
 }
 
 fn build_daily_rows_without_cost(
@@ -1970,6 +2067,8 @@ mod tests {
                     modified_at_ms: modified_at_ms(&failed_metadata),
                     size_bytes: failed_metadata.len() as i64,
                     rows: vec![cached_row],
+                    hourly_rows: vec![],
+                    timezone: "UTC".to_string(),
                     prompt_title: None,
                     quota_usage: None,
                 },
@@ -1979,6 +2078,8 @@ mod tests {
                     modified_at_ms: modified_at_ms(&valid_metadata),
                     size_bytes: valid_metadata.len() as i64,
                     rows: vec![],
+                    hourly_rows: vec![],
+                    timezone: "UTC".to_string(),
                     prompt_title: None,
                     quota_usage: None,
                 },
@@ -2082,6 +2183,62 @@ mod tests {
 
         assert_eq!(third.metrics.files_parsed, 1);
         assert_eq!(third.metrics.files_reused, 0);
+    }
+
+    #[test]
+    fn reparses_unchanged_sessions_when_the_app_timezone_changes() {
+        let temp_dir = tempfile_dir();
+        let db_path = temp_dir.join("usage.sqlite");
+        let mut db = crate::db::open_database(&db_path).unwrap();
+        let codex_home = temp_dir.join(".codex");
+        let sessions = codex_home.join("sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::write(
+            sessions.join("session.jsonl"),
+            format!(
+                "{}\n{}",
+                token_context("2026-05-08T23:30:00.000Z", "gpt-5"),
+                token_event(
+                    "2026-05-08T23:30:00.000Z",
+                    "gpt-5",
+                    1000,
+                    200,
+                    300,
+                    1300,
+                    1000,
+                    200,
+                    300,
+                    1300
+                )
+            ),
+        )
+        .unwrap();
+
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(
+            &mut db,
+            &pricing,
+            Some(codex_home.clone()),
+            Some("UTC".into()),
+        )
+        .unwrap();
+        let rescanned = scan_codex_usage(
+            &mut db,
+            &pricing,
+            Some(codex_home),
+            Some("Asia/Shanghai".into()),
+        )
+        .unwrap();
+
+        assert_eq!(rescanned.metrics.files_parsed, 1);
+        assert_eq!(rescanned.metrics.files_reused, 0);
+        let rollup = crate::db::query_all_session_file_rollups(&db)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(rollup.timezone, "Asia/Shanghai");
+        assert_eq!(rollup.rows[0].date, "2026-05-09");
+        assert_eq!(rollup.hourly_rows[0].hour, "2026-05-08T23:00:00Z");
     }
 
     #[test]
@@ -2573,6 +2730,33 @@ mod tests {
         .unwrap_err()
         .contains("no longer exists"));
         assert_eq!(scoped_snapshot(&db), snapshot);
+    }
+
+    #[test]
+    fn session_rescan_rebuilds_all_cached_days_after_a_timezone_change() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let a = home.join("sessions").join("a.jsonl");
+        let b = home.join("sessions").join("b.jsonl");
+        fs::write(&a, scoped_log("/repo/a", 100, "a")).unwrap();
+        fs::write(&b, scoped_log("/repo/b", 200, "b")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+
+        let result = rescan_session(
+            &mut db,
+            &pricing,
+            Some(home),
+            Some("Asia/Shanghai".into()),
+            a.to_str().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result.scan.metrics.files_parsed, 3);
+        let rollups = crate::db::query_all_session_file_rollups(&db).unwrap();
+        assert_eq!(rollups.len(), 2);
+        assert!(rollups
+            .iter()
+            .all(|rollup| rollup.timezone == "Asia/Shanghai"));
     }
 
     #[test]
