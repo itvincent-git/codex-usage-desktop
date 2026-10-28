@@ -26,6 +26,12 @@ pub enum TrayPopoverAction {
         size: tauri::PhysicalSize<u32>,
         cursor: tauri::LogicalPosition<f64>,
     },
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    FocusLostAt {
+        position: tauri::PhysicalPosition<i32>,
+        size: tauri::PhysicalSize<u32>,
+        cursor: tauri::LogicalPosition<f64>,
+    },
     ShowMain,
     Quit,
 }
@@ -48,6 +54,19 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
                 size: size.into(),
             };
             toggle_at(&app, Some(rect), cursor).map_err(|error| error.to_string())?;
+        }
+        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        TrayPopoverAction::FocusLostAt {
+            position,
+            size,
+            cursor,
+        } => {
+            let rect = tauri::Rect {
+                position: position.into(),
+                size: size.into(),
+            };
+            dismiss_on_focus_loss_at(&app, Some(rect), cursor)
+                .map_err(|error| error.to_string())?;
         }
         TrayPopoverAction::ShowMain => {
             if let Some(window) = app.get_webview_window("main") {
@@ -104,6 +123,44 @@ pub fn toggle(app: &tauri::AppHandle, rect: Option<tauri::Rect>) -> tauri::Resul
         .map_or(1.0, |monitor| monitor.scale_factor());
     let cursor = app.cursor_position()?.to_logical::<f64>(scale);
     toggle_at(app, rect, cursor)
+}
+
+#[cfg(target_os = "macos")]
+pub fn dismiss_on_focus_loss(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let scale = app
+        .primary_monitor()?
+        .map_or(1.0, |monitor| monitor.scale_factor());
+    let cursor = app.cursor_position()?.to_logical::<f64>(scale);
+    let rect = app
+        .tray_by_id("main")
+        .and_then(|tray| tray.rect().ok().flatten());
+    dismiss_on_focus_loss_at(app, rect, cursor)
+}
+
+#[cfg(target_os = "macos")]
+fn dismiss_on_focus_loss_at(
+    app: &tauri::AppHandle,
+    rect: Option<tauri::Rect>,
+    cursor: tauri::LogicalPosition<f64>,
+) -> tauri::Result<()> {
+    if let (Some(rect), Some(monitor)) = (rect, app.monitor_from_point(cursor.x, cursor.y)?) {
+        let scale = monitor.scale_factor();
+        let position = rect.position.to_logical::<f64>(scale);
+        let size = rect.size.to_logical::<f64>(scale);
+        if cursor.x >= position.x
+            && cursor.x < position.x + size.width
+            && cursor.y >= position.y
+            && cursor.y < position.y + size.height
+        {
+            // Clicking the status item blurs the panel before mouse-up.
+            // Leave it visible so that the click toggles it closed.
+            return Ok(());
+        }
+    }
+    if let Some(window) = app.get_webview_window("tray") {
+        window.hide()?;
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]

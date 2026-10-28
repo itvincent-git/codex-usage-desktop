@@ -1064,6 +1064,11 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "tray" {
                 if matches!(event, tauri::WindowEvent::Focused(false)) {
+                    #[cfg(target_os = "macos")]
+                    if let Err(error) = tray_popover::dismiss_on_focus_loss(window.app_handle()) {
+                        log::warn!("Failed to dismiss tray popover: {error}");
+                    }
+                    #[cfg(not(target_os = "macos"))]
                     let _ = window.hide();
                 }
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
