@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -22,6 +23,22 @@
         "minHeight": 760,
         "resizable": true,
         "devtools": true
+      },
+      {
+        "label": "quota",
+        "title": "Codex Quota",
+        "url": "index.html?window=quota",
+        "width": 352,
+        "height": 178,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

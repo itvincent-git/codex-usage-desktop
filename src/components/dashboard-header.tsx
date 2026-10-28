@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
+import { QuotaFloatingButton } from "./quota-floating-button";
 
 export type DashboardView = "dashboard" | "models" | "projects" | "daily" | "monthly" | "sessions" | "settings" | "logs";
 
@@ -98,6 +99,7 @@ export function DashboardHeader({
               </div>
             </div>
           )}
+          <QuotaFloatingButton />
           <Button variant="primary" size="sm" className="relative z-20" onClick={onRefresh} disabled={isBusy}>
             <RefreshCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             {t("hero.rescan", { defaultValue: "Rescan local logs" })}

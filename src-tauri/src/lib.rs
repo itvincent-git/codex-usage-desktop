@@ -9,6 +9,7 @@ mod exporter;
 mod overview;
 mod pricing;
 mod project_sessions;
+mod quota_window;
 mod scanner;
 mod session_file;
 mod session_index;
@@ -208,17 +209,22 @@ async fn rescan_project(
 
 #[tauri::command]
 async fn refresh_usage_data(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     force_limits: bool,
 ) -> Result<UsageRefreshResponse, String> {
     let database_path = state.database_path.clone();
     let pricing_cache_path = state.pricing_cache_path.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
+    let response = tauri::async_runtime::spawn_blocking(move || {
         refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    if let Some(limits) = &response.limits {
+        let _ = app.emit("codex-limits-updated", limits);
+    }
+    Ok(response)
 }
 
 #[tauri::command]
@@ -316,20 +322,40 @@ async fn fetch_monthly_usage(
 }
 
 #[tauri::command]
-async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
-    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
+async fn fetch_codex_limits(app: tauri::AppHandle) -> Result<CodexLimitsResponse, String> {
+    let limits = tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())??;
+    let _ = app.emit("codex-limits-updated", &limits);
+    Ok(limits)
+}
+
+#[tauri::command]
+fn show_quota_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("quota")
+        .ok_or_else(|| "Quota window is unavailable".to_string())?;
+    window.set_always_on_top(true).map_err(|e| e.to_string())?;
+    quota_window::configure(&window)?;
+    quota_window::show(&window)?;
+    window
+        .emit("quota-window-shown", ())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn activate_codex_window(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CodexWindowActivationResponse, String> {
     let marker_path = state.window_activation_marker_path.clone();
-    tauri::async_runtime::spawn_blocking(move || codex_limits::activate_codex_window(&marker_path))
-        .await
-        .map_err(|error| error.to_string())?
+    let response = tauri::async_runtime::spawn_blocking(move || {
+        codex_limits::activate_codex_window(&marker_path)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    let _ = app.emit("codex-limits-updated", &response.limits);
+    Ok(response)
 }
 
 #[tauri::command]
@@ -1010,6 +1036,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build());
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(feature = "e2e")]
     let builder = builder
         .plugin(tauri_plugin_wdio_webdriver::init())
@@ -1018,7 +1046,7 @@ pub fn run() {
     builder
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" {
+                if window.label() == "main" || window.label() == "quota" {
                     let _ = window.hide();
                     api.prevent_close();
                 }
@@ -1046,6 +1074,9 @@ pub fn run() {
             ))?;
 
             setup_app_menu(app)?;
+            if let Some(window) = app.get_webview_window("quota") {
+                quota_window::configure(&window)?;
+            }
 
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -1155,6 +1186,10 @@ pub fn run() {
             refresh_model_pricing,
             fetch_monthly_usage,
             fetch_codex_limits,
+            show_quota_window,
+            quota_window::set_quota_collapsed,
+            #[cfg(feature = "e2e")]
+            quota_window::quota_native_state,
             activate_codex_window,
             fetch_codex_quota_forecast,
             fetch_latest_codex_reset,
