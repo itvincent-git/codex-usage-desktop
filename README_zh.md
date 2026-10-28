@@ -60,6 +60,12 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 
 ![macOS 菜单栏中的 Codex 额度与重置倒计时](docs/menubar.jpg)
 
+菜单栏还可以显示今日 Token 用量和预估成本。在 macOS 上，右键点击菜单栏组件，即可打开紧凑面板，查看 5 小时与每周额度进度、重置时间、今日 Token 用量和预估成本，也可以直接打开主窗口或退出应用。
+
+<img src="docs/menubar-menu.jpg" alt="macOS 菜单栏右键面板，显示剩余额度、重置时间和今日用量" width="436" />
+
+*菜单栏截图中的账户和用量均为示例数据。*
+
 ### 🔍 找出 Token 消耗来源
 
 按以下维度拆分用量：

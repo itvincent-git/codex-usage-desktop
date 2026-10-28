@@ -60,6 +60,12 @@ Live limits use your existing local Codex login.
 
 ![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
 
+The menu bar can also show today's token usage and estimated cost. On macOS, right-click the menu bar widget to open a compact panel with 5-hour and weekly quota progress, reset times, today's tokens, and estimated cost. You can open the main window or quit the app directly from this panel.
+
+<img src="docs/menubar-menu.jpg" alt="macOS menu bar right-click panel with remaining quotas, reset times, and today's usage" width="436" />
+
+*Menu bar screenshots use illustrative account and usage data.*
+
 ### 🔍 Find what is using your tokens
 
 Break usage down by:

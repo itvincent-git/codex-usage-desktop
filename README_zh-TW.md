@@ -60,6 +60,12 @@ Codex Usage Desktop 將電腦上既有的 Codex 工作階段資料整理成清�
 
 ![macOS 選單列中的 Codex 額度與重設倒數計時](docs/menubar.jpg)
 
+選單列也可以顯示今日 Token 用量與預估成本。在 macOS 上，以滑鼠右鍵點選選單列元件，即可開啟精簡面板，查看 5 小時與每週額度進度、重設時間、今日 Token 用量與預估成本，也可以直接開啟主視窗或結束應用程式。
+
+<img src="docs/menubar-menu.jpg" alt="macOS 選單列右鍵面板，顯示剩餘額度、重設時間與今日用量" width="436" />
+
+*選單列截圖中的帳戶與用量皆為範例資料。*
+
 ### 🔍 找出 Token 消耗來源
 
 按以下維度查看用量：
