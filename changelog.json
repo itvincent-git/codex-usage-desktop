@@ -1,4 +1,8 @@
 {
+  "5.2.0": {
+    "zh": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover",
+    "en": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover"
+  },
   "5.1.1": {
     "zh": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view\n- fix(i18n): complete trend translations for release checks",
     "en": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view\n- fix(i18n): complete trend translations for release checks"
