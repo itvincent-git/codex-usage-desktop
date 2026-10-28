@@ -21,6 +21,12 @@ pub fn get_tray_popover(state: tauri::State<'_, TrayPopoverState>) -> Option<Val
 pub enum TrayPopoverAction {
     Toggle,
     #[cfg(all(target_os = "macos", feature = "e2e"))]
+    LeftClick,
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    AssertHighlighted {
+        expected: bool,
+    },
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
     ToggleAt {
         position: tauri::PhysicalPosition<i32>,
         size: tauri::PhysicalSize<u32>,
@@ -42,6 +48,27 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
         TrayPopoverAction::Toggle => {
             #[cfg(target_os = "macos")]
             toggle(&app, None).map_err(|error| error.to_string())?;
+        }
+        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        TrayPopoverAction::LeftClick => {
+            crate::handle_tray_click(&app, tauri::tray::MouseButton::Left, None);
+        }
+        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        TrayPopoverAction::AssertHighlighted { expected } => {
+            let tray = app.tray_by_id("main").ok_or("Tray icon is missing")?;
+            let highlighted = tray
+                .with_inner_tray_icon(|tray| {
+                    let status_item = tray.ns_status_item().expect("Tray status item is missing");
+                    let mtm =
+                        objc2::MainThreadMarker::new().expect("Tauri runs this on main thread");
+                    status_item.button(mtm).unwrap().isHighlighted()
+                })
+                .map_err(|error| error.to_string())?;
+            if highlighted != expected {
+                return Err(format!(
+                    "Expected tray highlight {expected}, received {highlighted}"
+                ));
+            }
         }
         #[cfg(all(target_os = "macos", feature = "e2e"))]
         TrayPopoverAction::ToggleAt {
@@ -74,11 +101,31 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
                 window.unminimize().map_err(|error| error.to_string())?;
                 window.set_focus().map_err(|error| error.to_string())?;
             }
-            if let Some(window) = app.get_webview_window("tray") {
-                window.hide().map_err(|error| error.to_string())?;
-            }
+            dismiss(&app).map_err(|error| error.to_string())?;
         }
         TrayPopoverAction::Quit => app.exit(0),
+    }
+    Ok(())
+}
+
+pub fn dismiss(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if let Some(window) = app.get_webview_window("tray") {
+        window.hide()?;
+    }
+    #[cfg(target_os = "macos")]
+    set_highlighted(app, false)?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn set_highlighted(app: &tauri::AppHandle, highlighted: bool) -> tauri::Result<()> {
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.with_inner_tray_icon(move |tray| {
+            let mtm = objc2::MainThreadMarker::new().expect("Tauri runs this on main thread");
+            if let Some(button) = tray.ns_status_item().and_then(|item| item.button(mtm)) {
+                button.highlight(highlighted);
+            }
+        })?;
     }
     Ok(())
 }
@@ -143,6 +190,11 @@ fn dismiss_on_focus_loss_at(
     rect: Option<tauri::Rect>,
     cursor: tauri::LogicalPosition<f64>,
 ) -> tauri::Result<()> {
+    if let Some(window) = app.get_webview_window("tray") {
+        if !window.is_visible()? {
+            return set_highlighted(app, false);
+        }
+    }
     if let (Some(rect), Some(monitor)) = (rect, app.monitor_from_point(cursor.x, cursor.y)?) {
         let scale = monitor.scale_factor();
         let position = rect.position.to_logical::<f64>(scale);
@@ -157,10 +209,7 @@ fn dismiss_on_focus_loss_at(
             return Ok(());
         }
     }
-    if let Some(window) = app.get_webview_window("tray") {
-        window.hide()?;
-    }
-    Ok(())
+    dismiss(app)
 }
 
 #[cfg(target_os = "macos")]
@@ -173,7 +222,7 @@ fn toggle_at(
         return Ok(());
     };
     if window.is_visible()? {
-        return window.hide();
+        return dismiss(app);
     }
     let rect = rect.or_else(|| {
         app.tray_by_id("main")
@@ -216,6 +265,7 @@ fn toggle_at(
         }
     }
     window.show()?;
+    set_highlighted(app, true)?;
     window.set_focus()
 }
 

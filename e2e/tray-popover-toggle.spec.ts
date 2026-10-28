@@ -1,7 +1,7 @@
 import { $, browser, expect } from "@wdio/globals";
 
 describe("menu bar popover dismissal", () => {
-  it("closes on a second tray click even when focus is lost before mouse-up", async function () {
+  it("closes with either mouse button without opening the main window after focus is lost", async function () {
     if (process.platform !== "darwin") this.skip();
     const monitor = await browser.tauri.execute(({ core }) =>
       core.invoke("plugin:window|primary_monitor", { label: "main" })) as {
@@ -27,7 +27,8 @@ describe("menu bar popover dismissal", () => {
     try {
       await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "showMain" }));
       await browser.waitUntil(async () => !(await visible()));
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (const button of ["right", "left"]) {
+        await browser.tauri.execute(({ core }) => core.invoke("plugin:window|hide", { label: "main" }));
         await actionAt("toggleAt");
         await browser.waitUntil(visible);
         await browser.switchToWindow("tray");
@@ -37,10 +38,13 @@ describe("menu bar popover dismissal", () => {
         // status item. Both actions use the production Rust dismissal path.
         await actionAt("focusLostAt");
         expect(await visible()).toBe(true);
-        await actionAt("toggleAt");
+        if (button === "right") await actionAt("toggleAt");
+        else await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "leftClick" }));
         await browser.waitUntil(async () => !(await visible()), {
           timeoutMsg: "The second tray click reopened the popover",
         });
+        expect(await browser.tauri.execute(({ core }) =>
+          core.invoke("plugin:window|is_visible", { label: "main" }))).toBe(false);
         await browser.switchToWindow("main");
       }
 
@@ -49,6 +53,46 @@ describe("menu bar popover dismissal", () => {
       await browser.switchToWindow("tray");
       await actionAt("focusLostAt", { x: cursor.x, y: cursor.y + 100 });
       await browser.waitUntil(async () => !(await visible()));
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "leftClick" }));
+      expect(await browser.tauri.execute(({ core }) =>
+        core.invoke("plugin:window|is_visible", { label: "main" }))).toBe(true);
+    } finally {
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "showMain" }));
+      await browser.switchToWindow("main");
+    }
+  });
+
+  it("clears the native status button highlight on outside click, Escape and show main", async function () {
+    if (process.platform !== "darwin") this.skip();
+    const visible = async () => await browser.tauri.execute(({ core }) =>
+      core.invoke("plugin:window|is_visible", { label: "tray" })) as boolean;
+    const assertHighlighted = async (expected: boolean) => browser.waitUntil(async () => {
+      try {
+        await browser.tauri.execute(({ core }, expected) =>
+          core.invoke("tray_popover_action", { action: { assertHighlighted: { expected } } }), expected);
+        return true;
+      } catch { return false; }
+    }, { timeoutMsg: `Expected native status button highlight to be ${expected}` });
+    try {
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "showMain" }));
+      for (const dismissal of ["outside", "escape", "showMain"]) {
+        await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "toggle" }));
+        await browser.waitUntil(visible);
+        await browser.switchToWindow("tray");
+        await $(".tray-popover").waitForDisplayed();
+        await assertHighlighted(true);
+
+        if (dismissal === "outside") {
+          await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_focus", { label: "main" }));
+        } else if (dismissal === "escape") {
+          await browser.keys("Escape");
+        } else {
+          await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "showMain" }));
+        }
+        await browser.waitUntil(async () => !(await visible()));
+        await assertHighlighted(false);
+        await browser.switchToWindow("main");
+      }
     } finally {
       await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "showMain" }));
       await browser.switchToWindow("main");

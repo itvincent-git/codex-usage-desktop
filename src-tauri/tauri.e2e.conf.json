@@ -11,7 +11,7 @@
         {
           "identifier": "e2e",
           "windows": ["main", "tray"],
-          "permissions": ["wdio:default", "wdio-webdriver:default", "core:window:allow-set-focus"]
+          "permissions": ["wdio:default", "wdio-webdriver:default", "core:window:allow-set-focus", "core:window:allow-hide"]
         }
       ]
     }

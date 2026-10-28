@@ -999,6 +999,32 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
     Ok(())
 }
 
+fn handle_tray_click(app: &tauri::AppHandle, button: MouseButton, _rect: Option<tauri::Rect>) {
+    #[cfg(target_os = "macos")]
+    if button == MouseButton::Right {
+        if let Err(error) = tray_popover::toggle(app, _rect) {
+            log::warn!("Failed to show tray popover: {error}");
+        }
+        return;
+    }
+    if button != MouseButton::Left {
+        return;
+    }
+    let popover_visible = app
+        .get_webview_window("tray")
+        .is_some_and(|window| window.is_visible().unwrap_or(false));
+    if let Err(error) = tray_popover::dismiss(app) {
+        log::warn!("Failed to dismiss tray popover: {error}");
+    }
+    if popover_visible {
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn delete_pricing_cache(path: &Path) -> Result<(), String> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -1072,7 +1098,7 @@ pub fn run() {
                     let _ = window.hide();
                 }
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    let _ = window.hide();
+                    let _ = tray_popover::dismiss(window.app_handle());
                     api.prevent_close();
                 }
             }
@@ -1159,24 +1185,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
-                        #[cfg(target_os = "macos")]
-                        if button == MouseButton::Right {
-                            if let Err(error) = tray_popover::toggle(app, Some(_rect)) {
-                                log::warn!("Failed to show tray popover: {error}");
-                            }
-                            return;
-                        }
-                        if button != MouseButton::Left {
-                            return;
-                        }
-                        if let Some(window) = app.get_webview_window("tray") {
-                            let _ = window.hide();
-                        }
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        handle_tray_click(tray.app_handle(), button, Some(_rect));
                     }
                 });
             #[cfg(not(target_os = "macos"))]
