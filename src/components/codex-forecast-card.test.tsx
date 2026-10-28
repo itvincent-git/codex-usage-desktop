@@ -23,6 +23,22 @@ describe("CodexForecastCard", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("shows a skeleton until data arrives and preserves content during refresh", () => {
+    const { rerender } = render(<CodexForecastCard {...props} data={null} isRefreshing />);
+    expect(screen.getByTestId("forecast-skeleton")).toHaveAttribute("role", "status");
+    expect(screen.queryByTestId("forecast-status")).not.toBeInTheDocument();
+
+    rerender(<CodexForecastCard {...props} data={null} error="Offline" />);
+    expect(screen.getByTestId("forecast-skeleton")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry forecast" })).toBeEnabled();
+
+    rerender(<CodexForecastCard {...props} data={data} isRefreshing />);
+    expect(screen.queryByTestId("forecast-skeleton")).not.toBeInTheDocument();
+    expect(status()).toHaveTextContent("Explicit announcement · time window");
+    expect(screen.getByRole("button", { name: "Refresh forecast" })).toBeDisabled();
+  });
+
   it("keeps the recent feed visible without promoting posts or retaining historical reference", () => {
     render(<CodexForecastCard {...props} data={{ ...data, hasOfficialSignal: false, latestAlert: {
       kind: "reset", state: "confirmed", summary: "Old reset confirmed",

@@ -305,7 +305,23 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByRole("button", { name: "Check limits" })).not.toBeInTheDocument();
   });
 
-  it("renders whichever reset data is available", () => {
+  it("keeps skeletons for missing reset data and replaces them independently", () => {
+    const reset = {
+      id: "reset", resetType: "regular" as const, announcedAt: "2026-07-15T00:00:00.000Z",
+      text: "Reset confirmed", source: { url: "https://example.com/reset" },
+    };
+    const { rerender } = render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} />);
+    expect(screen.getByRole("status", { name: "Latest token reset" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Reset credits" })).toBeInTheDocument();
+    expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
+
+    rerender(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} latestReset={reset} />);
+    expect(screen.queryByTestId("latest-reset-skeleton")).not.toBeInTheDocument();
+    expect(screen.getByTestId("reset-credits-skeleton")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View token resets from the last 30 days" })).toBeInTheDocument();
+  });
+
+  it("renders available credits while keeping a skeleton for missing reset history", () => {
     const { rerender } = render(
       <CodexLimitsCard
         onOpenResetCredits={() => {}}
@@ -322,6 +338,8 @@ describe("CodexLimitsCard component", () => {
     );
 
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("2 available");
+    expect(screen.queryByTestId("reset-credits-skeleton")).not.toBeInTheDocument();
+    expect(screen.getByTestId("latest-reset-skeleton")).toBeInTheDocument();
     expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
 
     rerender(
@@ -339,6 +357,7 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
+    expect(screen.getByTestId("reset-credits-skeleton")).toBeInTheDocument();
   });
 
   it("shows all reset credits sorted by expiry without a collapse toggle", () => {
@@ -495,6 +514,7 @@ describe("CodexLimitsCard component", () => {
     );
 
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("0 available");
+    expect(screen.queryByTestId("reset-credits-skeleton")).not.toBeInTheDocument();
     expect(screen.getByText("No reset credits available")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("reset-credit-count"));

@@ -78,7 +78,27 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
           </Button>
         </div>
         {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
-        {!data && !error ? <p role="status" className="text-xs text-muted-foreground">{t("forecast.loading")}</p> : null}
+        {!data ? (
+          <div data-testid="forecast-skeleton" role="status" aria-label={t("forecast.loading")}>
+            <div aria-hidden="true" className="grid min-w-0 gap-4 motion-safe:animate-pulse lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
+              <div className="space-y-4 rounded-xl border border-border p-4">
+                <div className="h-3 w-20 rounded bg-muted" />
+                <div className="h-5 w-3/4 rounded bg-muted" />
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-4 w-32 rounded bg-muted" />
+                {Array.from({ length: 5 }, (_, index) => (
+                  <div key={index} className="flex gap-3 border-b border-border/60 py-2.5">
+                    <div className="h-3 w-12 shrink-0 rounded bg-muted" />
+                    <div className="h-3 flex-1 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         {data ? <>
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
             <div data-testid="forecast-announcement" className={cn("min-w-0 space-y-3 rounded-xl border p-4 text-xs leading-relaxed", stale ? "border-border bg-muted/20" : pending && watch ? "border-success/30 bg-success/5" : promised ? "border-primary/25 bg-primary/5" : "border-warning/30 bg-warning/5")}>

@@ -55,8 +55,6 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
 }
 
 export function CodexLimitsCard({ limits, latestReset, recentResets, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
-  if (!latestReset && limits?.resetCreditsAvailableCount == null) return null;
-
   return (
     <Card className="h-full flex flex-col rounded-lg">
       <CardContent className="p-3 sm:p-4">
@@ -208,12 +206,13 @@ function ResetArea({
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
 }) {
+  const { t } = useTranslation();
   const showResetCredits = resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
 
   return (
     <div
       data-testid="reset-area"
-      className={cn("grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-2.5 sm:p-3", latestReset && showResetCredits && "content-md:grid-cols-2")}
+      className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-2.5 sm:p-3 content-md:grid-cols-2"
     >
       <div className="grid grid-cols-1 gap-2">
         {latestReset ? (
@@ -223,16 +222,37 @@ function ResetArea({
             recentDays={RECENT_RESET_OVERVIEW_DAYS}
             onOpen={() => onOpenResetHistory?.()}
           />
-        ) : null}
+        ) : (
+          <div data-testid="latest-reset-skeleton" role="status" aria-label={t("limits.latest_reset")} className="space-y-3 rounded-lg border border-border px-2.5 py-3">
+            <p className="text-xs font-semibold text-muted-foreground">{t("limits.latest_reset")}</p>
+            <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
+              <div className="h-4 w-2/3 rounded bg-muted" />
+              <div className="h-2.5 w-1/2 rounded bg-muted" />
+              <div className="grid grid-cols-7 gap-1.5">
+                {Array.from({ length: 35 }, (_, index) => <span key={index} className="h-2.5 rounded-[3px] bg-muted" />)}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       {showResetCredits ? (
         <ResetCreditsPanel
           availableCount={resetCreditsAvailableCount}
           credits={resetCredits}
           onOpen={onOpenResetCredits}
-          separated={Boolean(latestReset)}
+          separated
         />
-      ) : null}
+      ) : (
+        <div data-testid="reset-credits-skeleton" role="status" aria-label={t("limits.reset_credits")} className="space-y-3 border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0">
+          <p className="text-[10px] font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>
+          <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
+            <div className="h-4 w-16 rounded-full bg-muted" />
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-4/5 rounded bg-muted" />
+            <div className="h-3 w-3/5 rounded bg-muted" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
