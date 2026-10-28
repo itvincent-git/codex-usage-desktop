@@ -28,7 +28,7 @@ describe("menu bar usage popover", () => {
       await browser.switchToWindow("tray");
       await $(".tray-popover").waitForDisplayed();
     };
-    const isVisible = () => browser.tauri.execute<boolean>(({ core }) => core.invoke("plugin:window|is_visible", { label: "tray" }));
+    const isVisible = async () => await browser.tauri.execute(({ core }) => core.invoke("plugin:window|is_visible", { label: "tray" })) as boolean;
     try {
       await browser.execute(() => {
         localStorage.setItem("language", "zh");
@@ -61,7 +61,7 @@ describe("menu bar usage popover", () => {
         return browser.execute(() => (window as unknown as { limitsMockUsed: boolean }).limitsMockUsed);
       }, { timeout: 30_000 });
       await browser.waitUntil(async () => {
-        const data = await browser.tauri.execute<TrayPopoverData>(({ core }) => core.invoke("get_tray_popover"));
+        const data = await browser.tauri.execute(({ core }) => core.invoke("get_tray_popover")) as TrayPopoverData;
         return data?.account === limits.account && data.quotas[0]?.remainingPercent === 72;
       });
       await showPopover();
@@ -80,7 +80,7 @@ describe("menu bar usage popover", () => {
       await browser.saveScreenshot("/tmp/codex-tray-popover.png");
 
       // Updates use the Rust snapshot/event path while the panel stays open.
-      const data = await browser.tauri.execute<TrayPopoverData>(({ core }) => core.invoke("get_tray_popover"));
+      const data = await browser.tauri.execute(({ core }) => core.invoke("get_tray_popover")) as TrayPopoverData;
       const update = { ...data, quotas: [{ ...data.quotas[0], remainingPercent: 0, usedText: "已用 100%" }], cost: null };
       await browser.tauri.execute(({ core }, popover) => core.invoke("update_tray", { payload: { title: "Codex Usage", items: [], popover } }), update);
       await expect($('[data-quota="5h"] strong')).toHaveText("0%");
