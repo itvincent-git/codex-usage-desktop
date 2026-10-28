@@ -1149,6 +1149,7 @@ pub fn run() {
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button,
+                        rect: _rect,
                         button_state: MouseButtonState::Up,
                         ..
                     } = event
@@ -1156,10 +1157,7 @@ pub fn run() {
                         let app = tray.app_handle();
                         #[cfg(target_os = "macos")]
                         if button == MouseButton::Right {
-                            if let Err(error) = tray_popover::tray_popover_action(
-                                app.clone(),
-                                tray_popover::TrayPopoverAction::Toggle,
-                            ) {
+                            if let Err(error) = tray_popover::toggle(app, Some(_rect)) {
                                 log::warn!("Failed to show tray popover: {error}");
                             }
                             return;
