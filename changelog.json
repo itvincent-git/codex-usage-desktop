@@ -1,4 +1,8 @@
 {
+  "5.2.1": {
+    "zh": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover\n- fix(e2e): correct Tauri result types blocking release builds",
+    "en": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover\n- fix(e2e): correct Tauri result types blocking release builds"
+  },
   "5.2.0": {
     "zh": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover",
     "en": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover"
