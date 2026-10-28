@@ -27,6 +27,14 @@
     "command": "命令",
     "percent": "佔比"
   },
+  "tray": {
+    "quota_5h": "5 小時額度",
+    "quota_weekly": "每週額度",
+    "quota_monthly": "每月額度",
+    "used": "已用 {{percent}}%",
+    "today": "今日用量",
+    "estimated_cost": "預估成本"
+  },
   "header": {
     "navigation": "主導覽",
     "collapse_sidebar": "收合側欄",
@@ -739,11 +747,7 @@
     "menu_bar_show_title": "顯示在選單列 / 系統匣游標停留提示",
     "menu_bar_show_menu": "顯示在下拉選單中",
     "menu_bar_format_title": "選單列格式",
-    "menu_bar_format_desc": "使用 {remaining} 和 {reset} 自訂各額度文案及重置倒數計時單位。",
-    "menu_bar_format_5h": "5 小時額度範本",
-    "menu_bar_format_weekly": "每週額度範本",
-    "menu_bar_format_monthly": "每月額度範本",
-    "menu_bar_format_separator": "項目分隔字元",
+    "menu_bar_format_desc": "macOS 選單列以圓環顯示剩餘額度，並顯示重置倒數計時。可自訂倒數計時的分鐘、小時和天單位。",
     "menu_bar_countdown_units": "重置倒數計時單位",
     "menu_bar_countdown_unit_minute": "分鐘",
     "menu_bar_countdown_unit_hour": "小時",

@@ -1,4 +1,5 @@
 import { createTauriCapabilities } from "@wdio/tauri-service";
+import { browser } from "@wdio/globals";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,6 +37,9 @@ export const config: WebdriverIO.Config = {
     if (archivedSessionsHome) rmSync(archivedSessionsHome, { recursive: true, force: true });
   },
   runner: "local",
+  async before() {
+    await browser.switchToWindow("main");
+  },
   tsConfigPath: "./tsconfig.e2e.json",
   specs: ["./e2e/**/*.spec.ts"],
   maxInstances: 1,

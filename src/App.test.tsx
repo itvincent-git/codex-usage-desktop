@@ -2101,7 +2101,7 @@ describe("App", () => {
 
     await waitFor(() => {
       const payload = updateTrayMock.mock.calls.at(-1)?.[0]?.payload;
-      expect(payload?.title).toBe("⏱️ 80%/3h┃🗓️ 55%/4d");
+      expect(payload?.title).toBe("⏱️ 80%/3h 🗓️ 55%/4d");
       expect(payload?.items.slice(0, 4)).toEqual([
         { id: "account", text: "Account: user@example.com", enabled: false },
         { id: "membership", text: "Plan: pro", enabled: false },
@@ -2154,7 +2154,7 @@ describe("App", () => {
     });
   });
 
-  it("uses saved custom tray title templates and countdown units", async () => {
+  it("ignores legacy tray title templates and preserves countdown units", async () => {
     const now = new Date().getTime();
     vi.spyOn(Date, "now").mockReturnValue(now);
     await i18n.changeLanguage("zh");
@@ -2203,7 +2203,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5小时:90% 4hr后重置；周: 50% 3days后重置",
+          title: "⏱️ 90%/4hr 🗓️ 50%/3days",
         }),
       }));
     });
@@ -2242,7 +2242,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "⏱️ 80%/3h┃🗓️ 55%/4d",
+          title: "⏱️ 80%/3h 🗓️ 55%/4d",
         }),
       }));
     });

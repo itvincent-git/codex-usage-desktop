@@ -7,9 +7,10 @@
     "security": {
       "capabilities": [
         "default",
+        "tray",
         {
           "identifier": "e2e",
-          "windows": ["main"],
+          "windows": ["main", "tray"],
           "permissions": ["wdio:default", "wdio-webdriver:default", "core:window:allow-set-focus"]
         }
       ]

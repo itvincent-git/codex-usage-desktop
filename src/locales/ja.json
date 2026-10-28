@@ -27,6 +27,14 @@
     "command": "コマンド",
     "percent": "割合"
   },
+  "tray": {
+    "quota_5h": "5時間の上限",
+    "quota_weekly": "週間の上限",
+    "quota_monthly": "月間の上限",
+    "used": "使用済み {{percent}}%",
+    "today": "今日の使用量",
+    "estimated_cost": "推定コスト"
+  },
   "header": {
     "navigation": "メインナビゲーション",
     "collapse_sidebar": "サイドバーを折りたたむ",
@@ -769,11 +777,7 @@
     "menu_bar_show_title": "メニューバー/トレイツールチップに表示",
     "menu_bar_show_menu": "ドロップダウンメニューに表示",
     "menu_bar_format_title": "メニューバーの書式",
-    "menu_bar_format_desc": "{remaining} と {reset} を使って、各上限の表示とリセットまでの単位をカスタマイズできます。",
-    "menu_bar_format_5h": "5時間上限のテンプレート",
-    "menu_bar_format_weekly": "週間上限のテンプレート",
-    "menu_bar_format_monthly": "月間上限のテンプレート",
-    "menu_bar_format_separator": "項目の区切り文字",
+    "menu_bar_format_desc": "macOS のメニューバーには残りの利用枠をリングで表示し、リセットまでの時間を表示します。分、時間、日の単位を変更できます。",
     "menu_bar_countdown_units": "リセットまでの単位",
     "menu_bar_countdown_unit_minute": "分",
     "menu_bar_countdown_unit_hour": "時間",

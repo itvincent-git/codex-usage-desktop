@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { renderTrayIcon, type TrayQuotaIndicator, type TrayMetricIndicator } from "@/lib/tray-icon";
+import type { TrayPopoverData } from "@/lib/tray-popover";
 
 export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d" | "60d" | "90d" | "180d" | "365d" | string;
 export type ExportFormat = "xlsx" | "markdown";
@@ -534,10 +536,18 @@ export type TrayMenuUpdate = {
   items: TrayMenuItemDto[];
   show_main_text?: string;
   quit_text?: string;
+  indicators?: TrayQuotaIndicator[];
+  metrics?: TrayMetricIndicator[];
+  dark?: boolean;
+  popover?: TrayPopoverData;
 };
 
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
-  return invoke<void>("update_tray", { payload });
+  const { indicators, metrics = [], dark = false, ...menu } = payload;
+  const icon = /Mac/.test(navigator.platform) && indicators && (indicators.length > 0 || metrics.length > 0)
+    ? renderTrayIcon(indicators, metrics, dark)
+    : null;
+  return invoke<void>("update_tray", { payload: { ...menu, icon } });
 }
 
 export type SessionRescanResponse = {

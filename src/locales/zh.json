@@ -27,6 +27,14 @@
     "command": "命令",
     "percent": "占比"
   },
+  "tray": {
+    "quota_5h": "5 小时额度",
+    "quota_weekly": "每周额度",
+    "quota_monthly": "每月额度",
+    "used": "已用 {{percent}}%",
+    "today": "今日用量",
+    "estimated_cost": "预估成本"
+  },
   "header": {
     "navigation": "主导航",
     "collapse_sidebar": "收起侧栏",
@@ -739,11 +747,7 @@
     "menu_bar_show_title": "显示在菜单栏 / 托盘悬停提示",
     "menu_bar_show_menu": "显示在下拉菜单中",
     "menu_bar_format_title": "菜单栏格式",
-    "menu_bar_format_desc": "使用 {remaining} 和 {reset} 自定义各额度文案及重置倒计时单位。",
-    "menu_bar_format_5h": "5 小时额度模板",
-    "menu_bar_format_weekly": "周度额度模板",
-    "menu_bar_format_monthly": "月度额度模板",
-    "menu_bar_format_separator": "项目分隔符",
+    "menu_bar_format_desc": "macOS 菜单栏以圆环显示剩余额度，并显示重置倒计时。可自定义倒计时的分钟、小时和天单位。",
     "menu_bar_countdown_units": "重置倒计时单位",
     "menu_bar_countdown_unit_minute": "分钟",
     "menu_bar_countdown_unit_hour": "小时",

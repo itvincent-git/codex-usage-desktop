@@ -115,8 +115,6 @@ export default function App() {
     handleTrayTitleShowChange,
     trayMenuShow,
     handleTrayMenuShowChange,
-    trayTitleFormats,
-    handleTrayTitleFormatChange,
     trayCountdownUnits,
     handleTrayCountdownUnitChange,
   } = useUsageDashboard();
@@ -489,8 +487,6 @@ export default function App() {
               onTrayTitleShowChange={handleTrayTitleShowChange}
               trayMenuShow={trayMenuShow}
               onTrayMenuShowChange={handleTrayMenuShowChange}
-              trayTitleFormats={trayTitleFormats}
-              onTrayTitleFormatChange={handleTrayTitleFormatChange}
               trayCountdownUnits={trayCountdownUnits}
               onTrayCountdownUnitChange={handleTrayCountdownUnitChange}
               codexLimits={codexLimits}

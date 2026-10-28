@@ -27,6 +27,14 @@
     "command": "명령",
     "percent": "백분율"
   },
+  "tray": {
+    "quota_5h": "5시간 한도",
+    "quota_weekly": "주간 한도",
+    "quota_monthly": "월간 한도",
+    "used": "사용 {{percent}}%",
+    "today": "오늘 사용량",
+    "estimated_cost": "예상 비용"
+  },
   "header": {
     "navigation": "주 탐색 메뉴",
     "collapse_sidebar": "사이드바 접기",
@@ -733,11 +741,7 @@
     "menu_bar_show_title": "메뉴 막대 / 트레이 도구 설명에 표시",
     "menu_bar_show_menu": "드롭다운 메뉴에 표시",
     "menu_bar_format_title": "메뉴 막대 표시 형식",
-    "menu_bar_format_desc": "{remaining}과 {reset}으로 각 한도의 표시 형식과 초기화까지 남은 시간의 단위를 설정합니다.",
-    "menu_bar_format_5h": "5시간 한도 템플릿",
-    "menu_bar_format_weekly": "주간 한도 템플릿",
-    "menu_bar_format_monthly": "월간 한도 템플릿",
-    "menu_bar_format_separator": "항목 구분자",
+    "menu_bar_format_desc": "macOS 메뉴 막대는 남은 한도를 원형으로 표시하고 초기화까지 남은 시간을 보여줍니다. 분, 시간, 일 단위를 변경할 수 있습니다.",
     "menu_bar_countdown_units": "초기화까지 남은 시간 단위",
     "menu_bar_countdown_unit_minute": "분",
     "menu_bar_countdown_unit_hour": "시간",
