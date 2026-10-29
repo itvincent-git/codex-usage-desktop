@@ -159,6 +159,10 @@
     "remaining": "剩余",
     "consumed": "已消耗",
     "window": "窗口时长",
+    "credits_balance": "Credits 余额",
+    "credits_unlimited": "无限",
+    "credits_unavailable": "暂不可用",
+    "credits_mock": "模拟数据",
     "reset_credits": "重置次数",
     "reset_credits_open": "在 ChatGPT 用量设置中查看重置次数",
     "reset_credits_available": "{{count}} 次可用",
@@ -844,5 +848,32 @@
     "feed_unavailable": "暂时无法加载 Feed 动态。",
     "feed_empty": "暂无近期 Feed 动态。",
     "feed_stale": "正在显示旧 Feed 数据，需要刷新。"
+  },
+  "session_credits": {
+    "estimated_cost": "估算费用",
+    "setting": "显示会话 credits 扣除",
+    "description": "查询会话从 credits 余额中扣除的数量。包含余额调整，可能包含赠送 credits，数据可能延迟。",
+    "label": "余额扣除 · 会话累计",
+    "refresh": "刷新会话 credits",
+    "loading": "加载中…",
+    "partial": "部分数据",
+    "cached": "缓存数据",
+    "mock": "模拟数据",
+    "adjustment": "负数可能包含退款或余额调整。",
+    "data_as_of": "数据时间",
+    "errors": {
+      "chatgptLoginRequired": "需要使用 ChatGPT 登录。",
+      "identityUnavailable": "无法确认 ChatGPT 账号和用户身份。",
+      "identityChanged": "账号已变化，请刷新以读取当前账号数据。",
+      "forbidden": "当前账号无法读取会话 credits。",
+      "endpointUnavailable": "会话 credits 接口暂不可用。",
+      "rateLimited": "请求过于频繁，请在冷却结束后重试。",
+      "serviceUnavailable": "会话 credits 暂不可用，已保留缓存值。",
+      "networkError": "网络连接失败，已保留缓存值。",
+      "invalidResponse": "响应格式无效，已保留缓存值。",
+      "loadFailed": "读取会话 credits 失败。",
+      "unavailable": "暂无可用的会话余额扣除数据，不代表扣除为零。",
+      "invalidThread": "此记录没有有效的会话 UUID。"
+    }
   }
 }

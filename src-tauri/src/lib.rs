@@ -1,3 +1,4 @@
+mod codex_auth;
 mod codex_environment;
 mod codex_forecast;
 mod codex_limits;
@@ -10,6 +11,7 @@ mod overview;
 mod pricing;
 mod project_sessions;
 mod scanner;
+mod session_credits;
 mod session_file;
 mod session_index;
 mod session_replay;
@@ -393,6 +395,31 @@ async fn fetch_project_day_sessions(
 }
 
 #[tauri::command]
+fn set_session_credits_scope(scope: String, revision: u64, active: bool) -> Result<(), String> {
+    session_credits::set_scope(scope, revision, active)
+}
+
+#[tauri::command]
+fn session_credits_identity() -> Result<String, String> {
+    session_credits::identity()
+}
+
+#[tauri::command]
+async fn fetch_session_credits(
+    state: tauri::State<'_, AppState>,
+    threads: Vec<session_credits::CreditThread>,
+    force: bool,
+    cache_only: bool,
+    scope: String,
+    revision: u64,
+) -> Result<session_credits::CreditResult, String> {
+    let database = state.database_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        session_credits::fetch(&database, threads, force, cache_only, &scope, revision)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 async fn fetch_session_details(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<SessionDetailRow>, String> {
@@ -454,8 +481,7 @@ async fn reset_usage_state(state: tauri::State<'_, AppState>) -> Result<(), Stri
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let db = db::open_database(&database_path)?;
-        db::reset_usage_state(&db)?;
+        session_credits::reset(&database_path)?;
         delete_pricing_cache(&pricing_cache_path)
     })
     .await
@@ -1136,6 +1162,8 @@ pub fn run() {
             tray_popover::setup(app)?;
 
             let app_data_dir = app.path().app_data_dir()?;
+            #[cfg(feature = "e2e")]
+            let app_data_dir = std::env::var_os("CODEX_USAGE_TEST_DATA_DIR").map(PathBuf::from).unwrap_or(app_data_dir);
             std::fs::create_dir_all(&app_data_dir)?;
             let database_path = app_data_dir.join("codex-usage-desktop.db");
             let pricing_cache_path = app_data_dir.join("codex-pricing-cache.json");
@@ -1253,6 +1281,9 @@ pub fn run() {
             open_url,
             reveal_in_file_manager,
             fetch_session_details,
+            set_session_credits_scope,
+            session_credits_identity,
+            fetch_session_credits,
             fetch_project_session_days,
             fetch_project_day_sessions,
             fetch_session_detail,
@@ -1297,6 +1328,8 @@ mod tests {
         CodexLimitsResponse {
             session: None,
             weekly: None,
+            credits: None,
+            credits_is_mock: false,
             reset_credits_available_count: None,
             reset_credits: None,
             updated_at: "2026-06-11T00:00:00.000Z".to_string(),

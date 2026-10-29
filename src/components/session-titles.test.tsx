@@ -1499,3 +1499,56 @@ describe("session refresh", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+describe("session detail credits", () => {
+  beforeEach(async () => { invokeMock.mockReset(); await i18n.changeLanguage("en"); });
+
+  it("does not request or display credits when the preference is off", async () => {
+    invokeMock.mockResolvedValue(replayDetail({ path: "/tmp/root.jsonl" }));
+    render(<SessionDetailModal session={session({ path: "/tmp/root.jsonl", threadId: "root-id" })} onClose={vi.fn()} />);
+    await screen.findByText("Observed quota usage");
+    expect(screen.queryByTestId("session-credits")).not.toBeInTheDocument();
+    expect(invokeMock.mock.calls.every(([command]) => command === "fetch_session_detail")).toBe(true);
+  });
+
+  it("shows lifetime credits after quota with the same partial, cached and mock labels", async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_session_detail") return replayDetail({ path: "/tmp/root.jsonl" });
+      if (command === "session_credits_identity") return "account";
+      if (command === "fetch_session_credits") return { identity: "account", requestStatus: null, retryAt: null, rows: [{
+        threadId: "root-id", dataStatus: "partial", balanceUsageCredits: "12.34", usageSource: "credits", dataAsOf: null, fetchedAt: "now", stale: true, isMock: true,
+      }] };
+    });
+    render(<SessionDetailModal showSessionCredits session={session({ path: "/tmp/root.jsonl", threadId: "root-id" })} onClose={vi.fn()} />);
+    const credits = await screen.findByTestId("session-credits");
+    await waitFor(() => expect(credits).toHaveTextContent("12.34 credits"));
+    expect(credits).toHaveTextContent("Partial data");
+    expect(credits).toHaveTextContent("Cached data");
+    expect(credits).toHaveTextContent("Simulated data");
+    const summary = screen.getByRole("region", { name: "Session summary" });
+    expect(summary).toContainElement(credits);
+    const quota = within(summary).getByText("Observed quota usage");
+    expect(quota.compareDocumentPosition(credits) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("queries the selected subagent instead of showing its parent's amount", async () => {
+    const agents = [
+      replayAgent({ path: "/tmp/root.jsonl", sessionId: "root-id" }),
+      replayAgent({ path: "/tmp/child.jsonl", sessionId: "child-id", parentSessionId: "root-id", depth: 1, nickname: "Curie", threadName: "Child task" }),
+    ];
+    invokeMock.mockImplementation(async (command: string, args?: { path?: string; threads?: { threadId: string }[] }) => {
+      if (command === "fetch_session_detail") return replayDetail({ path: args!.path, threadName: args!.path === "/tmp/child.jsonl" ? "Child task" : "Root task", agents });
+      if (command === "session_credits_identity") return "account";
+      if (command === "fetch_session_credits") return { identity: "account", requestStatus: null, retryAt: null, rows: args!.threads!.map(({ threadId }) => ({
+        threadId, dataStatus: "available", balanceUsageCredits: threadId === "root-id" ? "12.34" : "2.50", usageSource: "credits", dataAsOf: null, fetchedAt: "now", stale: false, isMock: false,
+      })) };
+    });
+    render(<SessionDetailModal showSessionCredits session={session({ path: "/tmp/root.jsonl", threadId: "root-id" })} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("session-credits")).toHaveTextContent("12.34 credits"));
+    const hierarchy = await screen.findByRole("region", { name: "1 subagent" });
+    await userEvent.click(within(hierarchy).getByRole("button", { name: /Curie.*Child task/ }));
+    await waitFor(() => expect(screen.getByTestId("session-credits")).toHaveTextContent("2.50 credits"));
+    expect(screen.getByTestId("session-credits")).not.toHaveTextContent("12.34");
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_session_credits").at(-1)?.[1].threads).toEqual([{ threadId: "child-id", modifiedAtMs: 0 }]);
+  });
+});

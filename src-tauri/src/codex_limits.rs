@@ -1,8 +1,11 @@
+#[cfg(test)]
+use crate::codex_auth::parse_codex_auth;
+use crate::codex_auth::{load_codex_auth, CodexAuth};
 use crate::{
     codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
     types::{
-        CodexLimitWindow, CodexLimitsResponse, CodexResetCredit,
-        CodexWindowActivationResponse, CodexWindowActivationStatus,
+        CodexCredits, CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse,
+        CodexResetCredit, CodexWindowActivationResponse, CodexWindowActivationStatus,
     },
 };
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
@@ -35,6 +38,8 @@ const WINDOW_ACTIVATION_MODEL: &str = "gpt-5.6-luna";
 const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
 #[cfg(debug_assertions)]
 const WINDOW_ACTIVATION_DEBUG_ENV: &str = "CODEX_USAGE_DEBUG_WINDOW_ACTIVATION";
+#[cfg(debug_assertions)]
+const CREDITS_DEBUG_ENV: &str = "CODEX_USAGE_DEBUG_CREDITS";
 
 #[derive(Debug, Clone, PartialEq)]
 enum WindowRole {
@@ -54,6 +59,7 @@ struct RpcRateLimitsResponse {
 struct RpcRateLimitSnapshot {
     primary: Option<RpcRateLimitWindow>,
     secondary: Option<RpcRateLimitWindow>,
+    credits: Option<CodexCredits>,
     rate_limit_reset_credits: Option<RpcRateLimitResetCredits>,
 }
 
@@ -84,6 +90,7 @@ struct RpcRateLimitWindow {
 #[derive(Debug, Deserialize)]
 struct OAuthUsageResponse {
     rate_limit: Option<OAuthRateLimitSnapshot>,
+    credits: Option<CodexCredits>,
     rate_limit_reset_credits: Option<OAuthRateLimitResetCredits>,
 }
 
@@ -162,16 +169,11 @@ struct WindowActivationMarker {
     attempted_at: i64,
 }
 
-#[derive(Debug, Clone)]
-struct CodexAuth {
-    access_token: String,
-    account_id: Option<String>,
-}
-
 #[derive(Debug)]
 struct LimitsSnapshot {
     primary: Option<RpcRateLimitWindow>,
     secondary: Option<RpcRateLimitWindow>,
+    credits: Option<CodexCredits>,
     reset_credits_available_count: Option<i64>,
     reset_credits: Option<Vec<CodexResetCredit>>,
     source: &'static str,
@@ -205,8 +207,42 @@ pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
         } else {
             limits
         };
+        #[cfg(debug_assertions)]
+        let limits = {
+            let mut limits = limits;
+            if let Ok(value) = env::var(CREDITS_DEBUG_ENV) {
+                apply_debug_credits(&mut limits, &value);
+            }
+            limits
+        };
         Ok(limits)
     })
+}
+
+#[cfg(debug_assertions)]
+fn apply_debug_credits(limits: &mut CodexLimitsResponse, value: &str) {
+    let value = value.trim();
+    let credits = match value {
+        "unavailable" => None,
+        "unlimited" => Some(CodexCredits {
+            has_credits: true,
+            unlimited: true,
+            balance: None,
+        }),
+        _ => match value.parse::<f64>() {
+            Ok(balance) if balance.is_finite() && balance >= 0.0 => Some(CodexCredits {
+                has_credits: balance > 0.0,
+                unlimited: false,
+                balance: Some(value.to_string()),
+            }),
+            _ => {
+                log::warn!("Ignoring invalid {CREDITS_DEBUG_ENV}; expected a non-negative finite number, unlimited, or unavailable.");
+                return;
+            }
+        },
+    };
+    limits.credits = credits;
+    limits.credits_is_mock = true;
 }
 
 fn fetch_codex_limits_single_flight(
@@ -611,6 +647,7 @@ fn make_oauth_snapshot(
     Ok(LimitsSnapshot {
         primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
         secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
+        credits: usage.credits,
         reset_credits_available_count,
         reset_credits,
         source: "oauth",
@@ -709,6 +746,7 @@ fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
     Ok(LimitsSnapshot {
         primary: limits.primary,
         secondary: limits.secondary,
+        credits: limits.credits,
         reset_credits_available_count: limits
             .rate_limit_reset_credits
             .as_ref()
@@ -770,6 +808,8 @@ fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimit
     CodexLimitsResponse {
         session: session.map(make_window),
         weekly: weekly.map(make_window),
+        credits: limits.credits,
+        credits_is_mock: false,
         reset_credits_available_count: limits.reset_credits_available_count,
         reset_credits: limits.reset_credits,
         updated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
@@ -969,43 +1009,6 @@ impl From<OAuthRateLimitWindow> for RpcRateLimitWindow {
             resets_at: window.reset_at,
         }
     }
-}
-
-fn load_codex_auth() -> Result<CodexAuth, String> {
-    let path = codex_auth_path().ok_or_else(|| "Codex auth path is unavailable.".to_string())?;
-    let content = fs::read_to_string(&path)
-        .map_err(|error| format!("Failed to read Codex auth at {}: {error}", path.display()))?;
-    parse_codex_auth(&content)
-}
-
-fn codex_auth_path() -> Option<PathBuf> {
-    Some(selected_codex_environment().home.join("auth.json"))
-}
-
-fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
-    let value = serde_json::from_str::<Value>(content)
-        .map_err(|error| format!("Failed to parse Codex auth.json: {error}"))?;
-
-    if let Some(api_key) = string_field(&value, "OPENAI_API_KEY") {
-        return Ok(CodexAuth {
-            access_token: api_key,
-            account_id: None,
-        });
-    }
-
-    let tokens = value
-        .get("tokens")
-        .ok_or_else(|| "Codex auth.json exists but contains no tokens.".to_string())?;
-    let access_token = string_field(tokens, "access_token")
-        .or_else(|| string_field(tokens, "accessToken"))
-        .ok_or_else(|| "Codex auth.json exists but contains no access token.".to_string())?;
-    let account_id =
-        string_field(tokens, "account_id").or_else(|| string_field(tokens, "accountId"));
-
-    Ok(CodexAuth {
-        access_token,
-        account_id,
-    })
 }
 
 fn string_field(value: &Value, key: &str) -> Option<String> {
@@ -1782,6 +1785,7 @@ mod tests {
                     LimitsSnapshot {
                         primary: None,
                         secondary: None,
+                        credits: None,
                         reset_credits_available_count: None,
                         reset_credits: None,
                         source: "first",
@@ -1832,6 +1836,8 @@ mod tests {
                 resets_at: Some(resets_at.to_string()),
             }),
             weekly: None,
+            credits: None,
+            credits_is_mock: false,
             reset_credits_available_count: None,
             reset_credits: None,
             updated_at: "2026-09-10T00:00:00.000Z".to_string(),
@@ -1841,6 +1847,98 @@ mod tests {
             workspace_name: None,
             subscription_expires_at: None,
             subscription_will_renew: None,
+        }
+    }
+
+    #[test]
+    fn paid_credits_survive_oauth_and_rpc_without_affecting_limits_or_reset_credits() {
+        for credits in [
+            json!({"has_credits": true, "unlimited": false, "balance": "1250.500001"}),
+            json!({"has_credits": false, "unlimited": false, "balance": "0"}),
+            json!({"has_credits": false, "unlimited": false, "balance": null}),
+            json!({"has_credits": true, "unlimited": false, "balance": null}),
+            json!({"has_credits": true, "unlimited": true, "balance": null}),
+            Value::Null,
+        ] {
+            let usage = serde_json::from_value::<OAuthUsageResponse>(json!({
+                "rate_limit": {
+                    "primary_window": {"used_percent": 25, "reset_at": null, "limit_window_seconds": 18000},
+                    "secondary_window": null
+                },
+                "credits": credits,
+                "rate_limit_reset_credits": {"available_count": 2}
+            }))
+            .unwrap();
+            let expected = usage.credits.clone();
+            let response = make_response(
+                make_oauth_snapshot(usage, Err("details unavailable".to_string())).unwrap(),
+                AccountSnapshot::default(),
+            );
+            assert_eq!(response.credits, expected);
+            assert!(!response.credits_is_mock);
+            assert_eq!(response.session.unwrap().remaining_percent, 75.0);
+            assert_eq!(response.reset_credits_available_count, Some(2));
+            let serialized = serde_json::to_value(&response.credits).unwrap();
+            if expected.is_some() {
+                assert!(serialized.get("hasCredits").is_some());
+                assert!(serialized.get("has_credits").is_none());
+            }
+            let rpc = serde_json::from_value::<RpcRateLimitsResponse>(json!({
+                "rateLimits": {"credits": serialized}
+            }))
+            .unwrap();
+            assert_eq!(rpc.rate_limits.credits, expected);
+        }
+
+        let usage = serde_json::from_value::<OAuthUsageResponse>(json!({})).unwrap();
+        let rpc =
+            serde_json::from_value::<RpcRateLimitsResponse>(json!({"rateLimits": {}})).unwrap();
+        assert!(usage.credits.is_none());
+        assert!(rpc.rate_limits.credits.is_none());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn debug_credits_cover_balances_unlimited_and_unavailable() {
+        let mut limits = limits_with_session(25.0, "2026-09-10T05:00:00.000Z");
+        let original = limits.clone();
+        for (value, expected) in [
+            (
+                " 1250.500001 ",
+                Some(CodexCredits {
+                    has_credits: true,
+                    unlimited: false,
+                    balance: Some("1250.500001".to_string()),
+                }),
+            ),
+            (
+                "0",
+                Some(CodexCredits {
+                    has_credits: false,
+                    unlimited: false,
+                    balance: Some("0".to_string()),
+                }),
+            ),
+            (
+                "unlimited",
+                Some(CodexCredits {
+                    has_credits: true,
+                    unlimited: true,
+                    balance: None,
+                }),
+            ),
+            ("unavailable", None),
+        ] {
+            apply_debug_credits(&mut limits, value);
+            assert_eq!(limits.credits, expected);
+            assert!(limits.credits_is_mock);
+            assert_eq!(limits.session, original.session);
+            assert_eq!(limits.reset_credits, original.reset_credits);
+        }
+        for value in ["-1", "NaN", "inf", "", "invalid", "1e999"] {
+            let mut limits = original.clone();
+            apply_debug_credits(&mut limits, value);
+            assert_eq!(limits, original);
         }
     }
 
@@ -2372,6 +2470,7 @@ mod tests {
                 Ok(LimitsSnapshot {
                     primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                     secondary: Some(window(40.0, Some(WEEKLY_WINDOW_MINUTES))),
+                    credits: None,
                     reset_credits_available_count: None,
                     reset_credits: None,
                     source: "cli-rpc",
@@ -2512,6 +2611,7 @@ mod tests {
             LimitsSnapshot {
                 primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
                 secondary: None,
+                credits: None,
                 reset_credits_available_count: Some(2),
                 reset_credits: None,
                 source: "oauth",

@@ -14,10 +14,12 @@ type ProjectSessionDayProps = {
   query: string;
   initiallyExpanded: boolean;
   revision?: number;
+  showSessionCredits?: boolean;
+  creditsActive?: boolean;
   onSessionClick?: (session: SessionDetailRow) => void;
 };
 
-export function ProjectSessionDayView({ day, project, range, query, initiallyExpanded, revision = 0, onSessionClick }: ProjectSessionDayProps) {
+export function ProjectSessionDayView({ day, project, range, query, initiallyExpanded, revision = 0, showSessionCredits = false, creditsActive = true, onSessionClick }: ProjectSessionDayProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [sessions, setSessions] = useState<SessionDetailRow[] | null>(null);
@@ -62,7 +64,7 @@ export function ProjectSessionDayView({ day, project, range, query, initiallyExp
         setError(null);
         setRetry((value) => value + 1);
       }}>{t("project_modal.retry")}</Button></div> : null}
-      {sessions ? <SessionUsageTable sessions={sessions} selectedProject={project} onSessionClick={onSessionClick} embedded projectDay agentGroupPageSize={30} />
+      {sessions ? <SessionUsageTable showSessionCredits={showSessionCredits} creditsActive={creditsActive && expanded} sessions={sessions} selectedProject={project} onSessionClick={onSessionClick} embedded projectDay agentGroupPageSize={30} />
         : expanded && !error ? <p role="status" className="p-4 text-sm text-muted-foreground">{t("loading.loading_sessions")}</p> : null}
     </div>
   </div>;

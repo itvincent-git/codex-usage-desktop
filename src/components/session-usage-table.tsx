@@ -1,3 +1,5 @@
+import { useSessionCredits } from "@/hooks/use-session-credits";
+import { SessionCredits } from "./session-credits";
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow, SessionQuotaWindowUsage } from "@/lib/api";
@@ -27,6 +29,8 @@ type SessionUsageTableProps = {
   embedded?: boolean;
   projectDay?: boolean;
   agentGroupPageSize?: number;
+  showSessionCredits?: boolean;
+  creditsActive?: boolean;
 };
 
 function formatBytes(bytes: number) {
@@ -358,6 +362,8 @@ export function SessionUsageTable({
   embedded = false,
   projectDay = false,
   agentGroupPageSize,
+  showSessionCredits = false,
+  creditsActive = true,
 }: SessionUsageTableProps) {
   const { t, i18n } = useTranslation();
   // Track which date groups are collapsed
@@ -496,6 +502,16 @@ export function SessionUsageTable({
     return date !== firstDate;
   };
 
+  const creditThreads = showSessionCredits && creditsActive ? groups.flatMap((group) => {
+    if (isCollapsed(group.date)) return [];
+    return group.agentGroups.slice(0, visibleGroupCounts[group.date] ?? agentGroupPageSize ?? group.agentGroups.length).flatMap((agentGroup) => {
+      const expanded = expandedAgentGroups[`${group.date}:${agentGroup.key}`];
+      const visible = expanded ? agentGroup.sessions : agentGroup.sessions.slice(0, COLLAPSED_SUBAGENT_LIMIT + 1);
+      return visible.flatMap((session) => session.threadId ? [{ threadId: session.threadId, modifiedAtMs: session.modifiedAtMs }] : []);
+    });
+  }) : [];
+  const credits = useSessionCredits(showSessionCredits && creditsActive, creditThreads);
+
   if (sessions.length === 0) {
     return (
       <Card className="border-border/60 bg-card/30 backdrop-blur-md">
@@ -514,6 +530,10 @@ export function SessionUsageTable({
 
   return (
     <div className="space-y-4">
+      {showSessionCredits && creditsActive ? <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <Button variant="secondary" size="sm" onClick={() => credits.refresh()} disabled={credits.loading || creditThreads.length === 0}>{t("session_credits.refresh")}</Button>
+        {credits.error ? <span role="status">{t(`session_credits.errors.${credits.error}`)}</span> : null}
+      </div> : null}
       {!embedded ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-1">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
@@ -894,7 +914,7 @@ export function SessionUsageTable({
                           <div className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums text-muted-foreground">
                             <span>{t("sessions.output")} <strong className="font-semibold text-foreground">{formatSessionTokenCount(session.outputTokens)}</strong></span>
                             <span aria-hidden="true">·</span>
-                            <span className="shrink-0">{t("sessions.cols.cost")}</span>
+                            <span className="shrink-0">{t(showSessionCredits ? "session_credits.estimated_cost" : "sessions.cols.cost")}</span>
                             <span
                               role="img"
                               aria-label={costLabel}
@@ -912,6 +932,7 @@ export function SessionUsageTable({
                               <span className="relative ml-auto">{formatCurrency(session.costUSD)}</span>
                             </span>
                           </div>
+                          {showSessionCredits && creditsActive ? <SessionCredits row={session.threadId ? credits.rows[session.threadId] : undefined} loading={credits.loading} error={credits.error} hasThreadId={Boolean(session.threadId)} /> : null}
                           <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={tokenLabel} data-testid="token-bar">
                             {isInactive ? null : (
                               <>

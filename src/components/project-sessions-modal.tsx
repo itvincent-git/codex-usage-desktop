@@ -30,6 +30,7 @@ type ProjectSessionsModalProps = {
   onClose: () => void;
   onSessionClick?: (session: SessionDetailRow) => void;
   isActive?: boolean;
+  showSessionCredits?: boolean;
   dataRevision?: number;
   onScanComplete?: (scan: ScanResponse) => Promise<void>;
   onGoToSessions: (projectPath: string) => void;
@@ -50,7 +51,7 @@ function TrendTooltip({ active, payload, label, t }: any) {
   </div>;
 }
 
-export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, onSessionClick, isActive = true, dataRevision = 0, onScanComplete }: ProjectSessionsModalProps) {
+export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, onSessionClick, isActive = true, showSessionCredits = false, dataRevision = 0, onScanComplete }: ProjectSessionsModalProps) {
   const { t } = useTranslation();
   const [sessionDays, setSessionDays] = useState<ProjectSessionDaysResponse | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -269,7 +270,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
           : sessionsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{sessionsError}</div>
             : !sessionDays?.days.length ? <div className="rounded-xl border border-dashed border-border p-8 text-center"><Terminal className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{searchQuery ? t("project_modal.no_matching_sessions") : t("project_modal.no_sessions")}</p></div>
               : <div key={JSON.stringify([project.project, range, query])} className="space-y-3">
-                {sessionDays.days.map((day, index) => <ProjectSessionDayView key={day.date} day={day} project={project.project} range={sessionRange} query={query} initiallyExpanded={index === 0} revision={dayRevision} onSessionClick={onSessionClick} />)}
+                {sessionDays.days.map((day, index) => <ProjectSessionDayView key={day.date} day={day} project={project.project} range={sessionRange} query={query} initiallyExpanded={index === 0} showSessionCredits={showSessionCredits} creditsActive={isActive} revision={dayRevision} onSessionClick={onSessionClick} />)}
               </div>}
         {moreError ? <p role="alert" className="text-sm text-error">{moreError}</p> : null}
         {sessionDays ? <div className="flex justify-center py-3"><Button variant="secondary" onClick={() => void loadMoreDays()} disabled={loadingMore || analyticsLoading || refreshing}>{loadingMore ? t("common.loading") : t("project_modal.load_more_days")}</Button></div> : null}

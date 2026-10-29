@@ -274,11 +274,23 @@ pub struct CodexResetCredit {
     pub expires_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexCredits {
+    #[serde(alias = "has_credits")]
+    pub has_credits: bool,
+    pub unlimited: bool,
+    pub balance: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexLimitsResponse {
     pub session: Option<CodexLimitWindow>,
     pub weekly: Option<CodexLimitWindow>,
+    pub credits: Option<CodexCredits>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub credits_is_mock: bool,
     pub reset_credits_available_count: Option<i64>,
     pub reset_credits: Option<Vec<CodexResetCredit>>,
     pub updated_at: String,
@@ -452,6 +464,8 @@ pub struct SessionQuotaWindowUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionDetailRow {
+    #[serde(default)]
+    pub thread_id: Option<String>,
     pub path: String,
     pub session_id: String,
     pub thread_name: Option<String>,

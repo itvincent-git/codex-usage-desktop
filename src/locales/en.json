@@ -159,6 +159,10 @@
     "remaining": "remaining",
     "consumed": "Consumed",
     "window": "Window",
+    "credits_balance": "Credits balance",
+    "credits_unlimited": "Unlimited",
+    "credits_unavailable": "Unavailable",
+    "credits_mock": "Simulated data",
     "reset_credits": "Reset credits",
     "reset_credits_open": "Open reset credits in ChatGPT Usage",
     "reset_credits_available": "{{count}} available",
@@ -838,5 +842,32 @@
     "feed_unavailable": "The feed is unavailable.",
     "feed_empty": "No recent feed posts.",
     "feed_stale": "Showing older feed data; it needs refreshing."
+  },
+  "session_credits": {
+    "estimated_cost": "Estimated cost",
+    "setting": "Show session credits debited",
+    "description": "Query credits debited from the balance for each session. Includes adjustments and may include promotional credits. Data may be delayed.",
+    "label": "Balance debits · session total",
+    "refresh": "Refresh session credits",
+    "loading": "Loading…",
+    "partial": "Partial data",
+    "cached": "Cached data",
+    "mock": "Simulated data",
+    "adjustment": "Negative amounts may include refunds or adjustments.",
+    "data_as_of": "Data as of",
+    "errors": {
+      "chatgptLoginRequired": "Sign in with ChatGPT to read session credits.",
+      "identityUnavailable": "The ChatGPT account and user identity could not be determined.",
+      "identityChanged": "Account changed. Refresh to load this account’s data.",
+      "forbidden": "This account cannot read session credits.",
+      "endpointUnavailable": "The session credits endpoint is temporarily unavailable.",
+      "rateLimited": "Too many requests. Try again after the cooldown.",
+      "serviceUnavailable": "Session credits are temporarily unavailable. Cached values are retained.",
+      "networkError": "Could not connect. Cached values are retained.",
+      "invalidResponse": "Invalid response. Cached values are retained.",
+      "loadFailed": "Could not read session credits.",
+      "unavailable": "No session balance debit data is available; this does not mean zero.",
+      "invalidThread": "This record does not contain a valid session UUID."
+    }
   }
 }

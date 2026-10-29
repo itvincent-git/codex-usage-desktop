@@ -82,6 +82,7 @@ pub fn open_database(database_path: &Path) -> Result<Connection, String> {
         "ALTER TABLE session_file_rollups ADD COLUMN turn_count INTEGER NOT NULL DEFAULT 0",
     )?;
     crate::project_sessions::create_tables(&db)?;
+    crate::session_credits::create_tables(&db)?;
     Ok(db)
 }
 
@@ -306,6 +307,8 @@ pub fn reset_usage_state(db: &Connection) -> Result<(), String> {
         DELETE FROM daily_usage_rollups;
         DELETE FROM session_file_rollups;
         DELETE FROM scan_runs;
+        DELETE FROM session_credits;
+        DELETE FROM session_credits_cooldown;
         DELETE FROM project_session_days;
         DELETE FROM project_session_index;
         DELETE FROM project_session_quota;
@@ -854,6 +857,7 @@ fn session_detail_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionD
         .to_string();
 
     Ok(SessionDetailRow {
+        thread_id: crate::session_index::rollout_thread_id(Path::new(&path)).map(str::to_owned),
         path,
         session_id,
         thread_name: prompt_title.filter(|title| !title.is_empty()),
@@ -1261,9 +1265,11 @@ mod tests {
         .unwrap();
         record_scan_run(&db, "2026-05-08T00:00:00.000Z", "UTC", 1).unwrap();
 
+        db.execute("INSERT INTO session_credits (identity,thread_id,fetched_at,local_modified_at,last_attempt_at) VALUES ('account','thread',1,1,1)", []).unwrap();
+        db.execute("INSERT INTO session_credits_cooldown VALUES ('account','rateLimited',1000)", []).unwrap();
         reset_usage_state(&db).unwrap();
 
-        for table in ["daily_usage_rollups", "session_file_rollups", "scan_runs"] {
+        for table in ["daily_usage_rollups", "session_file_rollups", "scan_runs", "session_credits", "session_credits_cooldown"] {
             let count: i64 = db
                 .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
                     row.get(0)

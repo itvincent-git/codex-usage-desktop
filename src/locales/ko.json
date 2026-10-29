@@ -838,5 +838,32 @@
     "feed_unavailable": "피드를 불러올 수 없습니다.",
     "feed_empty": "최근 피드 게시물이 없습니다.",
     "feed_stale": "이전 피드 데이터를 표시하고 있습니다. 새로고침이 필요합니다."
+  },
+  "session_credits": {
+    "estimated_cost": "예상 비용",
+    "setting": "세션 credits 차감 표시",
+    "description": "세션에서 credits 잔액에서 차감된 수량을 조회합니다. 조정 및 무료 credits가 포함될 수 있으며 데이터가 지연될 수 있습니다.",
+    "label": "잔액 차감 · 세션 누적",
+    "refresh": "세션 credits 새로 고침",
+    "loading": "불러오는 중…",
+    "partial": "일부 데이터",
+    "cached": "캐시 데이터",
+    "mock": "모의 데이터",
+    "adjustment": "음수에는 환불 또는 조정이 포함될 수 있습니다.",
+    "data_as_of": "데이터 기준 시각",
+    "errors": {
+      "chatgptLoginRequired": "ChatGPT로 로그인해야 합니다.",
+      "identityUnavailable": "ChatGPT 계정 및 사용자 신원을 확인할 수 없습니다.",
+      "identityChanged": "계정이 변경되었습니다. 새로 고침하세요.",
+      "forbidden": "이 계정은 세션 credits를 읽을 수 없습니다.",
+      "endpointUnavailable": "세션 credits API를 일시적으로 사용할 수 없습니다.",
+      "rateLimited": "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+      "serviceUnavailable": "일시적으로 사용할 수 없습니다. 캐시 값은 유지됩니다.",
+      "networkError": "연결할 수 없습니다. 캐시 값은 유지됩니다.",
+      "invalidResponse": "잘못된 응답입니다. 캐시 값은 유지됩니다.",
+      "loadFailed": "세션 credits를 읽을 수 없습니다.",
+      "unavailable": "사용 가능한 잔액 차감 데이터가 없습니다. 0을 의미하지 않습니다.",
+      "invalidThread": "유효한 세션 UUID가 없습니다."
+    }
   }
 }

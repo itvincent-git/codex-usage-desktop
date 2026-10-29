@@ -159,6 +159,10 @@
     "remaining": "剩餘",
     "consumed": "已消耗",
     "window": "時段時長",
+    "credits_balance": "Credits 餘額",
+    "credits_unlimited": "無限",
+    "credits_unavailable": "暫時無法取得",
+    "credits_mock": "模擬資料",
     "reset_credits": "重置次數",
     "reset_credits_open": "在 ChatGPT 用量設定中查看重置次數",
     "reset_credits_available": "{{count}} 次可用",
@@ -844,5 +848,32 @@
     "feed_unavailable": "暫時無法載入 Feed 動態。",
     "feed_empty": "暫無近期 Feed 動態。",
     "feed_stale": "正在顯示舊 Feed 資料，需要重新整理。"
+  },
+  "session_credits": {
+    "estimated_cost": "估算費用",
+    "setting": "顯示工作階段 credits 扣除",
+    "description": "查詢工作階段從 credits 餘額中扣除的數量。包含餘額調整，可能包含贈送 credits，資料可能延遲。",
+    "label": "餘額扣除 · 工作階段累計",
+    "refresh": "重新整理工作階段 credits",
+    "loading": "載入中…",
+    "partial": "部分資料",
+    "cached": "快取資料",
+    "mock": "模擬資料",
+    "adjustment": "負數可能包含退款或餘額調整。",
+    "data_as_of": "資料時間",
+    "errors": {
+      "chatgptLoginRequired": "需要使用 ChatGPT 登入。",
+      "identityUnavailable": "無法確認 ChatGPT 帳號和使用者身分。",
+      "identityChanged": "帳號已變更，請重新整理以讀取目前帳號資料。",
+      "forbidden": "目前帳號無法讀取工作階段 credits。",
+      "endpointUnavailable": "工作階段 credits 介面暫時無法使用。",
+      "rateLimited": "請求過於頻繁，請在冷卻結束後重試。",
+      "serviceUnavailable": "工作階段 credits 暫時無法使用，已保留快取值。",
+      "networkError": "網路連線失敗，已保留快取值。",
+      "invalidResponse": "回應格式無效，已保留快取值。",
+      "loadFailed": "讀取工作階段 credits 失敗。",
+      "unavailable": "暫無可用的工作階段餘額扣除資料，不代表扣除為零。",
+      "invalidThread": "此記錄沒有有效的工作階段 UUID。"
+    }
   }
 }
