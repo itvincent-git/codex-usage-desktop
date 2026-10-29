@@ -71,10 +71,10 @@ describe("Dashboard paid credits", () => {
       await expect(balance).toHaveText(creditsIsMock ? expect.stringContaining("Simulated data") : expect.not.stringContaining("Simulated data"));
       await expect($("span=credits@example.com")).toBeDisplayed();
       await expect($('[data-testid="limit-row-5-hour"]')).toBeDisplayed();
-      const layout = await balance.execute((element) => {
+      const layout = await browser.execute((element) => {
         const rect = element.getBoundingClientRect();
         return { left: rect.left, right: rect.right, viewport: document.documentElement.clientWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
-      });
+      }, await balance);
       expect(layout.left).toBeGreaterThanOrEqual(0);
       expect(layout.right).toBeLessThanOrEqual(layout.viewport);
       expect(layout.overflow).toBe(false);
