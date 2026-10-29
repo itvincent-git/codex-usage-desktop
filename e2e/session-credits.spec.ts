@@ -19,6 +19,13 @@ describe("optional native session credits", () => {
     await sessionsTab.click();
     await $('[data-testid="session-card"]').waitForDisplayed({ timeout: 30_000 });
     expect(await stats()).toHaveLength(0);
+    await $('[data-testid="session-card"] h3').click();
+    const detailDialog = $('[aria-labelledby="session-detail-title"]');
+    await detailDialog.waitForDisplayed();
+    await expect(detailDialog.$('[data-testid="session-credits"]')).not.toBeExisting();
+    expect(await stats()).toHaveLength(0);
+    await browser.keys("Escape");
+    await detailDialog.waitForExist({ reverse: true });
     await $('button[aria-label="Settings"]').click();
     const toggle = $('[role="switch"][aria-label="Show session credits debited"]');
     await expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -35,6 +42,19 @@ describe("optional native session credits", () => {
     expect(first.authorization).toBe("Bearer fixture-token");
     expect(first.path).toBe("/backend-api/wham/usage/thread_usage/query_v2");
     expect(first.ids).not.toContain(creditId(36));
+    await $('button=Refresh session credits').waitForEnabled();
+    const card = $('[data-testid="session-card"]');
+    const listCredits = await card.$('[data-testid="session-credits"]').getText();
+    await card.$("h3").click();
+    const enabledDetailDialog = $('[aria-labelledby="session-detail-title"]');
+    await enabledDetailDialog.waitForDisplayed();
+    const detailCredits = enabledDetailDialog.$('[data-testid="session-credits"]');
+    await expect(detailCredits).toHaveText(listCredits);
+    const summaryOrder = await enabledDetailDialog.$('[aria-label="Session summary"]').getText();
+    expect(summaryOrder.indexOf("Balance debits · session total")).toBeGreaterThan(summaryOrder.indexOf("Observed quota usage"));
+    expect(await stats()).toHaveLength(1);
+    await browser.keys("Escape");
+    await enabledDetailDialog.waitForExist({ reverse: true });
     // Read through the native command to assert cross-day rows share one UUID.
     const rows = await browser.execute(async () => {
       const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: <T>(command: string) => Promise<T> } }).__TAURI_INTERNALS__;
@@ -56,6 +76,7 @@ describe("optional native session credits", () => {
 
     // Same local files, a different account: no old debit values may survive.
     writeCreditAuth(process.env.CODEX_HOME!, "account-b");
+    await $('button=Refresh session credits').scrollIntoView({ block: "center" });
     await $('button=Refresh session credits').click();
     await browser.waitUntil(async () => (await stats()).some((request) => request.account === "account-b"));
     await browser.waitUntil(async () => (await $('[data-testid="session-credits"]').getText()).includes("98.76"));

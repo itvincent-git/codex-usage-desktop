@@ -15,11 +15,14 @@ import { SessionQuotaUsageView } from "./session-quota-usage";
 import { SessionArchivedBadge } from "./session-archived-badge";
 import { MetricBadge } from "./metric-badge";
 import { useModalFocus } from "@/hooks/use-modal-focus";
+import { useSessionCredits } from "@/hooks/use-session-credits";
+import { SessionCredits } from "./session-credits";
 import { SessionSearchContext, SessionSearchTarget, SessionSearchText, SessionSearchToolbar, useSessionSearchExpansion, type SessionSearchHandle, type SessionSearchState } from "./session-search";
 import type { SessionSearchHit } from "@/lib/session-search";
 
 type SessionDetailModalProps = {
   session: SessionDetailRow;
+  showSessionCredits?: boolean;
   onClose: () => void;
   onScanComplete?: (session: SessionDetailRow, previousPath: string, scan: ScanResponse) => Promise<void>;
 };
@@ -1203,7 +1206,7 @@ export const ConversationItem = memo(function ConversationItem({ block, rawJsonl
   );
 });
 
-export function SessionDetailModal({ session, onClose, onScanComplete }: SessionDetailModalProps) {
+export function SessionDetailModal({ session, showSessionCredits = false, onClose, onScanComplete }: SessionDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
   const [activePath, setActivePath] = useState(session.path);
@@ -1233,6 +1236,13 @@ export function SessionDetailModal({ session, onClose, onScanComplete }: Session
   const scrollRef = useRef<HTMLDivElement>(null);
   const turnRefs = useRef(new Map<string, HTMLElement>());
   useModalFocus(dialogRef, closeButtonRef, onClose);
+  const creditSession = refreshedSession?.path === activePath ? refreshedSession : activePath === session.path ? session : null;
+  const activeDetail = detail?.path === activePath ? detail : null;
+  const creditThreadId = creditSession?.threadId ?? activeDetail?.agents?.find((agent) => agent.path === activePath)?.sessionId;
+  const credits = useSessionCredits(showSessionCredits, creditThreadId ? [{
+    threadId: creditThreadId,
+    modifiedAtMs: creditSession?.modifiedAtMs ?? activeDetail?.modifiedAtMs ?? 0,
+  }] : []);
 
   useEffect(() => {
     function handleSearchKey(event: KeyboardEvent) {
@@ -1309,6 +1319,7 @@ export function SessionDetailModal({ session, onClose, onScanComplete }: Session
           .filter((key) => !previousKeys.has(key) || current.has(key))));
         setDetail(result.detail);
         setRefreshedSession(result.session);
+        credits.refresh();
       }
       await synchronization;
     } catch (error) {
@@ -1557,6 +1568,10 @@ export function SessionDetailModal({ session, onClose, onScanComplete }: Session
             </div>
           ) : null}
           {detail && (refreshedSession || activePath === session.path) ? <div className="mt-1.5 border-t border-border/50 pt-1.5"><SessionQuotaUsageView usage={refreshedSession ? refreshedSession.quotaUsage : session.quotaUsage} detailed /></div> : null}
+          {showSessionCredits ? <div className="mt-1.5 border-t border-border/50 pt-1.5">
+            <SessionCredits row={creditThreadId ? credits.rows[creditThreadId] : undefined} loading={credits.loading} error={credits.error} hasThreadId={Boolean(creditThreadId)} />
+            {credits.error ? <p role="status" className="mt-1 text-[10px] text-muted-foreground">{t(`session_credits.errors.${credits.error}`)}</p> : null}
+          </div> : null}
           </section>
           </div>
         </header>

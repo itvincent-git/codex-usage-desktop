@@ -528,6 +528,7 @@ export default function App() {
       {selectedSession && (
         <SessionDetailModal
           session={selectedSession}
+          showSessionCredits={showSessionCredits}
           onScanComplete={async (session, previousPath, scan) => {
             setProjectDataRevision((value) => value + 1);
             await handleLocalScanComplete(scan, session, previousPath);

@@ -1,7 +1,8 @@
 # Session balance credits
 
 The display setting is off by default. Enabling it only queries expanded, loaded
-session cards, including the cards currently shown in an agent group. It does not
+session cards, including the cards currently shown in an agent group, and the
+currently selected session in the detail header. It does not
 change token estimates, daily totals, agent totals, exports, or the menu bar.
 
 Each amount is a **session lifetime balance debit**, even when the session appears
