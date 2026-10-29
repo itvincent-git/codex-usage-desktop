@@ -157,6 +157,12 @@ export function useUsageDashboard() {
   const [isUpdateDismissed, setIsUpdateDismissed] = useState(false);
   const [trayClockMinute, setTrayClockMinute] = useState(() => Math.floor(Date.now() / 60_000));
 
+  const [showSessionCredits, setShowSessionCreditsState] = useState(() => localStorage.getItem("show_session_credits") === "true");
+  const setShowSessionCredits = (show: boolean) => {
+    localStorage.setItem("show_session_credits", String(show));
+    setShowSessionCreditsState(show);
+  };
+
   const [showLogsTab, setShowLogsTabState] = useState(() => {
     return localStorage.getItem("show_logs_tab") === "true";
   });
@@ -718,6 +724,7 @@ export function useUsageDashboard() {
       try {
         const unsubscribe = await listen<UsageRefreshResponse>("background-refresh-completed", async (event) => {
           await handleBackgroundRefreshCompleted(event.payload);
+          window.dispatchEvent(new Event("session-credits-revalidate"));
         });
         if (cancelled) {
           unsubscribe();
@@ -1210,6 +1217,8 @@ export function useUsageDashboard() {
     isLaunchAtLoginUpdating,
     showLogsTab,
     setShowLogsTab,
+    showSessionCredits,
+    setShowSessionCredits,
     autoRefreshIntervalMinutes,
     setAutoRefreshIntervalMinutes,
     sessions,

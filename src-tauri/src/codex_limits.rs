@@ -1,3 +1,6 @@
+#[cfg(test)]
+use crate::codex_auth::parse_codex_auth;
+use crate::codex_auth::{load_codex_auth, CodexAuth};
 use crate::{
     codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
     types::{
@@ -164,12 +167,6 @@ struct LimitsFetchFlight {
 struct WindowActivationMarker {
     window_key: String,
     attempted_at: i64,
-}
-
-#[derive(Debug, Clone)]
-struct CodexAuth {
-    access_token: String,
-    account_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1012,43 +1009,6 @@ impl From<OAuthRateLimitWindow> for RpcRateLimitWindow {
             resets_at: window.reset_at,
         }
     }
-}
-
-fn load_codex_auth() -> Result<CodexAuth, String> {
-    let path = codex_auth_path().ok_or_else(|| "Codex auth path is unavailable.".to_string())?;
-    let content = fs::read_to_string(&path)
-        .map_err(|error| format!("Failed to read Codex auth at {}: {error}", path.display()))?;
-    parse_codex_auth(&content)
-}
-
-fn codex_auth_path() -> Option<PathBuf> {
-    Some(selected_codex_environment().home.join("auth.json"))
-}
-
-fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
-    let value = serde_json::from_str::<Value>(content)
-        .map_err(|error| format!("Failed to parse Codex auth.json: {error}"))?;
-
-    if let Some(api_key) = string_field(&value, "OPENAI_API_KEY") {
-        return Ok(CodexAuth {
-            access_token: api_key,
-            account_id: None,
-        });
-    }
-
-    let tokens = value
-        .get("tokens")
-        .ok_or_else(|| "Codex auth.json exists but contains no tokens.".to_string())?;
-    let access_token = string_field(tokens, "access_token")
-        .or_else(|| string_field(tokens, "accessToken"))
-        .ok_or_else(|| "Codex auth.json exists but contains no access token.".to_string())?;
-    let account_id =
-        string_field(tokens, "account_id").or_else(|| string_field(tokens, "accountId"));
-
-    Ok(CodexAuth {
-        access_token,
-        account_id,
-    })
 }
 
 fn string_field(value: &Value, key: &str) -> Option<String> {

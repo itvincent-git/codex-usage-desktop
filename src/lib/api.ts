@@ -368,6 +368,7 @@ export type SessionQuotaUsage = {
 };
 
 export type SessionDetailRow = {
+  threadId?: string | null;
   turnCount: number;
   path: string;
   sessionId: string;
@@ -570,4 +571,29 @@ export async function rescanSession(path: string): Promise<SessionRescanResponse
 
 export async function rescanProject(project: string): Promise<ScanResponse> {
   return invoke<ScanResponse>("rescan_project", { project });
+}
+
+export type SessionCreditThread = { threadId: string; modifiedAtMs: number };
+export type SessionCreditsRow = {
+  threadId: string;
+  dataStatus: "available" | "partial" | "unavailable" | null;
+  balanceUsageCredits: string | null;
+  usageSource: string | null;
+  dataAsOf: string | null;
+  fetchedAt: string;
+  stale: boolean;
+  isMock: boolean;
+};
+export type SessionCreditsResult = {
+  identity: string | null;
+  rows: SessionCreditsRow[];
+  requestStatus: string | null;
+  retryAt: number | null;
+};
+export function sessionCreditsIdentity() { return invoke<string>("session_credits_identity"); }
+export function setSessionCreditsScope(scope: string, revision: number, active: boolean) {
+  return invoke<void>("set_session_credits_scope", { scope, revision, active });
+}
+export function fetchSessionCredits(threads: SessionCreditThread[], force: boolean, cacheOnly: boolean, scope: string, revision: number) {
+  return invoke<SessionCreditsResult>("fetch_session_credits", { threads, force, cacheOnly, scope, revision });
 }

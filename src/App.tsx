@@ -90,6 +90,8 @@ export default function App() {
     launchAtLogin,
     launchAtLoginError,
     isLaunchAtLoginUpdating,
+    showSessionCredits,
+    setShowSessionCredits,
     showLogsTab,
     setShowLogsTab,
     autoRefreshIntervalMinutes,
@@ -454,6 +456,8 @@ export default function App() {
           {!isLoading && view === "sessions" && !isSessionsLoading ? (
             <SessionUsageTable
               sessions={sessions}
+              showSessionCredits={showSessionCredits}
+              creditsActive={!selectedProjectForModal && !selectedSession && !isResetHistoryOpen}
               initialExpandedDate={selectedSessionDate}
               selectedProject={selectedProjectFilter}
               onClearProjectFilter={() => setSelectedProjectFilter(null)}
@@ -479,6 +483,8 @@ export default function App() {
               launchAtLoginError={launchAtLoginError}
               isLaunchAtLoginUpdating={isLaunchAtLoginUpdating}
               onLaunchAtLoginChange={(enabled) => void handleLaunchAtLoginChange(enabled)}
+              showSessionCredits={showSessionCredits}
+              onShowSessionCreditsChange={setShowSessionCredits}
               showLogsTab={showLogsTab}
               onShowLogsTabChange={setShowLogsTab}
               autoRefreshIntervalMinutes={autoRefreshIntervalMinutes}
@@ -504,6 +510,7 @@ export default function App() {
       {selectedProjectForModal && (
         <ProjectSessionsModal
           project={selectedProjectForModal}
+          showSessionCredits={showSessionCredits}
           range={range}
           onSessionClick={setSelectedSession}
           isActive={!selectedSession && !isResetHistoryOpen}

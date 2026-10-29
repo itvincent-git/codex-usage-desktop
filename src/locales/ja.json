@@ -878,5 +878,32 @@
     "feed_unavailable": "フィードを取得できません。",
     "feed_empty": "最近のフィード投稿はありません。",
     "feed_stale": "古いフィード情報を表示しています。更新が必要です。"
+  },
+  "session_credits": {
+    "estimated_cost": "推定費用",
+    "setting": "セッションの credits 差引額を表示",
+    "description": "セッションで credits 残高から差し引かれた数量を取得します。調整や無料 credits を含む場合があり、データが遅れることがあります。",
+    "label": "残高差引額 · セッション累計",
+    "refresh": "セッション credits を更新",
+    "loading": "読み込み中…",
+    "partial": "一部のデータ",
+    "cached": "キャッシュデータ",
+    "mock": "模擬データ",
+    "adjustment": "負の値には返金や調整が含まれる場合があります。",
+    "data_as_of": "データ日時",
+    "errors": {
+      "chatgptLoginRequired": "ChatGPT でログインしてください。",
+      "identityUnavailable": "ChatGPT のアカウントとユーザーを確認できません。",
+      "identityChanged": "アカウントが変わりました。更新してください。",
+      "forbidden": "このアカウントでは読み取れません。",
+      "endpointUnavailable": "セッション credits API は一時的に利用できません。",
+      "rateLimited": "リクエストが多すぎます。しばらくして再試行してください。",
+      "serviceUnavailable": "一時的に利用できません。キャッシュ値を保持しています。",
+      "networkError": "接続できません。キャッシュ値を保持しています。",
+      "invalidResponse": "無効な応答です。キャッシュ値を保持しています。",
+      "loadFailed": "セッション credits を読み取れません。",
+      "unavailable": "残高差引額のデータがありません。ゼロを意味しません。",
+      "invalidThread": "有効なセッション UUID がありません。"
+    }
   }
 }

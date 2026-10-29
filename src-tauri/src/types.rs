@@ -464,6 +464,8 @@ pub struct SessionQuotaWindowUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionDetailRow {
+    #[serde(default)]
+    pub thread_id: Option<String>,
     pub path: String,
     pub session_id: String,
     pub thread_name: Option<String>,

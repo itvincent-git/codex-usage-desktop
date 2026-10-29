@@ -551,6 +551,7 @@ dependencies = [
 name = "codex-usage-desktop"
 version = "5.2.1"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "dirs 6.0.0",

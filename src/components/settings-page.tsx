@@ -40,6 +40,8 @@ type SettingsPageProps = {
   launchAtLoginError: string | null;
   isLaunchAtLoginUpdating: boolean;
   onLaunchAtLoginChange: (enabled: boolean) => void;
+  showSessionCredits?: boolean;
+  onShowSessionCreditsChange?: (show: boolean) => void;
   showLogsTab: boolean;
   onShowLogsTabChange: (show: boolean) => void;
   autoRefreshIntervalMinutes: AutoRefreshIntervalMinutes;
@@ -81,6 +83,8 @@ export function SettingsPage({
   launchAtLoginError,
   isLaunchAtLoginUpdating,
   onLaunchAtLoginChange,
+  showSessionCredits = false,
+  onShowSessionCreditsChange,
   showLogsTab,
   onShowLogsTabChange,
   autoRefreshIntervalMinutes,
@@ -310,6 +314,17 @@ export function SettingsPage({
           <CardDescription>{t("settings.display_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-5 flex items-center justify-between gap-4 border-t border-border pt-5">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-foreground">{t("session_credits.setting")}</h4>
+              <p className="max-w-lg text-sm leading-6 text-muted-foreground">{t("session_credits.description")}</p>
+            </div>
+            <button type="button" role="switch" aria-checked={showSessionCredits} aria-label={t("session_credits.setting")}
+              disabled={isDisabled} onClick={() => onShowSessionCreditsChange?.(!showSessionCredits)}
+              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent ${showSessionCredits ? "bg-indigo-600" : "bg-neutral-700"}`}>
+              <span aria-hidden="true" className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${showSessionCredits ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
           <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <h4 className="text-sm font-medium text-foreground">{t("settings.show_logs_title")}</h4>
