@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "codex-usage-desktop"
-version = "5.3.0"
+version = "5.3.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
