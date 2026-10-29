@@ -2,7 +2,7 @@
 
 > **看清 Codex Token 用在哪里、额度还剩多少、何时重置——一个本地桌面应用就够了。**
 
-**[下载 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 芯片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md)
+**[下载 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 芯片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md)
 
 ⭐ 如果 Codex Usage Desktop 对你有帮助，欢迎[为项目点亮 **Star**](https://github.com/itvincent-git/codex-usage-desktop)。
 
@@ -59,6 +59,12 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 实时额度使用本机已有的 Codex 登录状态。
 
 ![macOS 菜单栏中的 Codex 额度与重置倒计时](docs/menubar.jpg)
+
+菜单栏还可以显示今日 Token 用量和预估成本。在 macOS 上，右键点击菜单栏组件，即可打开紧凑面板，查看 5 小时与每周额度进度、重置时间、今日 Token 用量和预估成本，也可以直接打开主窗口或退出应用。
+
+<img src="docs/menubar-menu.jpg" alt="macOS 菜单栏右键面板，显示剩余额度、重置时间和今日用量" width="436" />
+
+*菜单栏截图中的账户和用量均为示例数据。*
 
 ### 🔍 找出 Token 消耗来源
 
@@ -130,7 +136,7 @@ Codex Usage Desktop 随时可用，尽量减少打扰：
 - macOS 菜单栏 / Windows 系统托盘
 - 开机启动
 - 自动检查更新
-- English、简体中文、繁體中文和日本語
+- English、简体中文、繁體中文、日本語和한국어
 - Windows WSL Codex 会话检测
 - 浅色与深色主题
 

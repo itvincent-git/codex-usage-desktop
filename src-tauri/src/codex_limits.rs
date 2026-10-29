@@ -28,7 +28,6 @@ const CODEX_RESET_CREDITS_URL: &str =
     "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
 const CHATGPT_ACCOUNT_CHECK_URL: &str =
     "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27";
-const CODEX_QUOTA_FORECAST_URL: &str = "https://codexreset.app/api/signal";
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
@@ -165,20 +164,6 @@ struct LimitsFetchFlight {
 struct WindowActivationMarker {
     window_key: String,
     attempted_at: i64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CodexQuotaForecastApiResponse {
-    generated_at: String,
-    forecast: CodexQuotaForecastScore,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CodexQuotaForecastScore {
-    probability_24h: i64,
-    probability_48h: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -510,42 +495,6 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
         }
         thread::sleep(Duration::from_millis(100));
     }
-}
-
-pub fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(6))
-        .build()
-        .map_err(|error| format!("Failed to build forecast HTTP client: {error}"))?;
-
-    let response = client
-        .get(CODEX_QUOTA_FORECAST_URL)
-        .header("User-Agent", "codex-usage-desktop")
-        .header("Accept", "application/json")
-        .send()
-        .map_err(|error| format!("Forecast request failed: {error}"))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("Forecast endpoint returned status {status}"));
-    }
-
-    let body = response
-        .text()
-        .map_err(|error| format!("Failed to read forecast response: {error}"))?;
-
-    parse_codex_quota_forecast(&body)
-}
-
-fn parse_codex_quota_forecast(body: &str) -> Result<CodexQuotaForecastResponse, String> {
-    let response: CodexQuotaForecastApiResponse = serde_json::from_str(body)
-        .map_err(|error| format!("Failed to parse forecast JSON: {error}"))?;
-
-    Ok(CodexQuotaForecastResponse {
-        probability_24h: response.forecast.probability_24h,
-        score: response.forecast.probability_48h,
-        fetched_at: response.generated_at,
-    })
 }
 
 fn fetch_codex_limits_with(
@@ -1311,7 +1260,7 @@ impl CodexRpcProcess {
     }
 
     fn fetch_rate_limits(&mut self) -> Result<RpcRateLimitSnapshot, String> {
-        let value = self.request("account/rateLimits/read", None, Duration::from_secs(3))?;
+        let value = self.request("account/rateLimits/read", None, Duration::from_secs(30))?;
         let response = serde_json::from_value::<RpcRateLimitsResponse>(value)
             .map_err(|error| format!("Failed to parse Codex rate limits: {error}"))?;
         Ok(response.rate_limits)
@@ -2649,33 +2598,6 @@ mod tests {
                 workspace_name: Some("Elelive团队".to_string()),
                 has_active_subscription: Some(true),
                 ..SubscriptionInfo::default()
-            }
-        );
-    }
-
-    #[test]
-    fn parses_quota_forecast_from_full_response() {
-        let response = parse_codex_quota_forecast(
-            r#"{
-                "generatedAt": "2026-09-22T06:26:28.349Z",
-                "dataAsOf": "2026-09-22T01:19:18.975Z",
-                "forecast": {
-                    "probability24h": 67,
-                    "probability48h": 85,
-                    "confidence": "moderate",
-                    "hoursSinceLastReset": 1418.8
-                },
-                "sourceMonitoring": [{"source": "github", "status": "elevated"}]
-            }"#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            response,
-            CodexQuotaForecastResponse {
-                probability_24h: 67,
-                score: 85,
-                fetched_at: "2026-09-22T06:26:28.349Z".to_string(),
             }
         );
     }

@@ -1,4 +1,28 @@
 {
+  "5.2.1": {
+    "zh": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover\n- fix(e2e): correct Tauri result types blocking release builds",
+    "en": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover\n- fix(e2e): correct Tauri result types blocking release builds"
+  },
+  "5.2.0": {
+    "zh": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover",
+    "en": "- docs: replace dashboard screenshot with anonymized sample data\n- chore(homebrew): update cask to 5.1.1\n- feat(tray): add circular usage indicators and macOS popover"
+  },
+  "5.1.1": {
+    "zh": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view\n- fix(i18n): complete trend translations for release checks",
+    "en": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view\n- fix(i18n): complete trend translations for release checks"
+  },
+  "5.1.0": {
+    "zh": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view",
+    "en": "- chore(homebrew): update cask to 5.0.0\n- fix(limits): allow slow Codex CLI quota responses\n- feat(dashboard): add daily quota trend view"
+  },
+  "5.0.0": {
+    "zh": "- chore(homebrew): update cask to 4.2.0\n- doc: add gh instruction\n- feat(dashboard): add independent global reset forecast card\n- feat(dashboard): prioritize reset announcements and Tibo posts\n- feat(forecast): prioritize active reset promises and evidence\n- feat(forecast): replace historical reference with latest feed posts\n- feat: move quota controls into compact sidebar cards\n- fix: restore quota outline color reminders\n- fix: anchor quota outline depletion at top center\n- feat(sidebar): show compact quota cards when collapsed\n- feat: compact the Codex reset forecast layout\n- fix: simplify the forecast source footer\n- fix(ui): enlarge sidebar quota reset text\n- feat: use codex-reset.com for reset history\n- feat: display reset history as a 30-day block calendar\n- style: set reset history block radius to 3px\n- feat: highlight recent reset status and color reset details\n- fix: show all reset credits in a scrollable list\n- feat: move reset source attribution to third-party settings\n- fix: place app updates at the top of settings",
+    "en": "- chore(homebrew): update cask to 4.2.0\n- doc: add gh instruction\n- feat(dashboard): add independent global reset forecast card\n- feat(dashboard): prioritize reset announcements and Tibo posts\n- feat(forecast): prioritize active reset promises and evidence\n- feat(forecast): replace historical reference with latest feed posts\n- feat: move quota controls into compact sidebar cards\n- fix: restore quota outline color reminders\n- fix: anchor quota outline depletion at top center\n- feat(sidebar): show compact quota cards when collapsed\n- feat: compact the Codex reset forecast layout\n- fix: simplify the forecast source footer\n- fix(ui): enlarge sidebar quota reset text\n- feat: use codex-reset.com for reset history\n- feat: display reset history as a 30-day block calendar\n- style: set reset history block radius to 3px\n- feat: highlight recent reset status and color reset details\n- fix: show all reset credits in a scrollable list\n- feat: move reset source attribution to third-party settings\n- fix: place app updates at the top of settings"
+  },
+  "4.2.0": {
+    "zh": "- chore(homebrew): update cask to 4.1.0\n- fix: keep collapsed sidebar clear of macOS window controls\n- docs: refresh dashboard screenshot with illustrative data\n- feat(i18n): add Korean localization (#15)\n- docs: add Korean README",
+    "en": "- chore(homebrew): update cask to 4.1.0\n- fix: keep collapsed sidebar clear of macOS window controls\n- docs: refresh dashboard screenshot with illustrative data\n- feat(i18n): add Korean localization (#15)\n- docs: add Korean README"
+  },
   "4.1.0": {
     "zh": "- chore(homebrew): update cask to 4.0.1\n- feat: add background search to session details\n- fix: find session matches in place without hiding context\n- fix: open session search from the header icon\n- fix: highlight all session matches in a floating search bar\n- fix: keep session search responsive during rapid typing",
     "en": "- chore(homebrew): update cask to 4.0.1\n- feat: add background search to session details\n- fix: find session matches in place without hiding context\n- fix: open session search from the header icon\n- fix: highlight all session matches in a floating search bar\n- fix: keep session search responsive during rapid typing"

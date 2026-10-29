@@ -1,4 +1,5 @@
 mod codex_environment;
+mod codex_forecast;
 mod codex_limits;
 mod codex_projects;
 mod codex_resets;
@@ -12,6 +13,7 @@ mod scanner;
 mod session_file;
 mod session_index;
 mod session_replay;
+mod tray_popover;
 mod types;
 mod update_analytics;
 
@@ -23,7 +25,7 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem, MenuItemKind};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use types::{
@@ -332,8 +334,10 @@ async fn activate_codex_window(
 }
 
 #[tauri::command]
-async fn fetch_codex_quota_forecast() -> Result<CodexQuotaForecastResponse, String> {
-    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_quota_forecast)
+async fn fetch_codex_quota_forecast(
+    locale: Option<String>,
+) -> Result<CodexQuotaForecastResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || codex_forecast::fetch(locale.as_deref().unwrap_or("en")))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -884,6 +888,7 @@ async fn reveal_in_file_manager(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 #[derive(serde::Deserialize)]
 struct TrayMenuItemDto {
     id: String,
@@ -891,19 +896,59 @@ struct TrayMenuItemDto {
     enabled: bool,
 }
 
+#[cfg(target_os = "macos")]
+#[derive(serde::Deserialize)]
+struct TrayIconBitmap {
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+}
+
 #[derive(serde::Deserialize)]
 struct TrayMenuUpdate {
     title: String,
+    #[cfg(not(target_os = "macos"))]
     items: Vec<TrayMenuItemDto>,
+    #[cfg(not(target_os = "macos"))]
     show_main_text: Option<String>,
+    #[cfg(not(target_os = "macos"))]
     quit_text: Option<String>,
+    popover: Option<serde_json::Value>,
+    #[cfg(target_os = "macos")]
+    icon: Option<TrayIconBitmap>,
 }
 
 #[tauri::command]
 fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), String> {
+    if let Some(data) = payload.popover {
+        tray_popover::update(&app, data)?;
+    }
     if let Some(tray) = app.tray_by_id("main") {
         #[cfg(target_os = "macos")]
-        let _ = tray.set_title(Some(&payload.title));
+        {
+            if let Some(icon) = payload.icon {
+                if icon.width == 0
+                    || icon.height == 0
+                    || u64::from(icon.width) * u64::from(icon.height) * 4 != icon.rgba.len() as u64
+                {
+                    return Err("Invalid tray icon dimensions".to_string());
+                }
+                tray.set_icon(Some(tauri::image::Image::new_owned(
+                    icon.rgba,
+                    icon.width,
+                    icon.height,
+                )))
+                .map_err(|error| error.to_string())?;
+                tray.set_title(Some(""))
+                    .map_err(|error| error.to_string())?;
+            } else {
+                tray.set_icon(None).map_err(|error| error.to_string())?;
+                tray.set_title(Some(&payload.title))
+                    .map_err(|error| error.to_string())?;
+            }
+            tray.set_tooltip(Some(&payload.title))
+                .map_err(|error| error.to_string())?;
+        }
         #[cfg(not(target_os = "macos"))]
         let _ = tray.set_tooltip(Some(if payload.title.is_empty() {
             "Codex Usage".to_string()
@@ -911,44 +956,73 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
             payload.title.clone()
         }));
 
-        let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
+        #[cfg(not(target_os = "macos"))]
+        {
+            let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
 
-        for item in payload.items {
-            if item.id == "separator" {
-                menu_builder = menu_builder.separator();
-            } else {
-                let menu_item = tauri::menu::MenuItemBuilder::with_id(&item.id, &item.text)
-                    .enabled(item.enabled)
-                    .build(&app)
-                    .map_err(|e| e.to_string())?;
-                menu_builder = menu_builder.item(&menu_item);
+            for item in payload.items {
+                if item.id == "separator" {
+                    menu_builder = menu_builder.separator();
+                } else {
+                    let menu_item = tauri::menu::MenuItemBuilder::with_id(&item.id, &item.text)
+                        .enabled(item.enabled)
+                        .build(&app)
+                        .map_err(|e| e.to_string())?;
+                    menu_builder = menu_builder.item(&menu_item);
+                }
             }
+
+            let show_main_label = payload
+                .show_main_text
+                .unwrap_or_else(|| "显示主窗口 / Show Main Window".to_string());
+            let quit_label = payload
+                .quit_text
+                .unwrap_or_else(|| "退出 / Quit".to_string());
+
+            menu_builder = menu_builder
+                .separator()
+                .item(
+                    &tauri::menu::MenuItemBuilder::with_id("show_main", &show_main_label)
+                        .build(&app)
+                        .map_err(|e| e.to_string())?,
+                )
+                .item(
+                    &tauri::menu::MenuItemBuilder::with_id("quit", &quit_label)
+                        .build(&app)
+                        .map_err(|e| e.to_string())?,
+                );
+
+            let menu = menu_builder.build().map_err(|e| e.to_string())?;
+            let _ = tray.set_menu(Some(menu));
         }
-
-        let show_main_label = payload
-            .show_main_text
-            .unwrap_or_else(|| "显示主窗口 / Show Main Window".to_string());
-        let quit_label = payload
-            .quit_text
-            .unwrap_or_else(|| "退出 / Quit".to_string());
-
-        menu_builder = menu_builder
-            .separator()
-            .item(
-                &tauri::menu::MenuItemBuilder::with_id("show_main", &show_main_label)
-                    .build(&app)
-                    .map_err(|e| e.to_string())?,
-            )
-            .item(
-                &tauri::menu::MenuItemBuilder::with_id("quit", &quit_label)
-                    .build(&app)
-                    .map_err(|e| e.to_string())?,
-            );
-
-        let menu = menu_builder.build().map_err(|e| e.to_string())?;
-        let _ = tray.set_menu(Some(menu));
     }
     Ok(())
+}
+
+fn handle_tray_click(app: &tauri::AppHandle, button: MouseButton, _rect: Option<tauri::Rect>) {
+    #[cfg(target_os = "macos")]
+    if button == MouseButton::Right {
+        if let Err(error) = tray_popover::toggle(app, _rect) {
+            log::warn!("Failed to show tray popover: {error}");
+        }
+        return;
+    }
+    if button != MouseButton::Left {
+        return;
+    }
+    let popover_visible = app
+        .get_webview_window("tray")
+        .is_some_and(|window| window.is_visible().unwrap_or(false));
+    if let Err(error) = tray_popover::dismiss(app) {
+        log::warn!("Failed to dismiss tray popover: {error}");
+    }
+    if popover_visible {
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
 }
 
 fn delete_pricing_cache(path: &Path) -> Result<(), String> {
@@ -1014,6 +1088,20 @@ pub fn run() {
 
     builder
         .on_window_event(|window, event| {
+            if window.label() == "tray" {
+                if matches!(event, tauri::WindowEvent::Focused(false)) {
+                    #[cfg(target_os = "macos")]
+                    if let Err(error) = tray_popover::dismiss_on_focus_loss(window.app_handle()) {
+                        log::warn!("Failed to dismiss tray popover: {error}");
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    let _ = window.hide();
+                }
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    let _ = tray_popover::dismiss(window.app_handle());
+                    api.prevent_close();
+                }
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     let _ = window.hide();
@@ -1043,6 +1131,9 @@ pub fn run() {
             ))?;
 
             setup_app_menu(app)?;
+            app.manage(tray_popover::TrayPopoverState::default());
+            #[cfg(target_os = "macos")]
+            tray_popover::setup(app)?;
 
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -1088,20 +1179,18 @@ pub fn run() {
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
+                        button,
+                        rect: _rect,
+                        button_state: MouseButtonState::Up,
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        handle_tray_click(tray.app_handle(), button, Some(_rect));
                     }
                 });
             #[cfg(not(target_os = "macos"))]
             let tray_builder = tray_builder.icon(tray_icon_image);
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             let tray_builder = tray_builder.show_menu_on_left_click(false);
 
             let _tray = tray_builder.build(app).map_err(|e| e.to_string())?;
@@ -1167,7 +1256,9 @@ pub fn run() {
             fetch_project_session_days,
             fetch_project_day_sessions,
             fetch_session_detail,
-            update_tray
+            update_tray,
+            tray_popover::get_tray_popover,
+            tray_popover::tray_popover_action
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

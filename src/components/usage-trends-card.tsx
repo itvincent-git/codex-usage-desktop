@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { OverviewResponse } from "@/lib/api";
-import { formatCompactNumber, formatCurrencyShort, formatNumber } from "@/lib/formatters";
+import { formatCompactNumber, formatCurrencyShort, formatNumber, formatPercent } from "@/lib/formatters";
 import { formatTrendDateLabel, getYAxisWidth } from "@/lib/usage-dashboard";
 import type { MetricCardData, MetricCardKind } from "@/lib/usage-dashboard";
 import { cn } from "@/lib/utils";
@@ -34,20 +34,27 @@ const chartLegend = [
   { dataKey: "costUSD", labelKey: "common.cost", defaultLabel: "Cost", className: "bg-primary" },
 ] as const;
 
-type ChartSeriesKey = (typeof chartLegend)[number]["dataKey"];
+const quotaLegend = [
+  { dataKey: "fiveHourPercent", labelKey: "trends.five_hour_usage", defaultLabel: "5h usage", className: "border-orange-500", stroke: "#f97316", dash: undefined },
+  { dataKey: "weeklyPercent", labelKey: "trends.weekly_monthly_usage", defaultLabel: "Weekly/monthly usage", className: "border-rose-500 border-dashed", stroke: "#f43f5e", dash: "5 4" },
+] as const;
 
-export const UsageTrendTooltip = ({ active, payload, label, t, compact = false }: any) => {
+type ChartSeriesKey = (typeof chartLegend)[number]["dataKey"] | (typeof quotaLegend)[number]["dataKey"];
+type TrendView = "cost" | "quota";
+
+export const UsageTrendTooltip = ({ active, payload, label, t, compact = false, view = "cost" }: any) => {
   if (active && payload && payload.length) {
-    const input = payload.find((p: any) => p.dataKey === "inputTokens")?.value ?? 0;
-    const cached = payload.find((p: any) => p.dataKey === "cachedInputTokens")?.value ?? 0;
-    const output = payload.find((p: any) => p.dataKey === "outputTokens")?.value ?? 0;
-    const cost = payload.find((p: any) => p.dataKey === "costUSD")?.value ?? 0;
-    const total = payload.find((p: any) => p.dataKey === "totalTokens")?.value ?? input + cached + output;
+    const day = payload[0]?.payload;
+    const input = day?.inputTokens ?? payload.find((p: any) => p.dataKey === "inputTokens")?.value ?? 0;
+    const cached = day?.cachedInputTokens ?? payload.find((p: any) => p.dataKey === "cachedInputTokens")?.value ?? 0;
+    const output = day?.outputTokens ?? payload.find((p: any) => p.dataKey === "outputTokens")?.value ?? 0;
+    const cost = day?.costUSD ?? payload.find((p: any) => p.dataKey === "costUSD")?.value ?? 0;
+    const total = day?.totalTokens ?? payload.find((p: any) => p.dataKey === "totalTokens")?.value ?? input + cached + output;
 
     return (
       <div className={cn("select-none rounded-lg border border-border/70 bg-surface shadow-xl", compact ? "min-w-36 p-2" : "min-w-[220px] p-3.5")}>
         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {label}
+          {compact ? label : day?.date ?? label}
         </p>
         <div className="space-y-1.5 text-xs">
           <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-border/60 pb-1.5 font-semibold text-foreground">
@@ -79,13 +86,29 @@ export const UsageTrendTooltip = ({ active, payload, label, t, compact = false }
             <span className="font-mono font-medium text-foreground">{formatNumber(output)}</span>
           </div> : null}
 
-          <div className="mt-1.5 flex items-center justify-between gap-4 border-t border-border/60 pt-1.5 font-semibold text-primary">
+          {!compact && view === "quota" ? <div className="mt-1.5 space-y-1.5 border-t border-border/60 pt-1.5">
+            {quotaLegend.map((item) => {
+              const value = day?.[item.dataKey] ?? payload.find((p: any) => p.dataKey === item.dataKey)?.value;
+              return (
+                <div key={item.dataKey} className="flex items-center justify-between gap-4">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className={cn("w-3 border-t-2", item.className)} />
+                    {t(item.labelKey)}
+                  </span>
+                  <span className="font-mono font-medium text-foreground">
+                    {value == null ? t("trends.no_data") : t("trends.approx_percent", { value: formatPercent(value / 100) })}
+                  </span>
+                </div>
+              );
+            })}
+            <p className="max-w-64 text-[10px] leading-relaxed text-muted-foreground">{t("trends.quota_note")}</p>
+          </div> : <div className="mt-1.5 flex items-center justify-between gap-4 border-t border-border/60 pt-1.5 font-semibold text-primary">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-primary" />
               {t("common.cost", { defaultValue: "Cost" })}
             </span>
             <span className="font-mono">{formatCurrencyShort(cost)}</span>
-          </div>
+          </div>}
         </div>
       </div>
     );
@@ -98,6 +121,8 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const { t } = useTranslation();
   const gradientId = useId().replace(/:/g, "");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [view, setView] = useState<TrendView>("cost");
+  const isQuotaView = !compact && view === "quota";
   const [hiddenSeries, setHiddenSeries] = useState<Set<ChartSeriesKey>>(() => new Set());
   const trendData = daily.map((day) => ({
     date: day.date,
@@ -107,12 +132,17 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
     outputTokens: day.outputTokens,
     totalTokens: day.totalTokens,
     costUSD: day.costUSD,
+    fiveHourPercent: day.fiveHourPercent ?? null,
+    weeklyPercent: day.weeklyPercent ?? null,
   }));
 
   const maxDailyTokens = Math.max(...daily.map((day) => day.totalTokens), 1);
   const maxDailyCost = Math.max(...daily.map((day) => day.costUSD), 0);
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatCompactNumber, 64);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
+  const maxDailyQuota = Math.max(...daily.flatMap((day) => [day.fiveHourPercent ?? 0, day.weeklyPercent ?? 0]), 1);
+  const quotaAxisWidth = getYAxisWidth(maxDailyQuota, (value) => `${formatNumber(value)}%`, 72);
+  const hasQuotaData = daily.some((day) => day.fiveHourPercent != null || day.weeklyPercent != null);
 
   const toggleSeries = (dataKey: ChartSeriesKey) => {
     setHiddenSeries((current) => {
@@ -152,9 +182,25 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
       {compact ? <div className="flex items-center gap-3 px-1 text-[10px] text-muted-foreground"><span className="sr-only">{title}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-success/80" />{t("trends.total_tokens")}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-primary" />{t("common.cost")}</span></div> : <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-2 sm:px-3 sm:py-1.5">
         {title ? <span className="mr-auto text-xs font-semibold text-foreground">{title}</span> : null}
         <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
-        <span className="sr-only">{t("trends.cost_trend", { defaultValue: "Cost Trend" })}</span>
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {chartLegend.map((item) => (
+        <div role="group" aria-label={t("trends.view_label")} className="mr-3 inline-flex shrink-0 rounded-md border border-border/70 p-0.5">
+          {(["cost", "quota"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={view === mode}
+              className={cn(
+                "rounded-sm px-2 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                view === mode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setView(mode)}
+            >
+              {t(`trends.view_${mode}`)}
+            </button>
+          ))}
+        </div>
+        <span className="sr-only">{t(isQuotaView ? "trends.quota_trend" : "trends.cost_trend")}</span>
+        <div role="group" aria-label={t("trends.legend_label")} className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {chartLegend.filter((item) => !isQuotaView || item.dataKey !== "costUSD").map((item) => (
             <button
               key={item.dataKey}
               type="button"
@@ -169,6 +215,21 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
               {t(item.labelKey, { defaultValue: item.defaultLabel })}
             </button>
           ))}
+          {isQuotaView ? quotaLegend.map((item) => (
+            <button
+              key={item.dataKey}
+              type="button"
+              aria-pressed={!hiddenSeries.has(item.dataKey)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-sm transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                hiddenSeries.has(item.dataKey) && "opacity-35",
+              )}
+              onClick={() => toggleSeries(item.dataKey)}
+            >
+              <span className={cn("w-3 border-t-2", item.className)} />
+              {t(item.labelKey, { defaultValue: item.defaultLabel })}
+            </button>
+          )) : null}
         </div>
         <button
           type="button"
@@ -187,7 +248,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
               ? { height: chartHeight, minHeight: chartHeight }
               : { height: chartHeight }
           }
-          className={cn("min-w-0", typeof chartHeight === "string" && "flex-1 min-h-[145px]")}
+          className={cn("relative min-w-0", typeof chartHeight === "string" && "flex-1 min-h-[145px]")}
         >
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <ComposedChart data={trendData} barGap={4} barCategoryGap={compact ? "10%" : "32%"} margin={compact ? { top: 8, right: 4, left: 4, bottom: 0 } : { top: 18, right: 10, left: 4, bottom: 6 }}>
@@ -217,23 +278,26 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 tickFormatter={(value) => formatCompactNumber(Number(value))}
               />
               <YAxis
-                yAxisId="cost"
+                yAxisId="metric"
                 hide={compact}
                 orientation="right"
-                width={costAxisWidth}
+                width={isQuotaView ? quotaAxisWidth : costAxisWidth}
+                domain={isQuotaView ? [0, "auto"] : undefined}
+                allowDecimals={!isQuotaView}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--primary) / 0.78)", fontSize: 11 }}
-                tickFormatter={(value) => formatCurrencyShort(Number(value))}
+                tick={{ fill: isQuotaView ? "rgb(var(--muted-foreground) / 0.7)" : "rgb(var(--primary) / 0.78)", fontSize: 11 }}
+                tickFormatter={(value) => isQuotaView ? `${formatNumber(Number(value))}%` : formatCurrencyShort(Number(value))}
               />
               <Tooltip
-                content={<UsageTrendTooltip t={t} compact={compact} />}
+                content={<UsageTrendTooltip t={t} compact={compact} view={view} />}
+                includeHidden
                 cursor={{ stroke: "rgb(var(--primary) / 0.22)", strokeDasharray: "4 4", strokeWidth: 1 }}
                 wrapperStyle={{ zIndex: 10 }}
               />
 
-              {!compact ? <Area
-                yAxisId="cost"
+              {!compact && !isQuotaView ? <Area
+                yAxisId="metric"
                 type="monotone"
                 dataKey="costUSD"
                 fill={`url(#${gradientId})`}
@@ -283,8 +347,8 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 isAnimationActive={false}
               /> : null}
 
-              <Line
-                yAxisId="cost"
+              {!isQuotaView ? <Line
+                yAxisId="metric"
                 type="monotone"
                 dataKey="costUSD"
                 name="Cost (USD)"
@@ -294,9 +358,26 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 activeDot={compact ? { r: 3 } : { r: 5.5, strokeWidth: 2.25, fill: "rgb(var(--surface))" }}
                 hide={hiddenSeries.has("costUSD")}
                 isAnimationActive={false}
-              />
+              /> : quotaLegend.map((item) => (
+                <Line
+                  key={item.dataKey}
+                  yAxisId="metric"
+                  type="linear"
+                  dataKey={item.dataKey}
+                  name={t(item.labelKey)}
+                  stroke={item.stroke}
+                  strokeDasharray={item.dash}
+                  strokeWidth={2.5}
+                  dot={{ r: 2.8, strokeWidth: 1.5, fill: "rgb(var(--surface))" }}
+                  activeDot={{ r: 5.5, strokeWidth: 2.25, fill: "rgb(var(--surface))" }}
+                  connectNulls={false}
+                  hide={hiddenSeries.has(item.dataKey)}
+                  isAnimationActive={false}
+                />
+              ))}
             </ComposedChart>
           </ResponsiveContainer>
+          {isQuotaView && !hasQuotaData ? <p role="status" className="pointer-events-none absolute inset-x-0 top-2 text-center text-xs text-muted-foreground">{t("trends.quota_no_data")}</p> : null}
         </div>
 
         {metrics.length > 0 ? <div className="trend-metrics grid grid-cols-2 gap-px sm:grid-cols-4 overflow-hidden rounded-lg border border-border/70 bg-border/70">

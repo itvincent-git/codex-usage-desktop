@@ -1,3 +1,4 @@
+import { useCodexForecast } from "@/hooks/use-codex-forecast";
 import { save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
@@ -7,14 +8,12 @@ import {
   activateCodexWindow,
   exportUsage,
   fetchCodexLimits,
-  fetchCodexQuotaForecast,
   fetchLatestCodexReset,
   fetchCodexResetHistory,
   fetchMonthlyUsage,
   fetchOverview,
   resetUsageState,
   type CodexLimitsResponse,
-  type CodexQuotaForecastResponse,
   type CodexResetAnnouncement,
   type ExportFormat,
   type MonthlyUsageResponse,
@@ -38,16 +37,18 @@ import {
   type ScanResponse,
 } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
+import type { TrayQuotaIndicator, TrayMetricIndicator } from "@/lib/tray-icon";
+import type { TrayPopoverData } from "@/lib/tray-popover";
 import type { DashboardView } from "@/components/dashboard-header";
 import { getExportDialogOptions, getExportFileName, getRangeLabel } from "@/lib/usage-dashboard";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { formatResetTime, hasSubscription, RECENT_RESET_OVERVIEW_DAYS } from "@/components/codex-limits-card";
 import {
   DEFAULT_TRAY_COUNTDOWN_UNITS,
-  DEFAULT_TRAY_TITLE_FORMATS,
+  TRAY_TITLE_TEMPLATES,
+  formatCompactResetCountdown,
   formatTrayLimitTitle,
   type TrayCountdownUnits,
-  type TrayTitleFormats,
 } from "@/lib/tray-format";
 
 function isNewerVersion(current: string, target: string): boolean {
@@ -68,7 +69,6 @@ export type AutoRefreshIntervalMinutes = (typeof AUTO_REFRESH_INTERVAL_OPTIONS)[
 const DEFAULT_AUTO_REFRESH_INTERVAL_MINUTES: AutoRefreshIntervalMinutes = 5;
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 const UPDATE_CHECK_RETRY_MS = 60 * 60_000;
-const CODEX_QUOTA_FORECAST_URL = "https://codexreset.app/";
 const CHATGPT_USAGE_URL = "https://chatgpt.com/#settings/Usage";
 
 function hasExpiredLimitWindow(window: CodexLimitWindow | null | undefined): boolean {
@@ -118,7 +118,7 @@ function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgress
 }
 
 export function useUsageDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -129,7 +129,7 @@ export function useUsageDashboard() {
   const [isWindowActivating, setIsWindowActivating] = useState(false);
   const [windowActivationStatus, setWindowActivationStatus] = useState<CodexWindowActivationStatus | null>(null);
   const [windowActivationError, setWindowActivationError] = useState<string | null>(null);
-  const [codexQuotaForecast, setCodexQuotaForecast] = useState<CodexQuotaForecastResponse | null>(null);
+  const forecast = useCodexForecast(view === "dashboard", i18n.language);
   const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
   const [recentCodexResets, setRecentCodexResets] = useState<CodexResetAnnouncement[] | null>(null);
   const [scanMessage, setScanMessage] = useState<ScanMessage>({ key: "hero.sync_logs_to_cache_desc" });
@@ -195,20 +195,21 @@ export function useUsageDashboard() {
     return { limit5h: true, limitWeekly: true, tokens: false, cost: false };
   });
 
+  const [trayDark, setTrayDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return;
+    const update = () => setTrayDark(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
   const [trayMenuShow, setTrayMenuShowState] = useState(() => {
     try {
       const saved = localStorage.getItem("tray_menu_show");
       if (saved) return JSON.parse(saved);
     } catch (_) {}
     return { limit5h: true, limitWeekly: true, tokens: true, cost: true };
-  });
-
-  const [trayTitleFormats, setTrayTitleFormatsState] = useState<TrayTitleFormats>(() => {
-    try {
-      const saved = localStorage.getItem("tray_title_formats");
-      if (saved) return { ...DEFAULT_TRAY_TITLE_FORMATS, ...JSON.parse(saved) };
-    } catch (_) {}
-    return DEFAULT_TRAY_TITLE_FORMATS;
   });
 
   const [trayCountdownUnits, setTrayCountdownUnitsState] = useState<TrayCountdownUnits>(() => {
@@ -229,12 +230,6 @@ export function useUsageDashboard() {
     const next = { ...trayMenuShow, [key]: value };
     localStorage.setItem("tray_menu_show", JSON.stringify(next));
     setTrayMenuShowState(next);
-  };
-
-  const handleTrayTitleFormatChange = (key: keyof TrayTitleFormats, value: string) => {
-    const next = { ...trayTitleFormats, [key]: value };
-    localStorage.setItem("tray_title_formats", JSON.stringify(next));
-    setTrayTitleFormatsState(next);
   };
 
   const handleTrayCountdownUnitChange = (key: keyof TrayCountdownUnits, value: string) => {
@@ -351,15 +346,6 @@ export function useUsageDashboard() {
       setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
     } finally {
       limitsFetchInFlightRef.current = false;
-    }
-  });
-
-  const loadCodexQuotaForecast = useEffectEvent(async () => {
-    try {
-      const data = await fetchCodexQuotaForecast();
-      setCodexQuotaForecast(data);
-    } catch (_) {
-      setCodexQuotaForecast(null);
     }
   });
 
@@ -586,7 +572,6 @@ export function useUsageDashboard() {
     try {
       // Do not block initial render on limits fetch
       void loadCodexLimits();
-      void loadCodexQuotaForecast();
       void loadLatestCodexReset();
       void loadRecentCodexResets();
       await loadOverview(range);
@@ -765,27 +750,39 @@ export function useUsageDashboard() {
     const hasSub = hasSubscription(codexLimits);
 
     const titleParts: string[] = [];
+    const indicators: TrayQuotaIndicator[] = [];
+    const addIndicator = (window: CodexLimitWindow | null | undefined, kind: TrayQuotaIndicator["kind"]) => {
+      indicators.push({
+        kind,
+        remainingPercent: window?.remainingPercent ?? null,
+        countdown: formatCompactResetCountdown(window?.resetsAt ?? null, trayCountdownUnits),
+      });
+    };
     if (hasSub) {
       if (trayTitleShow.limit5h && codexLimits?.session) {
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limit5h, codexLimits.session, trayCountdownUnits));
+        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limit5h, codexLimits.session, trayCountdownUnits));
+        addIndicator(codexLimits.session, "5h");
       }
       if (trayTitleShow.limitWeekly) {
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitWeekly, codexLimits?.weekly, trayCountdownUnits));
+        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limitWeekly, codexLimits?.weekly, trayCountdownUnits));
+        addIndicator(codexLimits?.weekly, "weekly");
       }
     } else {
       if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
         const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
-        titleParts.push(formatTrayLimitTitle(trayTitleFormats.limitMonthly, activeWindow, trayCountdownUnits));
+        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limitMonthly, activeWindow, trayCountdownUnits));
+        addIndicator(activeWindow, "monthly");
       }
     }
 
-    if (trayTitleShow.tokens) {
-      titleParts.push(`T: ${formatCompactNumber(todayTokens)}`);
-    }
-    if (trayTitleShow.cost) {
-      titleParts.push(formatCurrencyShort(todayCost));
-    }
-    const title = titleParts.join(trayTitleFormats.separator);
+    const metrics: TrayMetricIndicator[] = [];
+    if (trayTitleShow.tokens) metrics.push({ kind: "tokens", value: formatCompactNumber(todayTokens) });
+    if (trayTitleShow.cost) metrics.push({ kind: "cost", value: formatCurrencyShort(todayCost).replace(/^(?:US)?\$\s*/, "") });
+    const extraParts: string[] = [];
+    if (trayTitleShow.tokens) extraParts.push(`T: ${formatCompactNumber(todayTokens)}`);
+    if (trayTitleShow.cost) extraParts.push(formatCurrencyShort(todayCost));
+    titleParts.push(...extraParts);
+    const title = titleParts.join(" ");
 
     const items: TrayMenuItemDto[] = [];
 
@@ -840,9 +837,56 @@ export function useUsageDashboard() {
       items.splice(accountItemCount, 0, { id: "separator", text: "", enabled: false });
     }
 
+    const quotas: TrayPopoverData["quotas"] = [];
+    const addQuota = (kind: TrayQuotaIndicator["kind"], window: CodexLimitWindow | null | undefined) => {
+      const reset = window?.resetsAt ? new Date(window.resetsAt) : null;
+      const validReset = reset && Number.isFinite(reset.getTime());
+      const resetText = validReset
+        ? reset.getTime() <= Date.now()
+          ? t("limits.resetting_soon")
+          : t("limits.sidebar_reset_at", { time: reset.toLocaleString(i18n.language, {
+              ...(kind === "5h" ? {} : { month: "2-digit", day: "2-digit" } as const),
+              hour: "2-digit", minute: "2-digit", hour12: false,
+            }) })
+        : t("limits.reset_unavailable");
+      const countdown = formatCompactResetCountdown(window?.resetsAt ?? null, trayCountdownUnits);
+      quotas.push({
+        kind,
+        label: t(`tray.quota_${kind}`),
+        remainingPercent: window?.remainingPercent ?? null,
+        usedText: window ? t("tray.used", { percent: Math.round(window.usedPercent) }) : t("limits.unavailable"),
+        resetText: `${resetText}${validReset && countdown && countdown !== "soon" && kind === "5h" ? ` · ${countdown}` : ""}`,
+      });
+    };
+    if (hasSub) {
+      if (trayMenuShow.limit5h && codexLimits?.session) addQuota("5h", codexLimits.session);
+      if (trayMenuShow.limitWeekly) addQuota("weekly", codexLimits?.weekly);
+    } else if (trayMenuShow.limit5h || trayMenuShow.limitWeekly) {
+      addQuota("monthly", codexLimits?.weekly ?? codexLimits?.session);
+    }
+
     void updateTray({
       title,
       items,
+      indicators,
+      metrics,
+      dark: trayDark,
+      popover: {
+        account: codexLimits?.account ?? null,
+        membership: codexLimits?.membershipLevel ?? null,
+        workspace: codexLimits?.workspaceName ?? null,
+        quotas,
+        tokens: trayMenuShow.tokens ? { value: formatCompactNumber(todayTokens), exact: formatNumber(todayTokens) } : null,
+        cost: trayMenuShow.cost ? formatCurrency(todayCost) : null,
+        labels: {
+          remaining: t("limits.remaining"),
+          today: t("tray.today"),
+          cost: t("tray.estimated_cost"),
+          unavailable: t("limits.unavailable"),
+          showMain: t("settings.menu_bar_show_main"),
+          quit: t("settings.menu_bar_quit"),
+        },
+      },
       show_main_text: t("settings.menu_bar_show_main", { defaultValue: "Show Main Window" }),
       quit_text: t("settings.menu_bar_quit", { defaultValue: "Quit" }),
     }).catch((err) => {
@@ -854,7 +898,7 @@ export function useUsageDashboard() {
     overview,
     trayTitleShow,
     trayMenuShow,
-    trayTitleFormats,
+    trayDark,
     trayCountdownUnits,
     trayClockMinute,
     t,
@@ -934,10 +978,11 @@ export function useUsageDashboard() {
   async function handleRefresh() {
     setIsRefreshing(true);
     const startedAt = performance.now();
+    void forecast.refresh();
 
     try {
       await scanAndReloadOverview(startedAt, { force: true });
-      await Promise.all([loadCodexQuotaForecast(), loadLatestCodexReset(), loadRecentCodexResets()]);
+      await Promise.all([loadLatestCodexReset(), loadRecentCodexResets()]);
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
@@ -1123,14 +1168,6 @@ export function useUsageDashboard() {
     }
   };
 
-  const handleOpenCodexQuotaForecast = async () => {
-    try {
-      await openUrl(CODEX_QUOTA_FORECAST_URL);
-    } catch (e) {
-      console.error("Failed to open Codex quota forecast URL", e);
-    }
-  };
-
   const handleOpenResetCredits = async () => {
     try {
       await openUrl(CHATGPT_USAGE_URL);
@@ -1150,7 +1187,7 @@ export function useUsageDashboard() {
     isWindowActivating,
     windowActivationStatus,
     windowActivationError,
-    codexQuotaForecast,
+    forecast,
     latestCodexReset,
     recentCodexResets,
     scanMessage: t(scanMessage.key, scanMessage.values),
@@ -1190,15 +1227,12 @@ export function useUsageDashboard() {
     handleManualUpdateCheck,
     handleUpgrade,
     handleOpenUpdateRelease,
-    handleOpenCodexQuotaForecast,
     handleOpenResetCredits,
     handleLaunchAtLoginChange,
     trayTitleShow,
     handleTrayTitleShowChange,
     trayMenuShow,
     handleTrayMenuShowChange,
-    trayTitleFormats,
-    handleTrayTitleFormatChange,
     trayCountdownUnits,
     handleTrayCountdownUnitChange,
   };

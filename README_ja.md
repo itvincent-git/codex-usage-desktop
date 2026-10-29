@@ -2,7 +2,7 @@
 
 > **Codex のトークンの使い道、残りの利用枠、リセット時刻を、ひとつのローカルデスクトップアプリで把握。**
 
-**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md) · [繁體中文](README_zh-TW.md)
+**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md)
 
 ⭐ Codex Usage Desktop が役に立ったら、[プロジェクトに **Star** を付けて](https://github.com/itvincent-git/codex-usage-desktop)応援してください。
 
@@ -59,6 +59,12 @@ Codex の使用量が増えているか、トークンが何に使われてい�
 リアルタイムの利用枠取得には、ローカルの Codex の既存のログイン状態を使用します。
 
 ![macOS メニューバーに表示される Codex の利用枠とリセットまでのカウントダウン](docs/menubar.jpg)
+
+メニューバーには、本日のトークン使用量と推定コストも表示できます。macOS では、メニューバーのウィジェットを右クリックすると、5 時間枠と週間枠の残量、リセット時刻、本日のトークン使用量、推定コストを確認できるコンパクトなパネルが開きます。このパネルからメインウィンドウを開いたり、アプリを終了したりすることもできます。
+
+<img src="docs/menubar-menu.jpg" alt="残りの利用枠、リセット時刻、本日の使用量を表示する macOS メニューバーの右クリックパネル" width="436" />
+
+*メニューバーのスクリーンショット内のアカウントと使用量はサンプルデータです。*
 
 ### 🔍 トークンの消費元を特定
 
@@ -130,7 +136,7 @@ Codex の利用枠やリセットの仕組みは、時間とともに変わる�
 - macOS メニューバー / Windows システムトレイ
 - ログイン時の自動起動
 - アップデートの自動確認
-- English・简体中文・繁體中文・日本語
+- English・简体中文・繁體中文・日本語・한국어
 - Windows での WSL 内の Codex セッション検出
 - ライトテーマとダークテーマ
 

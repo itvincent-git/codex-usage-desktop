@@ -320,9 +320,53 @@ pub enum CodexWindowActivationStatus {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaForecastResponse {
-    pub probability_24h: i64,
-    pub score: i64,
-    pub fetched_at: String,
+    pub updated_at: String,
+    pub last_reset_at: Option<String>,
+    pub has_official_signal: bool,
+    pub latest_alert: Option<CodexForecastAlert>,
+    pub recent_posts: Option<Vec<CodexForecastPost>>,
+    pub evidence_posts: Option<Vec<CodexForecastPost>>,
+    pub evidence_stale: bool,
+    pub evidence_updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CodexForecastPost {
+    pub id: String,
+    pub text: String,
+    pub url: String,
+    pub at: String,
+    #[serde(default)]
+    pub is_reply: bool,
+    #[serde(rename(deserialize = "in_reply_to_tweet_id", serialize = "replyToId"))]
+    pub reply_to_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CodexForecastAlert {
+    pub id: Option<String>,
+    pub kind: Option<String>,
+    pub state: Option<String>,
+    pub pending: Option<String>,
+    pub source_at: Option<String>,
+    pub summary: Option<String>,
+    pub localized_summary: Option<String>,
+    pub url: Option<String>,
+    pub score: Option<i64>,
+    pub window: Option<CodexForecastWindow>,
+    pub observed_at: Option<String>,
+    pub confirmed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CodexForecastWindow {
+    pub label: Option<String>,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
+    pub time_zone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

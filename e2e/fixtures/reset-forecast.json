@@ -1,0 +1,83 @@
+{
+  "updatedAt": "2026-10-24T01:00:00.000Z",
+  "lastResetAt": "2026-10-23T17:40:51.000Z",
+  "hasOfficialSignal": true,
+  "latestAlert": {
+    "id": "2113492502355562875",
+    "kind": "watch",
+    "state": "active",
+    "summary": "Tibo has announced a global reset within the next three hours.",
+    "localizedSummary": null,
+    "sourceAt": "2026-10-24T00:00:00.000Z",
+    "url": "https://x.com/thsottiaux/status/2113492502355562875",
+    "score": 93,
+    "window": {
+      "label": "Within the next three hours",
+      "startAt": "2026-10-24T00:00:00.000Z",
+      "endAt": "2026-10-24T03:00:00.000Z",
+      "timeZone": "UTC"
+    }
+  },
+  "evidencePosts": [
+    {
+      "id": "2113492502355562875",
+      "text": "Landing within the next three hours.",
+      "url": "https://x.com/thsottiaux/status/2113492502355562875",
+      "at": "2026-10-24T00:00:00.000Z",
+      "isReply": true,
+      "replyToId": "2113492187770175603"
+    },
+    {
+      "id": "2113492187770175603",
+      "text": "A global Codex reset is coming.",
+      "url": "https://x.com/thsottiaux/status/2113492187770175603",
+      "at": "2026-10-23T23:59:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    }
+  ],
+  "evidenceStale": false,
+  "evidenceUpdatedAt": "2026-10-24T01:00:00.000Z",
+  "recentPosts": [
+    {
+      "id": "2113700000000000005",
+      "text": "Codex CLI updates are now available.",
+      "url": "https://x.com/thsottiaux/status/2113700000000000005",
+      "at": "2026-10-24T00:59:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    },
+    {
+      "id": "2113700000000000004",
+      "text": "Landing tomorrow before 10am PST.",
+      "url": "https://x.com/thsottiaux/status/2113700000000000004",
+      "at": "2026-10-24T00:58:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    },
+    {
+      "id": "2113700000000000003",
+      "text": "Today is reset day.",
+      "url": "https://x.com/thsottiaux/status/2113700000000000003",
+      "at": "2026-10-24T00:57:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    },
+    {
+      "id": "2113700000000000002",
+      "text": "We’ll see.",
+      "url": "https://x.com/thsottiaux/status/2113700000000000002",
+      "at": "2026-10-24T00:56:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    },
+    {
+      "id": "2113700000000000001",
+      "text": "More performance improvements.",
+      "url": "https://x.com/thsottiaux/status/2113700000000000001",
+      "at": "2026-10-24T00:55:00.000Z",
+      "isReply": false,
+      "replyToId": null
+    }
+  ]
+}

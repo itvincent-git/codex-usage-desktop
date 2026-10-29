@@ -1,7 +1,7 @@
 import { RotateCcw, Sparkles, RefreshCw, CheckCircle, ArrowUpRight, RotateCw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { UpdateCheckResponse, CodexLimitsResponse } from "@/lib/api";
+import { openUrl, type UpdateCheckResponse, type CodexLimitsResponse } from "@/lib/api";
 import {
   AUTO_REFRESH_INTERVAL_OPTIONS,
   type AutoRefreshIntervalMinutes,
@@ -10,11 +10,11 @@ import {
 } from "@/hooks/use-usage-dashboard";
 import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
 import { getReleaseNotes } from "@/lib/release-notes";
 import { getLanguage, languageCodes, languages } from "@/lib/languages";
-import type { TrayCountdownUnits, TrayTitleFormats } from "@/lib/tray-format";
+import type { TrayCountdownUnits } from "@/lib/tray-format";
 import {
   Select,
   SelectContent,
@@ -48,8 +48,6 @@ type SettingsPageProps = {
   onTrayTitleShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
   trayMenuShow: { limit5h: boolean; limitWeekly: boolean; tokens: boolean; cost: boolean };
   onTrayMenuShowChange: (key: "limit5h" | "limitWeekly" | "tokens" | "cost", value: boolean) => void;
-  trayTitleFormats: TrayTitleFormats;
-  onTrayTitleFormatChange: (key: keyof TrayTitleFormats, value: string) => void;
   trayCountdownUnits: TrayCountdownUnits;
   onTrayCountdownUnitChange: (key: keyof TrayCountdownUnits, value: string) => void;
   codexLimits: CodexLimitsResponse | null;
@@ -62,9 +60,9 @@ const TRAY_OPTION_KEYS = {
   cost: "cost",
 } as const;
 
-type SettingsSection = "general" | "menuBar" | "maintenance";
+type SettingsSection = "general" | "menuBar" | "maintenance" | "third_party";
 
-const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance"];
+const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance", "third_party"];
 
 export function SettingsPage({
   isResetting,
@@ -91,8 +89,6 @@ export function SettingsPage({
   onTrayTitleShowChange,
   trayMenuShow,
   onTrayMenuShowChange,
-  trayTitleFormats,
-  onTrayTitleFormatChange,
   trayCountdownUnits,
   onTrayCountdownUnitChange,
   codexLimits,
@@ -163,6 +159,121 @@ export function SettingsPage({
 
   const generalContent = (
     <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.updates_title")}</CardTitle>
+          <CardDescription>{t("settings.updates_desc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium text-foreground">{t("settings.current_version")}</h4>
+                <p className="text-sm text-muted-foreground">
+                  v{updateInfo?.currentVersion || tauriConfig.version}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={onCheckUpdates}
+                  disabled={isDisabled || isUpdateChecking}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isUpdateChecking ? "animate-spin" : ""}`} />
+                  {isUpdateChecking ? t("settings.btn_checking") : t("settings.btn_check_updates")}
+                </Button>
+              </div>
+            </div>
+
+            {updateCheckError ? (
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
+                {updateCheckError}
+              </div>
+            ) : null}
+
+            {updateInstallError ? (
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
+                {updateInstallError}
+              </div>
+            ) : null}
+
+            {updateInfo ? (
+              <div className="border-t border-border pt-5 space-y-4">
+                {updateInfo.hasUpdate ? (
+                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-indigo-50/20 dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-indigo-950/35 dark:via-purple-950/20 dark:to-indigo-950/10 p-5 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <h5 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+                          {t("settings.update_available", { version: updateInfo.latestVersion })}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {t("settings.update_available_desc")} {updateInfo.releaseName ? `"${updateInfo.releaseName}"` : ""}
+                        </p>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={onUpgrade}
+                        disabled={isDisabled || isInstallingUpdate}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                      >
+                        {isUpdateInstalled ? <RotateCw className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                        {upgradeLabel}
+                      </Button>
+                    </div>
+                    {updateInfo.releaseNotes ? (
+                      isRateLimitError ? (
+                        <div className="rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300 leading-normal flex items-start gap-2 select-text font-sans">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="whitespace-pre-wrap">
+                            {t("update.rate_limit_error")}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-indigo-50/50 dark:bg-black/25 border border-indigo-100 dark:border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
+                          {parsedReleaseNotes}
+                        </div>
+                      )
+                    ) : null}
+                    {isInstallingUpdate ? (
+                      <div
+                        className="h-1.5 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-500/15"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={updateProgress.percent ?? undefined}
+                      >
+                        <div
+                          className={`h-full rounded-full bg-indigo-600 transition-all duration-300 dark:bg-indigo-400 ${
+                            updateProgress.percent === null ? "w-1/2 animate-pulse" : ""
+                          }`}
+                          style={updateProgress.percent === null ? undefined : { width: `${updateProgress.percent}%` }}
+                        />
+                      </div>
+                    ) : null}
+                    {updateInstallError && updateInfo.releaseUrl ? (
+                      <Button variant="ghost" size="sm" onClick={onOpenUpdateRelease}>
+                        {t("settings.btn_view_release")} <ArrowUpRight className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-4 text-sm">
+                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                      <p className="font-medium text-foreground">{t("settings.up_to_date")}</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.up_to_date_desc", { version: updateInfo.currentVersion })}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{t("settings.language_title")}</CardTitle>
@@ -326,31 +437,6 @@ export function SettingsPage({
             </p>
           </div>
           <div className="space-y-4">
-            {(hasSub
-              ? [["limit5h", "menu_bar_format_5h"], ["limitWeekly", "menu_bar_format_weekly"]]
-              : [["limitMonthly", "menu_bar_format_monthly"]]
-            ).map(([key, labelKey]) => (
-              <label key={key} className="block space-y-2">
-                <span className="text-sm text-muted-foreground">{t(`settings.${labelKey}`)}</span>
-                <input
-                  type="text"
-                  value={trayTitleFormats[key as keyof TrayTitleFormats]}
-                  onChange={(event) => onTrayTitleFormatChange(key as keyof TrayTitleFormats, event.target.value)}
-                  disabled={isDisabled}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </label>
-            ))}
-            <label className="block space-y-2">
-              <span className="text-sm text-muted-foreground">{t("settings.menu_bar_format_separator")}</span>
-              <input
-                type="text"
-                value={trayTitleFormats.separator}
-                onChange={(event) => onTrayTitleFormatChange("separator", event.target.value)}
-                disabled={isDisabled}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </label>
             <fieldset className="space-y-2">
               <legend className="text-sm text-muted-foreground">{t("settings.menu_bar_countdown_units")}</legend>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -415,121 +501,6 @@ export function SettingsPage({
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.updates_title")}</CardTitle>
-          <CardDescription>{t("settings.updates_desc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <h4 className="text-sm font-medium text-foreground">{t("settings.current_version")}</h4>
-                <p className="text-sm text-muted-foreground">
-                  v{updateInfo?.currentVersion || tauriConfig.version}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <Button 
-                  variant="secondary" 
-                  size="lg" 
-                  onClick={onCheckUpdates} 
-                  disabled={isDisabled || isUpdateChecking}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isUpdateChecking ? "animate-spin" : ""}`} />
-                  {isUpdateChecking ? t("settings.btn_checking") : t("settings.btn_check_updates")}
-                </Button>
-              </div>
-            </div>
-
-            {updateCheckError ? (
-              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
-                {updateCheckError}
-              </div>
-            ) : null}
-
-            {updateInstallError ? (
-              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
-                {updateInstallError}
-              </div>
-            ) : null}
-
-            {updateInfo ? (
-              <div className="border-t border-border pt-5 space-y-4">
-                {updateInfo.hasUpdate ? (
-                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-indigo-50/20 dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-indigo-950/35 dark:via-purple-950/20 dark:to-indigo-950/10 p-5 space-y-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <h5 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-                          {t("settings.update_available", { version: updateInfo.latestVersion })}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          {t("settings.update_available_desc")} {updateInfo.releaseName ? `"${updateInfo.releaseName}"` : ""}
-                        </p>
-                      </div>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={onUpgrade}
-                        disabled={isDisabled || isInstallingUpdate}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white"
-                      >
-                        {isUpdateInstalled ? <RotateCw className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
-                        {upgradeLabel}
-                      </Button>
-                    </div>
-                    {updateInfo.releaseNotes ? (
-                      isRateLimitError ? (
-                        <div className="rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300 leading-normal flex items-start gap-2 select-text font-sans">
-                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <div className="whitespace-pre-wrap">
-                            {t("update.rate_limit_error")}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg bg-indigo-50/50 dark:bg-black/25 border border-indigo-100 dark:border-white/5 p-3 text-xs font-mono text-muted-foreground max-h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
-                          {parsedReleaseNotes}
-                        </div>
-                      )
-                    ) : null}
-                    {isInstallingUpdate ? (
-                      <div
-                        className="h-1.5 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-500/15"
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={updateProgress.percent ?? undefined}
-                      >
-                        <div
-                          className={`h-full rounded-full bg-indigo-600 transition-all duration-300 dark:bg-indigo-400 ${
-                            updateProgress.percent === null ? "w-1/2 animate-pulse" : ""
-                          }`}
-                          style={updateProgress.percent === null ? undefined : { width: `${updateProgress.percent}%` }}
-                        />
-                      </div>
-                    ) : null}
-                    {updateInstallError && updateInfo.releaseUrl ? (
-                      <Button variant="ghost" size="sm" onClick={onOpenUpdateRelease}>
-                        {t("settings.btn_view_release")} <ArrowUpRight className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 rounded-lg border border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-4 text-sm">
-                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <div>
-                      <p className="font-medium text-foreground">{t("settings.up_to_date")}</p>
-                      <p className="text-xs text-muted-foreground">{t("settings.up_to_date_desc", { version: updateInfo.currentVersion })}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
     </>
   );
 
@@ -575,6 +546,31 @@ export function SettingsPage({
             className="scroll-mt-4 space-y-4"
           >
             {maintenanceContent}
+          </section>
+          <section
+            id="settings-section-third_party"
+            aria-labelledby="settings-tab-third_party"
+            className="scroll-mt-4"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("settings.nav_third_party")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  <Trans
+                    i18nKey="settings.codex_reset_desc"
+                    components={{
+                      provider: <a
+                        href="https://codex-reset.com/"
+                        className="hover:underline focus-visible:underline"
+                        onClick={(event) => { event.preventDefault(); void openUrl(event.currentTarget.href); }}
+                      />,
+                    }}
+                  />
+                </p>
+              </CardContent>
+            </Card>
           </section>
         </div>
       </div>

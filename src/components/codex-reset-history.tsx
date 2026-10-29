@@ -29,8 +29,9 @@ export function buildResetHistorySummary(
   const sortedResets = [...resets].sort(
     (left, right) => dayjs(right.announcedAt).valueOf() - dayjs(left.announcedAt).valueOf(),
   );
-  const intervals = sortedResets.slice(0, -1).map((reset, index) =>
-    dayjs(reset.announcedAt).diff(sortedResets[index + 1].announcedAt, "minute", true) / (60 * 24),
+  const regularResets = sortedResets.filter((reset) => reset.resetType === "regular");
+  const intervals = regularResets.slice(0, -1).map((reset, index) =>
+    dayjs(reset.announcedAt).diff(regularResets[index + 1].announcedAt, "minute", true) / (60 * 24),
   );
   const startDate = now.startOf("day").subtract(HISTORY_DAYS - 1, "day");
   const endDate = now.endOf("day");
@@ -82,18 +83,12 @@ function formatRelativeTime(timestamp: string, locale: string, now = dayjs()) {
 
 function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[]; days: number }) {
   const { t } = useTranslation();
-  const recentDays = buildResetHistorySummary(resets).calendarDays
-    .filter((day) => day.inRange)
-    .slice(-days);
+  const recentDays = buildResetHistorySummary(resets).calendarDays;
 
   return (
-    <span
-      role="list"
-      aria-label={t("limits.reset_overview_label", { days })}
-      className="col-span-3 mt-1.5 grid items-center"
-      style={{ gridTemplateColumns: `repeat(${days}, minmax(0, 1fr))` }}
-    >
+    <span role="list" aria-label={t("limits.reset_overview_label", { days })} className="col-span-3 mt-2 grid grid-cols-7 gap-1.5">
       {recentDays.map((day) => {
+        if (!day.inRange) return <span key={day.date.format("YYYY-MM-DD")} className="h-2.5" aria-hidden="true" />;
         const resetType = day.resetType;
         const status = resetType === "mixed"
           ? `${t("limits.reset_type_regular")}, ${t("limits.reset_type_banked")}`
@@ -102,13 +97,11 @@ function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[
           date: day.date.format("YYYY-MM-DD"),
           status,
         });
-        const color = resetType === "mixed"
-          ? "border-orange-500 bg-gradient-to-br from-orange-500 from-50% to-sky-300 to-50%"
-          : resetType === "regular"
-            ? "border-orange-500 bg-orange-500"
-            : resetType === "banked"
-              ? "border-sky-400 bg-sky-300"
-              : "border-muted-foreground/45 bg-transparent";
+        const color = resetType === "regular" || resetType === "mixed"
+          ? "bg-orange-500"
+          : resetType === "banked"
+            ? "bg-sky-300"
+            : "bg-muted-foreground/15";
 
         return (
           <span
@@ -116,10 +109,12 @@ function RecentResetOverview({ resets, days }: { resets: CodexResetAnnouncement[
             role="listitem"
             data-reset-overview-day
             data-reset-type={resetType ?? "none"}
-            className={`h-1.5 w-1.5 justify-self-center rounded-full border ${color}`}
+            className={`h-2.5 w-full overflow-hidden rounded-[3px] ${color}`}
             aria-label={label}
             title={label}
-          />
+          >
+            {resetType === "mixed" ? <span className="ml-auto block h-full w-1/2 bg-sky-300" aria-hidden="true" /> : null}
+          </span>
         );
       })}
     </span>
@@ -149,27 +144,33 @@ export function LatestResetButton({
   );
 
   return (
-    <button
-      type="button"
-      className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] content-center items-center gap-x-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-primary/35 bg-primary/[0.07] hover:border-primary/50 hover:bg-primary/10" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
-      onClick={onOpen}
-      aria-label={t("limits.latest_reset_open")}
-    >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary ${isRecentReset ? "bg-primary/15" : "bg-primary/10"}`}>
-        <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
-      </span>
-      <span className="min-w-0">
-        <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-none text-foreground/80">
-          {isRecentReset ? <span data-testid="recent-reset-indicator" className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" /> : null}
-          <span className="truncate">{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
+    <>
+      <button
+        type="button"
+        className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] content-center items-center gap-x-2 rounded-lg border px-2.5 py-1.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isRecentReset ? "border-primary/35 bg-primary/[0.07] hover:border-primary/50 hover:bg-primary/10" : "border-primary/25 bg-primary/5 hover:border-primary/40 hover:bg-primary/10"}`}
+        onClick={onOpen}
+        aria-label={t("limits.latest_reset_open")}
+      >
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary ${isRecentReset ? "bg-primary/15" : "bg-primary/10"}`}>
+          <RotateCcw className="h-4.5 w-4.5" aria-hidden="true" />
         </span>
-        <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
-          {relativeResetTime} · {dayjs(reset.announcedAt).format("MM-DD HH:mm")} · {t(`limits.reset_type_${reset.resetType}`)}
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-none">
+            {isRecentReset ? <span data-testid="recent-reset-indicator" className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" /> : null}
+            <span data-testid="latest-reset-status" className={`truncate rounded px-1.5 py-1 ${isRecentReset ? "bg-success/10 text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
+          </span>
+          <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
+            <span data-testid="latest-reset-relative-time" className={isRecentReset ? "font-semibold text-emerald-700 dark:text-emerald-400" : "font-medium text-foreground/75"}>{relativeResetTime}</span>
+            <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
+            <time dateTime={reset.announcedAt} className="text-primary/80">{dayjs(reset.announcedAt).format("MM-DD HH:mm")}</time>
+            <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
+            <span data-testid="latest-reset-type" className={`font-medium ${reset.resetType === "banked" ? "text-sky-700 dark:text-sky-300" : "text-orange-700 dark:text-orange-400"}`}>{t(`limits.reset_type_${reset.resetType}`)}</span>
+          </span>
         </span>
-      </span>
-      <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
-      {recentResets ? <RecentResetOverview resets={recentResets} days={recentDays} /> : null}
-    </button>
+        <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
+        {recentResets ? <RecentResetOverview resets={recentResets} days={recentDays} /> : null}
+      </button>
+    </>
   );
 }
 
@@ -326,12 +327,13 @@ function ResetAnnouncements({ resets }: { resets: CodexResetAnnouncement[] }) {
 function ResetHistoryContent({ resets }: { resets: CodexResetAnnouncement[] }) {
   const { t, i18n } = useTranslation();
   const summary = useMemo(() => buildResetHistorySummary(resets), [resets]);
-  const latestReset = summary.resets[0];
+  const regularResets = summary.resets.filter((reset) => reset.resetType === "regular");
+  const latestReset = regularResets[0];
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <>
-      <section className="rounded-xl border border-border bg-background/35 p-4">
+      {latestReset ? <section className="rounded-xl border border-border bg-background/35 p-4">
         <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("limits.latest_reset")}</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -349,10 +351,10 @@ function ResetHistoryContent({ resets }: { resets: CodexResetAnnouncement[] }) {
             <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </button>
         </div>
-      </section>
+      </section> : null}
 
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        <MetricCard label={t("limits.reset_count")} value={String(summary.resets.length)} tone="border-amber-300/70 bg-amber-300/20" />
+        <MetricCard label={t("limits.reset_count")} value={String(regularResets.length)} tone="border-amber-300/70 bg-amber-300/20" />
         <MetricCard label={t("limits.reset_average_interval")} value={formatDays(summary.averageIntervalDays, (value) => t("limits.reset_days_short", { value }))} tone="border-rose-300/70 bg-rose-300/20" />
         <MetricCard label={t("limits.reset_longest_wait")} value={formatDays(summary.longestIntervalDays, (value) => t("limits.reset_days_short", { value }))} tone="border-sky-300/70 bg-sky-300/20" />
       </div>

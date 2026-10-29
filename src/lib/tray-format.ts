@@ -1,23 +1,15 @@
 import type { CodexLimitWindow } from "@/lib/api";
 
-export type TrayTitleFormats = {
-  limit5h: string;
-  limitWeekly: string;
-  limitMonthly: string;
-  separator: string;
-};
-
 export type TrayCountdownUnits = {
   minute: string;
   hour: string;
   day: string;
 };
 
-export const DEFAULT_TRAY_TITLE_FORMATS: TrayTitleFormats = {
+export const TRAY_TITLE_TEMPLATES = {
   limit5h: "⏱️ {remaining}/{reset}",
   limitWeekly: "🗓️ {remaining}/{reset}",
   limitMonthly: "M: {remaining}/{reset}",
-  separator: "┃",
 };
 
 export const DEFAULT_TRAY_COUNTDOWN_UNITS: TrayCountdownUnits = {
@@ -46,10 +38,16 @@ export function formatCompactResetCountdown(
   const minutes = Math.ceil(diffMs / 60_000);
   if (minutes < 60) return compactUnit(units, minutes, "minute");
 
-  const hours = Math.ceil(minutes / 60);
-  if (hours < 24) return compactUnit(units, hours, "hour");
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const remainingMinutes = minutes % 60;
+    return compactUnit(units, hours, "hour")
+      + (remainingMinutes ? compactUnit(units, remainingMinutes, "minute") : "");
+  }
 
-  return compactUnit(units, Math.ceil(hours / 24), "day");
+  const remainingHours = hours % 24;
+  return compactUnit(units, Math.floor(hours / 24), "day")
+    + (remainingHours ? compactUnit(units, remainingHours, "hour") : "");
 }
 
 export function formatTrayLimitTitle(

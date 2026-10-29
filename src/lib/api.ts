@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { renderTrayIcon, type TrayQuotaIndicator, type TrayMetricIndicator } from "@/lib/tray-icon";
+import type { TrayPopoverData } from "@/lib/tray-popover";
 
 export type RangeKey = "1d" | "2d" | "7d" | "14d" | "30d" | "60d" | "90d" | "180d" | "365d" | string;
 export type ExportFormat = "xlsx" | "markdown";
@@ -182,9 +184,38 @@ export type CodexWindowActivationResponse = {
 };
 
 export type CodexQuotaForecastResponse = {
-  probability24h: number;
-  score: number;
-  fetchedAt: string;
+  updatedAt: string;
+  lastResetAt: string | null;
+  hasOfficialSignal: boolean;
+  latestAlert: CodexForecastAlert | null;
+  recentPosts: CodexForecastPost[] | null;
+  evidencePosts: CodexForecastPost[] | null;
+  evidenceStale: boolean;
+  evidenceUpdatedAt: string | null;
+};
+
+export type CodexForecastPost = {
+  id: string;
+  text: string;
+  url: string;
+  at: string;
+  isReply: boolean;
+  replyToId: string | null;
+};
+
+export type CodexForecastAlert = {
+  id?: string | null;
+  kind?: "watch" | "reset" | (string & {}) | null;
+  state?: "active" | "expired" | "confirmed" | (string & {}) | null;
+  pending?: "done" | "on_its_way" | (string & {}) | null;
+  sourceAt?: string | null;
+  summary?: string | null;
+  localizedSummary?: string | null;
+  url?: string | null;
+  score?: number | null;
+  window?: { label?: string | null; startAt?: string | null; endAt?: string | null; timeZone?: string | null } | null;
+  observedAt?: string | null;
+  confirmedAt?: string | null;
 };
 
 export type CodexResetAnnouncement = {
@@ -246,8 +277,8 @@ export async function activateCodexWindow(): Promise<CodexWindowActivationRespon
   return invoke<CodexWindowActivationResponse>("activate_codex_window");
 }
 
-export async function fetchCodexQuotaForecast(): Promise<CodexQuotaForecastResponse> {
-  return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast");
+export async function fetchCodexQuotaForecast(locale: string): Promise<CodexQuotaForecastResponse> {
+  return invoke<CodexQuotaForecastResponse>("fetch_codex_quota_forecast", { locale });
 }
 
 export async function fetchLatestCodexReset(): Promise<CodexResetAnnouncement | null> {
@@ -513,10 +544,18 @@ export type TrayMenuUpdate = {
   items: TrayMenuItemDto[];
   show_main_text?: string;
   quit_text?: string;
+  indicators?: TrayQuotaIndicator[];
+  metrics?: TrayMetricIndicator[];
+  dark?: boolean;
+  popover?: TrayPopoverData;
 };
 
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
-  return invoke<void>("update_tray", { payload });
+  const { indicators, metrics = [], dark = false, ...menu } = payload;
+  const icon = /Mac/.test(navigator.platform) && indicators && (indicators.length > 0 || metrics.length > 0)
+    ? renderTrayIcon(indicators, metrics, dark)
+    : null;
+  return invoke<void>("update_tray", { payload: { ...menu, icon } });
 }
 
 export type SessionRescanResponse = {

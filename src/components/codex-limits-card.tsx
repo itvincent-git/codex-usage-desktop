@@ -1,42 +1,38 @@
-import { ChevronDown, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LatestResetButton } from "@/components/codex-reset-history";
-import type { CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
+import type { CodexLimitWindow, CodexLimitsResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type CodexLimitsCardProps = {
   limits: CodexLimitsResponse | null;
-  error: string | null;
-  quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
+  onOpenResetHistory?: () => void;
+  onOpenResetCredits: () => void;
+};
+
+type CodexSidebarLimitsProps = {
+  compact?: boolean;
+  limits: CodexLimitsResponse | null;
+  error: string | null;
   isLimitsRefreshing?: boolean;
   isWindowActivating?: boolean;
   windowActivationStatus?: CodexWindowActivationStatus | null;
   windowActivationError?: string | null;
   onRefreshLimits?: () => void;
   onActivateWindow?: () => void;
-  onOpenQuotaForecast?: () => void;
-  onOpenResetHistory?: () => void;
-  onOpenResetCredits: () => void;
 };
 
-export const RECENT_RESET_OVERVIEW_DAYS = 14;
+export const RECENT_RESET_OVERVIEW_DAYS = 30;
 
 type LimitRowProps = {
   label: string;
   window: CodexLimitWindow | null;
-};
-
-type QuotaForecastTone = {
-  label: string;
-  className: string;
-  scoreClassName: string;
-  ringColor: string;
 };
 
 function isOAuthLoginError(err: string | null): boolean {
@@ -58,86 +54,92 @@ export function hasSubscription(limits: CodexLimitsResponse | null | undefined):
   return ["plus", "pro", "prolite", "team", "business", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, error, quotaForecast, latestReset, recentResets, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onOpenQuotaForecast, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
-  const { t } = useTranslation();
-  const quotaForecast24hScore = quotaForecast ? Math.round(clampPercent(quotaForecast.probability24h)) : null;
-  const quotaForecastScore = quotaForecast ? Math.round(clampPercent(quotaForecast.score)) : null;
-  const quotaForecast24hTone = quotaForecast24hScore === null ? null : getQuotaForecastTone(quotaForecast24hScore, t);
-  const quotaForecastTone = quotaForecastScore === null ? null : getQuotaForecastTone(quotaForecastScore, t);
-
+export function CodexLimitsCard({ limits, latestReset, recentResets, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   return (
     <Card className="h-full flex flex-col rounded-lg">
-      <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center gap-3">
-        {onRefreshLimits && onActivateWindow ? (
-          <LimitActions
-            window={limits?.session ?? null}
-            showActivation={hasSubscription(limits)}
-            isRefreshing={isLimitsRefreshing}
-            isActivating={isWindowActivating}
-            activationStatus={windowActivationStatus}
-            activationError={windowActivationError}
-            onRefresh={onRefreshLimits}
-            onActivate={onActivateWindow}
-          />
-        ) : null}
-        {error ? (
-          isOAuthLoginError(error) ? (
-            <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-warning font-semibold">
-                  <LogIn className="h-4.5 w-4.5" />
-                  <span>{t("limits.not_logged_in")} / 尚未登录</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-normal">
-                  {t("limits.login_instruction")}
-                </p>
-                <div className="bg-muted/60 hover:bg-muted p-2.5 rounded-lg font-mono text-xs select-all border border-border flex items-center justify-between group transition-colors">
-                  <span className="text-foreground select-all">codex auth login</span>
-                  <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">{t("limits.click_to_select")}</span>
-                </div>
-              </div>
-              <p className="text-[10px] text-muted-foreground/80 leading-normal mt-2 pt-2 border-t border-border/40">
-                {t("limits.login_hint")}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
-              {t("limits.unavailable_reason")}
-            </div>
-          )
-        ) : (
-          <div className="flex flex-1 flex-col justify-center">
-            <div className={cn(
-              "grid gap-3 justify-center",
-              hasSubscription(limits) ? "grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,3fr)_minmax(0,4fr)]" : "grid-cols-1 md:grid-cols-2"
-            )}>
-            {hasSubscription(limits) ? (
-              <>
-                <LimitRow label="5 hour" window={limits?.session ?? null} />
-                <LimitRow label="Weekly" window={limits?.weekly ?? null} />
-              </>
-            ) : (
-              <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} />
-            )}
-            <ResetArea
-              quotaForecast={quotaForecast}
-              latestReset={latestReset}
-              recentResets={recentResets}
-              quotaForecast24hScore={quotaForecast24hScore}
-              quotaForecast24hTone={quotaForecast24hTone}
-              quotaForecastScore={quotaForecastScore}
-              quotaForecastTone={quotaForecastTone}
-              resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
-              resetCredits={limits?.resetCredits}
-              onOpenQuotaForecast={onOpenQuotaForecast}
-              onOpenResetHistory={onOpenResetHistory}
-              onOpenResetCredits={onOpenResetCredits}
-            />
-            </div>
-          </div>
-        )}
+      <CardContent className="p-3 sm:p-4">
+        <ResetArea
+          latestReset={latestReset}
+          recentResets={recentResets}
+          resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
+          resetCredits={limits?.resetCredits}
+          onOpenResetHistory={onOpenResetHistory}
+          onOpenResetCredits={onOpenResetCredits}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow }: CodexSidebarLimitsProps) {
+  const { t } = useTranslation();
+  const [, refreshCountdown] = useState(0);
+  const now = Date.now();
+  useEffect(() => {
+    const timer = window.setInterval(() => refreshCountdown((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <section className="sidebar-limits space-y-3" aria-label={t("limits.sidebar_title")}>
+      {!compact ? <div className="flex min-w-0 items-center justify-between gap-1 text-[10px]">
+        <h2 className="font-semibold">{t("limits.sidebar_title")}</h2>
+        <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={limits ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm") }) : undefined}>
+          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", error ? "bg-warning" : limits ? "bg-success" : "bg-muted-foreground")} />
+          <span className="truncate">{t(error ? "limits.unavailable" : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
+        </span>
+      </div> : null}
+      {!compact && onRefreshLimits && onActivateWindow ? (
+        <LimitActions
+          window={limits?.session ?? null}
+          showActivation={hasSubscription(limits)}
+          isRefreshing={isLimitsRefreshing}
+          isActivating={isWindowActivating}
+          activationStatus={windowActivationStatus}
+          activationError={windowActivationError}
+          onRefresh={onRefreshLimits}
+          onActivate={onActivateWindow}
+        />
+      ) : null}
+      {error ? (
+        compact ? <p className="break-words text-center text-[9px] text-warning" title={error}>{t("limits.unavailable")}</p> : isOAuthLoginError(error) ? (
+          <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-warning font-semibold">
+                <LogIn className="h-4.5 w-4.5" />
+                <span>{t("limits.not_logged_in")} / 尚未登录</span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-normal">
+                {t("limits.login_instruction")}
+              </p>
+              <div className="bg-muted/60 hover:bg-muted p-2 rounded-lg font-mono text-[10px] select-all border border-border flex flex-wrap items-center justify-between gap-1 group transition-colors">
+                <span className="break-all text-foreground select-all">codex auth login</span>
+                <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">{t("limits.click_to_select")}</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground/80 leading-normal mt-2 pt-2 border-t border-border/40">
+              {t("limits.login_hint")}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
+            {t("limits.unavailable_reason")}
+          </div>
+        )
+
+      ) : (
+        <div className="space-y-3">
+          {hasSubscription(limits) ? (
+            <>
+              <LimitRow label="5 hour" window={limits?.session ?? null} now={now} compact={compact} />
+              <LimitRow label="Weekly" window={limits?.weekly ?? null} now={now} compact={compact} />
+            </>
+          ) : (
+            <LimitRow label="monthly" window={limits?.weekly ?? limits?.session ?? null} now={now} compact={compact} />
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -171,137 +173,48 @@ function LimitActions({
       : t(showActivation ? (canActivate ? "limits.activate_ready" : "limits.activate_active") : "limits.query_desc");
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/15 p-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-foreground">{t("limits.actions_title")}</p>
-        <p className={cn("mt-0.5 text-[10px] leading-normal", activationError ? "text-error" : "text-muted-foreground")}>
-          {statusText}
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={onRefresh}>
-          {isRefreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          {t("limits.query_action")}
+    <div className="space-y-2">
+      <div className="flex gap-1.5">
+        <Button type="button" size="sm" variant="secondary" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-[10px]" aria-label={t("limits.query_action")} title={t("limits.query_desc")} disabled={busy} onClick={onRefresh}>
+          {isRefreshing ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <RefreshCw className="h-3 w-3 shrink-0" />}
+          <span className="truncate">{t("limits.query_action")}</span>
         </Button>
         {showActivation ? (
-          <Button type="button" size="sm" disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
-            {isActivating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            {t(isActivating ? "limits.activating_action" : "limits.activate_action")}
+          <Button type="button" size="sm" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-[10px]" aria-label={t(isActivating ? "limits.activating_action" : "limits.activate_action")} title={statusText} disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
+            {isActivating ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <Play className="h-3 w-3 shrink-0" />}
+            <span className="truncate">{t(isActivating ? "limits.activating_action" : "limits.sidebar_activate")}</span>
           </Button>
         ) : null}
       </div>
+      {activationStatus || activationError ? <p role="status" className={cn("text-[10px] leading-normal", activationError ? "text-error" : "text-muted-foreground")}>{statusText}</p> : null}
     </div>
   );
 }
 
-function formatQuotaForecast(score: number, t: any) {
-  const roundedScore = Math.round(clampPercent(score));
-  if (roundedScore >= 70) {
-    return t("limits.quota_forecast_likely", { score: roundedScore });
-  }
-  if (roundedScore >= 40) {
-    return t("limits.quota_forecast_possible", { score: roundedScore });
-  }
-  return t("limits.quota_forecast_low", { score: roundedScore });
-}
-
-function getQuotaForecastTone(score: number, t: any): QuotaForecastTone {
-  if (score >= 70) {
-    return {
-      label: t("limits.quota_forecast_likely_label"),
-      className: "border-error/30 bg-error/10 hover:border-error/45 hover:bg-error/15",
-      scoreClassName: "text-error",
-      ringColor: "rgb(var(--error))",
-    };
-  }
-
-  if (score >= 40) {
-    return {
-      label: t("limits.quota_forecast_possible_label"),
-      className: "border-warning/35 bg-warning/10 hover:border-warning/50 hover:bg-warning/15",
-      scoreClassName: "text-warning",
-      ringColor: "rgb(var(--warning))",
-    };
-  }
-
-  return {
-    label: t("limits.quota_forecast_low_label"),
-    className: "border-success/30 bg-success/10 hover:border-success/45 hover:bg-success/15",
-    scoreClassName: "text-success",
-    ringColor: "rgb(var(--success))",
-  };
-}
-
-function QuotaForecastRing({ score, tone, horizon }: { score: number; tone: QuotaForecastTone; horizon: "24h" | "48h" }) {
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-
-  return (
-    <span data-forecast-horizon={horizon} className="flex flex-col items-center gap-0.5">
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/55">
-        <svg viewBox="0 0 48 48" className="h-10 w-10" role="img" aria-label={`${score}% reset probability in ${horizon}`}>
-          <circle cx="24" cy="24" r={radius} fill="none" stroke="rgb(var(--border) / 0.65)" strokeWidth="4" />
-          <circle
-            cx="24"
-            cy="24"
-            r={radius}
-            fill="none"
-            stroke={tone.ringColor}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            strokeWidth="4"
-            transform="rotate(-90 24 24)"
-            className="transition-all duration-500 ease-out"
-          />
-        </svg>
-        <span className={cn("absolute font-mono text-[11px] font-bold leading-none tabular-nums", tone.scoreClassName)}>
-          {score}
-        </span>
-      </span>
-      <span className="font-mono text-[9px] font-semibold leading-none text-foreground/70">{horizon}</span>
-    </span>
-  );
-}
-
 function ResetArea({
-  quotaForecast,
   latestReset,
   recentResets,
-  quotaForecast24hScore,
-  quotaForecast24hTone,
-  quotaForecastScore,
-  quotaForecastTone,
   resetCreditsAvailableCount,
   resetCredits,
-  onOpenQuotaForecast,
   onOpenResetHistory,
   onOpenResetCredits,
 }: {
-  quotaForecast?: CodexQuotaForecastResponse | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
-  quotaForecast24hScore: number | null;
-  quotaForecast24hTone: QuotaForecastTone | null;
-  quotaForecastScore: number | null;
-  quotaForecastTone: QuotaForecastTone | null;
   resetCreditsAvailableCount?: number | null;
   resetCredits?: CodexResetCredit[] | null;
-  onOpenQuotaForecast?: () => void;
   onOpenResetHistory?: () => void;
   onOpenResetCredits: () => void;
 }) {
   const { t } = useTranslation();
-  const showQuotaForecast = quotaForecast && quotaForecast24hScore !== null && quotaForecast24hTone && quotaForecastScore !== null && quotaForecastTone;
   const showResetCredits = resetCreditsAvailableCount !== null && resetCreditsAvailableCount !== undefined;
 
   return (
     <div
       data-testid="reset-area"
-      className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
+      className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface p-2.5 sm:p-3 content-md:grid-cols-2"
     >
-      <div className={cn("grid gap-2", latestReset && showQuotaForecast ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1")}>
+      <div className="grid grid-cols-1 gap-2">
         {latestReset ? (
           <LatestResetButton
             reset={latestReset}
@@ -309,117 +222,92 @@ function ResetArea({
             recentDays={RECENT_RESET_OVERVIEW_DAYS}
             onOpen={() => onOpenResetHistory?.()}
           />
-        ) : null}
-        {showQuotaForecast ? (
-          <button
-            type="button"
-            data-testid="quota-forecast"
-            className={cn(
-              "flex flex-col items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              quotaForecastTone.className,
-            )}
-            onClick={onOpenQuotaForecast}
-            aria-label={t("limits.quota_forecast_open")}
-          >
-            <span className="flex items-center gap-2">
-              <QuotaForecastRing score={quotaForecast24hScore} tone={quotaForecast24hTone} horizon="24h" />
-              <QuotaForecastRing score={quotaForecastScore} tone={quotaForecastTone} horizon="48h" />
-            </span>
-            <span className="text-[10px] font-semibold leading-tight text-foreground/80">
-              {quotaForecastTone.label}
-            </span>
-          </button>
-        ) : null}
+        ) : (
+          <div data-testid="latest-reset-skeleton" role="status" aria-label={t("limits.latest_reset")} className="space-y-3 rounded-lg border border-border px-2.5 py-3">
+            <p className="text-xs font-semibold text-muted-foreground">{t("limits.latest_reset")}</p>
+            <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
+              <div className="h-4 w-2/3 rounded bg-muted" />
+              <div className="h-2.5 w-1/2 rounded bg-muted" />
+              <div className="grid grid-cols-7 gap-1.5">
+                {Array.from({ length: 35 }, (_, index) => <span key={index} className="h-2.5 rounded-[3px] bg-muted" />)}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       {showResetCredits ? (
         <ResetCreditsPanel
           availableCount={resetCreditsAvailableCount}
           credits={resetCredits}
           onOpen={onOpenResetCredits}
-          separated={Boolean(latestReset || showQuotaForecast)}
+          separated
         />
-      ) : null}
+      ) : (
+        <div data-testid="reset-credits-skeleton" role="status" aria-label={t("limits.reset_credits")} className="space-y-3 border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0">
+          <p className="text-[10px] font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>
+          <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
+            <div className="h-4 w-16 rounded-full bg-muted" />
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-4/5 rounded bg-muted" />
+            <div className="h-3 w-3/5 rounded bg-muted" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function LimitRow({ label, window }: LimitRowProps) {
+export function formatSidebarCountdown(resetsAt: string | null, now: number): string | null {
+  if (!resetsAt) return null;
+  const diff = new Date(resetsAt).getTime() - now;
+  if (!Number.isFinite(diff)) return null;
+  if (diff <= 0) return "0m";
+  // Never round across the one-day threshold: minutes are shown only below 24 hours.
+  if (diff >= 86_400_000) return `${Math.floor(diff / 86_400_000)}d${Math.floor(diff / 3_600_000) % 24}h`;
+  const minutes = Math.ceil(diff / 60_000);
+  return `${Math.floor(minutes / 60)}h${minutes % 60}m`;
+}
+
+function LimitRow({ label, window, now, compact }: LimitRowProps & { now: number; compact: boolean }) {
   const { t } = useTranslation();
+  const outlineTrackRef = useRef<SVGRectElement>(null);
+  useLayoutEffect(() => {
+    const track = outlineTrackRef.current!;
+    const updateStart = () => {
+      const { width, height } = track.getBBox();
+      if (!width || !height) return;
+      // Shift the clockwise dash to the top center so its gap grows to the left.
+      const offset = -100 * (width / 2 - 11) / track.getTotalLength();
+      track.parentElement!.style.setProperty("--quota-start-offset", String(offset));
+    };
+    updateStart();
+    const observer = new ResizeObserver(updateStart);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, []);
+  const friendlyLabel = t(label === "monthly" ? "limits.sidebar_monthly" : label === "Weekly" ? "limits.sidebar_weekly" : "limits.sidebar_5hour");
+  const remaining = window && Number.isFinite(window.remainingPercent) ? Math.min(100, Math.max(0, window.remainingPercent)) : 0;
+  const outlineClass = remaining < 30 ? "stroke-error" : remaining < 70 ? "stroke-warning" : "stroke-success";
+  const countdown = formatSidebarCountdown(window?.resetsAt ?? null, now);
+  const reset = countdown !== null ? dayjs(window!.resetsAt).format(label === "5 hour" ? "HH:mm" : "MM/DD HH:mm") : null;
 
-  if (!window) {
-    return (
-      <div className="rounded-xl border border-border bg-muted/20 p-2.5 sm:p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold text-foreground">
-            {label.toLowerCase().includes("monthly")
-              ? t("limits.window_monthly")
-              : label.toLowerCase().includes("weekly")
-              ? t("limits.window_weekly")
-              : t("limits.window_5hour")}
-          </p>
-          <p className="text-[10px] text-muted-foreground">{t("limits.unavailable")}</p>
-        </div>
-        <div className="mt-2 h-1 rounded-full bg-border" />
-        <p className="mt-1.5 text-[11px] leading-normal text-muted-foreground">
-          {t("limits.no_window_returned")}
-        </p>
-      </div>
-    );
-  }
-
-  const usedPercent = clampPercent(window.usedPercent);
-  const remainingPercent = clampPercent(window.remainingPercent);
-  const status = getLimitStatus(remainingPercent, t);
-  const resetLabel = formatResetTime(window.resetsAt, window.windowMinutes, t);
-
-  const friendlyLabel = label.toLowerCase().includes("monthly")
-    ? t("limits.window_monthly")
-    : label.toLowerCase().includes("weekly")
-    ? t("limits.window_weekly")
-    : t("limits.window_5hour");
   return (
-    <div
-      data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`}
-      className="rounded-xl border border-border bg-surface p-2.5 sm:p-3 transition-all duration-300 hover:border-border/80 hover:shadow-sm"
-    >
-      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] items-center gap-3 sm:gap-4">
-        <div className="flex justify-center">
-          <LimitGauge remainingPercent={remainingPercent} tone={status.tone} />
-        </div>
-        
-        <div className="space-y-1 flex flex-col items-center sm:items-stretch text-center sm:text-left">
-          <div className="flex flex-col items-center sm:flex-row sm:justify-between gap-1 w-full">
-            <h4 className="text-xs sm:text-sm font-semibold text-foreground leading-none">{friendlyLabel}</h4>
-            <span className={cn("rounded-full px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider w-fit", status.badgeClass)}>
-              {status.label}
-            </span>
-          </div>
-
-          <div className="space-y-0.5">
-            <p className="text-lg sm:text-xl font-bold tracking-tight text-foreground leading-none">
-              {formatLimitPercent(remainingPercent)}{" "}
-              <span className="text-[10px] font-normal text-muted-foreground">{t("limits.remaining")}</span>
-            </p>
-            <p className="text-[11px] font-medium text-primary leading-normal">{resetLabel}</p>
-          </div>
-
-          <div className="grid w-full grid-cols-2 gap-2 border-t border-border/50 pt-1.5 text-left text-[10px]">
-            <div>
-              <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.consumed")}</p>
-              <p className="font-semibold text-foreground leading-none">
-                {formatLimitPercent(usedPercent)}{" "}
-                <span className="font-normal text-muted-foreground text-[8px] sm:text-[9px]">
-                  {formatWindowUsage(window.windowMinutes, usedPercent, t)}
-                </span>
-              </p>
-            </div>
-            <div>
-              <p className="text-[8px] sm:text-[9px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">{t("limits.window")}</p>
-              <p className="font-semibold text-foreground leading-none">{formatWindowMinutes(window.windowMinutes, t)}</p>
-            </div>
-          </div>
-        </div>
+    <div data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`} className={cn("relative rounded-xl bg-primary/[0.025]", compact ? "px-1 py-2 text-center" : "px-3 pb-2.5 pt-3.5")}>
+      <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible fill-none">
+        <rect ref={outlineTrackRef} x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
+        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)", strokeDashoffset: "var(--quota-start-offset)" }} pathLength="100" strokeDasharray={`${remaining} ${100 - remaining}`} className={cn("transition-[stroke-dasharray] duration-300", outlineClass)} strokeWidth="1.5" /> : null}
+      </svg>
+      <span data-quota-label className={cn("text-[9px] font-medium text-primary", compact ? "relative block leading-tight" : "absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 leading-none")}>{friendlyLabel}</span>
+      <div className={cn("flex items-baseline gap-1.5", compact && "mt-1 justify-center")}>
+        {!compact ? <span className="text-xs">{t("limits.remaining")}</span> : null}
+        <span className="text-xl font-bold tabular-nums tracking-tight text-primary">{window ? `${Math.round(remaining)}%` : "—"}</span>
       </div>
+      {!compact ? <div className="quota-reset-row mt-1 flex items-center justify-between gap-1 whitespace-nowrap text-[11px] tabular-nums">
+        <span className="min-w-0 text-muted-foreground" title={reset ? t("limits.sidebar_reset_at", { time: dayjs(window!.resetsAt).format("YYYY-MM-DD HH:mm") }) : t("limits.no_window_returned")}>
+          {reset ? <>{reset}<span className="quota-reset-word"> {t("limits.sidebar_reset")}</span></> : t("limits.reset_unavailable")}
+        </span>
+        {countdown !== null ? <span className="flex shrink-0 items-center gap-1 font-medium text-primary" title={t("limits.sidebar_countdown")}><Clock3 className="h-3 w-3" aria-hidden="true" /><span data-quota-countdown>{countdown}</span></span> : null}
+      </div> : null}
     </div>
   );
 }
@@ -436,7 +324,6 @@ function ResetCreditsPanel({
   separated: boolean;
 }) {
   const { t } = useTranslation();
-  const [isExpanded, setIsExpanded] = useState(false);
   const count = Math.max(0, Math.trunc(availableCount));
   const sortedCredits = [...(credits ?? [])]
     .sort((left, right) => {
@@ -445,10 +332,9 @@ function ResetCreditsPanel({
       return new Date(left.expiresAt).getTime() - new Date(right.expiresAt).getTime();
     })
     .slice(0, count);
-  const visibleCredits = isExpanded ? sortedCredits : sortedCredits.slice(0, 1);
 
   return (
-    <div className={cn(separated && "mt-3 border-t border-border/60 pt-2.5")}>
+    <div className={cn(separated && "border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0")}>
       <div className="flex w-full items-center gap-1">
         <button
           type="button"
@@ -468,27 +354,20 @@ function ResetCreditsPanel({
             {t("limits.reset_credits_available", { count })}
           </span>
         </button>
-        <button
-          type="button"
-          className="shrink-0 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={t("limits.reset_credits_toggle")}
-          aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((expanded) => !expanded)}
-        >
-          <ChevronDown
-            className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-180")}
-            aria-hidden="true"
-          />
-        </button>
       </div>
-      <div className="mt-2 border-t border-border/40 text-[10px] leading-normal text-foreground/85">
+      <div
+        role="region"
+        aria-label={t("limits.reset_credits")}
+        tabIndex={0}
+        className="mt-2 max-h-40 overflow-y-auto overscroll-contain border-t border-border/40 text-[10px] leading-normal text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         {count === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>
         ) : sortedCredits.length === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_details_unavailable")}</p>
         ) : (
           <>
-            {visibleCredits.map((credit, index) => (
+            {sortedCredits.map((credit, index) => (
               <div
                 key={credit.id}
                 className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-b border-border/40 py-2 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
@@ -508,7 +387,7 @@ function ResetCreditsPanel({
                 )}
               </div>
             ))}
-            {isExpanded && sortedCredits.length < count ? (
+            {sortedCredits.length < count ? (
               <p className="border-t border-border/40 pt-2 text-muted-foreground">
                 {t("limits.reset_credits_details_partial", { count: count - sortedCredits.length })}
               </p>
@@ -532,110 +411,6 @@ function formatResetCreditTimeLeft(expiresAt: string, t: any): string {
 
   const days = Math.ceil(diffMs / 86_400_000);
   return t(days === 1 ? "limits.days_left_one" : "limits.days_left_other", { count: days });
-}
-
-function LimitGauge({ remainingPercent, tone }: { remainingPercent: number; tone: "success" | "warning" | "error" }) {
-  const radius = 38;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (remainingPercent / 100) * circumference;
-  const { t } = useTranslation();
-  
-  const color =
-    tone === "success" 
-      ? "rgb(var(--primary))" 
-      : tone === "warning" 
-      ? "rgb(var(--warning))" 
-      : "rgb(var(--error))";
-
-  // Glowing shadow based on health state
-  const glowClass = 
-    tone === "success" 
-      ? "shadow-[0_0_8px_rgba(var(--primary),0.08)]" 
-      : tone === "warning" 
-      ? "shadow-[0_0_8px_rgba(var(--warning),0.08)]" 
-      : "shadow-[0_0_8px_rgba(var(--error),0.08)]";
-
-  return (
-    <div className={cn("relative flex h-14 w-14 items-center justify-center rounded-full bg-muted/5 border border-border/10", glowClass)}>
-      <svg viewBox="0 0 96 96" className="h-14 w-14" role="img" aria-label={`${Math.round(remainingPercent)}% remaining`}>
-        {/* Background Track Ring */}
-        <circle 
-          cx="48" 
-          cy="48" 
-          r={radius} 
-          fill="none" 
-          stroke="rgb(var(--border) / 0.4)" 
-          strokeWidth="6" 
-        />
-        {/* Foreground Colored Active Ring */}
-        <circle
-          cx="48"
-          cy="48"
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          strokeWidth="6"
-          transform="rotate(-90 48 48)"
-          className="transition-all duration-500 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center select-none">
-        <p className="font-mono text-sm font-bold tabular-nums text-foreground leading-none">{formatLimitPercent(remainingPercent)}</p>
-        <p className="text-[7px] uppercase tracking-wider text-muted-foreground font-bold mt-0.5">{t("limits.left")}</p>
-      </div>
-    </div>
-  );
-}
-
-function clampPercent(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.min(Math.max(value, 0), 100);
-}
-
-// Ensure clean integer percentages for standard display
-function formatLimitPercent(value: number) {
-  return `${Math.round(value)}%`;
-}
-
-function formatWindowMinutes(windowMinutes: number | null, t?: any) {
-  if (windowMinutes === 300) {
-    return t ? t("limits.window_min", { count: 300 }) : "300 min";
-  }
-  if (windowMinutes) {
-    if (windowMinutes >= 1440) {
-      const days = Math.round(windowMinutes / 1440);
-      return t ? t("limits.window_days", { count: days }) : `${days} days`;
-    }
-    if (windowMinutes >= 60) {
-      return t ? t("limits.window_hours", { count: Math.round(windowMinutes / 60) }) : `${Math.round(windowMinutes / 60)} hrs`;
-    }
-    return t ? t("limits.window_min", { count: windowMinutes }) : `${windowMinutes} min`;
-  }
-
-  return t ? t("limits.window_unknown") : "Unknown";
-}
-
-function formatWindowUsage(windowMinutes: number | null, usedPercent: number, t?: any) {
-  if (!windowMinutes) {
-    return "";
-  }
-
-  const consumedMins = Math.round((windowMinutes * usedPercent) / 100);
-  if (consumedMins >= 60) {
-    const hrs = Math.floor(consumedMins / 60);
-    const mins = consumedMins % 60;
-    if (mins > 0) {
-      return t ? `(${t("limits.window_hours", { count: hrs })}${t("limits.window_min", { count: mins })})` : `(${hrs}h ${mins}m)`;
-    }
-    return t ? `(${t("limits.window_hours", { count: hrs })})` : `(${hrs}h)`;
-  }
-  return t ? `(${t("limits.window_min", { count: consumedMins })})` : `(${consumedMins}m)`;
 }
 
 export function formatResetTime(resetsAtStr: string | null, windowMinutes: number | null, t?: any): string {
@@ -669,36 +444,4 @@ export function formatResetTime(resetsAtStr: string | null, windowMinutes: numbe
   // For weekly limit
   const resetDate = resetsAt.format("YYYY-MM-DD h:mm A");
   return t ? t("limits.resets_at", { time: resetDate, timeLeft: timeLeftText }) : `Resets ${resetDate} (${timeLeftText})`;
-}
-
-function getLimitStatus(remainingPercent: number, t?: any): {
-  label: string;
-  tone: "success" | "warning" | "error";
-  badgeClass: string;
-  barClass: string;
-} {
-  if (remainingPercent < 30) {
-    return {
-      label: t ? t("limits.status_near_limit") : "Near Limit",
-      tone: "error",
-      badgeClass: "bg-error/10 text-error border border-error/20",
-      barClass: "bg-error",
-    };
-  }
-
-  if (remainingPercent < 70) {
-    return {
-      label: t ? t("limits.status_moderate") : "Moderate",
-      tone: "warning",
-      badgeClass: "bg-warning/10 text-warning border border-warning/20",
-      barClass: "bg-warning",
-    };
-  }
-
-  return {
-    label: t ? t("limits.status_healthy") : "Healthy",
-    tone: "success",
-    badgeClass: "bg-success/10 text-success border border-success/20",
-    barClass: "bg-primary",
-  };
 }

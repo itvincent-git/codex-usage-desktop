@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./i18n";
-import App from "./App";
 import "./styles.css";
 import { isTauri } from "@tauri-apps/api/core";
 
@@ -13,6 +12,10 @@ async function renderApp() {
   if (import.meta.env.MODE === "e2e") {
     await import("@wdio/tauri-plugin");
   }
+
+  const App = window.location.hash === "#tray"
+    ? (await import("./components/tray-popover")).TrayPopover
+    : (await import("./App")).default;
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

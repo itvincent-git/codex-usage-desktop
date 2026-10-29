@@ -255,21 +255,21 @@ describe("App", () => {
     const user = userEvent.setup();
     const app = render(<StrictMode><App /></StrictMode>);
     const handle = screen.getByRole("separator", { name: "Resize sidebar" });
-    expect(handle).toHaveAttribute("aria-valuenow", "160");
+    expect(handle).toHaveAttribute("aria-valuenow", "240");
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(handle).toHaveAttribute("aria-valuenow", "168");
+    expect(handle).toHaveAttribute("aria-valuenow", "248");
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     app.unmount();
 
     const restored = render(<StrictMode><App /></StrictMode>);
     expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
     await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
-    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "168");
+    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "248");
     restored.unmount();
 
     render(<StrictMode><App /></StrictMode>);
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "168");
+    expect(screen.getByRole("separator", { name: "Resize sidebar" })).toHaveAttribute("aria-valuenow", "248");
   });
 
   it("checks for updates again after the app stays open for 24 hours", async () => {
@@ -567,11 +567,16 @@ describe("App", () => {
     expect(await screen.findByText("cached quota schema mismatch")).toBeInTheDocument();
   });
 
-  it("opens the external quota forecast when the forecast badge is clicked", async () => {
+  it("moves the reset data attribution from the dashboard to third-party settings", async () => {
     forecastInvokeMock.mockResolvedValue({
-      probability24h: 61,
-      score: 73,
-      fetchedAt: "2026-06-25T09:00:19.499Z",
+      updatedAt: "2026-06-25T09:00:19.499Z",
+      lastResetAt: null,
+      latestAlert: null,
+      hasOfficialSignal: false,
+      recentPosts: [],
+      evidencePosts: null,
+      evidenceStale: false,
+      evidenceUpdatedAt: null,
     });
 
     invokeMock.mockImplementation(async (command: string, args?: { range?: string; url?: string }) => {
@@ -595,9 +600,16 @@ describe("App", () => {
 
     render(<App />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Open Codex quota reset forecast" }));
-
-    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codexreset.app/" });
+    expect(await screen.findByTestId("global-reset-forecast")).toBeInTheDocument();
+    expect(screen.queryByText(/codex-reset\.com/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Third Party" }));
+    expect(screen.getByRole("tab", { name: "Third Party" })).toHaveAttribute("aria-selected", "true");
+    const source = screen.getByRole("link", { name: "codex-reset.com" });
+    expect(source).toHaveAttribute("href", "https://codex-reset.com/");
+    expect(source.closest("p")).toHaveTextContent("Reset history, announcements and feed data are provided by codex-reset.com.");
+    await userEvent.click(source);
+    expect(invokeMock).toHaveBeenCalledWith("open_url", { url: "https://codex-reset.com/" });
   });
 
   it("opens ChatGPT Usage when reset credits are clicked", async () => {
@@ -1182,6 +1194,8 @@ describe("App", () => {
     // jsdom does not skip the inert background during native Tab traversal.
     screen.getByRole("button", { name: "Settings" }).focus();
     expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Check limits" })).toHaveFocus();
     await user.tab({ shift: true });
     expect(screen.getByRole("tab", { name: "Project" })).toHaveFocus();
     loadMoreButton.focus();
@@ -1952,7 +1966,7 @@ describe("App", () => {
 
     await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
     expect(latestResetInvokeMock).toHaveBeenCalledTimes(1);
-    expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 14 });
+    expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 30 });
     expect(resetHistoryInvokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
@@ -2087,7 +2101,7 @@ describe("App", () => {
 
     await waitFor(() => {
       const payload = updateTrayMock.mock.calls.at(-1)?.[0]?.payload;
-      expect(payload?.title).toBe("⏱️ 80%/3h┃🗓️ 55%/4d");
+      expect(payload?.title).toBe("⏱️ 80%/3h 🗓️ 55%/4d");
       expect(payload?.items.slice(0, 4)).toEqual([
         { id: "account", text: "Account: user@example.com", enabled: false },
         { id: "membership", text: "Plan: pro", enabled: false },
@@ -2140,7 +2154,7 @@ describe("App", () => {
     });
   });
 
-  it("uses saved custom tray title templates and countdown units", async () => {
+  it("ignores legacy tray title templates and preserves countdown units", async () => {
     const now = new Date().getTime();
     vi.spyOn(Date, "now").mockReturnValue(now);
     await i18n.changeLanguage("zh");
@@ -2189,7 +2203,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "5小时:90% 4hr后重置；周: 50% 3days后重置",
+          title: "⏱️ 90%/4hr 🗓️ 50%/3days",
         }),
       }));
     });
@@ -2228,7 +2242,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(updateTrayMock).toHaveBeenCalledWith(expect.objectContaining({
         payload: expect.objectContaining({
-          title: "⏱️ 80%/3h┃🗓️ 55%/4d",
+          title: "⏱️ 80%/3h 🗓️ 55%/4d",
         }),
       }));
     });
@@ -2876,6 +2890,26 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Settings", level: 1 })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("tab", { name: "Dashboard" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("switches to Korean in settings and saves the language preference", async () => {
+    mockLoadedDashboard();
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    const languageSelect = screen.getAllByRole("combobox").find((element) => element.textContent === "English")!;
+    await waitFor(() => expect(languageSelect).toBeEnabled());
+    fireEvent.keyDown(languageSelect, { key: "ArrowDown" });
+    await userEvent.click(await screen.findByRole("option", { name: "한국어" }));
+
+    expect(await screen.findByRole("heading", { name: "설정", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("언어 설정")).toBeInTheDocument();
+    expect(screen.getByText("앱의 표시 언어를 변경합니다.")).toBeInTheDocument();
+    expect(localStorage.getItem("language")).toBe("ko");
+    expect(i18n.resolvedLanguage).toBe("ko");
+    await userEvent.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(screen.getByRole("tab", { name: "대시보드" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "설정" })).toBeInTheDocument();
   });
 
   it("shows launch at login as disabled when autostart is not enabled", async () => {

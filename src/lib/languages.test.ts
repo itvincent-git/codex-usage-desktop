@@ -32,6 +32,11 @@ describe("language configuration", () => {
     },
   );
 
+  it.each(["ko", "ko-KR", "KO-kr", "ko-KP", "ko-KR-u-nu-latn"])("recognizes %s as Korean", (locale) => {
+    expect(findLanguage(locale)).toBe("ko");
+    expect(getLanguage(locale)).toBe("ko");
+  });
+
   it.each(["fr-FR", "unknown", "zh-Hantfoo", "zh-TWfoo"])("falls back to English for %s", (locale) => {
     expect(findLanguage(locale)).toBeUndefined();
     expect(getLanguage(locale)).toBe("en");
@@ -53,6 +58,43 @@ describe("language configuration", () => {
       const parameters = (text: string) => (text.match(/\{\{[^}]+\}\}|\{(?:remaining|reset)\}/g) ?? []).sort();
       expect(parameters(value), key).toEqual(parameters(simplified[key]));
     }
+  });
+
+  it("uses Korean date and number locales", () => {
+    expect(languages.ko.name).toBe("한국어");
+    expect(languages.ko.dateLocale.code).toBe("ko");
+    expect(languages.ko.intlLocale).toBe("ko-KR");
+    expect(format(new Date(2026, 9, 7), "PPPP", { locale: languages.ko.dateLocale })).toBe("2026년 10월 7일 수요일");
+  });
+
+  it("includes every English key in Korean and preserves interpolation parameters", () => {
+    const english = Object.fromEntries(translationEntries(languages.en.translations));
+    const korean = Object.fromEntries(translationEntries(languages.ko.translations));
+    expect(Object.keys(korean).sort()).toEqual(Object.keys(english).sort());
+    for (const [key, value] of Object.entries(korean)) {
+      expect(value.trim(), key).not.toBe("");
+      const parameters = (text: string) => (text.match(/\{\{[^}]+\}\}|\{(?:remaining|reset)\}/g) ?? []).sort();
+      expect(parameters(value), key).toEqual(parameters(english[key]));
+    }
+  });
+
+  it.each(Object.entries(languages))("includes all trend translations in %s and preserves interpolation parameters", (_code, language) => {
+    const english = Object.fromEntries(translationEntries(languages.en.translations.trends));
+    const translated = Object.fromEntries(translationEntries(language.translations.trends));
+    expect(Object.keys(translated).sort()).toEqual(Object.keys(english).sort());
+    for (const [key, value] of Object.entries(translated)) {
+      expect(value.trim(), key).not.toBe("");
+      const parameters = (text: string) => (text.match(/\{\{[^}]+\}\}/g) ?? []).sort();
+      expect(parameters(value), key).toEqual(parameters(english[key]));
+    }
+  });
+
+  it("selects Korean release notes and falls back to English when missing", () => {
+    const notes = JSON.stringify({ en: "English notes", ko: "한국어 업데이트 내역" });
+    expect(getReleaseNotes(notes, "ko")).toBe("한국어 업데이트 내역");
+    expect(getReleaseNotes(notes, "ko-KR")).toBe("한국어 업데이트 내역");
+    expect(getReleaseNotes('{"en":"English notes","ko":null}', "ko")).toBe("English notes");
+    expect(getReleaseNotes('{"en":"English notes"}', "ko-KR")).toBe("English notes");
   });
 
   it("selects localized release notes and falls back to English", () => {

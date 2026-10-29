@@ -2,7 +2,7 @@
 
 > **Know where your Codex tokens go, how much quota you have left, and when your limits reset — all from one local desktop app.**
 
-**[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md)
+**[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md)
 
 ⭐ If Codex Usage Desktop is useful to you, consider giving the project a [**Star**](https://github.com/itvincent-git/codex-usage-desktop).
 
@@ -59,6 +59,12 @@ You can also show limit information directly in the **macOS menu bar or Windows 
 Live limits use your existing local Codex login.
 
 ![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
+
+The menu bar can also show today's token usage and estimated cost. On macOS, right-click the menu bar widget to open a compact panel with 5-hour and weekly quota progress, reset times, today's tokens, and estimated cost. You can open the main window or quit the app directly from this panel.
+
+<img src="docs/menubar-menu.jpg" alt="macOS menu bar right-click panel with remaining quotas, reset times, and today's usage" width="436" />
+
+*Menu bar screenshots use illustrative account and usage data.*
 
 ### 🔍 Find what is using your tokens
 
@@ -130,7 +136,7 @@ Codex Usage Desktop is designed to stay out of your way:
 - macOS menu bar / Windows system tray
 - Launch at login
 - Automatic update checks
-- English, 简体中文, 繁體中文, and 日本語
+- English, 简体中文, 繁體中文, 日本語, and 한국어
 - Windows WSL Codex session detection
 - Light and dark themes
 
