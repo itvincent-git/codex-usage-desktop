@@ -52,6 +52,17 @@ describe("optional native session credits", () => {
     await expect(detailCredits).toHaveText(listCredits);
     const summaryOrder = await enabledDetailDialog.$('[aria-label="Session summary"]').getText();
     expect(summaryOrder.indexOf("Balance debits · session total")).toBeGreaterThan(summaryOrder.indexOf("Observed quota usage"));
+    for (const width of [1440, 1100]) {
+      await browser.setWindowSize(width, 760);
+      await browser.waitUntil(async () => browser.execute(() => {
+        const summary = document.querySelector('[aria-labelledby="session-detail-title"] [aria-label="Session summary"]')!;
+        const quota = summary.querySelector("#session-quota-title")!.getBoundingClientRect();
+        const credits = summary.querySelector('[data-testid="session-credits"]')!.getBoundingClientRect();
+        return Math.abs(credits.top - quota.top) < 4 && credits.left > quota.right
+          && credits.right <= summary.getBoundingClientRect().right && summary.scrollWidth <= summary.clientWidth;
+      }), { timeoutMsg: `Session credits should be beside the quota heading without overflow at ${width}px` });
+    }
+    await browser.setWindowSize(1440, 960);
     expect(await stats()).toHaveLength(1);
     await browser.keys("Escape");
     await enabledDetailDialog.waitForExist({ reverse: true });

@@ -1567,10 +1567,12 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
               <span>{t("sessions.detail.cli", { value: detail?.summary.cliVersion ?? "--" })}</span>
             </div>
           ) : null}
-          {detail && (refreshedSession || activePath === session.path) ? <div className="mt-1.5 border-t border-border/50 pt-1.5"><SessionQuotaUsageView usage={refreshedSession ? refreshedSession.quotaUsage : session.quotaUsage} detailed /></div> : null}
-          {showSessionCredits ? <div className="mt-1.5 border-t border-border/50 pt-1.5">
-            <SessionCredits row={creditThreadId ? credits.rows[creditThreadId] : undefined} loading={credits.loading} error={credits.error} hasThreadId={Boolean(creditThreadId)} />
-            {credits.error ? <p role="status" className="mt-1 text-[10px] text-muted-foreground">{t(`session_credits.errors.${credits.error}`)}</p> : null}
+          {detail && (refreshedSession || activePath === session.path) || showSessionCredits ? <div className="mt-1.5 flex items-start gap-x-4 border-t border-border/50 pt-1.5">
+            {detail && (refreshedSession || activePath === session.path) ? <div className="min-w-0 flex-1"><SessionQuotaUsageView usage={refreshedSession ? refreshedSession.quotaUsage : session.quotaUsage} detailed /></div> : null}
+            {showSessionCredits ? <div className="ml-auto max-w-[50%] py-0.5">
+              <SessionCredits row={creditThreadId ? credits.rows[creditThreadId] : undefined} loading={credits.loading} error={credits.error} hasThreadId={Boolean(creditThreadId)} />
+              {credits.error ? <p role="status" className="mt-1 text-[10px] text-muted-foreground">{t(`session_credits.errors.${credits.error}`)}</p> : null}
+            </div> : null}
           </div> : null}
           </section>
           </div>
