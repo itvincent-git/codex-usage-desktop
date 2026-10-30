@@ -282,7 +282,7 @@ describe("menu bar quota widget", () => {
   run("outlines rings in both themes and previews contrasting backgrounds", async () => {
     const icons: TrayIconBitmap[] = [];
     for (const dark of [false, true]) {
-      const icon = await browser.execute(renderTrayIcon, [
+      const icon = await browser.execute<TrayIconBitmap, Parameters<typeof renderTrayIcon>>(renderTrayIcon, [
         { kind: "5h", remainingPercent: 7, countdown: "2h3m" },
         { kind: "weekly", remainingPercent: 51, countdown: "4天23h" },
         { kind: "monthly", remainingPercent: 100, countdown: null },
@@ -299,7 +299,7 @@ describe("menu bar quota widget", () => {
         }
       }
       expect(outlinePixels).toBeGreaterThan(0);
-      const empty = await browser.execute(renderTrayIcon, [
+      const empty = await browser.execute<TrayIconBitmap, Parameters<typeof renderTrayIcon>>(renderTrayIcon, [
         { kind: "5h", remainingPercent: 0, countdown: null },
       ], [], dark);
       // The bottom of an empty ring is still visible, without becoming opaque.
