@@ -35,10 +35,24 @@ export function renderTrayIcon(
   context.textBaseline = "middle";
   context.lineCap = "round";
   const foreground = dark ? "#f5f5f7" : "#252b37";
+  const outline = dark ? "#252b37" : "#f5f5f7";
+  const drawRing = (x: number, color: string, end: number, alpha = 1) => {
+    context.globalAlpha = alpha;
+    // Keep the outer edge inside the 18-point bitmap, including its outline.
+    context.beginPath();
+    context.arc(x + 9, 9, 7.4, -Math.PI / 2, end);
+    context.strokeStyle = outline;
+    context.lineWidth = 3;
+    context.stroke();
+    context.strokeStyle = color;
+    context.lineWidth = 2;
+    context.stroke();
+    context.globalAlpha = 1;
+  };
   // The menu bar can contrast with the webview theme (for example over a dark
   // wallpaper). Outline bitmap text so it stays legible on either background.
   const drawText = (text: string, x: number, y: number) => {
-    context.strokeStyle = dark ? "#252b37" : "#f5f5f7";
+    context.strokeStyle = outline;
     context.lineWidth = 1.5;
     context.lineJoin = "round";
     context.strokeText(text, x, y);
@@ -49,17 +63,9 @@ export function renderTrayIcon(
     if (index > 0) x += 12;
     const remaining = remainingPercent === null ? null : Math.min(100, Math.max(0, remainingPercent));
     const color = kind === "5h" ? "#36b883" : "#8b5cf6";
-    context.lineWidth = 2;
-    context.strokeStyle = color;
-    context.globalAlpha = 0.2;
-    context.beginPath();
-    context.arc(x + 9, 9, 7.8, 0, Math.PI * 2);
-    context.stroke();
-    context.globalAlpha = 1;
+    drawRing(x, color, Math.PI * 1.5, 0.4);
     if (remaining !== null && remaining > 0) {
-      context.beginPath();
-      context.arc(x + 9, 9, 7.8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining / 100);
-      context.stroke();
+      drawRing(x, color, -Math.PI / 2 + Math.PI * 2 * remaining / 100);
     }
     context.fillStyle = foreground;
     context.textAlign = "center";
@@ -78,11 +84,7 @@ export function renderTrayIcon(
   });
   metrics.forEach(({ kind, value }, index) => {
     if (indicators.length > 0 || index > 0) x += 12;
-    context.strokeStyle = kind === "tokens" ? "#3b82f6" : "#d4a017";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.arc(x + 9, 9, 7.8, 0, Math.PI * 2);
-    context.stroke();
+    drawRing(x, kind === "tokens" ? "#3b82f6" : "#d4a017", Math.PI * 1.5);
     context.fillStyle = foreground;
     context.textAlign = "center";
     context.textBaseline = "alphabetic";

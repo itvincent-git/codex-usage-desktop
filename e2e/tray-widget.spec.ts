@@ -1,7 +1,7 @@
 import { $, browser, expect } from "@wdio/globals";
 import { writeFileSync } from "node:fs";
 import type { CodexLimitsResponse } from "../src/lib/api";
-import type { TrayIconBitmap } from "../src/lib/tray-icon";
+import { renderTrayIcon, type TrayIconBitmap } from "../src/lib/tray-icon";
 
 describe("menu bar quota widget", () => {
   const run = process.platform === "darwin" && process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
@@ -69,6 +69,7 @@ describe("menu bar quota widget", () => {
       const pixels: { x: number; y: number }[] = [];
       for (let y = 0; y < icon.height; y++) {
         for (let x = 0; x < 54; x++) {
+          if (Math.hypot(x + 0.5 - 27, y + 0.5 - 27) > 16.5) continue;
           const offset = (y * icon.width + x) * 4;
           const lightText = icon.rgba[offset] === 245 && icon.rgba[offset + 1] === 245 && icon.rgba[offset + 2] === 247;
           const darkText = icon.rgba[offset] === 37 && icon.rgba[offset + 1] === 43 && icon.rgba[offset + 2] === 55;
@@ -277,4 +278,80 @@ describe("menu bar quota widget", () => {
       await browser.refresh();
     }
   }).timeout(180_000);
+
+  run("outlines rings in both themes and previews contrasting backgrounds", async () => {
+    const icons: TrayIconBitmap[] = [];
+    for (const dark of [false, true]) {
+      const icon = await browser.execute(renderTrayIcon, [
+        { kind: "5h", remainingPercent: 7, countdown: "2h3m" },
+        { kind: "weekly", remainingPercent: 51, countdown: "4天23h" },
+        { kind: "monthly", remainingPercent: 100, countdown: null },
+      ], [], dark);
+      icons.push(icon);
+      const outline = dark ? [37, 43, 55] : [245, 245, 247];
+      let outlinePixels = 0;
+      for (let y = 0; y < 54; y++) {
+        for (let x = 0; x < 54; x++) {
+          const radius = Math.hypot(x + 0.5 - 27, y + 0.5 - 27);
+          const offset = (y * icon.width + x) * 4;
+          if (radius > 24 && radius < 27 && outline.every((value, channel) => icon.rgba[offset + channel] === value)
+            && icon.rgba[offset + 3] > 128) outlinePixels++;
+        }
+      }
+      expect(outlinePixels).toBeGreaterThan(0);
+      const empty = await browser.execute(renderTrayIcon, [
+        { kind: "5h", remainingPercent: 0, countdown: null },
+      ], [], dark);
+      // The bottom of an empty ring is still visible, without becoming opaque.
+      const alpha = empty.rgba[(49 * empty.width + 27) * 4 + 3];
+      expect(alpha).toBeGreaterThanOrEqual(100);
+      expect(alpha).toBeLessThan(200);
+    }
+    const png = await browser.execute((icons) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 930;
+      const context = canvas.getContext("2d")!;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#252b37";
+      context.font = "600 26px -apple-system, sans-serif";
+      context.fillText("圆环细描边 + 40% 底环 · 实际渲染预览", 28, 42);
+      context.font = "18px -apple-system, sans-serif";
+      context.fillText("浅色主题文字", 28, 78);
+      context.fillText("深色主题文字", 620, 78);
+      const sources = icons.map((icon) => {
+        const source = document.createElement("canvas");
+        source.width = icon.width;
+        source.height = icon.height;
+        source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(icon.rgba), icon.width, icon.height), 0, 0);
+        return source;
+      });
+      const backgrounds = [
+        ["蓝色背景（接近反馈截图）", "#478fbe"],
+        ["浅色背景", "#f2f3f5"],
+        ["深色背景", "#16181d"],
+        ["紫色背景（接近周额度圆环）", "#8b5cf6"],
+        ["绿色背景（接近 5h 圆环）", "#36b883"],
+      ];
+      backgrounds.forEach(([label, color], index) => {
+        const y = 96 + index * 160;
+        for (let theme = 0; theme < 2; theme++) {
+          const x = 16 + theme * 592;
+          context.fillStyle = color;
+          context.fillRect(x, y, 576, 148);
+          context.fillStyle = index === 2 ? "#f5f5f7" : "#182332";
+          context.font = "16px -apple-system, sans-serif";
+          context.fillText(label, x + 14, y + 25);
+          const source = sources[theme];
+          context.drawImage(source, x + 14, y + 44, source.width / 3, 18);
+          context.drawImage(source, x + 14, y + 86, source.width / 3 * 2, 36);
+          context.font = "12px -apple-system, sans-serif";
+          context.fillText("上：18pt 实际尺寸 / 下：2 倍放大 · 剩余 7% / 51% / 100%", x + 14, y + 138);
+        }
+      });
+      return canvas.toDataURL("image/png").split(",")[1];
+    }, icons);
+    writeFileSync("/tmp/codex-tray-ring-preview.png", Buffer.from(png, "base64"));
+  });
 });
