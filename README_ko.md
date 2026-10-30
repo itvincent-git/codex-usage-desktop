@@ -2,7 +2,7 @@
 
 > **Codex 토큰이 어디에 쓰이는지, 사용 한도가 얼마나 남았는지, 언제 초기화되는지 — 하나의 로컬 데스크톱 앱에서 확인하세요.**
 
-**[Windows x64 버전 다운로드](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 버전](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 버전](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [简体中文](README_zh.md) · [繁體中文](README_zh-TW.md) · [日本語](README_ja.md)
+**[Windows x64 버전 다운로드](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 버전](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 버전](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [简体中文](README_zh.md) · [繁體中文](README_zh-TW.md) · [日本語](README_ja.md) · [Deutsch](README_de.md)
 
 ⭐ Codex Usage Desktop이 도움이 되었다면 [프로젝트에 **Star**](https://github.com/itvincent-git/codex-usage-desktop)를 남겨 주세요.
 
@@ -136,7 +136,7 @@ Codex Usage Desktop은 작업 흐름을 방해하지 않도록 설계되었습�
 - macOS 메뉴 막대 / Windows 시스템 트레이
 - 로그인 시 실행
 - 자동 업데이트 확인
-- English, 简体中文, 繁體中文, 日本語 및 한국어
+- English, 简体中文, 繁體中文, 日本語, 한국어 및 Deutsch
 - Windows WSL의 Codex 세션 감지
 - 밝은 테마와 어두운 테마
 

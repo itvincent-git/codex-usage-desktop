@@ -2,7 +2,7 @@
 
 > **看清 Codex Token 用在哪裡、額度還剩多少、何時重設，一個本機桌面應用程式就能掌握。**
 
-**[下載 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 晶片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md) · [한국어](README_ko.md)
+**[下載 Windows x64 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple 晶片版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md) · [한국어](README_ko.md) · [Deutsch](README_de.md)
 
 ⭐ 如果 Codex Usage Desktop 對你有幫助，歡迎[為專案加上 **Star**](https://github.com/itvincent-git/codex-usage-desktop)。
 
@@ -136,7 +136,7 @@ Codex Usage Desktop 的設計讓你隨時掌握用量，同時減少對工作的
 - macOS 選單列 / Windows 系統匣
 - 登入時自動啟動
 - 自動檢查更新
-- English、简体中文、繁體中文、日本語和한국어
+- English、简体中文、繁體中文、日本語、한국어和Deutsch
 - 偵測 Windows WSL 中的 Codex 工作階段
 - 淺色與深色主題
 

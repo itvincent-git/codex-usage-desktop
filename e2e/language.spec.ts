@@ -17,6 +17,7 @@ describe("language startup", () => {
 
   for (const { code, name, settings, languageSettings } of [
     { code: "zh-Hant", name: "繁體中文", settings: "設定", languageSettings: "語言設定" },
+    { code: "de", name: "Deutsch", settings: "Einstellungen", languageSettings: "Spracheinstellungen" },
     { code: "ko", name: "한국어", settings: "설정", languageSettings: "언어 설정" },
   ]) {
     it(`switches from English to ${name} and restores it after refresh`, async () => {

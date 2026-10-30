@@ -2,7 +2,7 @@
 
 > **Codex のトークンの使い道、残りの利用枠、リセット時刻を、ひとつのローカルデスクトップアプリで把握。**
 
-**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md)
+**[Windows x64 版をダウンロード](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac 版](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [English README](README.md) · [中文说明](README_zh.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md) · [Deutsch](README_de.md)
 
 ⭐ Codex Usage Desktop が役に立ったら、[プロジェクトに **Star** を付けて](https://github.com/itvincent-git/codex-usage-desktop)応援してください。
 
@@ -136,7 +136,7 @@ Codex の利用枠やリセットの仕組みは、時間とともに変わる�
 - macOS メニューバー / Windows システムトレイ
 - ログイン時の自動起動
 - アップデートの自動確認
-- English・简体中文・繁體中文・日本語・한국어
+- English・简体中文・繁體中文・日本語・한국어・Deutsch
 - Windows での WSL 内の Codex セッション検出
 - ライトテーマとダークテーマ
 

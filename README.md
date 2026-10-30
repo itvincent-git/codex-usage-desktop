@@ -2,7 +2,7 @@
 
 > **Know where your Codex tokens go, how much quota you have left, and when your limits reset — all from one local desktop app.**
 
-**[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md)
+**[Download for Windows x64](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-windows-x64-setup.exe)** · **[Apple Silicon](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-arm64.dmg)** · **[Intel Mac](https://github.com/itvincent-git/codex-usage-desktop/releases/latest/download/codex-usage-desktop-macos-x64.dmg)** · [中文说明](README_zh.md) · [日本語](README_ja.md) · [繁體中文](README_zh-TW.md) · [한국어](README_ko.md) · [Deutsch](README_de.md)
 
 ⭐ If Codex Usage Desktop is useful to you, consider giving the project a [**Star**](https://github.com/itvincent-git/codex-usage-desktop).
 
@@ -136,7 +136,7 @@ Codex Usage Desktop is designed to stay out of your way:
 - macOS menu bar / Windows system tray
 - Launch at login
 - Automatic update checks
-- English, 简体中文, 繁體中文, 日本語, and 한국어
+- English, 简体中文, 繁體中文, 日本語, 한국어, and Deutsch
 - Windows WSL Codex session detection
 - Light and dark themes
 

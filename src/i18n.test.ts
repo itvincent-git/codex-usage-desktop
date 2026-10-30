@@ -59,3 +59,53 @@ describe("Korean language startup", () => {
     expect(i18n.t("settings.auto_refresh_minutes", { count })).toBe(`${count}분마다`);
   });
 });
+
+describe("German language startup", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    localStorage.clear();
+    vi.stubGlobal("navigator", { language: "de-DE", languages: ["de-DE", "en-US"] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it.each(["de-DE", "de-AT", "de-CH"])("detects German for %s in the system language list", async (locale) => {
+    vi.stubGlobal("navigator", { language: "fr-FR", languages: ["fr-FR", locale, "en-US"] });
+    const { default: i18n } = await import("./i18n");
+    expect(i18n.resolvedLanguage).toBe("de");
+    expect(i18n.t("settings.language_title")).toBe("Spracheinstellungen");
+  });
+
+  it("detects German when only navigator.language is available", async () => {
+    vi.stubGlobal("navigator", { language: "de-CH" });
+    const { default: i18n } = await import("./i18n");
+    expect(i18n.resolvedLanguage).toBe("de");
+  });
+
+  it("restores saved German on an English system", async () => {
+    localStorage.setItem("language", "de");
+    vi.stubGlobal("navigator", { language: "en-US", languages: ["en-US"] });
+    const { default: i18n } = await import("./i18n");
+    expect(i18n.resolvedLanguage).toBe("de");
+  });
+
+  it("preserves an explicit English preference on a German system", async () => {
+    localStorage.setItem("language", "en");
+    const { default: i18n } = await import("./i18n");
+    expect(i18n.resolvedLanguage).toBe("en");
+  });
+
+  it.each([
+    [0, "0 Sitzungen", "0 Runden", "Alle 0 Minuten"],
+    [1, "1 Sitzung", "1 Runde", "Alle 1 Minute"],
+    [2, "2 Sitzungen", "2 Runden", "Alle 2 Minuten"],
+  ])("renders German singular and plural labels for %i", async (count, sessions, turns, refresh) => {
+    const { default: i18n } = await import("./i18n");
+    expect(i18n.t("sessions.count_sessions", { count })).toBe(sessions);
+    expect(i18n.t("sessions.count_turns", { count })).toBe(turns);
+    expect(i18n.t("settings.auto_refresh_minutes", { count })).toBe(refresh);
+  });
+});

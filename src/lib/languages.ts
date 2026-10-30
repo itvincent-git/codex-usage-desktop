@@ -1,4 +1,5 @@
-import { enUS, ja, ko, zhCN, zhTW } from "date-fns/locale";
+import { de, enUS, ja, ko, zhCN, zhTW } from "date-fns/locale";
+import deTranslations from "@/locales/de.json";
 import en from "@/locales/en.json";
 import jaTranslations from "@/locales/ja.json";
 import koTranslations from "@/locales/ko.json";
@@ -11,6 +12,7 @@ export const languages = {
   "zh-Hant": { name: "繁體中文", translations: zhHant, dateLocale: zhTW, intlLocale: "zh-TW", systemLocales: ["zh-Hant", "zh-TW", "zh-HK", "zh-MO"] },
   ja: { name: "日本語", translations: jaTranslations, dateLocale: ja, intlLocale: "ja-JP", systemLocales: ["ja"] },
   ko: { name: "한국어", translations: koTranslations, dateLocale: ko, intlLocale: "ko-KR", systemLocales: ["ko"] },
+  de: { name: "Deutsch", translations: deTranslations, dateLocale: de, intlLocale: "de-DE", systemLocales: ["de"] },
 } as const;
 
 export type Language = keyof typeof languages;

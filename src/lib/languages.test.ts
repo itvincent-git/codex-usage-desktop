@@ -37,6 +37,35 @@ describe("language configuration", () => {
     expect(getLanguage(locale)).toBe("ko");
   });
 
+  it.each(["de", "de-DE", "de-AT", "de-CH", "DE-de", "de-DE-u-nu-latn"])("recognizes %s as German", (locale) => {
+    expect(findLanguage(locale)).toBe("de");
+    expect(getLanguage(locale)).toBe("de");
+  });
+
+  it("uses German date and number locales", () => {
+    expect(languages.de.name).toBe("Deutsch");
+    expect(languages.de.dateLocale.code).toBe("de");
+    expect(languages.de.intlLocale).toBe("de-DE");
+    expect(format(new Date(2026, 9, 7), "PPPP", { locale: languages.de.dateLocale })).toBe("Mittwoch, 7. Oktober 2026");
+  });
+
+  it("includes every English key in German and preserves parameters and markup", () => {
+    const english = Object.fromEntries(translationEntries(languages.en.translations));
+    const german = Object.fromEntries(translationEntries(languages.de.translations));
+    expect(Object.keys(german).sort()).toEqual(Object.keys(english).sort());
+    for (const [key, value] of Object.entries(german)) {
+      expect(value.trim(), key).not.toBe("");
+      const parameters = (text: string) => (text.match(/\{\{[^}]+\}\}|\{(?:remaining|reset)\}|<\/?[a-z]+>/g) ?? []).sort();
+      expect(parameters(value), key).toEqual(parameters(english[key]));
+    }
+  });
+
+  it("selects German release notes and falls back to English when missing", () => {
+    const notes = JSON.stringify({ en: "English notes", de: "Deutsche Versionshinweise" });
+    expect(getReleaseNotes(notes, "de-DE")).toBe("Deutsche Versionshinweise");
+    expect(getReleaseNotes('{"en":"English notes"}', "de-AT")).toBe("English notes");
+  });
+
   it.each(["fr-FR", "unknown", "zh-Hantfoo", "zh-TWfoo"])("falls back to English for %s", (locale) => {
     expect(findLanguage(locale)).toBeUndefined();
     expect(getLanguage(locale)).toBe("en");
