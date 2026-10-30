@@ -97,6 +97,16 @@
 }
 
 @layer utilities {
+  .usage-trends-content {
+    container: usage-trends / inline-size;
+  }
+
+  @container usage-trends (min-width: 32rem) {
+    .trend-metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
   .sidebar-limits {
     container: sidebar-quota / inline-size;
   }

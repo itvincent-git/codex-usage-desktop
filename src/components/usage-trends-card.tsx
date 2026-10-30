@@ -241,7 +241,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
       </CardHeader>}
-      <CardContent className={cn("flex flex-1 flex-col justify-between", compact ? "p-0" : "space-y-3 p-3 sm:p-3.5")}>
+      <CardContent className={cn("usage-trends-content flex flex-1 flex-col justify-between", compact ? "p-0" : "space-y-3 p-3 sm:p-3.5")}>
         <div
           style={
             typeof chartHeight === "number"
@@ -380,7 +380,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
           {isQuotaView && !hasQuotaData ? <p role="status" className="pointer-events-none absolute inset-x-0 top-2 text-center text-xs text-muted-foreground">{t("trends.quota_no_data")}</p> : null}
         </div>
 
-        {metrics.length > 0 ? <div className="trend-metrics grid grid-cols-2 gap-px sm:grid-cols-4 overflow-hidden rounded-lg border border-border/70 bg-border/70">
+        {metrics.length > 0 ? <div className="trend-metrics grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70">
           {metrics.map((metric) => (
             <SummaryCell key={metric.label} metric={metric} cacheHitRate={cacheHitRate} />
           ))}
@@ -417,16 +417,16 @@ function SummaryCell({
       "group relative min-w-0 bg-surface p-2 sm:p-2.5 transition-all duration-300 hover:bg-muted",
       style.accent,
     )}>
-      <div className="flex min-h-[56px] items-center justify-between gap-3">
-        <div className="space-y-0.5 flex-1 min-w-0">
+      <div className="flex min-h-[56px] flex-wrap items-center justify-between gap-3">
+        <div className="space-y-0.5 flex-1 min-w-[5rem]">
           <div className="flex items-center gap-2">
-            <span className={cn("h-2 w-2 rounded-full", style.dot)} />
-            <p className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none">
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", style.dot)} />
+            <p className="min-w-0 break-words text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground leading-none">
               {metric.label}
             </p>
           </div>
           <div className="pt-0.5">
-            <p className="truncate text-base sm:text-lg font-extrabold tracking-tight text-foreground leading-none" title={metric.value}>
+            <p className="break-words text-base sm:text-lg font-extrabold tracking-tight text-foreground leading-tight" title={metric.value}>
               {metric.value}
             </p>
             <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
