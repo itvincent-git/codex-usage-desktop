@@ -35,6 +35,15 @@ export function renderTrayIcon(
   context.textBaseline = "middle";
   context.lineCap = "round";
   const foreground = dark ? "#f5f5f7" : "#252b37";
+  // The menu bar can contrast with the webview theme (for example over a dark
+  // wallpaper). Outline bitmap text so it stays legible on either background.
+  const drawText = (text: string, x: number, y: number) => {
+    context.strokeStyle = dark ? "#252b37" : "#f5f5f7";
+    context.lineWidth = 1.5;
+    context.lineJoin = "round";
+    context.strokeText(text, x, y);
+    context.fillText(text, x, y);
+  };
   let x = 0;
   indicators.forEach(({ kind, remainingPercent, countdown }, index) => {
     if (index > 0) x += 12;
@@ -58,13 +67,13 @@ export function renderTrayIcon(
     context.font = `600 ${remaining !== null && Math.round(remaining) === 100 ? 7 : 8}px ${font}`;
     const label = remaining === null ? "–" : String(Math.round(remaining));
     const metrics = context.measureText(label);
-    context.fillText(label,
+    drawText(label,
       x + 9 + (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / 2,
       9 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2);
     context.textAlign = "left";
     context.textBaseline = "middle";
     context.font = `12px ${font}`;
-    if (countdown) context.fillText(countdown, x + 23, 9.5);
+    if (countdown) drawText(countdown, x + 23, 9.5);
     x += widths[index];
   });
   metrics.forEach(({ kind, value }, index) => {
@@ -80,13 +89,13 @@ export function renderTrayIcon(
     context.font = `600 10px ${font}`;
     const label = kind === "tokens" ? "T" : "$";
     const bounds = context.measureText(label);
-    context.fillText(label,
+    drawText(label,
       x + 9 + (bounds.actualBoundingBoxLeft - bounds.actualBoundingBoxRight) / 2,
       9 + (bounds.actualBoundingBoxAscent - bounds.actualBoundingBoxDescent) / 2);
     context.textAlign = "left";
     context.textBaseline = "middle";
     context.font = `12px ${font}`;
-    context.fillText(value, x + 23, 9.5);
+    drawText(value, x + 23, 9.5);
     x += metricWidths[index];
   });
   return {

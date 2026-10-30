@@ -81,6 +81,23 @@ describe("menu bar quota widget", () => {
       expect(Math.abs(centerX - 27)).toBeLessThanOrEqual(1.5);
       expect(Math.abs(centerY - 27)).toBeLessThanOrEqual(1.5);
     };
+    const expectOutlinedText = (icon: TrayIconBitmap) => {
+      // Both text tones must be present inside the ring and in the countdown.
+      // This covers a light webview over a dark menu bar, and the reverse.
+      for (const [start, end] of [[0, 54], [69, 120]]) {
+        for (const [red, green, blue] of [[245, 245, 247], [37, 43, 55]]) {
+          let count = 0;
+          for (let y = 0; y < icon.height; y++) {
+            for (let x = start; x < end; x++) {
+              const offset = (y * icon.width + x) * 4;
+              if (icon.rgba[offset] === red && icon.rgba[offset + 1] === green
+                && icon.rgba[offset + 2] === blue && icon.rgba[offset + 3] > 128) count++;
+            }
+          }
+          expect(count).toBeGreaterThan(0);
+        }
+      }
+    };
     const reload = async () => {
       await browser.execute(() => { (window as unknown as { trayReloading: boolean }).trayReloading = true; });
       await browser.refresh();
@@ -102,6 +119,7 @@ describe("menu bar quota widget", () => {
       expect(both.height).toBe(54);
       expect(both.rgba).toHaveLength(both.width * both.height * 4);
       expectCenteredNumber(both);
+      expectOutlinedText(both);
       const colorCount = (rgba: number[], red: number, green: number, blue: number) => rgba.filter((_, i) => i % 4 === 0
         && rgba[i] === red && rgba[i + 1] === green && rgba[i + 2] === blue && rgba[i + 3] === 255).length;
       // Fully consumed 5-hour quota has an empty ring; 11% weekly quota has a purple arc.
@@ -175,6 +193,7 @@ describe("menu bar quota widget", () => {
       await install(availableLimits);
       await browser.waitUntil(async () => (await result())?.title.includes("T: ") === true);
       const allMetrics = (await result())!.icon!;
+      expectOutlinedText(allMetrics);
       expect(colorCount(allMetrics.rgba, 59, 130, 246)).toBeGreaterThan(500);
       expect(colorCount(allMetrics.rgba, 212, 160, 23)).toBeGreaterThan(500);
       expect(colorCount(allMetrics.rgba, 54, 184, 131)).toBeGreaterThan(500);
@@ -197,6 +216,24 @@ describe("menu bar quota widget", () => {
         return canvas.toDataURL("image/png").split(",")[1];
       }, allMetrics);
       writeFileSync("/tmp/codex-tray-metrics.png", Buffer.from(metricsPng, "base64"));
+      const contrastPng = await browser.execute((icon) => {
+        const source = document.createElement("canvas");
+        source.width = icon.width;
+        source.height = icon.height;
+        source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(icon.rgba), icon.width, icon.height), 0, 0);
+        const canvas = document.createElement("canvas");
+        canvas.width = icon.width + 24;
+        canvas.height = icon.height * 2 + 36;
+        const context = canvas.getContext("2d")!;
+        for (const [index, color] of ["#101114", "#eeeeee"].entries()) {
+          const y = index * (icon.height + 12);
+          context.fillStyle = color;
+          context.fillRect(0, y, canvas.width, icon.height + 24);
+          context.drawImage(source, 12, y + 12);
+        }
+        return canvas.toDataURL("image/png").split(",")[1];
+      }, allMetrics);
+      writeFileSync("/tmp/codex-tray-contrast.png", Buffer.from(contrastPng, "base64"));
 
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: false, limitWeekly: false, tokens: false, cost: true })));
       await reload();
