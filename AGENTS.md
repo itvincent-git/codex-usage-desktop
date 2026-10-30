@@ -84,7 +84,7 @@ Known pitfalls to avoid:
 
 ## Git
 - After completing the task, if there are no issues, commit the changes to Git. Write by Conventional Commits style in English.
-- The GitHub CLI (`gh`) is installed and can be used to interact with GitHub.
+- Run `pnpm typecheck` before commit to git.
 
 ---
 
