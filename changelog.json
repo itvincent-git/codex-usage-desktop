@@ -1,4 +1,8 @@
 {
+  "5.4.1": {
+    "zh": "- chore(homebrew): update cask to 5.3.2\n- feat(i18n): add German language support and README\n- fix(ui): prevent German trend metrics from clipping\n- fix: prevent session quota labels from overlapping\n- fix(tray): outline text for contrasting menu bar backgrounds\n- fix(tray): outline rings for contrasting menu bar backgrounds\n- fix(e2e): specify tray icon execute argument types\n- doc: add typecheck prompt",
+    "en": "- chore(homebrew): update cask to 5.3.2\n- feat(i18n): add German language support and README\n- fix(ui): prevent German trend metrics from clipping\n- fix: prevent session quota labels from overlapping\n- fix(tray): outline text for contrasting menu bar backgrounds\n- fix(tray): outline rings for contrasting menu bar backgrounds\n- fix(e2e): specify tray icon execute argument types\n- doc: add typecheck prompt"
+  },
   "5.4.0": {
     "zh": "- chore(homebrew): update cask to 5.3.2\n- feat(i18n): add German language support and README\n- fix(ui): prevent German trend metrics from clipping\n- fix: prevent session quota labels from overlapping\n- fix(tray): outline text for contrasting menu bar backgrounds\n- fix(tray): outline rings for contrasting menu bar backgrounds",
     "en": "- chore(homebrew): update cask to 5.3.2\n- feat(i18n): add German language support and README\n- fix(ui): prevent German trend metrics from clipping\n- fix: prevent session quota labels from overlapping\n- fix(tray): outline text for contrasting menu bar backgrounds\n- fix(tray): outline rings for contrasting menu bar backgrounds"
