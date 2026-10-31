@@ -10,16 +10,18 @@ use crate::{
 };
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+#[cfg(test)]
+use serde_json::json;
+use serde_json::Value;
 use std::{
     collections::HashMap,
     env,
     ffi::{OsStr, OsString},
     fs,
-    io::{BufRead, BufReader, Read, Write},
+    io::Read,
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
-    sync::{mpsc, Arc, Condvar, Mutex, OnceLock},
+    process::{Command, Stdio},
+    sync::{Arc, Condvar, Mutex, OnceLock},
     thread,
     time::{Duration, Instant},
 };
@@ -48,40 +50,9 @@ enum WindowRole {
     Unknown,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RpcRateLimitsResponse {
-    rate_limits: RpcRateLimitSnapshot,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RpcRateLimitSnapshot {
-    primary: Option<RpcRateLimitWindow>,
-    secondary: Option<RpcRateLimitWindow>,
-    credits: Option<CodexCredits>,
-    rate_limit_reset_credits: Option<RpcRateLimitResetCredits>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RpcRateLimitResetCredits {
-    available_count: Option<i64>,
-    #[serde(default)]
-    credits: Vec<RpcResetCredit>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RpcResetCredit {
-    id: String,
-    status: String,
-    expires_at: Option<i64>,
-}
-
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct RpcRateLimitWindow {
+struct RateLimitWindow {
     used_percent: f64,
     window_duration_mins: Option<i64>,
     resets_at: Option<i64>,
@@ -171,8 +142,8 @@ struct WindowActivationMarker {
 
 #[derive(Debug)]
 struct LimitsSnapshot {
-    primary: Option<RpcRateLimitWindow>,
-    secondary: Option<RpcRateLimitWindow>,
+    primary: Option<RateLimitWindow>,
+    secondary: Option<RateLimitWindow>,
     credits: Option<CodexCredits>,
     reset_credits_available_count: Option<i64>,
     reset_credits: Option<Vec<CodexResetCredit>>,
@@ -197,8 +168,7 @@ struct SubscriptionInfo {
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
     fetch_codex_limits_single_flight(|| {
         log::info!("Starting fetch_codex_limits...");
-        let limits =
-            fetch_codex_limits_with(fetch_oauth_limits, fetch_cli_limits, fetch_account_snapshot)?;
+        let limits = fetch_codex_limits_with(fetch_oauth_limits, fetch_account_snapshot)?;
         #[cfg(debug_assertions)]
         let limits = if window_activation_debug_enabled() {
             let mut debug_limits = limits;
@@ -496,31 +466,14 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
 
 fn fetch_codex_limits_with(
     fetch_oauth: impl FnOnce() -> Result<LimitsSnapshot, String>,
-    fetch_cli: impl FnOnce() -> Result<LimitsSnapshot, String>,
     fetch_account: impl FnOnce() -> AccountSnapshot,
 ) -> Result<CodexLimitsResponse, String> {
-    let account = fetch_account();
-    match fetch_oauth() {
-        Ok(limits) => {
-            log::info!("Successfully fetched limits via OAuth.");
-            Ok(make_response(limits, account))
-        }
-        Err(oauth_error) => {
-            log::warn!("OAuth limits fetch failed: {oauth_error}. Falling back to CLI...");
-            match fetch_cli() {
-                Ok(limits) => {
-                    log::info!("Successfully fetched limits via CLI fallback.");
-                    Ok(make_response(limits, account))
-                }
-                Err(cli_error) => {
-                    log::error!("Both OAuth and CLI failed. CLI error: {cli_error}");
-                    Err(format!(
-                        "OAuth unavailable: {oauth_error}; CLI RPC unavailable: {cli_error}"
-                    ))
-                }
-            }
-        }
-    }
+    let limits = fetch_oauth().map_err(|error| {
+        log::warn!("OAuth limits fetch failed: {error}");
+        error
+    })?;
+    log::info!("Successfully fetched limits via OAuth.");
+    Ok(make_response(limits, fetch_account()))
 }
 
 fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
@@ -528,7 +481,7 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
     let auth = load_codex_auth()?;
     log::info!("Building reqwest client for OAuth...");
     let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(5))
         .build()
         .map_err(|error| format!("Failed to create Codex usage client: {error}"))?;
 
@@ -645,8 +598,8 @@ fn make_oauth_snapshot(
     };
 
     Ok(LimitsSnapshot {
-        primary: rate_limit.primary_window.map(RpcRateLimitWindow::from),
-        secondary: rate_limit.secondary_window.map(RpcRateLimitWindow::from),
+        primary: rate_limit.primary_window.map(RateLimitWindow::from),
+        secondary: rate_limit.secondary_window.map(RateLimitWindow::from),
         credits: usage.credits,
         reset_credits_available_count,
         reset_credits,
@@ -732,30 +685,6 @@ impl ResetCreditsCache {
         self.ready.notify_all();
         result
     }
-}
-
-fn fetch_cli_limits() -> Result<LimitsSnapshot, String> {
-    let codex = resolve_codex_command(selected_codex_environment()).ok_or_else(|| {
-        "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
-    })?;
-    let mut rpc = CodexRpcProcess::start(codex)?;
-    rpc.initialize()?;
-    let limits = rpc.fetch_rate_limits()?;
-    rpc.shutdown();
-
-    Ok(LimitsSnapshot {
-        primary: limits.primary,
-        secondary: limits.secondary,
-        credits: limits.credits,
-        reset_credits_available_count: limits
-            .rate_limit_reset_credits
-            .as_ref()
-            .and_then(|credits| credits.available_count),
-        reset_credits: limits
-            .rate_limit_reset_credits
-            .map(|credits| normalize_rpc_reset_credits(credits.credits)),
-        source: "cli-rpc",
-    })
 }
 
 fn fetch_account_snapshot() -> AccountSnapshot {
@@ -1001,7 +930,7 @@ fn base64url_decode(input: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-impl From<OAuthRateLimitWindow> for RpcRateLimitWindow {
+impl From<OAuthRateLimitWindow> for RateLimitWindow {
     fn from(window: OAuthRateLimitWindow) -> Self {
         Self {
             used_percent: window.used_percent,
@@ -1040,22 +969,6 @@ fn normalize_oauth_reset_credits(credits: Vec<OAuthResetCredit>) -> Vec<CodexRes
     )
 }
 
-fn normalize_rpc_reset_credits(credits: Vec<RpcResetCredit>) -> Vec<CodexResetCredit> {
-    sort_reset_credits(
-        credits
-            .into_iter()
-            .filter(|credit| credit.status.eq_ignore_ascii_case("available"))
-            .map(|credit| CodexResetCredit {
-                id: credit.id,
-                expires_at: credit
-                    .expires_at
-                    .and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single())
-                    .map(|date| date.to_rfc3339_opts(SecondsFormat::Millis, true)),
-            })
-            .collect(),
-    )
-}
-
 fn sort_reset_credits(mut credits: Vec<CodexResetCredit>) -> Vec<CodexResetCredit> {
     credits.sort_by_key(|credit| {
         (
@@ -1066,7 +979,7 @@ fn sort_reset_credits(mut credits: Vec<CodexResetCredit>) -> Vec<CodexResetCredi
     credits
 }
 
-fn make_window(window: RpcRateLimitWindow) -> CodexLimitWindow {
+fn make_window(window: RateLimitWindow) -> CodexLimitWindow {
     let used_percent = clamp_percent(window.used_percent);
     let remaining_percent = clamp_percent(100.0 - used_percent);
     let resets_at = window
@@ -1091,9 +1004,9 @@ fn clamp_percent(value: f64) -> f64 {
 }
 
 fn normalize_windows(
-    primary: Option<RpcRateLimitWindow>,
-    secondary: Option<RpcRateLimitWindow>,
-) -> (Option<RpcRateLimitWindow>, Option<RpcRateLimitWindow>) {
+    primary: Option<RateLimitWindow>,
+    secondary: Option<RateLimitWindow>,
+) -> (Option<RateLimitWindow>, Option<RateLimitWindow>) {
     match (primary, secondary) {
         (Some(primary), Some(secondary)) => {
             match (window_role(&primary), window_role(&secondary)) {
@@ -1117,7 +1030,7 @@ fn normalize_windows(
     }
 }
 
-fn window_role(window: &RpcRateLimitWindow) -> WindowRole {
+fn window_role(window: &RateLimitWindow) -> WindowRole {
     match window.window_duration_mins {
         Some(SESSION_WINDOW_MINUTES) => WindowRole::Session,
         Some(WEEKLY_WINDOW_MINUTES) => WindowRole::Weekly,
@@ -1125,231 +1038,11 @@ fn window_role(window: &RpcRateLimitWindow) -> WindowRole {
     }
 }
 
-struct CodexRpcProcess {
-    child: Child,
-    stdin: std::process::ChildStdin,
-    rx: mpsc::Receiver<String>,
-    stderr: Arc<Mutex<String>>,
-    next_id: i64,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CodexCommand {
     Native(PathBuf),
     WindowsCmd(PathBuf),
     Wsl { distribution: String, path: String },
-}
-
-impl CodexRpcProcess {
-    fn start(codex: CodexCommand) -> Result<Self, String> {
-        let display = codex_command_display(&codex);
-        let mut command = codex_process_command(&codex);
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        }
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                format!("Failed to start Codex CLI app-server at {display}: {error}")
-            })?;
-
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "Failed to open Codex RPC stdin.".to_string())?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "Failed to open Codex RPC stdout.".to_string())?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| "Failed to open Codex RPC stderr.".to_string())?;
-        let (tx, rx) = mpsc::channel();
-        let stderr_output = Arc::new(Mutex::new(String::new()));
-
-        thread::spawn(move || {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines().map_while(Result::ok) {
-                if tx.send(line).is_err() {
-                    break;
-                }
-            }
-        });
-
-        let stderr_buffer = Arc::clone(&stderr_output);
-        thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                if let Ok(mut output) = stderr_buffer.lock() {
-                    if !output.is_empty() {
-                        output.push('\n');
-                    }
-                    output.push_str(&line);
-                }
-            }
-        });
-
-        Ok(Self {
-            child,
-            stdin,
-            rx,
-            stderr: stderr_output,
-            next_id: 1,
-        })
-    }
-
-    fn initialize(&mut self) -> Result<(), String> {
-        self.request(
-            "initialize",
-            Some(json!({
-                "clientInfo": {
-                    "name": "codex-usage-desktop",
-                    "version": env!("CARGO_PKG_VERSION")
-                }
-            })),
-            Duration::from_secs(20),
-        )?;
-        self.send_notification("initialized", json!({}))?;
-        Ok(())
-    }
-
-    fn fetch_rate_limits(&mut self) -> Result<RpcRateLimitSnapshot, String> {
-        let value = self.request("account/rateLimits/read", None, Duration::from_secs(30))?;
-        let response = serde_json::from_value::<RpcRateLimitsResponse>(value)
-            .map_err(|error| format!("Failed to parse Codex rate limits: {error}"))?;
-        Ok(response.rate_limits)
-    }
-
-    fn request(
-        &mut self,
-        method: &str,
-        params: Option<Value>,
-        timeout: Duration,
-    ) -> Result<Value, String> {
-        let id = self.next_id;
-        self.next_id += 1;
-        let payload = json!({
-            "id": id,
-            "method": method,
-            "params": params.unwrap_or_else(|| json!({})),
-        });
-        self.write_payload(&payload)?;
-
-        let deadline = Instant::now() + timeout;
-        loop {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err(self.timeout_error(method));
-            }
-
-            let line = self
-                .rx
-                .recv_timeout(remaining)
-                .map_err(|error| match error {
-                    mpsc::RecvTimeoutError::Timeout => self.timeout_error(method),
-                    mpsc::RecvTimeoutError::Disconnected => self.closed_stdout_error(method),
-                })?;
-            let message = match serde_json::from_str::<Value>(&line) {
-                Ok(value) => value,
-                Err(_) => continue,
-            };
-            if message.get("id").and_then(Value::as_i64) != Some(id) {
-                continue;
-            }
-            if let Some(error) = message.get("error") {
-                let message = error
-                    .get("message")
-                    .and_then(Value::as_str)
-                    .unwrap_or("Codex RPC request failed.");
-                return Err(message.to_string());
-            }
-            return message
-                .get("result")
-                .cloned()
-                .ok_or_else(|| "Codex RPC response was missing result.".to_string());
-        }
-    }
-
-    fn send_notification(&mut self, method: &str, params: Value) -> Result<(), String> {
-        self.write_payload(&json!({
-            "method": method,
-            "params": params,
-        }))
-    }
-
-    fn write_payload(&mut self, payload: &Value) -> Result<(), String> {
-        let data = serde_json::to_vec(payload).map_err(|error| error.to_string())?;
-        self.stdin
-            .write_all(&data)
-            .and_then(|_| self.stdin.write_all(b"\n"))
-            .map_err(|error| format!("Failed to write Codex RPC request: {error}"))
-    }
-
-    fn shutdown(&mut self) {
-        stop_child(&mut self.child);
-    }
-
-    fn timeout_error(&mut self, method: &str) -> String {
-        let _ = self.child.kill();
-        let stderr = self.stderr_text();
-        if stderr.is_empty() {
-            format!("Codex RPC `{method}` timed out.")
-        } else {
-            format!("Codex RPC `{method}` timed out. stderr: {stderr}")
-        }
-    }
-
-    fn closed_stdout_error(&mut self, method: &str) -> String {
-        let status = self.child.try_wait().ok().flatten();
-        let stderr = self.stderr_text();
-        let status_text = status
-            .map(|status| format!(" with status {status}"))
-            .unwrap_or_default();
-
-        if stderr.is_empty() {
-            format!("Codex RPC `{method}` closed stdout{status_text}.")
-        } else {
-            format!("Codex RPC `{method}` closed stdout{status_text}. stderr: {stderr}")
-        }
-    }
-
-    fn stderr_text(&self) -> String {
-        self.stderr
-            .lock()
-            .map(|output| output.trim().to_string())
-            .unwrap_or_default()
-    }
-}
-
-impl Drop for CodexRpcProcess {
-    fn drop(&mut self) {
-        self.shutdown();
-    }
-}
-
-fn stop_child(child: &mut Child) {
-    if child.try_wait().ok().flatten().is_none() {
-        let _ = child.kill();
-    }
-    let _ = child.wait();
-}
-
-fn codex_app_server_args() -> [&'static str; 7] {
-    [
-        "-c",
-        "mcp_servers={}",
-        "-s",
-        "read-only",
-        "-a",
-        "never",
-        "app-server",
-    ]
 }
 
 fn codex_activation_args() -> [&'static str; 16] {
@@ -1544,46 +1237,6 @@ fn classify_native_command(path: PathBuf, windows: bool) -> CodexCommand {
     }
 }
 
-fn codex_process_command(codex: &CodexCommand) -> Command {
-    match codex {
-        CodexCommand::Native(path) => {
-            #[cfg(target_os = "windows")]
-            let mut command = Command::new(path);
-            #[cfg(not(target_os = "windows"))]
-            let mut command = {
-                let mut command = Command::new("/usr/bin/env");
-                command.arg(path);
-                command
-            };
-            command
-                .args(codex_app_server_args())
-                .env("PATH", effective_path_with_codex(path));
-            command
-        }
-        CodexCommand::WindowsCmd(path) => {
-            // Rust handles the cmd.exe launcher and batch-file escaping.
-            let mut command = Command::new(path);
-            command
-                .args(codex_app_server_args())
-                .env("PATH", effective_path_with_codex(path));
-            command
-        }
-        CodexCommand::Wsl { distribution, path } => {
-            let inner_command = std::iter::once(path.as_str())
-                .chain(codex_app_server_args())
-                .map(shell_quote)
-                .collect::<Vec<_>>()
-                .join(" ");
-            let login_command = format!("exec \"$SHELL\" -lic {}", shell_quote(&inner_command));
-            let mut command = Command::new("wsl.exe");
-            command
-                .args(["-d", distribution, "--", "sh", "-lc"])
-                .arg(login_command);
-            command
-        }
-    }
-}
-
 fn codex_activation_process_command(codex: &CodexCommand, working_directory: &Path) -> Command {
     let args = codex_activation_args();
     let mut command = match codex {
@@ -1757,21 +1410,7 @@ fn is_executable(path: &PathBuf) -> bool {
 mod tests {
     use super::*;
     use std::cell::Cell;
-
-    #[cfg(unix)]
-    #[test]
-    fn shutdown_reaps_running_child() {
-        unsafe extern "C" {
-            fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
-        }
-
-        let mut child = Command::new("sleep").arg("30").spawn().unwrap();
-        let pid = child.id() as i32;
-        stop_child(&mut child);
-
-        let mut status = 0;
-        assert_eq!(unsafe { waitpid(pid, &mut status, 1) }, -1);
-    }
+    use std::sync::mpsc;
 
     #[test]
     fn concurrent_limits_fetches_share_one_result() {
@@ -1819,8 +1458,8 @@ mod tests {
         assert_eq!(fresh.unwrap_err(), "new fetch");
     }
 
-    fn window(used_percent: f64, window_minutes: Option<i64>) -> RpcRateLimitWindow {
-        RpcRateLimitWindow {
+    fn window(used_percent: f64, window_minutes: Option<i64>) -> RateLimitWindow {
+        RateLimitWindow {
             used_percent,
             window_duration_mins: window_minutes,
             resets_at: Some(1_800_000_000),
@@ -1851,7 +1490,7 @@ mod tests {
     }
 
     #[test]
-    fn paid_credits_survive_oauth_and_rpc_without_affecting_limits_or_reset_credits() {
+    fn paid_credits_survive_oauth_without_affecting_limits_or_reset_credits() {
         for credits in [
             json!({"has_credits": true, "unlimited": false, "balance": "1250.500001"}),
             json!({"has_credits": false, "unlimited": false, "balance": "0"}),
@@ -1883,18 +1522,10 @@ mod tests {
                 assert!(serialized.get("hasCredits").is_some());
                 assert!(serialized.get("has_credits").is_none());
             }
-            let rpc = serde_json::from_value::<RpcRateLimitsResponse>(json!({
-                "rateLimits": {"credits": serialized}
-            }))
-            .unwrap();
-            assert_eq!(rpc.rate_limits.credits, expected);
         }
 
         let usage = serde_json::from_value::<OAuthUsageResponse>(json!({})).unwrap();
-        let rpc =
-            serde_json::from_value::<RpcRateLimitsResponse>(json!({"rateLimits": {}})).unwrap();
         assert!(usage.credits.is_none());
-        assert!(rpc.rate_limits.credits.is_none());
     }
 
     #[cfg(debug_assertions)]
@@ -1991,22 +1622,6 @@ mod tests {
         assert_eq!(high.used_percent, 100.0);
         assert_eq!(high.remaining_percent, 0.0);
         assert_eq!(high.resets_at, Some("2027-01-15T08:00:00.000Z".to_string()));
-    }
-
-    #[test]
-    fn app_server_args_use_supported_read_only_policy_for_limits_rpc() {
-        assert_eq!(
-            codex_app_server_args(),
-            [
-                "-c",
-                "mcp_servers={}",
-                "-s",
-                "read-only",
-                "-a",
-                "never",
-                "app-server",
-            ]
-        );
     }
 
     #[test]
@@ -2418,54 +2033,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_cli_reset_credits_and_converts_unix_expirations() {
-        let response = serde_json::from_value::<RpcRateLimitsResponse>(json!({
-            "rateLimits": {
-                "primary": null,
-                "secondary": null,
-                "rateLimitResetCredits": {
-                    "availableCount": 2,
-                    "credits": [
-                        {"id": "never", "status": "available", "expiresAt": null},
-                        {"id": "used", "status": "redeemed", "expiresAt": 1785542400},
-                        {"id": "expires", "status": "available", "expiresAt": 1785542400}
-                    ]
-                }
-            }
-        }))
-        .unwrap();
-        let credits = response.rate_limits.rate_limit_reset_credits.unwrap();
-
-        assert_eq!(credits.available_count, Some(2));
-        assert_eq!(
-            normalize_rpc_reset_credits(credits.credits),
-            vec![
-                CodexResetCredit {
-                    id: "expires".to_string(),
-                    expires_at: Some("2026-08-01T00:00:00.000Z".to_string()),
-                },
-                CodexResetCredit {
-                    id: "never".to_string(),
-                    expires_at: None,
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn parses_legacy_cli_rate_limits_without_reset_credits() {
-        let response = serde_json::from_value::<RpcRateLimitsResponse>(json!({
-            "rateLimits": {"primary": null, "secondary": null}
-        }))
-        .unwrap();
-
-        assert!(response.rate_limits.rate_limit_reset_credits.is_none());
-    }
-
-    #[test]
-    fn falls_back_to_cli_when_oauth_fails() {
+    fn fetches_oauth_limits_with_account_details() {
         let response = fetch_codex_limits_with(
-            || Err("no oauth".to_string()),
             || {
                 Ok(LimitsSnapshot {
                     primary: Some(window(20.0, Some(SESSION_WINDOW_MINUTES))),
@@ -2473,30 +2042,31 @@ mod tests {
                     credits: None,
                     reset_credits_available_count: None,
                     reset_credits: None,
-                    source: "cli-rpc",
+                    source: "oauth",
                 })
             },
-            AccountSnapshot::default,
+            || AccountSnapshot {
+                account: Some("test@example.com".to_string()),
+                ..AccountSnapshot::default()
+            },
         )
         .unwrap();
 
-        assert_eq!(response.source, "cli-rpc");
+        assert_eq!(response.source, "oauth");
+        assert_eq!(response.account.as_deref(), Some("test@example.com"));
         assert_eq!(response.session.unwrap().remaining_percent, 80.0);
+        assert_eq!(response.weekly.unwrap().remaining_percent, 60.0);
     }
 
     #[test]
-    fn combines_oauth_and_cli_errors_when_both_fail() {
+    fn returns_oauth_error_without_fetching_account_details() {
         let error = fetch_codex_limits_with(
             || Err("bad token".to_string()),
-            || Err("bad rpc".to_string()),
-            AccountSnapshot::default,
+            || panic!("Account details must not delay a failed limits request"),
         )
         .unwrap_err();
 
-        assert_eq!(
-            error,
-            "OAuth unavailable: bad token; CLI RPC unavailable: bad rpc"
-        );
+        assert_eq!(error, "bad token");
     }
 
     #[test]
@@ -2688,14 +2258,14 @@ mod tests {
     #[test]
     fn windows_cmd_wrapper_passes_unquoted_arguments_to_rust() {
         let codex = classify_native_command(PathBuf::from(r"C:\\Users\\test\\codex.cmd"), true);
-        let command = codex_process_command(&codex);
+        let command = codex_activation_process_command(&codex, Path::new("."));
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
             .collect::<Vec<_>>();
 
         assert_eq!(command.get_program(), r"C:\\Users\\test\\codex.cmd");
-        assert_eq!(args, codex_app_server_args());
+        assert_eq!(args, codex_activation_args());
     }
 
     #[cfg(target_os = "windows")]
@@ -2752,16 +2322,6 @@ fn main() {
             assert_eq!(lines[0], "true", "activation must not create a console");
             assert_eq!(lines[1], root.to_str().unwrap());
             assert_eq!(&lines[2..], codex_activation_args());
-
-            let output = codex_process_command(&codex)
-                .creation_flags(0x08000000)
-                .current_dir(&root)
-                .output()
-                .unwrap();
-            assert!(output.status.success(), "{output:?}");
-            let stdout = String::from_utf8(output.stdout).unwrap();
-            let lines = stdout.lines().collect::<Vec<_>>();
-            assert_eq!(&lines[2..], codex_app_server_args());
         }
         fs::remove_dir_all(root).unwrap();
     }
@@ -2776,10 +2336,13 @@ fn main() {
 
     #[test]
     fn wsl_cli_runs_through_the_selected_distributions_login_shell() {
-        let command = codex_process_command(&CodexCommand::Wsl {
-            distribution: "Ubuntu".to_string(),
-            path: "/home/test/.nvm/bin/codex".to_string(),
-        });
+        let command = codex_activation_process_command(
+            &CodexCommand::Wsl {
+                distribution: "Ubuntu".to_string(),
+                path: "/home/test/.nvm/bin/codex".to_string(),
+            },
+            Path::new("."),
+        );
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
@@ -2789,7 +2352,7 @@ fn main() {
         assert_eq!(&args[..5], &["-d", "Ubuntu", "--", "sh", "-lc"]);
         assert!(args[5].contains("$SHELL"));
         assert!(args[5].contains("/home/test/.nvm/bin/codex"));
-        assert!(args[5].contains("app-server"));
+        assert!(args[5].contains("exec"));
     }
 
     #[test]

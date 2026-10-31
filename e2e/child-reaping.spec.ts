@@ -1,5 +1,4 @@
 import { browser, expect } from "@wdio/globals";
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 type SpawnRecord = { pid: number; parent: number };
@@ -17,15 +16,14 @@ function records(): SpawnRecord[] {
   }
 }
 
-describe("native Codex RPC child reaping", () => {
+describe("native Codex limits without CLI fallback", () => {
   const run = process.env.REPRO_LOG ? it : it.skip;
 
-  run("reaps completed RPC children", async () => {
+  run("returns authentication errors without starting Codex CLI", async () => {
     await expect(browser).toHaveTitle("Codex Usage Desktop");
-    const states: string[] = [];
+    expect(records()).toHaveLength(0);
 
     for (let i = 0; i < 5; i += 1) {
-      const before = records().length;
       const result = await browser.executeAsync((done) => {
         const tauri = (window as unknown as {
           __TAURI__: { core: { invoke: (command: string) => Promise<unknown> } };
@@ -35,25 +33,8 @@ describe("native Codex RPC child reaping", () => {
           (error) => done(`error: ${String(error)}`),
         );
       });
-      expect(result).toBe("ok");
-      await browser.waitUntil(() => Promise.resolve(records().length > before), {
-        timeout: 10_000,
-        timeoutMsg: "mock Codex CLI did not start",
-      });
-
-      const { pid, parent } = records().at(-1)!;
-      const parentStatus = execFileSync("ps", ["-o", "stat=", "-p", String(parent)], { encoding: "utf8" }).trim();
-      expect(parentStatus).not.toBe("");
-      let childStatus = "";
-      try {
-        childStatus = execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" }).trim();
-      } catch {
-        // Reaped children are absent from ps.
-      }
-      states.push(`${pid}:${childStatus || "reaped"}`);
-      expect(childStatus).toBe("");
+      expect(result).toBe("error: chatgptLoginRequired");
+      expect(records()).toHaveLength(0);
     }
-
-    console.log(`RPC child process states: ${states.join(", ")}`);
-  }).timeout(90_000);
+  });
 });
