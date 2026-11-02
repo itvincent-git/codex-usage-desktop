@@ -1,4 +1,8 @@
 {
+  "5.4.3": {
+    "zh": "- chore(homebrew): update cask to 5.4.2\n- fix(tray): enlarge quota rings and percentage labels",
+    "en": "- chore(homebrew): update cask to 5.4.2\n- fix(tray): enlarge quota rings and percentage labels"
+  },
   "5.4.2": {
     "zh": "- chore(homebrew): update cask to 5.4.1\n- fix: shorten quota request timeout and remove CLI fallback\n- docs: rename Chinese README label to Simplified Chinese\n- fix(tray): use native monochrome template rendering on macOS",
     "en": "- chore(homebrew): update cask to 5.4.1\n- fix: shorten quota request timeout and remove CLI fallback\n- docs: rename Chinese README label to Simplified Chinese\n- fix(tray): use native monochrome template rendering on macOS"
