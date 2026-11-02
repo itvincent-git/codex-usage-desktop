@@ -201,15 +201,6 @@ export function useUsageDashboard() {
     return { limit5h: true, limitWeekly: true, tokens: false, cost: false };
   });
 
-  const [trayDark, setTrayDark] = useState(() => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
-  useEffect(() => {
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    if (!media) return;
-    const update = () => setTrayDark(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
   const [trayMenuShow, setTrayMenuShowState] = useState(() => {
     try {
       const saved = localStorage.getItem("tray_menu_show");
@@ -877,7 +868,6 @@ export function useUsageDashboard() {
       items,
       indicators,
       metrics,
-      dark: trayDark,
       popover: {
         account: codexLimits?.account ?? null,
         membership: codexLimits?.membershipLevel ?? null,
@@ -905,7 +895,6 @@ export function useUsageDashboard() {
     overview,
     trayTitleShow,
     trayMenuShow,
-    trayDark,
     trayCountdownUnits,
     trayClockMinute,
     t,

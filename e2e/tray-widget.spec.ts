@@ -6,7 +6,7 @@ import { renderTrayIcon, type TrayIconBitmap } from "../src/lib/tray-icon";
 describe("menu bar quota widget", () => {
   const run = process.platform === "darwin" && process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
 
-  run("distinguishes 5-hour and weekly/monthly remaining quota rings with saved preferences", async () => {
+  run("updates monochrome quota and metric templates with saved preferences", async () => {
     const previous = await browser.execute(() => {
       const keys = ["language", "tray_title_show", "tray_title_formats", "tray_countdown_units"];
       const previous = Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
@@ -71,9 +71,7 @@ describe("menu bar quota widget", () => {
         for (let x = 0; x < 54; x++) {
           if (Math.hypot(x + 0.5 - 27, y + 0.5 - 27) > 16.5) continue;
           const offset = (y * icon.width + x) * 4;
-          const lightText = icon.rgba[offset] === 245 && icon.rgba[offset + 1] === 245 && icon.rgba[offset + 2] === 247;
-          const darkText = icon.rgba[offset] === 37 && icon.rgba[offset + 1] === 43 && icon.rgba[offset + 2] === 55;
-          if ((lightText || darkText) && icon.rgba[offset + 3] > 128) pixels.push({ x, y });
+          if (icon.rgba[offset + 3] > 128) pixels.push({ x, y });
         }
       }
       expect(pixels.length).toBeGreaterThan(0);
@@ -82,22 +80,21 @@ describe("menu bar quota widget", () => {
       expect(Math.abs(centerX - 27)).toBeLessThanOrEqual(1.5);
       expect(Math.abs(centerY - 27)).toBeLessThanOrEqual(1.5);
     };
-    const expectOutlinedText = (icon: TrayIconBitmap) => {
-      // Both text tones must be present inside the ring and in the countdown.
-      // This covers a light webview over a dark menu bar, and the reverse.
-      for (const [start, end] of [[0, 54], [69, 120]]) {
-        for (const [red, green, blue] of [[245, 245, 247], [37, 43, 55]]) {
-          let count = 0;
-          for (let y = 0; y < icon.height; y++) {
-            for (let x = start; x < end; x++) {
-              const offset = (y * icon.width + x) * 4;
-              if (icon.rgba[offset] === red && icon.rgba[offset + 1] === green
-                && icon.rgba[offset + 2] === blue && icon.rgba[offset + 3] > 128) count++;
-            }
-          }
-          expect(count).toBeGreaterThan(0);
+    const expectTemplate = async (icon: TrayIconBitmap) => {
+      // Inspect the native image after each update, including preference reloads.
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "assertTemplate" }));
+      expect(icon.rgba.some((value, index) => index % 4 === 3 && value === 255)).toBe(true);
+      expect(icon.rgba.every((value, index) => index % 4 === 3 || value === 0)).toBe(true);
+    };
+    const opaqueRingPixels = (icon: TrayIconBitmap) => {
+      let count = 0;
+      for (let y = 0; y < icon.height; y++) {
+        for (let x = 0; x < 54; x++) {
+          const radius = Math.hypot(x + 0.5 - 27, y + 0.5 - 27);
+          if (radius > 18 && radius < 26 && icon.rgba[(y * icon.width + x) * 4 + 3] === 255) count++;
         }
       }
+      return count;
     };
     const reload = async () => {
       await browser.execute(() => { (window as unknown as { trayReloading: boolean }).trayReloading = true; });
@@ -120,13 +117,9 @@ describe("menu bar quota widget", () => {
       expect(both.height).toBe(54);
       expect(both.rgba).toHaveLength(both.width * both.height * 4);
       expectCenteredNumber(both);
-      expectOutlinedText(both);
-      const colorCount = (rgba: number[], red: number, green: number, blue: number) => rgba.filter((_, i) => i % 4 === 0
-        && rgba[i] === red && rgba[i + 1] === green && rgba[i + 2] === blue && rgba[i + 3] === 255).length;
-      // Fully consumed 5-hour quota has an empty ring; 11% weekly quota has a purple arc.
-      const emptyRing = both.rgba.filter((_, index) => Math.floor(index / 4) % both.width < 54);
-      expect(colorCount(emptyRing, 54, 184, 131)).toBe(0);
-      expect(colorCount(both.rgba, 139, 92, 246)).toBeGreaterThan(30);
+      await expectTemplate(both);
+      // An exhausted quota keeps its faint track but has no opaque progress arc.
+      expect(opaqueRingPixels(both)).toBe(0);
 
       const availableLimits = {
         ...limits,
@@ -137,10 +130,8 @@ describe("menu bar quota widget", () => {
       await browser.waitUntil(async () => (await result())?.title === "⏱️ 100%/2h3m 🗓️ 89%/1d2h");
       const full = (await result())!.icon!;
       expectCenteredNumber(full);
-      const fullRing = full.rgba.filter((_, index) => Math.floor(index / 4) % full.width < 54);
-      expect(colorCount(fullRing, 54, 184, 131)).toBeGreaterThan(500);
-      expect(colorCount(fullRing, 139, 92, 246)).toBe(0);
-      expect(colorCount(full.rgba, 139, 92, 246)).toBeGreaterThan(500);
+      await expectTemplate(full);
+      expect(opaqueRingPixels(full)).toBeGreaterThan(500);
       const png = await browser.execute((icon) => {
         const canvas = document.createElement("canvas");
         canvas.width = icon.width;
@@ -154,8 +145,8 @@ describe("menu bar quota widget", () => {
       await browser.waitUntil(async () => (await result())?.title === "⏱️ 89%/2h3m 🗓️ 89%/1d2h");
       const equal = (await result())!.icon!;
       expectCenteredNumber(equal);
-      expect(colorCount(equal.rgba, 54, 184, 131)).toBeGreaterThan(500);
-      expect(colorCount(equal.rgba, 139, 92, 246)).toBeGreaterThan(500);
+      await expectTemplate(equal);
+      expect(opaqueRingPixels(equal)).toBeGreaterThan(500);
 
       for (const remainingPercent of [7, 97, 99]) {
         await install({ ...availableLimits, session: { ...availableLimits.session, usedPercent: 100 - remainingPercent, remainingPercent } });
@@ -167,38 +158,38 @@ describe("menu bar quota widget", () => {
       await browser.waitUntil(async () => (await result())?.title === "🗓️ 89%/1d2h");
       const single = (await result())!.icon!;
       expect(single.width).toBeLessThan(both.width);
-      expect(colorCount(single.rgba, 54, 184, 131)).toBe(0);
-      expect(colorCount(single.rgba, 139, 92, 246)).toBeGreaterThan(500);
+      await expectTemplate(single);
+      expect(opaqueRingPixels(single)).toBeGreaterThan(500);
 
       await install({ ...availableLimits, session: null, weekly: { ...availableLimits.weekly, usedPercent: 50, remainingPercent: 50 } });
       await browser.waitUntil(async () => (await result())?.title === "🗓️ 50%/1d2h");
-      expect(colorCount((await result())!.icon!.rgba, 139, 92, 246)).toBeGreaterThan(100);
-      expect(colorCount((await result())!.icon!.rgba, 54, 184, 131)).toBe(0);
+      const half = (await result())!.icon!;
+      await expectTemplate(half);
+      expect(opaqueRingPixels(half)).toBeGreaterThan(100);
+      expect(opaqueRingPixels(half)).toBeLessThan(opaqueRingPixels(single));
 
       await install({ ...availableLimits, membershipLevel: "free" });
       await browser.waitUntil(async () => (await result())?.title === "M: 89%/1d2h");
       const monthly = (await result())!.icon!;
-      expect(colorCount(monthly.rgba, 139, 92, 246)).toBeGreaterThan(500);
-      expect(colorCount(monthly.rgba, 54, 184, 131)).toBe(0);
+      await expectTemplate(monthly);
+      expect(opaqueRingPixels(monthly)).toBe(opaqueRingPixels(single));
 
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: false, limitWeekly: false, tokens: true, cost: false })));
       await reload();
       await install(limits);
       await browser.waitUntil(async () => (await result())?.title.startsWith("T: ") === true);
       const tokensOnly = (await result())!.icon!;
-      expect(colorCount(tokensOnly.rgba, 59, 130, 246)).toBeGreaterThan(500);
-      expect(colorCount(tokensOnly.rgba, 212, 160, 23)).toBe(0);
+      await expectTemplate(tokensOnly);
+      expect(opaqueRingPixels(tokensOnly)).toBeGreaterThan(500);
 
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: true, cost: true })));
       await reload();
       await install(availableLimits);
       await browser.waitUntil(async () => (await result())?.title.includes("T: ") === true);
       const allMetrics = (await result())!.icon!;
-      expectOutlinedText(allMetrics);
-      expect(colorCount(allMetrics.rgba, 59, 130, 246)).toBeGreaterThan(500);
-      expect(colorCount(allMetrics.rgba, 212, 160, 23)).toBeGreaterThan(500);
-      expect(colorCount(allMetrics.rgba, 54, 184, 131)).toBeGreaterThan(500);
-      expect(colorCount(allMetrics.rgba, 139, 92, 246)).toBeGreaterThan(500);
+      await expectTemplate(allMetrics);
+      expect(allMetrics.width).toBeGreaterThan(full.width);
+      expect(allMetrics.width).toBeGreaterThan(tokensOnly.width);
       const gapStart = await browser.execute(() => {
         const context = document.createElement("canvas").getContext("2d")!;
         context.font = "12px -apple-system, BlinkMacSystemFont, sans-serif";
@@ -217,31 +208,13 @@ describe("menu bar quota widget", () => {
         return canvas.toDataURL("image/png").split(",")[1];
       }, allMetrics);
       writeFileSync("/tmp/codex-tray-metrics.png", Buffer.from(metricsPng, "base64"));
-      const contrastPng = await browser.execute((icon) => {
-        const source = document.createElement("canvas");
-        source.width = icon.width;
-        source.height = icon.height;
-        source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(icon.rgba), icon.width, icon.height), 0, 0);
-        const canvas = document.createElement("canvas");
-        canvas.width = icon.width + 24;
-        canvas.height = icon.height * 2 + 36;
-        const context = canvas.getContext("2d")!;
-        for (const [index, color] of ["#101114", "#eeeeee"].entries()) {
-          const y = index * (icon.height + 12);
-          context.fillStyle = color;
-          context.fillRect(0, y, canvas.width, icon.height + 24);
-          context.drawImage(source, 12, y + 12);
-        }
-        return canvas.toDataURL("image/png").split(",")[1];
-      }, allMetrics);
-      writeFileSync("/tmp/codex-tray-contrast.png", Buffer.from(contrastPng, "base64"));
 
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: false, limitWeekly: false, tokens: false, cost: true })));
       await reload();
       await install(limits);
       await browser.waitUntil(async () => (await result())?.title.startsWith("$") === true);
-      expect(colorCount((await result())!.icon!.rgba, 212, 160, 23)).toBeGreaterThan(500);
-      expect(colorCount((await result())!.icon!.rgba, 59, 130, 246)).toBe(0);
+      await expectTemplate((await result())!.icon!);
+      expect(opaqueRingPixels((await result())!.icon!)).toBeGreaterThan(500);
 
       await browser.execute(() => {
         localStorage.removeItem("tray_title_show");
@@ -279,79 +252,54 @@ describe("menu bar quota widget", () => {
     }
   }).timeout(180_000);
 
-  run("outlines rings in both themes and previews contrasting backgrounds", async () => {
-    const icons: TrayIconBitmap[] = [];
-    for (const dark of [false, true]) {
+  run("renders a transparent alpha mask with faint empty tracks and no outline", async () => {
+    for (const remainingPercent of [null, 0, 7, 100]) {
       const icon = await browser.execute<TrayIconBitmap, Parameters<typeof renderTrayIcon>>(renderTrayIcon, [
-        { kind: "5h", remainingPercent: 7, countdown: "2h3m" },
-        { kind: "weekly", remainingPercent: 51, countdown: "4天23h" },
-        { kind: "monthly", remainingPercent: 100, countdown: null },
-      ], [], dark);
-      icons.push(icon);
-      const outline = dark ? [37, 43, 55] : [245, 245, 247];
-      let outlinePixels = 0;
-      for (let y = 0; y < 54; y++) {
-        for (let x = 0; x < 54; x++) {
-          const radius = Math.hypot(x + 0.5 - 27, y + 0.5 - 27);
-          const offset = (y * icon.width + x) * 4;
-          if (radius > 24 && radius < 27 && outline.every((value, channel) => icon.rgba[offset + channel] === value)
-            && icon.rgba[offset + 3] > 128) outlinePixels++;
-        }
+        { kind: "5h", remainingPercent, countdown: "2h3m" },
+      ], [{ kind: "tokens", value: "1.2M" }, { kind: "cost", value: "$3.45" }]);
+      expect(icon.rgba.every((value, index) => index % 4 === 3 || value === 0)).toBe(true);
+      // The 25% track stays visible at zero/unavailable; full quota is opaque.
+      const alpha = icon.rgba[(49 * icon.width + 27) * 4 + 3];
+      expect(alpha).toBe(remainingPercent === 100 ? 255 : 64);
+      // Removing the outline leaves the outermost bitmap rows transparent.
+      for (const y of [0, icon.height - 1]) {
+        expect(icon.rgba.slice(y * icon.width * 4, (y + 1) * icon.width * 4).every((value) => value === 0)).toBe(true);
       }
-      expect(outlinePixels).toBeGreaterThan(0);
-      const empty = await browser.execute<TrayIconBitmap, Parameters<typeof renderTrayIcon>>(renderTrayIcon, [
-        { kind: "5h", remainingPercent: 0, countdown: null },
-      ], [], dark);
-      // The bottom of an empty ring is still visible, without becoming opaque.
-      const alpha = empty.rgba[(49 * empty.width + 27) * 4 + 3];
-      expect(alpha).toBeGreaterThanOrEqual(100);
-      expect(alpha).toBeLessThan(200);
     }
-    const png = await browser.execute((icons) => {
+
+    const icon = await browser.execute<TrayIconBitmap, Parameters<typeof renderTrayIcon>>(renderTrayIcon, [
+      { kind: "5h", remainingPercent: 95, countdown: "19m" },
+      { kind: "weekly", remainingPercent: 92, countdown: "3d19h" },
+    ], []);
+    // Preview the alpha mask with representative system tints; native Template
+    // behavior is verified above against NSImage, rather than this simulation.
+    const png = await browser.execute((icon) => {
+      const source = document.createElement("canvas");
+      source.width = icon.width;
+      source.height = icon.height;
+      source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(icon.rgba), icon.width, icon.height), 0, 0);
       const canvas = document.createElement("canvas");
-      canvas.width = 1200;
-      canvas.height = 930;
+      canvas.width = icon.width + 48;
+      canvas.height = 3 * (icon.height + 36);
       const context = canvas.getContext("2d")!;
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = "#252b37";
-      context.font = "600 26px -apple-system, sans-serif";
-      context.fillText("圆环细描边 + 40% 底环 · 实际渲染预览", 28, 42);
-      context.font = "18px -apple-system, sans-serif";
-      context.fillText("浅色主题文字", 28, 78);
-      context.fillText("深色主题文字", 620, 78);
-      const sources = icons.map((icon) => {
-        const source = document.createElement("canvas");
-        source.width = icon.width;
-        source.height = icon.height;
-        source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(icon.rgba), icon.width, icon.height), 0, 0);
-        return source;
-      });
-      const backgrounds = [
-        ["蓝色背景（接近反馈截图）", "#478fbe"],
-        ["浅色背景", "#f2f3f5"],
-        ["深色背景", "#16181d"],
-        ["紫色背景（接近周额度圆环）", "#8b5cf6"],
-        ["绿色背景（接近 5h 圆环）", "#36b883"],
-      ];
-      backgrounds.forEach(([label, color], index) => {
-        const y = 96 + index * 160;
-        for (let theme = 0; theme < 2; theme++) {
-          const x = 16 + theme * 592;
-          context.fillStyle = color;
-          context.fillRect(x, y, 576, 148);
-          context.fillStyle = index === 2 ? "#f5f5f7" : "#182332";
-          context.font = "16px -apple-system, sans-serif";
-          context.fillText(label, x + 14, y + 25);
-          const source = sources[theme];
-          context.drawImage(source, x + 14, y + 44, source.width / 3, 18);
-          context.drawImage(source, x + 14, y + 86, source.width / 3 * 2, 36);
-          context.font = "12px -apple-system, sans-serif";
-          context.fillText("上：18pt 实际尺寸 / 下：2 倍放大 · 剩余 7% / 51% / 100%", x + 14, y + 138);
-        }
-      });
+      for (const [index, [background, foreground]] of [
+        ["#eeeeee", "#000000"], ["#16181d", "#ffffff"], ["#96985e", "#ffffff"],
+      ].entries()) {
+        const tint = document.createElement("canvas");
+        tint.width = source.width;
+        tint.height = source.height;
+        const mask = tint.getContext("2d")!;
+        mask.drawImage(source, 0, 0);
+        mask.globalCompositeOperation = "source-in";
+        mask.fillStyle = foreground;
+        mask.fillRect(0, 0, tint.width, tint.height);
+        const y = index * (icon.height + 36);
+        context.fillStyle = background;
+        context.fillRect(0, y, canvas.width, icon.height + 36);
+        context.drawImage(tint, 24, y + 18);
+      }
       return canvas.toDataURL("image/png").split(",")[1];
-    }, icons);
-    writeFileSync("/tmp/codex-tray-ring-preview.png", Buffer.from(png, "base64"));
+    }, icon);
+    writeFileSync("/tmp/codex-tray-template-preview.png", Buffer.from(png, "base64"));
   });
 });

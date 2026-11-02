@@ -959,11 +959,18 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
                 {
                     return Err("Invalid tray icon dimensions".to_string());
                 }
-                tray.set_icon(Some(tauri::image::Image::new_owned(
+                let icon = tauri::image::Image::new_owned(
                     icon.rgba,
                     icon.width,
                     icon.height,
-                )))
+                )
+                .try_into()
+                .map_err(|error: tauri::Error| error.to_string())?;
+                // Set the image and template flag together to avoid a color flash.
+                tray.with_inner_tray_icon(move |tray| {
+                    tray.set_icon_with_as_template(Some(icon), true)
+                })
+                .map_err(|error| error.to_string())?
                 .map_err(|error| error.to_string())?;
                 tray.set_title(Some(""))
                     .map_err(|error| error.to_string())?;

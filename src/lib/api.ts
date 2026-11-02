@@ -547,14 +547,13 @@ export type TrayMenuUpdate = {
   quit_text?: string;
   indicators?: TrayQuotaIndicator[];
   metrics?: TrayMetricIndicator[];
-  dark?: boolean;
   popover?: TrayPopoverData;
 };
 
 export async function updateTray(payload: TrayMenuUpdate): Promise<void> {
-  const { indicators, metrics = [], dark = false, ...menu } = payload;
+  const { indicators, metrics = [], ...menu } = payload;
   const icon = /Mac/.test(navigator.platform) && indicators && (indicators.length > 0 || metrics.length > 0)
-    ? renderTrayIcon(indicators, metrics, dark)
+    ? renderTrayIcon(indicators, metrics)
     : null;
   return invoke<void>("update_tray", { payload: { ...menu, icon } });
 }

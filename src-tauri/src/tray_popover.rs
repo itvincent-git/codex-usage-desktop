@@ -27,6 +27,8 @@ pub enum TrayPopoverAction {
         expected: bool,
     },
     #[cfg(all(target_os = "macos", feature = "e2e"))]
+    AssertTemplate,
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
     ToggleAt {
         position: tauri::PhysicalPosition<i32>,
         size: tauri::PhysicalSize<u32>,
@@ -68,6 +70,23 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
                 return Err(format!(
                     "Expected tray highlight {expected}, received {highlighted}"
                 ));
+            }
+        }
+        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        TrayPopoverAction::AssertTemplate => {
+            let tray = app.tray_by_id("main").ok_or("Tray icon is missing")?;
+            let is_template = tray
+                .with_inner_tray_icon(|tray| {
+                    let mtm =
+                        objc2::MainThreadMarker::new().expect("Tauri runs this on main thread");
+                    tray.ns_status_item()
+                        .and_then(|item| item.button(mtm))
+                        .and_then(|button| button.image())
+                        .is_some_and(|image| image.isTemplate())
+                })
+                .map_err(|error| error.to_string())?;
+            if !is_template {
+                return Err("Expected a native template tray image".to_string());
             }
         }
         #[cfg(all(target_os = "macos", feature = "e2e"))]
