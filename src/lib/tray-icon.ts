@@ -39,7 +39,7 @@ export function renderTrayIcon(
   const drawRing = (x: number, end: number, alpha = 1) => {
     context.globalAlpha = alpha;
     context.beginPath();
-    context.arc(x + 9, 9, 7.4, -Math.PI / 2, end);
+    context.arc(x + 9, 9, 7.9, -Math.PI / 2, end);
     context.lineWidth = 2;
     context.stroke();
     context.globalAlpha = 1;
@@ -54,7 +54,7 @@ export function renderTrayIcon(
     }
     context.textAlign = "center";
     context.textBaseline = "alphabetic";
-    context.font = `600 ${remaining !== null && Math.round(remaining) === 100 ? 7 : 8}px ${font}`;
+    context.font = `600 ${remaining !== null && Math.round(remaining) === 100 ? 7.5 : 9.5}px ${font}`;
     const label = remaining === null ? "–" : String(Math.round(remaining));
     const metrics = context.measureText(label);
     context.fillText(label,

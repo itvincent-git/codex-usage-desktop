@@ -69,7 +69,7 @@ describe("menu bar quota widget", () => {
       const pixels: { x: number; y: number }[] = [];
       for (let y = 0; y < icon.height; y++) {
         for (let x = 0; x < 54; x++) {
-          if (Math.hypot(x + 0.5 - 27, y + 0.5 - 27) > 16.5) continue;
+          if (Math.hypot(x + 0.5 - 27, y + 0.5 - 27) > 20) continue;
           const offset = (y * icon.width + x) * 4;
           if (icon.rgba[offset + 3] > 128) pixels.push({ x, y });
         }
@@ -261,9 +261,10 @@ describe("menu bar quota widget", () => {
       // The 25% track stays visible at zero/unavailable; full quota is opaque.
       const alpha = icon.rgba[(49 * icon.width + 27) * 4 + 3];
       expect(alpha).toBe(remainingPercent === 100 ? 255 : 64);
-      // Removing the outline leaves the outermost bitmap rows transparent.
+      // The larger ring reaches the outer rows without clipping its curve.
       for (const y of [0, icon.height - 1]) {
-        expect(icon.rgba.slice(y * icon.width * 4, (y + 1) * icon.width * 4).every((value) => value === 0)).toBe(true);
+        expect(icon.rgba[(y * icon.width + 27) * 4 + 3]).toBeGreaterThan(0);
+        for (const x of [0, 53]) expect(icon.rgba[(y * icon.width + x) * 4 + 3]).toBe(0);
       }
     }
 
