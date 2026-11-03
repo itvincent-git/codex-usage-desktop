@@ -1,5 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { CodexLimitsResponse } from "../src/lib/api";
 import { renderTrayIcon, type TrayIconBitmap } from "../src/lib/tray-icon";
 
@@ -7,6 +8,14 @@ describe("menu bar quota widget", () => {
   const run = process.platform === "darwin" && process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
 
   run("updates monochrome quota and metric templates with saved preferences", async () => {
+    const sessions = join(process.env.CODEX_HOME!, "sessions");
+    mkdirSync(sessions, { recursive: true });
+    const timestamp = new Date().toISOString();
+    writeFileSync(join(sessions, "tray-tokens.jsonl"), [
+      { type: "session_meta", payload: { cwd: "/tray-tokens" } },
+      { type: "turn_context", payload: { model: "gpt-5" } },
+      { type: "event_msg", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 123000, output_tokens: 456, total_tokens: 123456 } } } },
+    ].map((entry) => JSON.stringify({ timestamp, ...entry })).join("\n"));
     const previous = await browser.execute(() => {
       const keys = ["language", "tray_title_show", "tray_title_formats", "tray_countdown_units"];
       const previous = Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
@@ -110,6 +119,7 @@ describe("menu bar quota widget", () => {
       await $('button[aria-label="Check limits"]').waitForEnabled({ timeout: 90_000 });
     };
     try {
+      await browser.tauri.execute(({ core }) => core.invoke("scan_usage"));
       await reload();
       await install(limits);
       await browser.waitUntil(async () => (await result())?.title === "⏱️ 0%/2h3m 🗓️ 11%/1d2h");
@@ -177,10 +187,17 @@ describe("menu bar quota widget", () => {
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: false, limitWeekly: false, tokens: true, cost: false })));
       await reload();
       await install(limits);
-      await browser.waitUntil(async () => (await result())?.title.startsWith("T: ") === true);
+      await browser.waitUntil(async () => (await result())?.title === "T: 123.46K");
       const tokensOnly = (await result())!.icon!;
       await expectTemplate(tokensOnly);
       expect(opaqueRingPixels(tokensOnly)).toBeGreaterThan(500);
+
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "toggle" }));
+      await browser.switchToWindow("tray");
+      await expect($(".tray-metric:first-child strong")).toHaveText("123.46K");
+      await expect($(".tray-metric:first-child small")).toHaveText("123,456");
+      await browser.keys("Escape");
+      await browser.switchToWindow("main");
 
       await browser.execute(() => localStorage.setItem("tray_title_show", JSON.stringify({ limit5h: true, limitWeekly: true, tokens: true, cost: true })));
       await reload();

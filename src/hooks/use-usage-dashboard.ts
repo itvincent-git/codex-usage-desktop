@@ -36,7 +36,7 @@ import {
   type UsageRefreshResponse,
   type ScanResponse,
 } from "@/lib/api";
-import { formatCompactNumber, formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatCurrencyShort, formatNumber } from "@/lib/formatters";
 import type { TrayQuotaIndicator, TrayMetricIndicator } from "@/lib/tray-icon";
 import type { TrayPopoverData } from "@/lib/tray-popover";
 import type { DashboardView } from "@/components/dashboard-header";
@@ -48,6 +48,7 @@ import {
   TRAY_TITLE_TEMPLATES,
   formatCompactResetCountdown,
   formatTrayLimitTitle,
+  formatTrayTokens,
   type TrayCountdownUnits,
 } from "@/lib/tray-format";
 
@@ -743,6 +744,7 @@ export function useUsageDashboard() {
     const todayStr = getTodayDateString(tz);
     const todayRow = overview?.daily?.find((d) => d.date === todayStr) || overview?.daily?.[overview.daily.length - 1];
     const todayTokens = todayRow ? todayRow.totalTokens : 0;
+    const todayTokensLabel = formatTrayTokens(todayTokens);
     const todayCost = todayRow ? todayRow.costUSD : 0;
 
     const hasSub = hasSubscription(codexLimits);
@@ -774,10 +776,10 @@ export function useUsageDashboard() {
     }
 
     const metrics: TrayMetricIndicator[] = [];
-    if (trayTitleShow.tokens) metrics.push({ kind: "tokens", value: formatCompactNumber(todayTokens) });
+    if (trayTitleShow.tokens) metrics.push({ kind: "tokens", value: todayTokensLabel });
     if (trayTitleShow.cost) metrics.push({ kind: "cost", value: formatCurrencyShort(todayCost).replace(/^(?:US)?\$\s*/, "") });
     const extraParts: string[] = [];
-    if (trayTitleShow.tokens) extraParts.push(`T: ${formatCompactNumber(todayTokens)}`);
+    if (trayTitleShow.tokens) extraParts.push(`T: ${todayTokensLabel}`);
     if (trayTitleShow.cost) extraParts.push(formatCurrencyShort(todayCost));
     titleParts.push(...extraParts);
     const title = titleParts.join(" ");
@@ -822,7 +824,7 @@ export function useUsageDashboard() {
     }
 
     if (trayMenuShow.tokens) {
-      const text = `${t("settings.menu_bar_opt_tokens")}: ${formatNumber(todayTokens)}`;
+      const text = `${t("settings.menu_bar_opt_tokens")}: ${todayTokensLabel}`;
       items.push({ id: "status_tokens", text, enabled: false });
     }
 
@@ -873,7 +875,7 @@ export function useUsageDashboard() {
         membership: codexLimits?.membershipLevel ?? null,
         workspace: codexLimits?.workspaceName ?? null,
         quotas,
-        tokens: trayMenuShow.tokens ? { value: formatCompactNumber(todayTokens), exact: formatNumber(todayTokens) } : null,
+        tokens: trayMenuShow.tokens ? { value: todayTokensLabel, exact: formatNumber(todayTokens) } : null,
         cost: trayMenuShow.cost ? formatCurrency(todayCost) : null,
         labels: {
           remaining: t("limits.remaining"),

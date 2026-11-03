@@ -4,11 +4,24 @@ import {
   TRAY_TITLE_TEMPLATES,
   formatCompactResetCountdown,
   formatTrayLimitTitle,
+  formatTrayTokens,
 } from "./tray-format";
 
 const now = new Date("2026-09-04T00:00:00.000Z").getTime();
 
 describe("tray title formatting", () => {
+  it.each([
+    [0, "0"],
+    [999, "999"],
+    [1_000, "1K"],
+    [1_234, "1.23K"],
+    [123_456, "123.46K"],
+    [1_234_567, "1.23M"],
+    [1_234_567_890, "1.23B"],
+  ])("formats %i tokens as %s", (tokens, expected) => {
+    expect(formatTrayTokens(tokens)).toBe(expected);
+  });
+
   it.each([
     [1, "1m"],
     [59, "59m"],

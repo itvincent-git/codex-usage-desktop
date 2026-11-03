@@ -1,5 +1,14 @@
 import type { CodexLimitWindow } from "@/lib/api";
 
+const tokenFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
+
+export function formatTrayTokens(value: number): string {
+  return tokenFormatter.format(value);
+}
+
 export type TrayCountdownUnits = {
   minute: string;
   hour: string;
