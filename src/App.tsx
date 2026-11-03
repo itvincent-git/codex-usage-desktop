@@ -206,26 +206,29 @@ export default function App() {
       ) : null}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
       <div aria-hidden="true" className="h-[var(--window-controls-height)] shrink-0" />
-      <div className="relative min-h-0 flex-1 overflow-hidden [container-type:inline-size] [container-name:app-content]" data-app-content>
-      <div
-        className="h-full overflow-y-auto"
-        aria-hidden={selectedProjectForModal || selectedSession || isResetHistoryOpen ? "true" : undefined}
-        inert={selectedProjectForModal || selectedSession || isResetHistoryOpen ? true : undefined}
-      >
-      <div className="relative mx-auto flex min-h-full w-full max-w-layout flex-col px-6 pb-8 pt-4 content-sm:px-8 content-lg:px-10">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute right-10 top-3 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
-        />
-
-        {view === "settings" ? (
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden [container-type:inline-size] [container-name:app-content]" data-app-content>
+      {view === "settings" ? (
+        <div className="mx-auto w-full max-w-layout shrink-0 px-6 pt-4 content-sm:px-8 content-lg:px-10">
           <header className="flex items-center gap-3 border-b border-border/80 pb-3">
             <Button variant="secondary" size="sm" onClick={() => navigate(settingsReturnView === "logs" && !showLogsTab ? "dashboard" : settingsReturnView)}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               {t("common.back")}
             </Button>
           </header>
-        ) : <DashboardHeader
+        </div>
+      ) : null}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        aria-hidden={selectedProjectForModal || selectedSession || isResetHistoryOpen ? "true" : undefined}
+        inert={selectedProjectForModal || selectedSession || isResetHistoryOpen ? true : undefined}
+      >
+      <div className={`relative mx-auto flex min-h-full w-full max-w-layout flex-col px-6 pb-8 content-sm:px-8 content-lg:px-10 ${view === "settings" ? "pt-0" : "pt-4"}`}>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute right-10 top-3 h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(10,10,10,0.08)_1px,_transparent_1px)] bg-[length:14px_14px] opacity-60"
+        />
+
+        {view !== "settings" ? <DashboardHeader
           updateInfo={updateInfo}
           isUpdateDismissed={isUpdateDismissed}
           updateInstallStatus={updateInstallStatus}
@@ -237,7 +240,7 @@ export default function App() {
           overview={overview}
           scanMessage={scanMessage}
           lastRescanDurationMs={lastRescanDurationMs}
-        />}
+        /> : null}
 
         <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
           {updateInfo?.hasUpdate && !isUpdateDismissed ? (
