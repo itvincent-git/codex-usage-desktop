@@ -264,7 +264,7 @@ Der Inhalt Ihrer Codex-Sitzungen ist sensibel. Die App ist darauf ausgelegt, ihn
 
 ## Entwicklung
 
-Installieren Sie Node.js `>= 24`, `pnpm`, Rust, [sccache](https://github.com/mozilla/sccache#installation) (unter macOS mit `brew install sccache` oder mit `cargo install sccache --locked`) sowie die Tauri-v2-Systemabhängigkeiten und starten Sie anschließend die native Desktop-App:
+Installieren Sie Node.js `^24.15.0 || >=26.0.0`, `pnpm`, Rust, [sccache](https://github.com/mozilla/sccache#installation) (unter macOS mit `brew install sccache` oder mit `cargo install sccache --locked`) sowie die Tauri-v2-Systemabhängigkeiten und starten Sie anschließend die native Desktop-App:
 
 ```bash
 pnpm install

@@ -266,7 +266,7 @@ Codex 会话内容可能包含敏感信息，因此应用被设计为将日志�
 
 Codex Usage Desktop 使用 React 19、Vite、Tauri v2 和 Rust 原生 usage pipeline 构建。
 
-安装 Node.js `>= 24`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS 使用 `brew install sccache`，或使用 `cargo install sccache --locked`）和 Tauri v2 系统依赖，然后通过真实桌面应用启动：
+安装 Node.js `^24.15.0 || >=26.0.0`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS 使用 `brew install sccache`，或使用 `cargo install sccache --locked`）和 Tauri v2 系统依赖，然后通过真实桌面应用启动：
 
 ```bash
 pnpm install

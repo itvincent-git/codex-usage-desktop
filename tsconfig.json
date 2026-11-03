@@ -16,9 +16,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["node", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src", "src-tauri", "vite.config.ts", "tailwind.config.ts", "vitest.config.ts"]

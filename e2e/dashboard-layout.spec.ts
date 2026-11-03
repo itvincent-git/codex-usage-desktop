@@ -69,7 +69,7 @@ describe("dashboard layout", () => {
     await browser.refresh();
   });
 
-  run("moves quota controls into the sidebar and keeps them available when collapsed", async () => {
+  run("shows quota cards in the sidebar when expanded and collapsed", async () => {
     await browser.setWindowSize(1100, 760);
     const readLayout = () => browser.execute(() => {
       const trends = document.querySelector('[data-testid="usage-trends-card"]')!;
@@ -94,15 +94,14 @@ describe("dashboard layout", () => {
     await $('button[aria-label="Collapse sidebar"]').click();
     await expect($('button[aria-label="Expand sidebar"]')).toHaveAttribute("aria-expanded", "false");
     expect(await readLayout()).toEqual(expected);
-    await $('button[aria-label="Quota overview"]').click();
-    await expect($('[data-testid="limit-row-5-hour"]')).toBeDisplayed();
+    await expect($('[data-app-sidebar] [data-testid="limit-row-5-hour"]')).toBeDisplayed();
+    await expect($('[data-app-sidebar] [data-testid="limit-row-weekly"]')).toBeDisplayed();
+    await browser.saveScreenshot("/tmp/codex-dashboard-layout-1100-collapsed.png");
+    await $('button[aria-label="Expand sidebar"]').click();
+    expect(await readLayout()).toEqual(expected);
     await $('button[aria-label="Check limits"]').click();
     await $('button[aria-label="Check limits"]').waitForEnabled();
     await expect($('[data-testid="limit-row-5-hour"]')).toHaveText(expect.stringContaining("75%"));
-    await browser.saveScreenshot("/tmp/codex-dashboard-layout-1100-collapsed.png");
-    await browser.keys("Escape");
-    await $('button[aria-label="Expand sidebar"]').click();
-    expect(await readLayout()).toEqual(expected);
     await browser.saveScreenshot("/tmp/codex-dashboard-layout-1100.png");
   });
 

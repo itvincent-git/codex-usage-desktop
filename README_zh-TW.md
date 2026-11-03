@@ -266,7 +266,7 @@ Codex 工作階段內容可能包含敏感資訊，因此應用程式的設計�
 
 Codex Usage Desktop 使用 React 19、Vite、Tauri v2 和 Rust 原生用量處理流程建置。
 
-安裝 Node.js `>= 24`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS 使用 `brew install sccache`，或使用 `cargo install sccache --locked`）和 Tauri v2 系統相依套件，然後啟動實際的桌面應用程式：
+安裝 Node.js `^24.15.0 || >=26.0.0`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS 使用 `brew install sccache`，或使用 `cargo install sccache --locked`）和 Tauri v2 系統相依套件，然後啟動實際的桌面應用程式：
 
 ```bash
 pnpm install

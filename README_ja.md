@@ -266,7 +266,7 @@ Codex のセッション内容には機密情報が含まれる可能性があ�
 
 Codex Usage Desktop は React 19、Vite、Tauri v2、および Rust ネイティブの使用量処理パイプラインで構築されています。
 
-Node.js `>= 24`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS では `brew install sccache`、または `cargo install sccache --locked`）、Tauri v2 のシステム依存関係をインストールしてから、実際のデスクトップアプリを起動します。
+Node.js `^24.15.0 || >=26.0.0`、`pnpm`、Rust、[sccache](https://github.com/mozilla/sccache#installation)（macOS では `brew install sccache`、または `cargo install sccache --locked`）、Tauri v2 のシステム依存関係をインストールしてから、実際のデスクトップアプリを起動します。
 
 ```bash
 pnpm install
