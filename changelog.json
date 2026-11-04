@@ -1,4 +1,8 @@
 {
+  "5.5.0": {
+    "zh": "- chore(homebrew): update cask to 5.4.3\n- fix(tray): display daily tokens in human-readable format\n- docs: update menu bar screenshot\n- chore(deps): upgrade desktop dependencies and security patches\n- fix(settings): keep back button outside scrolling content",
+    "en": "- chore(homebrew): update cask to 5.4.3\n- fix(tray): display daily tokens in human-readable format\n- docs: update menu bar screenshot\n- chore(deps): upgrade desktop dependencies and security patches\n- fix(settings): keep back button outside scrolling content"
+  },
   "5.4.3": {
     "zh": "- chore(homebrew): update cask to 5.4.2\n- fix(tray): enlarge quota rings and percentage labels",
     "en": "- chore(homebrew): update cask to 5.4.2\n- fix(tray): enlarge quota rings and percentage labels"
