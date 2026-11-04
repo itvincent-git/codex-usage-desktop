@@ -231,7 +231,7 @@ describe("CodexLimitsCard component", () => {
     const errorMsg = "OAuth unavailable: Failed to read Codex auth at /Users/vincent/.codex/auth.json: No such file or directory (os error 2); CLI RPC unavailable: Codex CLI not found.";
     render(<CodexSidebarLimits limits={null} error={errorMsg} />);
 
-    expect(screen.getByText("Not Logged In / 尚未登录")).toBeInTheDocument();
+    expect(screen.getByText("Not Logged In")).toBeInTheDocument();
     expect(screen.getByText("codex auth login")).toBeInTheDocument();
     expect(screen.queryByText("Codex limits unavailable:")).not.toBeInTheDocument();
   });
@@ -240,9 +240,24 @@ describe("CodexLimitsCard component", () => {
     const errorMsg = "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.";
     render(<CodexSidebarLimits limits={null} error={errorMsg} />);
 
-    expect(screen.queryByText("Not Logged In / 尚未登录")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not Logged In")).not.toBeInTheDocument();
     expect(screen.getByText("Unable to get Codex limits right now. Please check your network and Codex login status, then try again.")).toBeInTheDocument();
     expect(screen.queryByText(errorMsg)).not.toBeInTheDocument();
+  });
+
+  it("recognizes the native missing-login error code", () => {
+    render(<CodexSidebarLimits limits={null} error="chatgptLoginRequired" />);
+    expect(screen.getByText("codex auth login")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["codexAuthUnreadable", /Check access to auth.json/],
+    ["codexAuthInvalid", /Sign in to Codex again/],
+    ["chatgptQuotaNotApplicable", /These credentials use an API key/],
+  ])("gives specific guidance for %s", (error, message) => {
+    render(<CodexSidebarLimits limits={null} error={error} />);
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.queryByText("codex auth login")).not.toBeInTheDocument();
   });
 
   it("renders a single monthly limit row when the user is not subscribed to any membership", () => {

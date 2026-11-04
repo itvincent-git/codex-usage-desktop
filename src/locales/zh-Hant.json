@@ -916,6 +916,27 @@
     "quota_rate_limited": "額度查詢過於頻繁，請稍後再次查詢。",
     "quota_service_error": "額度服務暫時無法使用，請稍後重試。",
     "quota_timeout": "額度查詢逾時，請檢查網路或代理設定後重試。",
-    "last_scan_failed": "上次掃描失敗"
+    "last_scan_failed": "上次掃描失敗",
+    "cache_path": "用量快取檔案",
+    "title_sessionParseError": "工作階段日誌解析失敗",
+    "description_sessionParseError": "下方顯示出錯檔案及行號。請先備份檔案，修復後重新掃描。若檔案未經修改，可複製診斷資訊回報格式相容問題。本次掃描未覆寫既有用量。",
+    "title_sessionReadError": "無法讀取工作階段檔案",
+    "description_sessionReadError": "請檢查下方檔案的讀取權限、可用性及壓縮檔案是否損壞。必要時從備份還原後重新掃描。來源日誌未被修改。",
+    "title_cacheCorrupt": "用量快取已損壞",
+    "description_cacheCorrupt": "可從本機日誌重建快取。下次啟動時會先備份損壞的快取。重新開啟前，請先結束所有應用程式副本。",
+    "title_cacheBusy": "用量快取正被占用",
+    "description_cacheBusy": "請關閉其他應用程式副本後重試。若快取位於同步資料夾，請等待同步完成。快取占用不需要重建。",
+    "title_diskFull": "磁碟空間不足",
+    "description_diskFull": "請釋放應用程式快取及日誌所在磁碟的空間後重試。選擇其他 Codex 目錄無法修復快取無法寫入的問題。",
+    "title_cachePermission": "無法寫入用量快取",
+    "description_cachePermission": "請檢查應用程式資料目錄的讀寫權限，以及磁碟是否唯讀或已中斷連線，然後重試。",
+    "rebuild_cache": "備份並重建快取",
+    "rebuild_confirm": "要在下次啟動時重建快取嗎？請先結束所有副本再重新開啟。既有快取及附屬檔案會移至備份目錄，本機用量會從日誌重建，來源日誌不會修改。線上額度等快取記錄可能需要重新取得。",
+    "rebuild_scheduled": "已安排復原。請完全結束所有副本後重新開啟。舊快取將保存在：",
+    "slow_title": "正在等待本機資料 · 已用 {{seconds}} 秒",
+    "slow_description": "日誌較多時掃描可能需要較長時間。請確認 WSL 或日誌所在磁碟可存取。目前未啟動第二次掃描。若持續未完成，可複製診斷資訊，完全結束應用程式後重新開啟。已載入的用量仍會保留顯示。",
+    "auth_unreadable": "無法讀取已儲存的 Codex 憑證。請檢查所選目錄中 auth.json 的存取權限。本機用量統計不需要這些憑證。",
+    "auth_invalid": "已儲存的 Codex 憑證格式無效。請在所選環境中重新使用 ChatGPT 登入 Codex。本機用量統計仍可使用。",
+    "quota_not_applicable": "目前憑證使用 API Key，此驗證方式無法查詢 ChatGPT 訂閱額度。本機 Token 及費用統計仍可使用。"
   }
 }

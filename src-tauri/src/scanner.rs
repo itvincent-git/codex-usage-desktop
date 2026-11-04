@@ -319,7 +319,8 @@ fn parse_rollup(
     pricing: &PricingSource,
 ) -> Result<SessionFileRollup, String> {
     let mut events = Vec::new();
-    let (title, quota, turn_count) = parse_session_file_with_quota(raw, &mut events, timezone)?;
+    let (title, quota, turn_count) = parse_session_file_with_quota(raw, &mut events, timezone)
+        .map_err(|error| format!("Failed to parse session {}: {error}", file.path.display()))?;
     Ok(SessionFileRollup {
         path: file.cache_key.clone(),
         modified_at_ms: file.modified_at_ms,

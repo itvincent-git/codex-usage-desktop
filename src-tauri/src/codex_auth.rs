@@ -13,13 +13,20 @@ pub(crate) struct CodexAuth {
 
 pub(crate) fn load_codex_auth() -> Result<CodexAuth, String> {
     let path = selected_codex_environment().home.join("auth.json");
-    let content = fs::read_to_string(path).map_err(|_| "chatgptLoginRequired".to_string())?;
+    let content = read_auth_file(&path)?;
     parse_codex_auth(&content)
+}
+
+fn read_auth_file(path: &std::path::Path) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => "chatgptLoginRequired".to_string(),
+        _ => "codexAuthUnreadable".to_string(),
+    })
 }
 
 pub(crate) fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
     let value: Value = serde_json::from_str(content)
-        .map_err(|_| "Failed to parse Codex auth.json.".to_string())?;
+        .map_err(|_| "codexAuthInvalid".to_string())?;
     if let Some(api_key) = string_field(&value, "OPENAI_API_KEY") {
         return Ok(CodexAuth {
             access_token: api_key,
@@ -69,6 +76,16 @@ fn string_field(value: &Value, key: &str) -> Option<String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn distinguishes_missing_unreadable_and_invalid_auth_without_exposing_contents() {
+        let root = std::env::temp_dir().join(format!("auth-errors-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        assert_eq!(read_auth_file(&root.join("missing")).unwrap_err(), "chatgptLoginRequired");
+        assert_eq!(read_auth_file(&root).unwrap_err(), "codexAuthUnreadable");
+        assert_eq!(parse_codex_auth("private invalid content").unwrap_err(), "codexAuthInvalid");
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn chatgpt_identity_uses_both_account_and_user_claims() {

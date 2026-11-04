@@ -479,6 +479,9 @@ fn fetch_codex_limits_with(
 fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
     log::info!("Attempting to load codex auth...");
     let auth = load_codex_auth()?;
+    if !auth.is_chatgpt {
+        return Err("chatgptQuotaNotApplicable".to_string());
+    }
     log::info!("Building reqwest client for OAuth...");
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(5))

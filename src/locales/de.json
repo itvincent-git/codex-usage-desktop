@@ -953,6 +953,27 @@
     "quota_rate_limited": "Kontingentabfragen werden vorübergehend begrenzt. Warten Sie kurz und fragen Sie die Limits erneut ab.",
     "quota_service_error": "Der Kontingentdienst ist vorübergehend nicht verfügbar. Versuchen Sie es später erneut.",
     "quota_timeout": "Die Kontingentabfrage hat das Zeitlimit überschritten. Prüfen Sie Verbindung und Proxy und versuchen Sie es erneut.",
-    "last_scan_failed": "Letzter Scan fehlgeschlagen"
+    "last_scan_failed": "Letzter Scan fehlgeschlagen",
+    "cache_path": "Nutzungscache-Datei",
+    "title_sessionParseError": "Sitzungsprotokoll konnte nicht ausgewertet werden",
+    "description_sessionParseError": "Datei und Zeile stehen unten. Sichern Sie die Datei vor der Reparatur und scannen Sie erneut. Bei unveränderten Dateien melden Sie die Diagnose als mögliches Formatproblem. Vorhandene Nutzungsdaten wurden nicht ersetzt.",
+    "title_sessionReadError": "Sitzungsdatei kann nicht gelesen werden",
+    "description_sessionReadError": "Prüfen Sie Zugriffsrechte, Verfügbarkeit und beschädigte komprimierte Dateien. Stellen Sie die Datei bei Bedarf aus einer Sicherung wieder her. Quellprotokolle wurden nicht verändert.",
+    "title_cacheCorrupt": "Nutzungscache ist beschädigt",
+    "description_cacheCorrupt": "Der Cache kann aus lokalen Protokollen neu erstellt werden. Beim nächsten Start wird der alte Cache gesichert. Beenden Sie vorher alle App-Instanzen.",
+    "title_cacheBusy": "Nutzungscache ist belegt",
+    "description_cacheBusy": "Schließen Sie andere App-Instanzen und versuchen Sie es erneut. Warten Sie bei synchronisierten Ordnern auf den Abschluss der Synchronisierung. Eine Sperre erfordert keinen Neuaufbau.",
+    "title_diskFull": "Nicht genügend Speicherplatz",
+    "description_diskFull": "Geben Sie Speicherplatz auf den Laufwerken für Cache und Protokolle frei. Ein anderer Codex-Ordner behebt keinen nicht beschreibbaren Cache.",
+    "title_cachePermission": "Nutzungscache ist nicht beschreibbar",
+    "description_cachePermission": "Prüfen Sie Lese- und Schreibrechte des App-Datenordners sowie schreibgeschützte oder getrennte Laufwerke. Versuchen Sie es danach erneut.",
+    "rebuild_cache": "Cache sichern und neu erstellen",
+    "rebuild_confirm": "Cache beim nächsten Start neu erstellen? Beenden Sie vorher alle App-Instanzen. Alter Cache und Begleitdateien werden gesichert. Lokale Nutzung wird aus Protokollen erstellt; Quellprotokolle bleiben erhalten. Online-Guthaben muss eventuell erneut geladen werden.",
+    "rebuild_scheduled": "Wiederherstellung geplant. Beenden Sie alle App-Instanzen vollständig und öffnen Sie die App erneut. Sicherungsordner:",
+    "slow_title": "Warten auf lokale Daten · {{seconds}} Sekunden",
+    "slow_description": "Viele Protokolle benötigen mehr Zeit. Prüfen Sie WSL und das Protokolllaufwerk. Es wurde kein zweiter Scan gestartet. Wenn das Warten anhält, kopieren Sie die Diagnose und beenden und öffnen Sie die App vollständig. Geladene Daten bleiben sichtbar.",
+    "auth_unreadable": "Codex-Anmeldedaten können nicht gelesen werden. Prüfen Sie den Zugriff auf auth.json im gewählten Ordner. Lokale Statistiken benötigen diese Daten nicht.",
+    "auth_invalid": "Codex-Anmeldedaten sind ungültig. Melden Sie sich in der gewählten Umgebung erneut mit ChatGPT bei Codex an. Lokale Statistiken bleiben verfügbar.",
+    "quota_not_applicable": "Diese Anmeldedaten verwenden einen API-Schlüssel. ChatGPT-Kontingente sind dafür nicht verfügbar. Lokale Token- und Kostenstatistiken bleiben verfügbar."
   }
 }

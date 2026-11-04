@@ -1,3 +1,4 @@
+mod cache_recovery;
 mod codex_auth;
 mod codex_environment;
 mod codex_forecast;
@@ -58,6 +59,14 @@ async fn fetch_usage_diagnostics(
     tauri::async_runtime::spawn_blocking(move || usage_diagnostics::inspect(&database_path))
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn schedule_cache_rebuild(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let database = state.database_path.clone();
+    tauri::async_runtime::spawn_blocking(move || cache_recovery::schedule(&database))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1207,6 +1216,9 @@ pub fn run() {
             let app_data_dir = std::env::var_os("CODEX_USAGE_TEST_DATA_DIR").map(PathBuf::from).unwrap_or(app_data_dir);
             std::fs::create_dir_all(&app_data_dir)?;
             let database_path = app_data_dir.join("codex-usage-desktop.db");
+            if let Err(error) = cache_recovery::apply_on_start(&database_path) {
+                log::error!("Cache recovery failed: {error}");
+            }
             let codex_home_path = app_data_dir.join("codex-home.json");
             usage_diagnostics::load_selection(&codex_home_path);
             let pricing_cache_path = app_data_dir.join("codex-pricing-cache.json");
@@ -1304,6 +1316,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             fetch_usage_diagnostics,
+            schedule_cache_rebuild,
             configure_codex_home,
             scan_usage,
             rescan_session,

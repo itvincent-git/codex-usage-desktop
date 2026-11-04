@@ -1,4 +1,5 @@
 import { UsageRecoveryCard } from "@/components/usage-recovery-card";
+import { ScanWaitNotice } from "@/components/scan-wait-notice";
 import { CodexForecastCard } from "@/components/codex-forecast-card";
 import { CodexLimitsCard, CodexSidebarLimits } from "@/components/codex-limits-card";
 import { CodexResetHistoryModal } from "@/components/codex-reset-history";
@@ -367,6 +368,7 @@ export default function App() {
             </div>
           ) : null}
 
+          <ScanWaitNotice active={isLoading || isScanning} diagnostics={diagnostics} />
           {showRecovery && view !== "settings" ? (
             <UsageRecoveryCard
               scanning={isScanning}

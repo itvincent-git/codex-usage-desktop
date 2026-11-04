@@ -916,6 +916,27 @@
     "quota_rate_limited": "额度查询过于频繁，请稍后再次查询。",
     "quota_service_error": "额度服务暂时不可用，请稍后重试。",
     "quota_timeout": "额度查询超时，请检查网络或代理设置后重试。",
-    "last_scan_failed": "上次扫描失败"
+    "last_scan_failed": "上次扫描失败",
+    "cache_path": "用量缓存文件",
+    "title_sessionParseError": "会话日志解析失败",
+    "description_sessionParseError": "下方显示了出错文件和行号。请先备份文件，修复后重新扫描。如果文件未经修改，可复制诊断信息反馈格式兼容问题。本次扫描未覆盖已有用量。",
+    "title_sessionReadError": "无法读取会话文件",
+    "description_sessionReadError": "请检查下方文件的读取权限、是否可访问，以及压缩文件是否损坏。必要时从备份恢复后重新扫描。源日志未被修改。",
+    "title_cacheCorrupt": "用量缓存已损坏",
+    "description_cacheCorrupt": "可以从本地会话日志重建缓存。下次启动时会先备份损坏的缓存。重新打开应用前，请先退出所有应用副本。",
+    "title_cacheBusy": "用量缓存正在被占用",
+    "description_cacheBusy": "请关闭其他应用副本后重试。如果缓存位于同步目录，请等待文件同步结束。缓存占用无需通过重建解决。",
+    "title_diskFull": "磁盘可用空间不足",
+    "description_diskFull": "请释放应用缓存和会话日志所在磁盘的空间后重试。选择其他 Codex 目录无法修复缓存不可写的问题。",
+    "title_cachePermission": "无法写入用量缓存",
+    "description_cachePermission": "请检查应用数据目录的读写权限，以及所在磁盘是否只读或已断开，然后重试。",
+    "rebuild_cache": "备份并重建缓存",
+    "rebuild_confirm": "是否安排在下次启动时重建缓存？请先退出所有应用副本，再重新打开。现有缓存及其附属文件会移入备份目录，本地用量会从会话日志重建，源日志不会修改。在线额度等缓存记录可能需要重新获取。",
+    "rebuild_scheduled": "已安排恢复。请完全退出所有应用副本后重新打开。旧缓存会保存在以下目录：",
+    "slow_title": "正在等待本地数据 · 已用 {{seconds}} 秒",
+    "slow_description": "日志较多时扫描可能需要更长时间。请确认 WSL 或日志所在磁盘可以访问。目前未启动第二次扫描。如果长时间仍未完成，可复制诊断信息，完全退出应用后重新打开。已加载的用量仍会保留显示。",
+    "auth_unreadable": "无法读取已保存的 Codex 凭据。请检查所选 Codex 目录中 auth.json 的访问权限。本地用量统计不需要这些凭据。",
+    "auth_invalid": "已保存的 Codex 凭据格式无效。请在所选环境中重新使用 ChatGPT 登录 Codex。本地用量统计仍可使用。",
+    "quota_not_applicable": "当前凭据使用 API Key，此认证方式无法查询 ChatGPT 订阅额度。本地 Token 和费用统计仍可使用。"
   }
 }

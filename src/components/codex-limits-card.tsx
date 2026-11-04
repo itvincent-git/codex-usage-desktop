@@ -43,6 +43,7 @@ function isOAuthLoginError(err: string | null): boolean {
   if (!err) return false;
   const lowercaseErr = err.toLowerCase();
   return (
+    lowercaseErr.includes("chatgptloginrequired") ||
     lowercaseErr.includes("no such file or directory") ||
     lowercaseErr.includes("failed to read codex auth") ||
     lowercaseErr.includes("contains no tokens") ||
@@ -53,6 +54,9 @@ function isOAuthLoginError(err: string | null): boolean {
 }
 
 function quotaErrorKey(error: string): string {
+  if (error.includes("codexAuthUnreadable")) return "recovery.auth_unreadable";
+  if (error.includes("codexAuthInvalid")) return "recovery.auth_invalid";
+  if (error.includes("chatgptQuotaNotApplicable")) return "recovery.quota_not_applicable";
   if (/\b403\b/.test(error)) return "recovery.quota_forbidden";
   if (/\b429\b/.test(error)) return "recovery.quota_rate_limited";
   if (/\b5\d\d\b/.test(error)) return "recovery.quota_service_error";
@@ -123,7 +127,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-warning font-semibold">
                 <LogIn className="h-4.5 w-4.5" />
-                <span>{t("limits.not_logged_in")} / 尚未登录</span>
+                <span>{t("limits.not_logged_in")}</span>
               </div>
               <p className="text-xs text-muted-foreground leading-normal">
                 {t("limits.login_instruction")}

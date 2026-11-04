@@ -1,7 +1,7 @@
 import { createTauriCapabilities } from "@wdio/tauri-service";
 import { browser } from "@wdio/globals";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startCreditsFixture } from "./e2e/fixtures/session-credits-server";
@@ -19,6 +19,11 @@ export const config: WebdriverIO.Config = {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-recovery-e2e-"));
       process.env.CODEX_HOME = join(archivedSessionsHome, "codex-not-found");
       process.env.CODEX_USAGE_TEST_DATA_DIR = join(archivedSessionsHome, "app-data");
+      // Exercise deferred recovery before the native app opens any database connections.
+      mkdirSync(process.env.CODEX_USAGE_TEST_DATA_DIR);
+      writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.db"), "startup corrupt cache fixture");
+      writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.db-wal"), "startup wal fixture");
+      writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.rebuild-on-start"), "");
       buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.recovery" }));
     } else if (process.argv.some((arg) => arg.includes("session-credits.spec.ts"))) {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-session-credits-e2e-"));

@@ -243,6 +243,7 @@ export async function scanUsage(): Promise<ScanResponse> {
 
 export type UsageDiagnostics = {
   codexHome: string;
+  cachePath?: string;
   runtime: string;
   status: "ready" | "missingDirectory" | "unreadableDirectory" | "noSessions" | "noUsage" | "databaseError";
   filesFound: number;
@@ -252,6 +253,10 @@ export type UsageDiagnostics = {
 
 export function fetchUsageDiagnostics(): Promise<UsageDiagnostics> {
   return invoke<UsageDiagnostics>("fetch_usage_diagnostics");
+}
+
+export function scheduleCacheRebuild(): Promise<string> {
+  return invoke<string>("schedule_cache_rebuild");
 }
 
 export function configureCodexHome(home: string | null): Promise<void> {

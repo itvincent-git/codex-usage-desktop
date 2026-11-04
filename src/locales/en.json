@@ -910,6 +910,27 @@
     "quota_rate_limited": "Quota requests are temporarily rate limited. Wait a moment and check limits again.",
     "quota_service_error": "The quota service is temporarily unavailable. Try again later.",
     "quota_timeout": "The quota request timed out. Check your connection or proxy and retry.",
-    "last_scan_failed": "Last scan failed"
+    "last_scan_failed": "Last scan failed",
+    "cache_path": "Usage cache file",
+    "title_sessionParseError": "A session log could not be parsed",
+    "description_sessionParseError": "The file and line are shown below. Back up the file before repairing it, then scan again. If it has not been edited, copy diagnostics to report a possible format incompatibility. This scan did not replace existing usage.",
+    "title_sessionReadError": "A session file could not be read",
+    "description_sessionReadError": "Check the file below for read permissions, availability or a damaged compressed archive. Restore it from a backup if needed, then scan again. Source logs have not been changed.",
+    "title_cacheCorrupt": "The usage cache is damaged",
+    "description_cacheCorrupt": "Rebuild the cache from local session logs. The damaged cache will be backed up on the next app start. Close other copies of this app before restarting.",
+    "title_cacheBusy": "The usage cache is in use",
+    "description_cacheBusy": "Close other copies of this app and retry. If the cache is in a synced folder, wait for syncing to finish. Rebuilding the cache is not needed for a lock.",
+    "title_diskFull": "Not enough disk space",
+    "description_diskFull": "Free space on the disk containing the app cache and session logs, then retry. Choosing another Codex directory will not repair an unwritable cache.",
+    "title_cachePermission": "The usage cache cannot be written",
+    "description_cachePermission": "Check read/write permissions for the app data folder and whether its disk is read-only or disconnected, then retry.",
+    "rebuild_cache": "Back up and rebuild cache",
+    "rebuild_confirm": "Schedule a cache rebuild for the next app start? Close all copies of this app before reopening. The existing cache and its sidecar files will be moved to a backup folder. Local usage will be rebuilt from session logs; source logs will not be changed. Cached online credit records may need to be fetched again.",
+    "rebuild_scheduled": "Recovery is scheduled. Fully quit all copies of this app, then reopen it. The old cache will be preserved under:",
+    "slow_title": "Waiting for local data · {{seconds}} seconds",
+    "slow_description": "Large log collections can take longer to scan. Check that WSL or the disk holding your logs is available. No second scan has been started. If this wait continues, copy diagnostics, fully quit the app and reopen it. Any previously loaded usage remains visible.",
+    "auth_unreadable": "The saved Codex credentials cannot be read. Check access to auth.json in the selected Codex directory. Local usage does not require these credentials.",
+    "auth_invalid": "The saved Codex credentials are invalid. Sign in to Codex again with ChatGPT in the selected environment. Local usage is still available.",
+    "quota_not_applicable": "These credentials use an API key rather than a ChatGPT subscription. ChatGPT quota is unavailable for this authentication mode. Local token and cost statistics are still available."
   }
 }

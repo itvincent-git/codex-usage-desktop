@@ -9,6 +9,7 @@ use std::{
 #[serde(rename_all = "camelCase")]
 pub struct UsageDiagnostics {
     codex_home: String,
+    cache_path: String,
     runtime: String,
     status: &'static str,
     files_found: usize,
@@ -27,6 +28,7 @@ fn inspect_environment(
 ) -> UsageDiagnostics {
     let mut result = UsageDiagnostics {
         codex_home: environment.home.to_string_lossy().into_owned(),
+        cache_path: database_path.to_string_lossy().into_owned(),
         runtime: match environment.runtime {
             codex_environment::CodexRuntime::Native => "native".to_string(),
             codex_environment::CodexRuntime::Wsl { distribution } => {
