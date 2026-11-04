@@ -20,6 +20,7 @@ type DashboardHeaderProps = {
   overview: OverviewResponse | null;
   scanMessage: string;
   lastRescanDurationMs: number | null;
+  syncFailed?: boolean;
 };
 
 export function DashboardHeader({
@@ -34,10 +35,11 @@ export function DashboardHeader({
   overview,
   scanMessage,
   lastRescanDurationMs,
+  syncFailed = false,
 }: DashboardHeaderProps) {
   const { t } = useTranslation();
 
-  const isSynced = overview ? !!overview.updatedAt : false;
+  const isSynced = !!overview?.updatedAt && !syncFailed;
   const isInstallingUpdate = updateInstallStatus === "downloading";
   const headerUpgradeLabel = updateInstallStatus === "installed"
     ? t("header.restart_update")

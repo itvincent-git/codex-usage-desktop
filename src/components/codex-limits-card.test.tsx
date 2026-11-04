@@ -305,23 +305,23 @@ describe("CodexLimitsCard component", () => {
     expect(screen.queryByRole("button", { name: "Check limits" })).not.toBeInTheDocument();
   });
 
-  it("keeps skeletons for missing reset data and replaces them independently", () => {
+  it("shows skeletons only while requests are loading and replaces them independently", () => {
     const reset = {
       id: "reset", resetType: "regular" as const, announcedAt: "2026-07-15T00:00:00.000Z",
       text: "Reset confirmed", source: { url: "https://example.com/reset" },
     };
-    const { rerender } = render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} />);
+    const { rerender } = render(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} isResetLoading isLimitsLoading />);
     expect(screen.getByRole("status", { name: "Latest token reset" })).toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Reset credits" })).toBeInTheDocument();
     expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
 
-    rerender(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} latestReset={reset} />);
+    rerender(<CodexLimitsCard onOpenResetCredits={() => {}} limits={null} latestReset={reset} isLimitsLoading />);
     expect(screen.queryByTestId("latest-reset-skeleton")).not.toBeInTheDocument();
     expect(screen.getByTestId("reset-credits-skeleton")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View token resets from the last 30 days" })).toBeInTheDocument();
   });
 
-  it("renders available credits while keeping a skeleton for missing reset history", () => {
+  it("renders available credits and reports missing reset history without an endless skeleton", () => {
     const { rerender } = render(
       <CodexLimitsCard
         onOpenResetCredits={() => {}}
@@ -339,7 +339,7 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.getByTestId("reset-credit-count")).toHaveTextContent("2 available");
     expect(screen.queryByTestId("reset-credits-skeleton")).not.toBeInTheDocument();
-    expect(screen.getByTestId("latest-reset-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("latest-reset-empty")).toBeInTheDocument();
     expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
 
     rerender(
@@ -357,7 +357,7 @@ describe("CodexLimitsCard component", () => {
 
     expect(screen.queryByTestId("quota-forecast")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reset-credit-count")).not.toBeInTheDocument();
-    expect(screen.getByTestId("reset-credits-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-credits-empty")).toBeInTheDocument();
   });
 
   it("shows all reset credits sorted by expiry without a collapse toggle", () => {

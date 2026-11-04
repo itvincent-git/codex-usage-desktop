@@ -400,7 +400,7 @@ fn write_activation_marker(marker_path: &Path, window_key: &str, now: i64) -> Re
 }
 
 fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
-    let codex = resolve_codex_command(selected_codex_environment()).ok_or_else(|| {
+    let codex = resolve_codex_command(&selected_codex_environment()).ok_or_else(|| {
         "Codex CLI not found. Set CODEX_CLI_PATH or install the codex command.".to_string()
     })?;
     let display = codex_command_display(&codex);

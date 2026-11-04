@@ -29,7 +29,7 @@ describe("CodexForecastCard", () => {
     expect(screen.queryByTestId("forecast-status")).not.toBeInTheDocument();
 
     rerender(<CodexForecastCard {...props} data={null} error="Offline" />);
-    expect(screen.getByTestId("forecast-skeleton")).toBeInTheDocument();
+    expect(screen.queryByTestId("forecast-skeleton")).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry forecast" })).toBeEnabled();
 

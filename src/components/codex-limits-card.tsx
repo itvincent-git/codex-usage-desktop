@@ -10,6 +10,10 @@ import { useTranslation } from "react-i18next";
 
 type CodexLimitsCardProps = {
   limits: CodexLimitsResponse | null;
+  isLimitsLoading?: boolean;
+  limitsError?: string | null;
+  isResetLoading?: boolean;
+  resetError?: string | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
   onOpenResetHistory?: () => void;
@@ -48,17 +52,29 @@ function isOAuthLoginError(err: string | null): boolean {
   );
 }
 
+function quotaErrorKey(error: string): string {
+  if (/\b403\b/.test(error)) return "recovery.quota_forbidden";
+  if (/\b429\b/.test(error)) return "recovery.quota_rate_limited";
+  if (/\b5\d\d\b/.test(error)) return "recovery.quota_service_error";
+  if (/timed?\s*out|timeout/i.test(error)) return "recovery.quota_timeout";
+  return "limits.unavailable_reason";
+}
+
 export function hasSubscription(limits: CodexLimitsResponse | null | undefined): boolean {
   if (!limits || !limits.membershipLevel) return false;
   const level = limits.membershipLevel.toLowerCase();
   return ["plus", "pro", "prolite", "team", "business", "enterprise"].includes(level);
 }
 
-export function CodexLimitsCard({ limits, latestReset, recentResets, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
+export function CodexLimitsCard({ limits, isLimitsLoading = false, limitsError = null, isResetLoading = false, resetError = null, latestReset, recentResets, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {
   return (
     <Card className="h-full flex flex-col rounded-lg">
       <CardContent className="p-3 sm:p-4">
         <ResetArea
+          isLimitsLoading={isLimitsLoading}
+          limitsError={limitsError}
+          isResetLoading={isResetLoading}
+          resetError={resetError}
           latestReset={latestReset}
           recentResets={recentResets}
           resetCreditsAvailableCount={limits?.resetCreditsAvailableCount}
@@ -123,7 +139,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           </div>
         ) : (
           <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
-            {t("limits.unavailable_reason")}
+            {t(quotaErrorKey(error))}
           </div>
         )
 
@@ -192,6 +208,10 @@ function LimitActions({
 }
 
 function ResetArea({
+  isLimitsLoading,
+  limitsError,
+  isResetLoading,
+  resetError,
   latestReset,
   recentResets,
   resetCreditsAvailableCount,
@@ -199,6 +219,10 @@ function ResetArea({
   onOpenResetHistory,
   onOpenResetCredits,
 }: {
+  isLimitsLoading: boolean;
+  limitsError: string | null;
+  isResetLoading: boolean;
+  resetError: string | null;
   latestReset?: CodexResetAnnouncement | null;
   recentResets?: CodexResetAnnouncement[] | null;
   resetCreditsAvailableCount?: number | null;
@@ -222,6 +246,11 @@ function ResetArea({
             recentDays={RECENT_RESET_OVERVIEW_DAYS}
             onOpen={() => onOpenResetHistory?.()}
           />
+        ) : !isResetLoading ? (
+          <div data-testid="latest-reset-empty" className="space-y-2 rounded-lg border border-border px-2.5 py-3 text-xs">
+            <p className="font-semibold text-muted-foreground">{t("limits.latest_reset")}</p>
+            <p className="leading-5 text-muted-foreground">{t(resetError ? "recovery.reset_failed" : "recovery.reset_empty")}</p>
+          </div>
         ) : (
           <div data-testid="latest-reset-skeleton" role="status" aria-label={t("limits.latest_reset")} className="space-y-3 rounded-lg border border-border px-2.5 py-3">
             <p className="text-xs font-semibold text-muted-foreground">{t("limits.latest_reset")}</p>
@@ -242,6 +271,11 @@ function ResetArea({
           onOpen={onOpenResetCredits}
           separated
         />
+      ) : !isLimitsLoading ? (
+        <div data-testid="reset-credits-empty" className="space-y-2 border-t border-border/60 pt-2.5 text-xs content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0">
+          <p className="font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>
+          <p className="leading-5 text-muted-foreground">{t(limitsError ? "recovery.credits_failed" : "recovery.credits_empty")}</p>
+        </div>
       ) : (
         <div data-testid="reset-credits-skeleton" role="status" aria-label={t("limits.reset_credits")} className="space-y-3 border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0">
           <p className="text-[10px] font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>

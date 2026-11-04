@@ -78,7 +78,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
           </Button>
         </div>
         {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
-        {!data ? (
+        {!data && isRefreshing ? (
           <div data-testid="forecast-skeleton" role="status" aria-label={t("forecast.loading")}>
             <div aria-hidden="true" className="grid min-w-0 gap-4 motion-safe:animate-pulse lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
               <div className="space-y-4 rounded-xl border border-border p-4">
@@ -99,6 +99,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
             </div>
           </div>
         ) : null}
+        {!data && !isRefreshing && !error ? <p className="text-xs text-muted-foreground">{t("recovery.forecast_empty")}</p> : null}
         {data ? <>
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
             <div data-testid="forecast-announcement" className={cn("min-w-0 space-y-3 rounded-xl border p-4 text-xs leading-relaxed", stale ? "border-border bg-muted/20" : pending && watch ? "border-success/30 bg-success/5" : promised ? "border-primary/25 bg-primary/5" : "border-warning/30 bg-warning/5")}>

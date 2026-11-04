@@ -18,6 +18,7 @@ mod session_replay;
 mod tray_popover;
 mod types;
 mod update_analytics;
+mod usage_diagnostics;
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -46,6 +47,30 @@ struct AppState {
     pricing_cache_path: PathBuf,
     window_activation_marker_path: PathBuf,
     install_id: Option<String>,
+    codex_home_path: PathBuf,
+}
+
+#[tauri::command]
+async fn fetch_usage_diagnostics(
+    state: tauri::State<'_, AppState>,
+) -> Result<usage_diagnostics::UsageDiagnostics, String> {
+    let database_path = state.database_path.clone();
+    tauri::async_runtime::spawn_blocking(move || usage_diagnostics::inspect(&database_path))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn configure_codex_home(
+    state: tauri::State<'_, AppState>,
+    home: Option<String>,
+) -> Result<(), String> {
+    let settings_path = state.codex_home_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        usage_diagnostics::configure(&settings_path, home.map(PathBuf::from))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 struct BackgroundRefreshSchedule {
@@ -1182,6 +1207,8 @@ pub fn run() {
             let app_data_dir = std::env::var_os("CODEX_USAGE_TEST_DATA_DIR").map(PathBuf::from).unwrap_or(app_data_dir);
             std::fs::create_dir_all(&app_data_dir)?;
             let database_path = app_data_dir.join("codex-usage-desktop.db");
+            let codex_home_path = app_data_dir.join("codex-home.json");
+            usage_diagnostics::load_selection(&codex_home_path);
             let pricing_cache_path = app_data_dir.join("codex-pricing-cache.json");
             let install_id =
                 update_analytics::load_install_id(&app_data_dir.join("analytics-install-id.v1"))
@@ -1196,6 +1223,7 @@ pub fn run() {
                 pricing_cache_path: pricing_cache_path.clone(),
                 window_activation_marker_path: app_data_dir.join("codex-window-activation.json"),
                 install_id,
+                codex_home_path,
             });
             let background_refresh_schedule = Arc::new(BackgroundRefreshSchedule::new());
             app.manage(background_refresh_schedule.clone());
@@ -1267,6 +1295,7 @@ pub fn run() {
                     }
                     Err(error) => {
                         log::warn!("Background usage refresh failed: {error}");
+                        let _ = app_handle.emit("background-refresh-failed", error);
                     }
                 }
             });
@@ -1274,6 +1303,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            fetch_usage_diagnostics,
+            configure_codex_home,
             scan_usage,
             rescan_session,
             rescan_project,

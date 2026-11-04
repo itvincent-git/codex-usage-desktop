@@ -1,3 +1,4 @@
+import { UsageRecoveryCard } from "@/components/usage-recovery-card";
 import { CodexForecastCard } from "@/components/codex-forecast-card";
 import { CodexLimitsCard, CodexSidebarLimits } from "@/components/codex-limits-card";
 import { CodexResetHistoryModal } from "@/components/codex-reset-history";
@@ -14,7 +15,6 @@ import { SettingsPage } from "@/components/settings-page";
 import { SessionUsageTable } from "@/components/session-usage-table";
 import { SessionDetailModal } from "@/components/session-detail-modal";
 import { ProjectSessionsModal } from "@/components/project-sessions-modal";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
@@ -70,6 +70,15 @@ export default function App() {
     windowActivationStatus,
     windowActivationError,
     forecast,
+    isScanning,
+    hasScanned,
+    scanError,
+    diagnostics,
+    diagnosticsError,
+    isLimitsLoading,
+    isResetLoading,
+    resetError,
+    handleCodexHomeChange,
     latestCodexReset,
     recentCodexResets,
     scanMessage,
@@ -155,6 +164,9 @@ export default function App() {
   const loadingDescription = overview
     ? t("loading.selected_window_desc")
     : t("loading.cached_snapshot_desc");
+  const awaitingFirstScan = !hasScanned && !overview?.updatedAt;
+  const showRecovery = !isLoading && (awaitingFirstScan || !!scanError || !!error || (view === "dashboard" && (!overview || overview.totals.totalTokens === 0)));
+  const showDashboard = !isLoading && !awaitingFirstScan && overview && (overview.totals.totalTokens > 0 || overview.models.length > 0);
   const isInstallingUpdate = updateInstallStatus === "downloading";
   const isUpdateInstalled = updateInstallStatus === "installed";
   const updateButtonLabel = isUpdateInstalled
@@ -235,10 +247,11 @@ export default function App() {
           updateProgress={updateProgress}
           onUpgrade={() => void handleUpgrade()}
           onRefresh={() => void handleRefresh()}
-          isRefreshing={isRefreshing}
-          isBusy={isLoading || isRefreshing || isResetting || isExporting !== null}
+          isRefreshing={isRefreshing || isScanning}
+          isBusy={isLoading || isScanning || isRefreshing || isResetting || isExporting !== null}
           overview={overview}
-          scanMessage={scanMessage}
+          scanMessage={scanError ? t("recovery.last_scan_failed") : scanMessage}
+          syncFailed={!!scanError}
           lastRescanDurationMs={lastRescanDurationMs}
         /> : null}
 
@@ -354,13 +367,20 @@ export default function App() {
             </div>
           ) : null}
 
-          {error ? (
-            <Card className="border-error/30">
-              <CardHeader>
-                <CardTitle className="text-2xl">{t("error.sync_failed")}</CardTitle>
-                <CardDescription>{error}</CardDescription>
-              </CardHeader>
-            </Card>
+          {showRecovery && view !== "settings" ? (
+            <UsageRecoveryCard
+              scanning={isScanning}
+              pending={awaitingFirstScan && isScanning}
+              error={scanError || error}
+              diagnostics={diagnostics}
+              diagnosticsError={diagnosticsError}
+              hasCachedData={!!overview?.updatedAt}
+              busy={isRefreshing || isResetting}
+              onRetry={() => void handleRefresh()}
+              onDetect={() => void handleCodexHomeChange(false)}
+              onChoose={() => void handleCodexHomeChange(true)}
+              onExpandRange={() => void handleRangeChange("365d")}
+            />
           ) : null}
 
           {isLoading ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
@@ -373,7 +393,7 @@ export default function App() {
             <LoadingState title={t("loading.loading_sessions")} description={t("loading.session_logs_desc")} />
           ) : null}
 
-          {!isLoading && view === "dashboard" && overview ? (
+          {showDashboard && view === "dashboard" && overview ? (
             <div className="space-y-5">
               <DashboardHeroCard
                 overview={overview}
@@ -389,6 +409,10 @@ export default function App() {
               <div className="min-w-0">
                 <CodexLimitsCard
                   limits={codexLimits}
+                  isLimitsLoading={isLimitsLoading}
+                  limitsError={codexLimitsError}
+                  isResetLoading={isResetLoading}
+                  resetError={resetError}
                   latestReset={latestCodexReset}
                   recentResets={recentCodexResets}
                   onOpenResetHistory={() => setIsResetHistoryOpen(true)}

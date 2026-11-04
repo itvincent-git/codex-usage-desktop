@@ -1,5 +1,5 @@
 import { useCodexForecast } from "@/hooks/use-codex-forecast";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -31,7 +31,10 @@ import {
   type SessionDetailRow,
   updateTray,
   type TrayMenuItemDto,
-  refreshUsageData,
+  scanUsage,
+  fetchUsageDiagnostics,
+  configureCodexHome,
+  type UsageDiagnostics,
   setBackgroundRefreshInterval,
   type UsageRefreshResponse,
   type ScanResponse,
@@ -131,6 +134,14 @@ export function useUsageDashboard() {
   const [windowActivationStatus, setWindowActivationStatus] = useState<CodexWindowActivationStatus | null>(null);
   const [windowActivationError, setWindowActivationError] = useState<string | null>(null);
   const forecast = useCodexForecast(view === "dashboard", i18n.language);
+  const [isScanning, setIsScanning] = useState(true);
+  const [hasScanned, setHasScanned] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<UsageDiagnostics | null>(null);
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
+  const [isLimitsLoading, setIsLimitsLoading] = useState(true);
+  const [isResetLoading, setIsResetLoading] = useState(true);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [latestCodexReset, setLatestCodexReset] = useState<CodexResetAnnouncement | null>(null);
   const [recentCodexResets, setRecentCodexResets] = useState<CodexResetAnnouncement[] | null>(null);
   const [scanMessage, setScanMessage] = useState<ScanMessage>({ key: "hero.sync_logs_to_cache_desc" });
@@ -291,6 +302,7 @@ export function useUsageDashboard() {
   const hasBootstrappedRef = useRef(false);
   const lastLimitsFetchTimeRef = useRef<number>(0);
   const limitsFetchInFlightRef = useRef(false);
+  const limitsGeneration = useRef(0);
   const lastAutoScanTimeRef = useRef<number>(0);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
   const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
@@ -308,6 +320,7 @@ export function useUsageDashboard() {
     if (generation !== overviewGeneration.current || nextRange !== currentRange.current) return;
     setOverview(data);
     setError(null);
+    return data;
   });
 
   const loadMonthlyUsage = useEffectEvent(async () => {
@@ -335,24 +348,35 @@ export function useUsageDashboard() {
 
     lastLimitsFetchTimeRef.current = now;
     limitsFetchInFlightRef.current = true;
+    setIsLimitsLoading(true);
+    const generation = ++limitsGeneration.current;
 
     try {
       const data = await fetchCodexLimits();
+      if (generation !== limitsGeneration.current) return;
       setCodexLimits(data);
       setCodexLimitsError(null);
     } catch (limitsError) {
+      if (generation !== limitsGeneration.current) return;
       setCodexLimitsError(errorMessage(limitsError, "Failed to load Codex limits."));
     } finally {
-      limitsFetchInFlightRef.current = false;
+      if (generation === limitsGeneration.current) {
+        limitsFetchInFlightRef.current = false;
+        setIsLimitsLoading(false);
+      }
     }
   });
 
   const loadLatestCodexReset = useEffectEvent(async () => {
+    setIsResetLoading(true);
     try {
       const data = await fetchLatestCodexReset();
       setLatestCodexReset(data);
-    } catch (_) {
-      setLatestCodexReset(null);
+      setResetError(null);
+    } catch (error) {
+      setResetError(errorMessage(error, "Failed to load reset history."));
+    } finally {
+      setIsResetLoading(false);
     }
   });
 
@@ -365,6 +389,15 @@ export function useUsageDashboard() {
     }
   });
 
+  const loadDiagnostics = useEffectEvent(async () => {
+    try {
+      setDiagnostics(await fetchUsageDiagnostics());
+      setDiagnosticsError(null);
+    } catch (error) {
+      setDiagnosticsError(errorMessage(error, "Failed to inspect the Codex directory."));
+    }
+  });
+
   const scanAndReloadOverview = useEffectEvent(async (startedAt: number, options?: { force?: boolean }) => {
     if (scanInFlightRef.current) {
       await scanInFlightRef.current;
@@ -372,40 +405,30 @@ export function useUsageDashboard() {
     }
 
     const scanPromise = (async () => {
-      const refresh = await refreshUsageData(options?.force === true);
-      const scan = refresh.scan;
-      const filesReused = scan.metrics?.filesReused ?? 0;
-      const filesParsed = scan.metrics?.filesParsed ?? 0;
-      setScanMessage({
-        key: "hero.synced_message",
-        values: {
-        days: scan.importedDays,
-        reused: filesReused,
-        parsed: filesParsed,
-        },
-      });
-
-      if (refresh.limits) {
-        setCodexLimits(refresh.limits);
-        setCodexLimitsError(null);
-        lastLimitsFetchTimeRef.current = Date.now();
-      } else if (refresh.limitsError) {
-        setCodexLimitsError(refresh.limitsError);
-        lastLimitsFetchTimeRef.current = Date.now();
+      setIsScanning(true);
+      if (options?.force) void loadCodexLimits({ force: true });
+      try {
+        // Local usage must become visible even when the online quota request fails or is slow.
+        const scan = await scanUsage();
+        const filesReused = scan.metrics?.filesReused ?? 0;
+        const filesParsed = scan.metrics?.filesParsed ?? 0;
+        setScanMessage({ key: "hero.synced_message", values: { days: scan.importedDays, reused: filesReused, parsed: filesParsed } });
+        const data = await loadOverview(currentRange.current);
+        setScanError(null);
+        if (!data || data.totals.totalTokens === 0) await loadDiagnostics();
+        else setDiagnostics(null);
+        if (view === "monthly") await loadMonthlyUsage();
+        if (view === "sessions") await loadSessions();
+        setLastRescanDurationMs(performance.now() - startedAt);
+        if (!options?.force && filesParsed > 0) void loadCodexLimits({ force: true });
+      } catch (error) {
+        setScanError(errorMessage(error, "Local scan failed."));
+        await loadDiagnostics();
+        throw error;
+      } finally {
+        setHasScanned(true);
+        setIsScanning(false);
       }
-
-      const isForeground = document.visibilityState === "visible" || options?.force === true;
-      if (isForeground || filesParsed > 0) {
-        await loadOverview(range);
-
-        if (view === "monthly") {
-          await loadMonthlyUsage();
-        }
-        if (view === "sessions") {
-          await loadSessions();
-        }
-      }
-      setLastRescanDurationMs(performance.now() - startedAt);
     })();
 
     scanInFlightRef.current = scanPromise;
@@ -573,11 +596,11 @@ export function useUsageDashboard() {
       void loadLatestCodexReset();
       void loadRecentCodexResets();
       await loadOverview(range);
-      setBootstrapped(true);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load overview.");
-      return;
+      setError(errorMessage(loadError, "Failed to load overview."));
     } finally {
+      // Keep recovery actions and background events available after an initial read failure.
+      setBootstrapped(true);
       setIsLoading(false);
     }
 
@@ -601,11 +624,14 @@ export function useUsageDashboard() {
       await loadCodexLimits({ force: true });
     }
 
+    setScanError(null);
+    setHasScanned(true);
     // Reload overview to keep UI fresh
     const filesParsed = refresh.scan?.metrics?.filesParsed ?? 0;
     const isForeground = document.visibilityState === "visible";
     if (isForeground || filesParsed > 0) {
-      await loadOverview(range);
+      const data = await loadOverview(range);
+      if (data?.totals.totalTokens === 0) await loadDiagnostics();
       if (view === "monthly") {
         await loadMonthlyUsage();
       }
@@ -711,9 +737,16 @@ export function useUsageDashboard() {
 
     let cancelled = false;
     let unlistenFn: (() => void) | null = null;
+    let unlistenError: (() => void) | null = null;
 
     const setupListener = async () => {
       try {
+        const stopErrors = await listen<string>("background-refresh-failed", (event) => {
+          setScanError(event.payload);
+          void loadDiagnostics();
+        });
+        if (cancelled) stopErrors();
+        else unlistenError = stopErrors;
         const unsubscribe = await listen<UsageRefreshResponse>("background-refresh-completed", async (event) => {
           await handleBackgroundRefreshCompleted(event.payload);
           window.dispatchEvent(new Event("session-credits-revalidate"));
@@ -733,6 +766,7 @@ export function useUsageDashboard() {
     return () => {
       cancelled = true;
       unlistenFn?.();
+      unlistenError?.();
     };
   }, [bootstrapped]);
 
@@ -942,7 +976,8 @@ export function useUsageDashboard() {
     setIsLoading(true);
 
     try {
-      await loadOverview(nextRange);
+      const data = await loadOverview(nextRange);
+      if (data?.totals.totalTokens === 0) await loadDiagnostics();
     } catch (rangeError) {
       setError(rangeError instanceof Error ? rangeError.message : "Failed to switch range.");
     } finally {
@@ -983,6 +1018,31 @@ export function useUsageDashboard() {
       await Promise.all([loadLatestCodexReset(), loadRecentCodexResets()]);
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  async function handleCodexHomeChange(chooseDirectory: boolean) {
+    if (isRefreshing || isScanning) return;
+    setIsRefreshing(true);
+    try {
+      const home = chooseDirectory
+        ? await open({ directory: true, multiple: false, title: t("recovery.choose_directory") })
+        : null;
+      if (chooseDirectory && typeof home !== "string") return;
+      await configureCodexHome(typeof home === "string" ? home : null);
+      limitsGeneration.current++;
+      limitsFetchInFlightRef.current = false;
+      setCodexLimits(null);
+      setCodexLimitsError(null);
+      setMonthlyUsage(null);
+      setSessions([]);
+      setHasLoadedSessions(false);
+      await loadDiagnostics();
+      await scanAndReloadOverview(performance.now(), { force: true });
+    } catch (error) {
+      setScanError(errorMessage(error, "Failed to change Codex directory."));
     } finally {
       setIsRefreshing(false);
     }
@@ -1186,6 +1246,15 @@ export function useUsageDashboard() {
     windowActivationStatus,
     windowActivationError,
     forecast,
+    isScanning,
+    hasScanned,
+    scanError,
+    diagnostics,
+    diagnosticsError,
+    isLimitsLoading,
+    isResetLoading,
+    resetError,
+    handleCodexHomeChange,
     latestCodexReset,
     recentCodexResets,
     scanMessage: t(scanMessage.key, scanMessage.values),

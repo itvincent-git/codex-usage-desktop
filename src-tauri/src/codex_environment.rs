@@ -1,6 +1,6 @@
 #[cfg(any(target_os = "windows", test))]
 use std::path::Path;
-use std::{env, path::PathBuf, sync::OnceLock};
+use std::{env, path::PathBuf, sync::Mutex};
 #[cfg(target_os = "windows")]
 use std::{
     process::{Command, Stdio},
@@ -28,10 +28,38 @@ pub struct CodexEnvironment {
     pub runtime: CodexRuntime,
 }
 
-static SELECTED_ENVIRONMENT: OnceLock<CodexEnvironment> = OnceLock::new();
+static SELECTED_ENVIRONMENT: Mutex<Option<CodexEnvironment>> = Mutex::new(None);
 
-pub fn selected_codex_environment() -> &'static CodexEnvironment {
-    SELECTED_ENVIRONMENT.get_or_init(resolve_codex_environment)
+pub fn selected_codex_environment() -> CodexEnvironment {
+    let mut selected = SELECTED_ENVIRONMENT.lock().unwrap();
+    selected.get_or_insert_with(resolve_codex_environment).clone()
+}
+
+pub fn select_codex_home(home: Option<PathBuf>) {
+    let environment = home
+        .map(environment_for_home)
+        .unwrap_or_else(resolve_codex_environment);
+    *SELECTED_ENVIRONMENT.lock().unwrap() = Some(environment);
+}
+
+fn environment_for_home(home: PathBuf) -> CodexEnvironment {
+    #[cfg(any(target_os = "windows", test))]
+    for prefix in [r"\\wsl$\", r"\\wsl.localhost\"] {
+        if let Some(rest) = home.to_string_lossy().strip_prefix(prefix) {
+            if let Some(distribution) = rest.split('\\').next().filter(|name| !name.is_empty()) {
+                return CodexEnvironment {
+                    home: home.clone(),
+                    runtime: CodexRuntime::Wsl {
+                        distribution: distribution.to_string(),
+                    },
+                };
+            }
+        }
+    }
+    CodexEnvironment {
+        home,
+        runtime: CodexRuntime::Native,
+    }
 }
 
 fn resolve_codex_environment() -> CodexEnvironment {
@@ -40,10 +68,7 @@ fn resolve_codex_environment() -> CodexEnvironment {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
     {
-        return CodexEnvironment {
-            home: PathBuf::from(home),
-            runtime: CodexRuntime::Native,
-        };
+        return environment_for_home(PathBuf::from(home));
     }
 
     let native_home = dirs::home_dir()
@@ -182,6 +207,15 @@ mod tests {
     };
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn manually_selected_wsl_directory_keeps_its_distribution() {
+        for path in [r"\\wsl$\Ubuntu\home\test\.codex", r"\\wsl.localhost\Ubuntu\home\test\.codex"] {
+            let environment = environment_for_home(PathBuf::from(path));
+            assert_eq!(environment.home, PathBuf::from(path));
+            assert_eq!(environment.runtime, CodexRuntime::Wsl { distribution: "Ubuntu".into() });
+        }
+    }
 
     #[test]
     fn parses_default_wsl_environment_as_unc_path() {

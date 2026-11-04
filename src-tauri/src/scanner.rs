@@ -478,18 +478,30 @@ fn load_daily_rows(
 
 fn find_session_files(codex_home: Option<PathBuf>) -> Result<Vec<SessionFile>, String> {
     let codex_home = codex_home.unwrap_or_else(default_codex_home);
+    let metadata = fs::metadata(&codex_home).map_err(|error| {
+        format!("Cannot access Codex directory {}: {error}", codex_home.display())
+    })?;
+    if !metadata.is_dir() {
+        return Err(format!(
+            "Codex directory is not a folder: {}", codex_home.display()
+        ));
+    }
     let mut files = Vec::new();
     let mut seen = BTreeSet::new();
     // Active copies take precedence; archived rollouts can have a flat layout.
     for directory in ["sessions", "archived_sessions"] {
         let sessions_dir = codex_home.join(directory);
-        if !sessions_dir.is_dir() {
-            continue;
+        match fs::metadata(&sessions_dir) {
+            Ok(metadata) if metadata.is_dir() => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Ok(_) => return Err(format!(
+                "Session directory is not a folder: {}", sessions_dir.display()
+            )),
+            Err(error) => return Err(format!("Cannot access {}: {error}", sessions_dir.display())),
         }
-        for entry in WalkDir::new(&sessions_dir)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
+        for entry in WalkDir::new(&sessions_dir) {
+            let entry = entry
+                .map_err(|error| format!("Cannot scan {}: {error}", sessions_dir.display()))?;
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -522,6 +534,10 @@ fn find_session_files(codex_home: Option<PathBuf>) -> Result<Vec<SessionFile>, S
     }
 
     Ok(files)
+}
+
+pub(crate) fn count_session_files(home: &Path) -> Result<usize, String> {
+    find_session_files(Some(home.to_path_buf())).map(|files| files.len())
 }
 
 fn session_file_id(path: &Path) -> Option<String> {
@@ -562,6 +578,7 @@ fn load_session_file_with_quota(
 ) -> Result<(String, SessionQuotaRollup, usize), String> {
     let content = read_session_file(path)?;
     parse_session_file_with_quota(&content, events, timezone)
+        .map_err(|error| format!("Failed to parse session {}: {error}", path.display()))
 }
 
 fn parse_session_file_with_quota(
@@ -579,15 +596,22 @@ fn parse_session_file_with_quota(
     let mut quota_snapshots = Vec::new();
     let event_start = events.len();
 
-    for line in content.lines() {
+    let mut lines = content.lines().enumerate().peekable();
+    let mut valid_records = 0;
+    while let Some((index, line)) = lines.next() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
 
-        let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
-            continue;
+        let entry = match serde_json::from_str::<Value>(trimmed) {
+            Ok(entry) => entry,
+            // Codex may still be appending the final record when we take the snapshot.
+            Err(error) if error.is_eof() && lines.peek().is_none()
+                && !content.ends_with('\n') && valid_records > 0 => break,
+            Err(error) => return Err(format!("Invalid JSON at line {}: {error}", index + 1)),
         };
+        valid_records += 1;
 
         turns.ingest(&entry);
         let entry_type = entry.get("type").and_then(Value::as_str);
@@ -2511,6 +2535,71 @@ mod tests {
                 .unwrap()
         })
         .collect()
+    }
+
+    #[test]
+    fn failed_directory_scan_preserves_usage_cache_and_index() {
+        let (_directory, home, mut db) = scoped_fixture();
+        fs::write(home.join("sessions/a.jsonl"), scoped_log("/repo/a", 100, "cached")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let snapshot = scoped_snapshot(&db);
+
+        let unavailable = home.with_extension("unavailable");
+        fs::rename(&home, &unavailable).unwrap();
+        let error = scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap_err();
+        assert!(error.contains("Cannot access Codex directory"), "{error}");
+        assert_eq!(scoped_snapshot(&db), snapshot);
+        fs::rename(&unavailable, &home).unwrap();
+
+        // A broken session directory must not look like a successful empty scan.
+        fs::rename(home.join("sessions"), home.join("saved-sessions")).unwrap();
+        fs::write(home.join("sessions"), "not a directory").unwrap();
+        assert!(scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into())).is_err());
+        assert_eq!(scoped_snapshot(&db), snapshot);
+    }
+
+    #[test]
+    fn malformed_log_preserves_cache_but_an_incomplete_last_record_can_be_retried() {
+        let (_directory, home, mut db) = scoped_fixture();
+        let path = home.join("sessions/a.jsonl");
+        let content = scoped_log("/repo/a", 100, "cached");
+        fs::write(&path, &content).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let snapshot = scoped_snapshot(&db);
+
+        fs::write(&path, format!("{content}\nbroken record\n")).unwrap();
+        let error = scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap_err();
+        assert!(error.contains("Failed to parse session"), "{error}");
+        assert!(error.contains("Invalid JSON at line"), "{error}");
+        assert_eq!(scoped_snapshot(&db), snapshot);
+
+        fs::write(&path, format!("{content}\n{{\"timestamp\":")).unwrap();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        assert_eq!(crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens, 110);
+
+        fs::write(&path, "not json").unwrap();
+        assert!(scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into())).is_err());
+        assert_eq!(crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens, 110);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_nested_directory_aborts_the_entire_scan() {
+        use std::os::unix::fs::PermissionsExt;
+        let (_directory, home, mut db) = scoped_fixture();
+        let nested = home.join("sessions/private");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("a.jsonl"), scoped_log("/repo/a", 100, "cached")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let snapshot = scoped_snapshot(&db);
+        fs::set_permissions(&nested, fs::Permissions::from_mode(0o000)).unwrap();
+        let result = scan_codex_usage(&mut db, &pricing, Some(home), Some("UTC".into()));
+        fs::set_permissions(nested, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(result.unwrap_err().contains("Cannot scan"));
+        assert_eq!(scoped_snapshot(&db), snapshot);
     }
 
     #[test]

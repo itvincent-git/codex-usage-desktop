@@ -15,7 +15,12 @@ let creditsFixture: Awaited<ReturnType<typeof startCreditsFixture>> | undefined;
 export const config: WebdriverIO.Config = {
   async onPrepare() {
     const buildArgs = ["test:e2e:build"];
-    if (process.argv.some((arg) => arg.includes("session-credits.spec.ts"))) {
+    if (process.env.CODEX_USAGE_RECOVERY_E2E === "1") {
+      archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-recovery-e2e-"));
+      process.env.CODEX_HOME = join(archivedSessionsHome, "codex-not-found");
+      process.env.CODEX_USAGE_TEST_DATA_DIR = join(archivedSessionsHome, "app-data");
+      buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.recovery" }));
+    } else if (process.argv.some((arg) => arg.includes("session-credits.spec.ts"))) {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-session-credits-e2e-"));
       process.env.CODEX_HOME = archivedSessionsHome;
       process.env.CODEX_USAGE_TEST_DATA_DIR = join(archivedSessionsHome, "app-data");

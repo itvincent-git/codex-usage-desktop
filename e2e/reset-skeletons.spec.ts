@@ -1,18 +1,17 @@
 import { $, browser, expect } from "@wdio/globals";
 import fixture from "./fixtures/reset-forecast.json";
 
-async function controlSnapshots(action: "holdResetSnapshots" | "releaseResetSnapshots" | "restoreResetTransport") {
+async function controlSnapshots(action: "holdResetSnapshots" | "releaseResetSnapshots" | "failResetSnapshots" | "restoreResetTransport") {
   await browser.execute((action) => (window as unknown as Record<string, () => void>)[action](), action);
 }
 
 describe("reset module skeletons", () => {
   it("replaces missing snapshots independently and retains loaded content during refresh", async () => {
-    await $('[data-testid="global-reset-forecast"]').waitForExist({ timeout: 90_000 });
-    const rescan = $('button=Rescan local logs');
-    await rescan.waitForEnabled({ timeout: 90_000 });
     const previousLanguage = await browser.execute(() => localStorage.getItem("language"));
     await browser.execute(() => localStorage.setItem("language", "en"));
     await browser.refresh();
+    await $('[data-testid="global-reset-forecast"]').waitForExist({ timeout: 90_000 });
+    const rescan = $('button=Rescan local logs');
     await rescan.waitForEnabled({ timeout: 90_000 });
     await browser.waitUntil(async () => {
       const button = $('[data-testid="global-reset-forecast"] button');
@@ -27,11 +26,13 @@ describe("reset module skeletons", () => {
       const reset = { id: "skeleton-test", resetType: "regular", announcedAt: "2026-10-24T00:30:00Z", text: "Reset confirmed", source: { url: "https://example.com/reset" } };
       let loaded = false;
       let held = false;
+      let failed = false;
       const pending: (() => void)[] = [];
       window.fetch = (input, options) => {
         const index = urls.indexOf(String(input));
         if (index < 0) return originalFetch(input, options);
         const respond = () => {
+          if (failed) return new Response(JSON.stringify("Simulated remote outage"), { headers: { "Content-Type": "application/json", "Tauri-Response": "error" } });
           const values = [
             { session: null, weekly: null, updatedAt: forecast.updatedAt, source: "oauth", resetCreditsAvailableCount: loaded ? 0 : null },
             loaded ? reset : null,
@@ -43,7 +44,8 @@ describe("reset module skeletons", () => {
         return held ? new Promise<Response>((resolve) => pending.push(() => resolve(respond()))) : Promise.resolve(respond());
       };
       Object.assign(window, {
-        holdResetSnapshots: () => { held = true; },
+        holdResetSnapshots: () => { failed = false; held = true; },
+        failResetSnapshots: () => { failed = true; },
         releaseResetSnapshots: () => { loaded = true; held = false; pending.splice(0).forEach((resolve) => resolve()); },
         restoreResetTransport: () => { window.fetch = originalFetch; },
       });
@@ -57,9 +59,11 @@ describe("reset module skeletons", () => {
       const latest = $('[data-testid="latest-reset-skeleton"]');
       const credits = $('[data-testid="reset-credits-skeleton"]');
       const forecast = $('[data-testid="forecast-skeleton"]');
-      await expect(latest).toBeDisplayed();
-      await expect(credits).toBeDisplayed();
-      await expect(forecast).toBeDisplayed();
+      await expect(latest).not.toExist();
+      await expect(credits).not.toExist();
+      await expect(forecast).not.toExist();
+      await expect($('[data-testid="latest-reset-empty"]')).toBeDisplayed();
+      await expect($('[data-testid="reset-credits-empty"]')).toBeDisplayed();
       await expect($('[data-testid="reset-credit-count"]')).not.toExist();
       for (const width of [1100, 1440]) {
         await browser.setWindowSize(width, 960);
@@ -69,13 +73,22 @@ describe("reset module skeletons", () => {
       }
       await browser.saveScreenshot("/tmp/codex-reset-skeletons.png");
 
+      await controlSnapshots("failResetSnapshots");
+      await rescan.click();
+      await rescan.waitForEnabled({ timeout: 90_000 });
+      await expect($('[data-testid="latest-reset-empty"]')).toHaveText(expect.stringContaining("Reset history could not be loaded"));
+      await expect($('[data-testid="reset-credits-empty"]')).toHaveText(expect.stringContaining("Reset credits are unavailable"));
+      await expect($('[data-testid="global-reset-forecast"]')).toHaveText(expect.stringContaining("Unable to load the forecast"));
+      await expect(forecast).not.toExist();
+      await browser.saveScreenshot("/tmp/codex-online-data-failed.png");
+
       await controlSnapshots("holdResetSnapshots");
-      await $('button[aria-label="Refresh forecast"]').click();
+      await $('button[aria-label="Retry forecast"]').click();
       await expect(forecast).toBeDisplayed();
       await controlSnapshots("releaseResetSnapshots");
       await expect(forecast).not.toExist();
-      await expect(latest).toBeDisplayed();
-      await expect(credits).toBeDisplayed();
+      await expect(latest).not.toExist();
+      await expect(credits).not.toExist();
 
       await $('button[aria-label="Check limits"]').waitForEnabled();
       await $('button[aria-label="Check limits"]').click();

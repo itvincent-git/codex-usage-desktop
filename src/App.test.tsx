@@ -14,6 +14,7 @@ const forecastInvokeMock = vi.hoisted(() => vi.fn());
 const latestResetInvokeMock = vi.hoisted(() => vi.fn());
 const resetHistoryInvokeMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
+const openMock = vi.hoisted(() => vi.fn());
 const autostartEnableMock = vi.hoisted(() => vi.fn());
 const autostartDisableMock = vi.hoisted(() => vi.fn());
 const autostartIsEnabledMock = vi.hoisted(() => vi.fn());
@@ -91,6 +92,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: openMock,
   save: saveMock,
 }));
 
@@ -213,6 +215,7 @@ describe("App", () => {
     resetHistoryInvokeMock.mockReset();
     resetHistoryInvokeMock.mockRejectedValue(new Error("Reset history unavailable"));
     saveMock.mockReset();
+    openMock.mockReset();
     autostartEnableMock.mockReset();
     autostartEnableMock.mockResolvedValue(undefined);
     autostartDisableMock.mockReset();
@@ -248,6 +251,79 @@ describe("App", () => {
     expect(screen.getByText("Estimating cost")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset cache" })).not.toBeInTheDocument();
+  });
+
+  it("shows first-scan progress instead of zero totals and recovers through directory selection", async () => {
+    let rejectScan!: (error: Error) => void;
+    let selected = false;
+    const firstScan = new Promise((_, reject) => { rejectScan = reject; });
+    const empty = { ...overview(), updatedAt: null, models: [], projects: [], totals: { ...overview().totals, totalTokens: 0, costUSD: 0 } };
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_overview") return selected ? overview() : empty;
+      if (command === "scan_usage") return selected ? scan(1) : firstScan;
+      if (command === "fetch_codex_limits") throw new Error("Offline");
+      if (command === "check_for_updates") return { hasUpdate: false };
+      if (command === "fetch_usage_diagnostics") return { codexHome: "/missing-codex", runtime: "native", status: "missingDirectory", filesFound: 0, cachedDays: 0, error: "Directory not found" };
+      if (command === "configure_codex_home") { selected = true; return; }
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+    render(<StrictMode><App /></StrictMode>);
+    expect(await screen.findByText("Scanning local Codex logs")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-hero")).not.toBeInTheDocument();
+    expect(invokeMock.mock.calls.filter(([command]) => command === "scan_usage")).toHaveLength(1);
+    await act(async () => { rejectScan(new Error("Directory not found")); });
+    expect(await screen.findByText("Codex directory not found")).toBeInTheDocument();
+    openMock.mockResolvedValueOnce(null);
+    await userEvent.click(screen.getByRole("button", { name: "Choose Codex directory" }));
+    expect(invokeMock).not.toHaveBeenCalledWith("configure_codex_home", expect.anything());
+    openMock.mockResolvedValueOnce("/correct-codex");
+    await userEvent.click(screen.getByRole("button", { name: "Choose Codex directory" }));
+    await waitFor(() => expect(screen.queryByTestId("usage-recovery")).not.toBeInTheDocument());
+    expect(invokeMock).toHaveBeenCalledWith("configure_codex_home", { home: "/correct-codex" });
+    expect(screen.getByTestId("dashboard-hero")).toBeInTheDocument();
+  });
+
+  it("allows recovery after the first overview read fails", async () => {
+    let recovered = false;
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_overview") {
+        if (!recovered) throw "Cache unavailable";
+        return overview();
+      }
+      if (command === "scan_usage") {
+        if (!recovered) throw new Error("Scan unavailable");
+        return scan(1);
+      }
+      if (command === "fetch_usage_diagnostics") return { codexHome: "/codex", runtime: "native", status: "databaseError", filesFound: 1, cachedDays: 0, error: "Cache unavailable" };
+      if (command === "fetch_codex_limits") return limits(80);
+      if (command === "check_for_updates") return { hasUpdate: false };
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+    render(<App />);
+    expect(await screen.findByText("Usage cache cannot be read")).toBeInTheDocument();
+    recovered = true;
+    await userEvent.click(screen.getByRole("button", { name: "Retry scan" }));
+    await waitFor(() => expect(screen.queryByTestId("usage-recovery")).not.toBeInTheDocument());
+    expect(screen.getByTestId("dashboard-hero")).toBeInTheDocument();
+    expect(eventListeners.get("background-refresh-failed")?.length).toBe(1);
+  });
+
+  it("renders scanned usage while the online quota request is still pending", async () => {
+    let resolveLimits!: (value: ReturnType<typeof limits>) => void;
+    const pendingLimits = new Promise((resolve) => { resolveLimits = resolve; });
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "fetch_overview") return overview();
+      if (command === "scan_usage") return scan(1);
+      if (command === "fetch_codex_limits") return pendingLimits;
+      if (command === "check_for_updates") return { hasUpdate: false };
+      throw new Error(`Unexpected invoke: ${command}`);
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rescan local logs" })).toBeEnabled());
+    expect(screen.getByTestId("dashboard-hero")).toBeInTheDocument();
+    expect(screen.queryByTestId("forecast-skeleton")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("latest-reset-skeleton")).not.toBeInTheDocument();
+    await act(async () => { resolveLimits(limits(80)); });
   });
 
   it("restores the sidebar width and collapse state when the app remounts", async () => {
@@ -2467,8 +2543,8 @@ describe("App", () => {
     const calls = invokeMock.mock.calls.map(([command, args]) => [command, args]);
     const resetCallIndex = calls.findIndex(([command]) => command === "reset_usage_state");
     expect(resetCallIndex).toBeGreaterThan(-1);
-    expect(calls[resetCallIndex + 1]).toEqual(["scan_usage", undefined]);
-    expect(calls[resetCallIndex + 2]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 1]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 2]).toEqual(["scan_usage", undefined]);
     expect(calls[resetCallIndex + 3]).toEqual(["fetch_overview", { range: "30d" }]);
   });
 
@@ -2612,27 +2688,7 @@ describe("App", () => {
       }
 
       if (command === "fetch_overview" && args?.range === "30d") {
-        return {
-          range: "30d",
-          days: 30,
-          timezone: "UTC",
-          startDate: "2026-03-28",
-          endDate: "2026-04-26",
-          updatedAt: "2026-04-26T00:00:00.000Z",
-          daily: [],
-          totals: {
-            inputTokens: 0,
-            cachedInputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            costUSD: 0,
-            avgTokensPerDay: 0,
-            avgCostPerDay: 0,
-            cacheHitRate: 0,
-            costPerMillionTokens: 0,
-          },
-          models: [],
-        };
+        return overview();
       }
 
       throw new Error(`Unexpected invoke: ${command}`);

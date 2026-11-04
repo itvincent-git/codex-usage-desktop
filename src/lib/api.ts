@@ -241,6 +241,23 @@ export async function scanUsage(): Promise<ScanResponse> {
   return invoke<ScanResponse>("scan_usage");
 }
 
+export type UsageDiagnostics = {
+  codexHome: string;
+  runtime: string;
+  status: "ready" | "missingDirectory" | "unreadableDirectory" | "noSessions" | "noUsage" | "databaseError";
+  filesFound: number;
+  cachedDays: number;
+  error: string | null;
+};
+
+export function fetchUsageDiagnostics(): Promise<UsageDiagnostics> {
+  return invoke<UsageDiagnostics>("fetch_usage_diagnostics");
+}
+
+export function configureCodexHome(home: string | null): Promise<void> {
+  return invoke<void>("configure_codex_home", { home });
+}
+
 export async function refreshUsageData(forceLimits: boolean): Promise<UsageRefreshResponse> {
   return invoke<UsageRefreshResponse>("refresh_usage_data", { forceLimits });
 }
