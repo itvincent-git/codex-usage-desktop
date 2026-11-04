@@ -20,8 +20,10 @@ pub fn get_tray_popover(state: tauri::State<'_, TrayPopoverState>) -> Option<Val
 #[serde(rename_all = "camelCase")]
 pub enum TrayPopoverAction {
     Toggle,
-    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
     LeftClick,
+    #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
+    RightClick,
     #[cfg(all(target_os = "macos", feature = "e2e"))]
     AssertHighlighted {
         expected: bool,
@@ -48,12 +50,16 @@ pub enum TrayPopoverAction {
 pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> Result<(), String> {
     match action {
         TrayPopoverAction::Toggle => {
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             toggle(&app, None).map_err(|error| error.to_string())?;
         }
-        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
         TrayPopoverAction::LeftClick => {
             crate::handle_tray_click(&app, tauri::tray::MouseButton::Left, None);
+        }
+        #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
+        TrayPopoverAction::RightClick => {
+            crate::handle_tray_click(&app, tauri::tray::MouseButton::Right, None);
         }
         #[cfg(all(target_os = "macos", feature = "e2e"))]
         TrayPopoverAction::AssertHighlighted { expected } => {
@@ -149,10 +155,11 @@ fn set_highlighted(app: &tauri::AppHandle, highlighted: bool) -> tauri::Result<(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn setup(app: &tauri::App) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
     use tauri::window::{Effect, EffectState, EffectsBuilder};
-    tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         "tray",
         tauri::WebviewUrl::App("index.html#tray".into()),
@@ -168,16 +175,16 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     .maximizable(false)
     .minimizable(false)
     .skip_taskbar(true)
-    .always_on_top(true)
-    .visible_on_all_workspaces(true)
-    .effects(
+    .always_on_top(true);
+    #[cfg(target_os = "macos")]
+    let builder = builder.visible_on_all_workspaces(true).effects(
         EffectsBuilder::new()
             .effect(Effect::Popover)
             .state(EffectState::Active)
             .radius(18.0)
             .build(),
-    )
-    .build()?;
+    );
+    builder.build()?;
     Ok(())
 }
 
@@ -288,6 +295,111 @@ fn toggle_at(
     window.set_focus()
 }
 
+#[cfg(target_os = "windows")]
+pub fn toggle(app: &tauri::AppHandle, rect: Option<tauri::Rect>) -> tauri::Result<()> {
+    let Some(window) = app.get_webview_window("tray") else {
+        return Ok(());
+    };
+    if window.is_visible()? {
+        return dismiss(app);
+    }
+    position_windows(app, rect)?;
+    window.show()?;
+    window.set_focus()
+}
+
+#[cfg(target_os = "windows")]
+pub fn dismiss_on_focus_loss(app: &tauri::AppHandle) -> tauri::Result<()> {
+    if let Some(rect) = app
+        .tray_by_id("main")
+        .and_then(|tray| tray.rect().ok().flatten())
+    {
+        let cursor = app.cursor_position()?;
+        // Windows reports tray bounds in physical screen coordinates.
+        let position = rect.position.to_physical::<f64>(1.0);
+        let size = rect.size.to_physical::<f64>(1.0);
+        if cursor.x >= position.x
+            && cursor.x < position.x + size.width
+            && cursor.y >= position.y
+            && cursor.y < position.y + size.height
+        {
+            // Preserve the open state until the tray mouse-up toggles it closed.
+            return Ok(());
+        }
+    }
+    dismiss(app)
+}
+
+#[cfg(target_os = "windows")]
+pub fn position_windows(app: &tauri::AppHandle, rect: Option<tauri::Rect>) -> tauri::Result<()> {
+    let Some(window) = app.get_webview_window("tray") else {
+        return Ok(());
+    };
+    let cursor = app.cursor_position()?;
+    let rect = rect.or_else(|| {
+        app.tray_by_id("main")
+            .and_then(|tray| tray.rect().ok().flatten())
+    });
+    let (position, size) = rect.map_or((cursor, tauri::PhysicalSize::new(0.0, 0.0)), |rect| {
+        (
+            rect.position.to_physical::<f64>(1.0),
+            rect.size.to_physical::<f64>(1.0),
+        )
+    });
+    let Some(monitor) = app.monitor_from_point(
+        position.x + size.width / 2.0,
+        position.y + size.height / 2.0,
+    )?
+    else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let window_size = window
+        .inner_size()?
+        .to_logical::<f64>(window.scale_factor()?);
+    // Keep all global coordinates physical; only scale the panel size and gap.
+    // Dividing global origins by each monitor's DPI breaks mixed-DPI layouts.
+    let (x, y) = windows_popover_position(
+        (position.x, position.y, size.width, size.height),
+        (window_size.width * scale, window_size.height * scale),
+        (
+            area.position.x as f64,
+            area.position.y as f64,
+            area.size.width as f64,
+            area.size.height as f64,
+        ),
+        6.0 * scale,
+    );
+    window.set_position(tauri::PhysicalPosition::new(
+        x.round() as i32,
+        y.round() as i32,
+    ))
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_popover_position(
+    tray: (f64, f64, f64, f64),
+    size: (f64, f64),
+    area: (f64, f64, f64, f64),
+    gap: f64,
+) -> (f64, f64) {
+    let left = area.0 + gap;
+    let top = area.1 + gap;
+    let right = (area.0 + area.2 - size.0 - gap).max(left);
+    let bottom = (area.1 + area.3 - size.1 - gap).max(top);
+    let below = tray.1 + tray.3 + gap;
+    let y = if below + size.1 <= area.1 + area.3 - gap {
+        below
+    } else {
+        tray.1 - size.1 - gap
+    };
+    (
+        (tray.0 + tray.2 / 2.0 - size.0 / 2.0).clamp(left, right),
+        y.clamp(top, bottom),
+    )
+}
+
 #[cfg(any(target_os = "macos", test))]
 fn popover_position(
     anchor: (f64, f64),
@@ -308,6 +420,62 @@ fn popover_position(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_panel_follows_taskbar_edges_and_content_height() {
+        let area = (0.0, 0.0, 1920.0, 1032.0);
+        let tray = (1800.0, 1040.0, 24.0, 24.0);
+        assert_eq!(
+            windows_popover_position(tray, (390.0, 490.0), area, 6.0),
+            (1524.0, 536.0)
+        );
+        assert_eq!(
+            windows_popover_position(tray, (390.0, 600.0), area, 6.0),
+            (1524.0, 426.0)
+        );
+        // Top, left and right taskbars use the available work area.
+        assert_eq!(
+            windows_popover_position(
+                (1800.0, 0.0, 24.0, 24.0),
+                (390.0, 490.0),
+                (0.0, 48.0, 1920.0, 1032.0),
+                6.0
+            ),
+            (1524.0, 54.0)
+        );
+        assert_eq!(
+            windows_popover_position(
+                (8.0, 900.0, 24.0, 24.0),
+                (390.0, 490.0),
+                (48.0, 0.0, 1872.0, 1080.0),
+                6.0
+            ),
+            (54.0, 404.0)
+        );
+        assert_eq!(
+            windows_popover_position(
+                (1880.0, 900.0, 24.0, 24.0),
+                (390.0, 490.0),
+                (0.0, 0.0, 1872.0, 1080.0),
+                6.0
+            ),
+            (1476.0, 404.0)
+        );
+    }
+
+    #[test]
+    fn windows_panel_stays_on_a_negative_origin_high_dpi_monitor() {
+        // 150% monitor to the left of the primary screen, with a bottom taskbar.
+        assert_eq!(
+            windows_popover_position(
+                (-180.0, 1460.0, 36.0, 36.0),
+                (585.0, 735.0),
+                (-2560.0, 0.0, 2560.0, 1440.0),
+                9.0
+            ),
+            (-594.0, 696.0)
+        );
+    }
 
     #[test]
     fn centers_below_the_tray_and_keeps_the_panel_on_screen() {

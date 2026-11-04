@@ -1,5 +1,5 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
   color: #202329;
   background: transparent;
   font-synthesis: none;
@@ -20,6 +20,8 @@ button { font: inherit; }
   user-select: none;
   font-size: 13px;
 }
+
+.tray-popover-windows { background: #f9fafd; }
 
 .tray-header { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; }
 .tray-app-icon { flex-shrink: 0; object-fit: contain; }
@@ -62,5 +64,6 @@ button { font: inherit; }
 @media (prefers-color-scheme: dark) {
   :root { color: #f1f2f5; --tray-secondary: #a5a7b1; --tray-divider: rgb(200 205 230 / 14%); }
   .tray-popover { background: rgb(30 31 38 / 65%); border-color: rgb(255 255 255 / 13%); }
+  .tray-popover-windows { background: #1e1f26; }
   .tray-membership { color: #c3a7ff; background: rgb(153 113 245 / 18%); }
 }

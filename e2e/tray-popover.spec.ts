@@ -1,10 +1,12 @@
 import { $, $$, browser, expect } from "@wdio/globals";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { CodexLimitsResponse } from "../src/lib/api";
 import type { TrayPopoverData } from "../src/lib/tray-popover";
 
 describe("menu bar usage popover", () => {
   it("renders live tray data with the app icon and supports dismissal and opening the main window", async function () {
-    if (process.platform !== "darwin") this.skip();
+    if (process.platform !== "darwin" && process.platform !== "win32") this.skip();
     await browser.switchToWindow("main");
     const previous = await browser.execute(() => Object.fromEntries(
       ["language", "tray_menu_show"].map((key) => [key, localStorage.getItem(key)]),
@@ -24,7 +26,7 @@ describe("menu bar usage popover", () => {
       }
     };
     const showPopover = async () => {
-      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "toggle" }));
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "rightClick" }));
       await browser.switchToWindow("tray");
       await $(".tray-popover").waitForDisplayed();
     };
@@ -66,6 +68,7 @@ describe("menu bar usage popover", () => {
       });
       await showPopover();
       await expect($(".tray-identity")).toHaveText(expect.stringContaining("itvincent@gmail.com"));
+      expect(await $(".tray-actions kbd").isExisting()).toBe(process.platform === "darwin");
       await expect($(".tray-membership")).toHaveText(/plus/i);
       await expect($('[data-quota="5h"] strong')).toHaveText("72%");
       await expect($('[data-quota="weekly"] strong')).toHaveText("96%");
@@ -77,7 +80,7 @@ describe("menu bar usage popover", () => {
         return image.complete && image.naturalWidth === 512;
       })).toBe(true);
       expect(await browser.execute(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-      await browser.saveScreenshot("/tmp/codex-tray-popover.png");
+      await browser.saveScreenshot(join(tmpdir(), "codex-tray-popover.png"));
 
       // Updates use the Rust snapshot/event path while the panel stays open.
       const data = await browser.tauri.execute(({ core }) => core.invoke("get_tray_popover")) as TrayPopoverData;
@@ -96,6 +99,20 @@ describe("menu bar usage popover", () => {
       await browser.waitUntil(async () => !(await isVisible()));
       await browser.switchToWindow("main");
       await expect($('button[aria-label="查询限额"]')).toBeDisplayed();
+
+      await showPopover();
+      await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "rightClick" }));
+      await browser.waitUntil(async () => !(await isVisible()));
+      await browser.switchToWindow("main");
+
+      if (process.platform === "win32") {
+        await browser.tauri.execute(({ core }) => core.invoke("plugin:window|hide", { label: "main" }));
+        await showPopover();
+        await browser.tauri.execute(({ core }) => core.invoke("tray_popover_action", { action: "leftClick" }));
+        await browser.waitUntil(async () => !(await isVisible()));
+        await browser.switchToWindow("main");
+        await expect($('button[aria-label="查询限额"]')).toBeDisplayed();
+      }
 
       await showPopover();
       await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_focus", { label: "main" }));

@@ -914,7 +914,7 @@ async fn reveal_in_file_manager(path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 #[derive(serde::Deserialize)]
 struct TrayMenuItemDto {
     id: String,
@@ -933,11 +933,11 @@ struct TrayIconBitmap {
 #[derive(serde::Deserialize)]
 struct TrayMenuUpdate {
     title: String,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     items: Vec<TrayMenuItemDto>,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     show_main_text: Option<String>,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     quit_text: Option<String>,
     popover: Option<serde_json::Value>,
     #[cfg(target_os = "macos")]
@@ -989,7 +989,7 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
             payload.title.clone()
         }));
 
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             let mut menu_builder = tauri::menu::MenuBuilder::new(&app);
 
@@ -1033,7 +1033,7 @@ fn update_tray(app: tauri::AppHandle, payload: TrayMenuUpdate) -> Result<(), Str
 }
 
 fn handle_tray_click(app: &tauri::AppHandle, button: MouseButton, _rect: Option<tauri::Rect>) {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     if button == MouseButton::Right {
         if let Err(error) = tray_popover::toggle(app, _rect) {
             log::warn!("Failed to show tray popover: {error}");
@@ -1043,17 +1043,20 @@ fn handle_tray_click(app: &tauri::AppHandle, button: MouseButton, _rect: Option<
     if button != MouseButton::Left {
         return;
     }
+    #[cfg(target_os = "macos")]
     let popover_visible = app
         .get_webview_window("tray")
         .is_some_and(|window| window.is_visible().unwrap_or(false));
     if let Err(error) = tray_popover::dismiss(app) {
         log::warn!("Failed to dismiss tray popover: {error}");
     }
+    #[cfg(target_os = "macos")]
     if popover_visible {
         return;
     }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
     }
 }
@@ -1122,12 +1125,18 @@ pub fn run() {
     builder
         .on_window_event(|window, event| {
             if window.label() == "tray" {
+                #[cfg(target_os = "windows")]
+                if matches!(event, tauri::WindowEvent::Resized(_)) {
+                    if let Err(error) = tray_popover::position_windows(window.app_handle(), None) {
+                        log::warn!("Failed to position tray popover: {error}");
+                    }
+                }
                 if matches!(event, tauri::WindowEvent::Focused(false)) {
-                    #[cfg(target_os = "macos")]
+                    #[cfg(any(target_os = "macos", target_os = "windows"))]
                     if let Err(error) = tray_popover::dismiss_on_focus_loss(window.app_handle()) {
                         log::warn!("Failed to dismiss tray popover: {error}");
                     }
-                    #[cfg(not(target_os = "macos"))]
+                    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
                     let _ = window.hide();
                 }
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -1165,7 +1174,7 @@ pub fn run() {
 
             setup_app_menu(app)?;
             app.manage(tray_popover::TrayPopoverState::default());
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             tray_popover::setup(app)?;
 
             let app_data_dir = app.path().app_data_dir()?;

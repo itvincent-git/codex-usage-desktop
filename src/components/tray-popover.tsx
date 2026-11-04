@@ -8,6 +8,8 @@ import appIcon from "../../src-tauri/icons/icon.png";
 import type { TrayPopoverData } from "@/lib/tray-popover";
 import "./tray-popover.css";
 
+const isMac = /Mac/.test(navigator.platform);
+
 export function TrayPopover() {
   const [data, setData] = useState<TrayPopoverData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function TrayPopover() {
     })().catch((err) => { if (active) setError(String(err)); });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") void getCurrentWindow().hide();
-      if (event.metaKey && event.key.toLowerCase() === "q") {
+      if (isMac && event.metaKey && event.key.toLowerCase() === "q") {
         event.preventDefault();
         void invoke("tray_popover_action", { action: "quit" });
       }
@@ -57,7 +59,7 @@ export function TrayPopover() {
   }
 
   return (
-    <main ref={panel} className="tray-popover" aria-label="Codex Usage">
+    <main ref={panel} className={`tray-popover${isMac ? "" : " tray-popover-windows"}`} aria-label="Codex Usage">
       <header className="tray-header">
         <img className="tray-app-icon" src={appIcon} alt="" width="44" height="44" />
         <div className="tray-identity">
@@ -92,7 +94,7 @@ export function TrayPopover() {
       {error ? <p className="tray-error" role="alert">{error}</p> : null}
       <footer className="tray-actions">
         <button type="button" onClick={() => void showMain()}><PanelsTopLeft aria-hidden="true" /><span>{data?.labels.showMain ?? "Show Main Window"}</span><ChevronRight className="tray-action-hint" aria-hidden="true" /></button>
-        <button type="button" onClick={() => void invoke("tray_popover_action", { action: "quit" }).catch((err) => setError(String(err)))}><Power aria-hidden="true" /><span>{data?.labels.quit ?? "Quit"}</span><kbd>⌘Q</kbd></button>
+        <button type="button" onClick={() => void invoke("tray_popover_action", { action: "quit" }).catch((err) => setError(String(err)))}><Power aria-hidden="true" /><span>{data?.labels.quit ?? "Quit"}</span>{isMac ? <kbd>⌘Q</kbd> : null}</button>
       </footer>
     </main>
   );
