@@ -63,6 +63,7 @@ jobs:
             echo "Expected tag: ${expected}"
             exit 1
           fi
+          echo "RELEASE_NAME=v${version}" >> "${GITHUB_ENV}"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -158,7 +159,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: Codex Usage Desktop ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.RELEASE_NAME }}
           releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: true
           prerelease: false
