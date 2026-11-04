@@ -116,6 +116,10 @@ So verstehen Sie sowohl, **was Codex getan hat**, als auch, **wie viel Verbrauch
 
 ![Sitzungszeitleiste mit Befehlen, Werkzeugaktivität und Links zu JSONL-Rohdaten](docs/session-detail.jpg)
 
+Um den Verbrauch bezahlter Credits zu sehen, aktivieren Sie in den Einstellungen **Abgebuchtes Sitzungsguthaben anzeigen** (standardmäßig deaktiviert). Die Sitzungsansicht (Sessions), die Sitzungsliste eines Projekts und die Sitzungsdetails zeigen dann **Guthabenabbuchungen · Sitzungssumme** neben den geschätzten Kosten an.
+
+Diese Werte geben die Guthabenabbuchungen für die gesamte Sitzung an, unabhängig vom ausgewählten Datumsbereich. Sie sind von den anhand der Token geschätzten Kosten in US-Dollar getrennt und können Aktionsguthaben sowie Guthabenkorrekturen enthalten. Negative Beträge können Erstattungen oder Korrekturen darstellen. Daten können verzögert oder unvollständig sein. Nicht verfügbare Daten erscheinen als `—`; das bedeutet nicht null Verbrauch. Werte aus dem Cache sind gekennzeichnet. Mit **Sitzungsguthaben aktualisieren** können Sie eine Aktualisierung anfordern.
+
 ### 🔄 Kontingentzurücksetzungen verstehen
 
 Das Verhalten der Codex-Kontingente kann sich ändern. Codex Usage Desktop macht diese Änderungen sichtbar.
@@ -246,6 +250,7 @@ Der Inhalt Ihrer Codex-Sitzungen ist sensibel. Die App ist darauf ausgelegt, ihn
 - In der App muss kein OpenAI- oder LiteLLM-API-Schlüssel eingegeben oder gespeichert werden.
 - Zusammengefasste Verbrauchsdaten werden in einem SQLite-Cache im App-Datenverzeichnis des Betriebssystems gespeichert.
 - Aktuelle Limits werden direkt von ChatGPT über Ihre bestehende lokale Codex-Authentifizierung abgerufen; dabei werden keine Sitzungsprotokolle übertragen.
+- Optionale Abfragen des Sitzungsguthabens erfordern eine ChatGPT-Anmeldung und senden Sitzungs-IDs mit Ihrer bestehenden lokalen Codex-Authentifizierung direkt an ChatGPT. Ergebnisse werden pro Konto lokal zwischengespeichert; Sitzungsinhalte werden nicht übertragen.
 - Netzwerkzugriff wird außerdem für öffentliche Schriftdateien, Modellpreise, Kontingentprognosen und Update-Prüfungen verwendet. Preise werden lokal zwischengespeichert. Diese Anfragen enthalten weder Ihre Sitzungsprotokolle noch Verbrauchsanalysen.
 
 ## Kompatibilität und aktuelle Einschränkungen
