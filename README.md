@@ -116,6 +116,10 @@ This makes it easier to understand both **what Codex did** and **how much usage 
 
 ![Session detail timeline with commands, tool activity, and raw JSONL links](docs/session-detail.jpg)
 
+To see paid credits usage, enable **Show session credits debited** in Settings (off by default). The Sessions view, project session list, and session details then show **Balance debits · session total** alongside estimated cost.
+
+These values report credits debited from the balance over the session's lifetime, rather than only the selected date range. They are separate from token-based estimated USD costs and may include promotional credits and balance adjustments; negative amounts can reflect refunds or adjustments. Data may be delayed or partial. Unavailable data appears as `—`, which does not mean zero; cached values are labeled, and **Refresh session credits** requests an update.
+
 ### 🔄 Understand quota resets
 
 Codex quota behavior can change over time. Codex Usage Desktop helps make those changes visible.
@@ -246,6 +250,7 @@ Your Codex session content is sensitive. The app is designed to keep it on your 
 - No OpenAI or LiteLLM API key needs to be entered into or stored by the app.
 - Aggregated usage data is stored in a SQLite cache in the operating system's app data directory.
 - Live limits are requested directly from ChatGPT using your existing local Codex authentication; the app does not send session logs with those requests.
+- Optional session credits queries require a ChatGPT login and send session IDs directly to ChatGPT using your existing local Codex authentication. Results are cached locally per account; session content is not sent.
 - Network access is also used for public font files, model pricing, quota forecasts, and update checks. Pricing is cached locally, and these requests do not include your session logs or usage analytics.
 
 ## Compatibility and current limits
