@@ -1242,7 +1242,7 @@ pub fn run() {
 
             // Set up the menu bar / system tray item
             #[cfg(not(target_os = "macos"))]
-            let tray_icon_bytes = include_bytes!("../icons/tray_icon.png");
+            let tray_icon_bytes = include_bytes!("../icons/icon.png");
             #[cfg(not(target_os = "macos"))]
             let tray_icon_image =
                 tauri::image::Image::from_bytes(tray_icon_bytes).map_err(|e| e.to_string())?;
