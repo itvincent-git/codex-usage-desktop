@@ -1,4 +1,8 @@
 {
+  "5.6.0": {
+    "zh": "- chore(homebrew): update cask to 5.5.0\n- feat(tray): reuse usage popover on Windows\n- fix(release): shorten release titles to version numbers\n- docs: explain session credits usage and privacy\n- docs: translate session credits guidance for all readmes\n- chore: merge remote main before push\n- fix: add startup diagnostics and preserve usage on scan failures\n- fix: guide recovery from usage data failures",
+    "en": "- chore(homebrew): update cask to 5.5.0\n- feat(tray): reuse usage popover on Windows\n- fix(release): shorten release titles to version numbers\n- docs: explain session credits usage and privacy\n- docs: translate session credits guidance for all readmes\n- chore: merge remote main before push\n- fix: add startup diagnostics and preserve usage on scan failures\n- fix: guide recovery from usage data failures"
+  },
   "5.5.0": {
     "zh": "- chore(homebrew): update cask to 5.4.3\n- fix(tray): display daily tokens in human-readable format\n- docs: update menu bar screenshot\n- chore(deps): upgrade desktop dependencies and security patches\n- fix(settings): keep back button outside scrolling content",
     "en": "- chore(homebrew): update cask to 5.4.3\n- fix(tray): display daily tokens in human-readable format\n- docs: update menu bar screenshot\n- chore(deps): upgrade desktop dependencies and security patches\n- fix(settings): keep back button outside scrolling content"
