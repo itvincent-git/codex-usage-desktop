@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { OverviewResponse, SessionDetailRow } from "../src/lib/api";
 
 // CODEX_USAGE_REFRESH_E2E=1 isolates both the Codex home and the application database.
-describe("targeted modal refresh", () => {
+describe("keyboard navigation and targeted refresh", () => {
   const run = process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
 
   run("refreshes session content, project dates and dashboard totals without scanning unrelated usage", async () => {
@@ -34,7 +34,38 @@ describe("targeted modal refresh", () => {
     });
     await browser.refresh();
     await $('[data-testid="projects-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
-    await $('[data-testid="projects-nav-tab"]').click();
+    const modifier = process.platform === "darwin" ? "Meta" : "Control";
+    for (const [index, page] of ["dashboard", "sessions", "models", "daily", "monthly", "projects"].entries()) {
+      await browser.keys([modifier, String(index + 1)]);
+      await expect($(`[data-testid="${page}-nav-tab"]`)).toHaveAttribute("aria-selected", "true");
+    }
+    await browser.keys([modifier, ","]);
+    await expect($("h1=Settings")).toBeDisplayed();
+    await $("button=Back").click();
+    await expect($('[data-testid="projects-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+    await browser.keys([modifier, "Shift", "l"]);
+    await expect($('button[aria-label="Expand sidebar"]')).toBeDisplayed();
+    await browser.keys([modifier, "Shift", "l"]);
+    await expect($('button[aria-label="Collapse sidebar"]')).toBeDisplayed();
+    appendFileSync(unrelated, encode([usage(9000)]));
+    const rangeButton = $('button[aria-label="Select time range"]');
+    await rangeButton.waitForDisplayed();
+    // The embedded driver does not emit the pointerdown event Radix menus require.
+    await rangeButton.execute((element) => element.focus());
+    await browser.keys("Enter");
+    await $('[role="menu"]').waitForDisplayed();
+    const customRange = $('//*[@role="menuitem" and normalize-space(.)="Select Custom Range..."]');
+    await customRange.waitForDisplayed();
+    await customRange.click();
+    const rangeDialog = $('[role="dialog"][aria-label="Select Custom Range"]');
+    await rangeDialog.waitForDisplayed();
+    await expect(rangeDialog.$('button[aria-label="Close custom range modal"]')).toBeFocused();
+    await browser.keys([modifier, "r"]);
+    await browser.keys([modifier, "1"]);
+    await expect($('[data-testid="projects-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+    await browser.keys("Escape");
+    await rangeDialog.waitForExist({ reverse: true });
+    await browser.execute(() => { (window as unknown as { shortcutMarker: string }).shortcutMarker = "preserved"; });
     await $('[data-testid="project-comparison"] tbody tr[role="button"]').waitForDisplayed({ timeout: 90_000 });
     const projectRowSelector = '//tr[@role="button" and .//p[text()="/targeted-refresh"]]';
     const row = $(projectRowSelector);
@@ -47,13 +78,27 @@ describe("targeted modal refresh", () => {
     const detail = $('[aria-labelledby="session-detail-title"]');
     await detail.waitForDisplayed();
     await expect(detail).toHaveText(expect.stringContaining("Original reply"));
+    await browser.keys([modifier, "1"]);
+    await expect(detail).toBeDisplayed();
+    await expect($('[data-testid="projects-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+    await browser.keys([modifier, "f"]);
+    const searchInput = detail.$('input[type="search"]');
+    await expect(searchInput).toBeFocused();
+    await searchInput.setValue("Original");
+    await browser.keys([modifier, "f"]);
+    expect(await searchInput.execute((element) => [(element as HTMLInputElement).selectionStart, (element as HTMLInputElement).selectionEnd])).toEqual([0, 8]);
+    await browser.keys("Escape");
+    await expect(searchInput).toHaveValue("");
+    await expect(detail).toBeDisplayed();
+    await browser.keys("Escape");
+    await expect(searchInput).not.toExist();
+    await expect(detail).toBeDisplayed();
     appendFileSync(target, encode([
       { timestamp, type: "event_msg", payload: { type: "agent_message", message: "Appended reply from session refresh" } }, usage(400),
     ]));
-    appendFileSync(unrelated, encode([usage(9000)]));
     const refreshSession = detail.$('button=Refresh this session');
     await refreshSession.waitForEnabled();
-    await refreshSession.click();
+    await browser.keys([modifier, "r"]);
     await expect(detail).toHaveText(expect.stringContaining("Appended reply from session refresh"));
     await expect(detail.$('[aria-label="Session summary"]')).toHaveText(expect.stringContaining("520"));
     await browser.keys("Escape");
@@ -80,7 +125,7 @@ describe("targeted modal refresh", () => {
     await expect(dayToggle).toHaveAttribute("aria-expanded", "true");
     const refreshProject = project.$('button=Refresh project sessions');
     await refreshProject.waitForEnabled();
-    await refreshProject.click();
+    await browser.keys([modifier, "r"]);
     await project.$('[data-testid="session-card"]:has(h3[title="New project session"])').waitForDisplayed();
     await expect(dayToggle).toHaveAttribute("aria-expanded", "true");
     await expect(project.$('[data-testid="project-modal-header"]')).toHaveText(expect.stringContaining("940"));
@@ -98,5 +143,9 @@ describe("targeted modal refresh", () => {
     await browser.keys("Escape");
     await project.waitForExist({ reverse: true });
     await expect($(projectRowSelector)).toHaveText(expect.stringContaining("940"));
+    await browser.keys([modifier, "r"]);
+    await browser.waitUntil(async () => (await inspectCache()).sessions.find((session) => session.path === unrelated)!.totalTokens === 9220);
+    await expect($('[data-testid="projects-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+    expect(await browser.execute(() => (window as unknown as { shortcutMarker: string }).shortcutMarker)).toBe("preserved");
   }).timeout(240_000);
 });

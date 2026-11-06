@@ -29,7 +29,7 @@ export function useModalFocus(
     ).filter((element) => (dialogRef.current?.contains(element) || element.closest("[data-app-sidebar]")) && !element.closest('[hidden], [inert], [aria-hidden="true"]'));
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || event.isComposing) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();

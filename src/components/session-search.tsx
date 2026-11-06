@@ -11,7 +11,7 @@ export type SessionSearchState = SessionSearchResult & {
   pending: boolean;
   error: boolean;
 };
-export type SessionSearchHandle = { clear: () => void };
+export type SessionSearchHandle = { clear: () => void; focus: () => void };
 const EMPTY_RESULT: SessionSearchResult = { count: 0, index: 0, hit: null, matches: [] };
 
 export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: {
@@ -45,7 +45,7 @@ export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: 
     setPending(false);
     onChange({ ...EMPTY_RESULT, source: detail, scope, active: false, pending: false, error: false });
   }
-  useImperativeHandle(ref, () => ({ clear }));
+  useImperativeHandle(ref, () => ({ clear, focus: () => { inputRef.current?.focus(); inputRef.current?.select(); } }));
 
   useEffect(() => {
     failed.current = false;
@@ -117,6 +117,7 @@ export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: 
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
           if (event.key === "Enter") {
             event.preventDefault();
             navigate(event.shiftKey ? -1 : 1);

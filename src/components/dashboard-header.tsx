@@ -1,3 +1,4 @@
+import { shortcutAria, shortcutLabel } from "@/lib/keyboard-shortcuts";
 import { Sparkles, RefreshCcw } from "lucide-react";
 import type { OverviewResponse, UpdateCheckResponse } from "@/lib/api";
 import type { UpdateInstallStatus, UpdateProgressState } from "@/hooks/use-usage-dashboard";
@@ -100,7 +101,7 @@ export function DashboardHeader({
               </div>
             </div>
           )}
-          <Button variant="primary" size="sm" className="relative z-20" onClick={onRefresh} disabled={isBusy}>
+          <Button variant="primary" size="sm" className="relative z-20" title={`${t("hero.rescan")} (${shortcutLabel("R")})`} aria-keyshortcuts={shortcutAria("R")} onClick={onRefresh} disabled={isBusy}>
             <RefreshCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             {t("hero.rescan", { defaultValue: "Rescan local logs" })}
           </Button>

@@ -1105,7 +1105,8 @@ fn delete_pricing_cache(path: &Path) -> Result<(), String> {
 
 fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
-    let reload_item = MenuItem::with_id(app, "reload_page", "Reload", true, Some("CmdOrCtrl+R"))?;
+    #[cfg(debug_assertions)]
+    let reload_item = MenuItem::with_id(app, "reload_page", "Reload WebView", true, Some("CmdOrCtrl+Shift+R"))?;
     #[cfg(debug_assertions)]
     let inspect_item = MenuItem::with_id(
         app,
@@ -1124,6 +1125,7 @@ fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
             if submenu.text()? == "View" {
                 #[cfg(debug_assertions)]
                 submenu.prepend(&inspect_item)?;
+                #[cfg(debug_assertions)]
                 submenu.prepend(&reload_item)?;
                 break;
             }

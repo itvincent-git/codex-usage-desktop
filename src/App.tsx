@@ -17,11 +17,13 @@ import { SessionUsageTable } from "@/components/session-usage-table";
 import { SessionDetailModal } from "@/components/session-detail-modal";
 import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { RangeSwitcher } from "@/components/range-switcher";
+import { useRefreshShortcut } from "@/hooks/use-refresh-shortcut";
+import { isPrimaryShortcut } from "@/lib/keyboard-shortcuts";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { getReleaseNotes } from "@/lib/release-notes";
 import type { SessionDetailRow } from "@/lib/api";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
@@ -189,6 +191,30 @@ export default function App() {
     setIsResetHistoryOpen(false);
     void handleViewChange(nextView);
   };
+
+  const hasModal = !!(selectedProjectForModal || selectedSession || isResetHistoryOpen);
+  useRefreshShortcut(() => {
+    if (!hasModal && !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') && view !== "settings" && !isLoading && !isScanning && !isRefreshing && !isResetting && isExporting === null) {
+      void handleRefresh();
+    }
+  });
+
+  const handleNavigationKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.isComposing || event.altKey) return;
+    const pages: DashboardView[] = ["dashboard", "sessions", "models", "daily", "monthly", "projects"];
+    const nextView = isPrimaryShortcut(event) ? (event.key === "," ? "settings" : pages[Number(event.key) - 1]) : undefined;
+    const toggleSidebar = isPrimaryShortcut(event, true) && event.key.toLowerCase() === "l";
+    if (!nextView && !toggleSidebar) return;
+    event.preventDefault();
+    if (event.repeat || hasModal || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+    if (toggleSidebar && view !== "settings") setSidebarCollapsed((collapsed) => !collapsed);
+    else if (nextView) navigate(nextView);
+  });
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => handleNavigationKey(event);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-background text-foreground">

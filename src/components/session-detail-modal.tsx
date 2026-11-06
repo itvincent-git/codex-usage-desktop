@@ -1,3 +1,5 @@
+import { useRefreshShortcut } from "@/hooks/use-refresh-shortcut";
+import { isPrimaryShortcut, shortcutAria, shortcutLabel } from "@/lib/keyboard-shortcuts";
 import {
   buildSessionConversation, cleanExecOutput, formatJsonForDisplay, formatToolArgumentValue,
   parseToolContentBlocks, parseUserInputAnswers, processSignal, splitWebSearchResults, summarizeOutput,
@@ -1246,11 +1248,13 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
 
   useEffect(() => {
     function handleSearchKey(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f" && detail) {
+      if (event.defaultPrevented || event.isComposing) return;
+      if (isPrimaryShortcut(event) && event.key.toLowerCase() === "f" && detail) {
         event.preventDefault();
-        if (showSearch) closeSearch();
+        if (showSearch) searchRef.current?.focus();
         else setShowSearch(true);
       } else if (event.key === "Escape" && showSearch) {
+        if (event.target instanceof HTMLInputElement && event.target.type === "search" && event.target.value) return;
         event.preventDefault();
         event.stopPropagation();
         closeSearch();
@@ -1329,6 +1333,10 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
       setRefreshing(false);
     }
   }
+
+  useRefreshShortcut(() => {
+    if (!refreshing && detail) void refreshSession();
+  }, true, true);
 
   const cacheRate = useMemo(() => {
     const inputTokens = detail?.summary.inputTokens ?? session.inputTokens;
@@ -1472,7 +1480,8 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
               ref={searchButtonRef}
               type="button"
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 ${DISCLOSURE_BUTTON_CLASS}`}
-              title={t("sessions.detail.search_placeholder")}
+              title={`${t("sessions.detail.search_placeholder")} (${shortcutLabel("F")})`}
+              aria-keyshortcuts={shortcutAria("F")}
               aria-label={t("sessions.detail.search_placeholder")}
               aria-expanded={showSearch}
               aria-controls="session-detail-search"
@@ -1496,7 +1505,7 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
               {t("sessions.detail.details")}
               {showDetails ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
-            <Button variant="primary" size="sm" onClick={() => void refreshSession()} disabled={refreshing || !detail} aria-busy={refreshing}>
+            <Button variant="primary" size="sm" title={`${t("sessions.detail.refresh")} (${shortcutLabel("R")})`} aria-keyshortcuts={shortcutAria("R")} onClick={() => void refreshSession()} disabled={refreshing || !detail} aria-busy={refreshing}>
               <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               {t("sessions.detail.refresh")}
             </Button>

@@ -1,3 +1,4 @@
+import { shortcutAria, shortcutLabel } from "@/lib/keyboard-shortcuts";
 import { CalendarDays, ChartColumn, Folder, LayoutDashboard, Logs, PanelLeftClose, PanelLeftOpen, Settings, Terminal, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -65,14 +66,14 @@ export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, w
       <div aria-hidden="true" className="h-[var(--window-drag-height)] shrink-0" />
       <div className={`flex h-16 shrink-0 items-center gap-2 px-3 ${collapsed ? "justify-center" : "justify-between"}`}>
         {!collapsed ? <span className="truncate text-sm font-semibold tracking-tight" title={t("header.app_title")}>Codex Usage</span> : null}
-        <button type="button" onClick={onToggleCollapsed} aria-label={toggleLabel} title={toggleLabel} aria-expanded={!collapsed} aria-controls="app-navigation" className="relative z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" onClick={onToggleCollapsed} aria-label={toggleLabel} title={`${toggleLabel} (${shortcutLabel("Shift+L")})`} aria-keyshortcuts={shortcutAria("Shift+L")} aria-expanded={!collapsed} aria-controls="app-navigation" className="relative z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
           {collapsed ? <PanelLeftOpen className="h-4 w-4" aria-hidden="true" /> : <PanelLeftClose className="h-4 w-4" aria-hidden="true" />}
         </button>
       </div>
       <nav id="app-navigation" aria-label={t("header.navigation")} className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         <div role="tablist" aria-orientation="vertical" aria-label={t("header.navigation")} className="space-y-1">
-          {pages.filter((page) => page.view !== "logs" || showLogsTab).map(({ view: page, label, icon: Icon }) => (
-            <button key={page} type="button" role="tab" aria-selected={view === page} aria-label={t(`common.${label}`)} title={collapsed ? t(`common.${label}`) : undefined} data-testid={`${page}-nav-tab`} onClick={() => onViewChange(page)} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"} ${view === page ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+          {pages.filter((page) => page.view !== "logs" || showLogsTab).map(({ view: page, label, icon: Icon }, index) => (
+            <button key={page} type="button" role="tab" aria-selected={view === page} aria-label={t(`common.${label}`)} title={index < 6 ? `${t(`common.${label}`)} (${shortcutLabel(String(index + 1))})` : t(`common.${label}`)} aria-keyshortcuts={index < 6 ? shortcutAria(String(index + 1)) : undefined} data-testid={`${page}-nav-tab`} onClick={() => onViewChange(page)} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"} ${view === page ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {!collapsed ? <span className="truncate">{t(`common.${label}`)}</span> : null}
             </button>
@@ -81,7 +82,7 @@ export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, w
       </nav>
       <div className={`mx-2 max-h-[55%] shrink-0 overflow-y-auto border-t border-border/80 pb-4 pt-3 ${collapsed ? "" : "px-1"}`}>{limits}</div>
       <div className="shrink-0 border-t border-border/80 p-2">
-        <button type="button" onClick={() => onViewChange("settings")} aria-label={t("common.settings")} title={collapsed ? t("common.settings") : undefined} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"}`}>
+        <button type="button" onClick={() => onViewChange("settings")} aria-label={t("common.settings")} title={`${t("common.settings")} (${shortcutLabel(",")})`} aria-keyshortcuts={shortcutAria(",")} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"}`}>
           <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />
           {!collapsed ? <span>{t("common.settings")}</span> : null}
         </button>

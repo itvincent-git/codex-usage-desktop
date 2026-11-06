@@ -326,6 +326,37 @@ describe("App", () => {
     await act(async () => { resolveLimits(limits(80)); });
   });
 
+  it("ignores navigation during composition and handles the platform modifier without duplicate listeners", async () => {
+    Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+    onTestFinished(() => { Reflect.deleteProperty(navigator, "platform"); });
+    mockLoadedDashboard();
+    render(<StrictMode><App /></StrictMode>);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rescan local logs" })).toBeEnabled());
+    for (const extra of [{ isComposing: true }, { repeat: true }, { altKey: true }, { shiftKey: true }]) {
+      fireEvent.keyDown(window, { key: ",", metaKey: true, ...extra });
+    }
+    fireEvent.keyDown(window, { key: ",", ctrlKey: true });
+    expect(screen.queryByRole("heading", { name: "Settings", level: 1 })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "L", metaKey: true, shiftKey: true });
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: ",", metaKey: true });
+    expect(screen.getByRole("heading", { name: "Settings", level: 1 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("tab", { name: "Dashboard" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Select time range" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Select Custom Range..." }));
+    expect(screen.getByRole("dialog", { name: "Select Custom Range" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close custom range modal" })).toHaveFocus());
+    const scans = invokeMock.mock.calls.filter(([command]) => command === "scan_usage").length;
+    fireEvent.keyDown(window, { key: "r", metaKey: true });
+    fireEvent.keyDown(window, { key: "6", metaKey: true });
+    expect(invokeMock.mock.calls.filter(([command]) => command === "scan_usage")).toHaveLength(scans);
+    expect(screen.getByRole("tab", { name: "Dashboard" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select time range" })).toHaveFocus();
+  });
+
   it("restores the sidebar width and collapse state when the app remounts", async () => {
     mockLoadedDashboard();
     const user = userEvent.setup();

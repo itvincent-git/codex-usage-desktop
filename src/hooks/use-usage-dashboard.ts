@@ -304,6 +304,7 @@ export function useUsageDashboard() {
   const limitsFetchInFlightRef = useRef(false);
   const limitsGeneration = useRef(0);
   const lastAutoScanTimeRef = useRef<number>(0);
+  const manualRefreshInFlightRef = useRef(false);
   const scanInFlightRef = useRef<Promise<void> | null>(null);
   const updateCheckInFlightRef = useRef<Promise<void> | null>(null);
   const windowActivationInFlightRef = useRef(false);
@@ -1009,6 +1010,8 @@ export function useUsageDashboard() {
   }
 
   async function handleRefresh() {
+    if (manualRefreshInFlightRef.current) return;
+    manualRefreshInFlightRef.current = true;
     setIsRefreshing(true);
     const startedAt = performance.now();
     void forecast.refresh();
@@ -1019,6 +1022,7 @@ export function useUsageDashboard() {
     } catch (refreshError) {
       setError(errorMessage(refreshError, "Refresh failed."));
     } finally {
+      manualRefreshInFlightRef.current = false;
       setIsRefreshing(false);
     }
   }

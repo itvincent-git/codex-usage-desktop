@@ -11,7 +11,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { RangeKey } from "@/lib/api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
@@ -43,6 +43,22 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
   const displayLabel = selectedRange ? t(`ranges.${selectedRange.value}`, { defaultValue: selectedRange.label }) : getRangeLabel(value, t);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!isModalOpen) return;
+    closeButtonRef.current?.focus();
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      event.preventDefault();
+      setIsModalOpen(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+      triggerRef.current?.focus();
+    };
+  }, [isModalOpen]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     if (value.startsWith("custom:")) {
       const [start, end] = value.slice("custom:".length).split("_");
@@ -93,6 +109,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            ref={triggerRef}
             className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "min-w-[11rem] justify-between")}
             aria-label={t("range_switcher.aria_select_range")}
           >
@@ -100,7 +117,12 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[11rem]">
+        <DropdownMenuContent align="end" className="min-w-[11rem]" onCloseAutoFocus={(event) => {
+          if (isModalOpen) {
+            event.preventDefault();
+            closeButtonRef.current?.focus();
+          }
+        }}>
           <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as RangeKey)}>
             {ranges.map((range) => (
               <DropdownMenuRadioItem key={range.value} value={range.value}>
@@ -130,6 +152,9 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             onClick={() => setIsModalOpen(false)}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("range_switcher.modal_title")}
               className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
@@ -137,6 +162,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
                 <h3 className="text-lg font-bold text-foreground">{t("range_switcher.modal_title")}</h3>
                 <button
                   type="button"
+                  ref={closeButtonRef}
                   onClick={() => setIsModalOpen(false)}
                   className="rounded-lg p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground transition cursor-pointer"
                   aria-label={t("range_switcher.modal_close_aria")}
