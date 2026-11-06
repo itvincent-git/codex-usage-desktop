@@ -12,6 +12,7 @@ import { hasSubscription } from "./codex-limits-card";
 import tauriConfig from "../../src-tauri/tauri.conf.json";
 import { Trans, useTranslation } from "react-i18next";
 import { useMemo, useState } from "react";
+import { shortcutLabel } from "@/lib/keyboard-shortcuts";
 import { getReleaseNotes } from "@/lib/release-notes";
 import { getLanguage, languageCodes, languages } from "@/lib/languages";
 import type { TrayCountdownUnits } from "@/lib/tray-format";
@@ -62,9 +63,9 @@ const TRAY_OPTION_KEYS = {
   cost: "cost",
 } as const;
 
-type SettingsSection = "general" | "menuBar" | "maintenance" | "third_party";
+type SettingsSection = "general" | "menuBar" | "shortcuts" | "maintenance" | "third_party";
 
-const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "maintenance", "third_party"];
+const SETTINGS_SECTIONS: SettingsSection[] = ["general", "menuBar", "shortcuts", "maintenance", "third_party"];
 
 export function SettingsPage({
   isResetting,
@@ -148,7 +149,7 @@ export function SettingsPage({
         aria-controls={sectionId}
         onClick={() => {
           setActiveSection(section);
-          document.getElementById(sectionId)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+          document.getElementById(sectionId)?.scrollIntoView?.({ block: "start", behavior: "instant" });
         }}
         className={`min-w-0 whitespace-normal break-words rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background ${
           selected
@@ -554,6 +555,42 @@ export function SettingsPage({
             className="scroll-mt-4"
           >
             {menuBarContent}
+          </section>
+          <section
+            id="settings-section-shortcuts"
+            aria-labelledby="settings-tab-shortcuts"
+            className="scroll-mt-4"
+          >
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("settings.nav_shortcuts")}</CardTitle>
+                <CardDescription>{t("settings.shortcuts_desc")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="divide-y divide-border border-t border-border">
+                  {[
+                    ...["dashboard", "sessions", "model", "daily", "monthly", "project"].map((page, index) => [t(`common.${page}`), shortcutLabel(String(index + 1))]),
+                    [t("common.settings"), shortcutLabel(",")],
+                    [t("settings.shortcuts_refresh"), shortcutLabel("R")],
+                    [t("settings.shortcuts_search"), shortcutLabel("F")],
+                    [t("settings.shortcuts_next"), "Enter"],
+                    [t("settings.shortcuts_previous"), "Shift+Enter"],
+                    [t("settings.shortcuts_sidebar"), shortcutLabel("Shift+L")],
+                    [t("settings.shortcuts_escape"), "Esc"],
+                  ].map(([label, keys]) => (
+                    <div key={keys} className="flex items-center justify-between gap-4 py-3 text-sm">
+                      <dt className="min-w-0 text-foreground">{label}</dt>
+                      <dd className="shrink-0"><kbd className="rounded border border-border bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">{keys}</kbd></dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-4 space-y-2 text-sm leading-6 text-muted-foreground">
+                  <p>{t("settings.shortcuts_refresh_note")}</p>
+                  <p>{t("settings.shortcuts_escape_note")}</p>
+                  <p>{t("settings.shortcuts_navigation_note")}</p>
+                </div>
+              </CardContent>
+            </Card>
           </section>
           <section
             id="settings-section-maintenance"

@@ -739,6 +739,17 @@
     }
   },
   "settings": {
+    "nav_shortcuts": "Tastenkürzel",
+    "shortcuts_desc": "Tastenkürzel gelten, wenn die App den Fokus hat. Die Tastenanzeige passt sich dem Betriebssystem an.",
+    "shortcuts_refresh": "Aktuelle Daten aktualisieren",
+    "shortcuts_search": "In aktueller Sitzung suchen (erneut drücken, um den Suchtext auszuwählen)",
+    "shortcuts_next": "Nächster Treffer im Suchfeld",
+    "shortcuts_previous": "Vorheriger Treffer im Suchfeld",
+    "shortcuts_sidebar": "Seitenleiste ein- / ausklappen",
+    "shortcuts_escape": "Suche leeren oder aktuelle Überlagerung schließen",
+    "shortcuts_refresh_note": "Auf Hauptseiten werden lokale Protokolle gescannt. Im Projektdialog wird nur das aktuelle Projekt aktualisiert, in Sitzungsdetails nur die aktuelle Sitzung. In den Einstellungen und anderen Dialogen ist die Aktualisierung inaktiv.",
+    "shortcuts_escape_note": "Esc leert zuerst ein ausgefülltes Suchfeld, schließt dann die Suchleiste und anschließend die aktuellen Details. Verschachtelte Dialoge werden einzeln von oben geschlossen.",
+    "shortcuts_navigation_note": "Solange ein Dialog geöffnet ist, sind die Tastenkürzel für Seitenwechsel, Einstellungen und Seitenleiste inaktiv.",
     "title": "Einstellungen",
     "subtitle": "Lokalen App-Zustand und Wiederherstellungsaktionen verwalten.",
     "nav_aria": "Einstellungsbereiche",

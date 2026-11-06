@@ -696,6 +696,17 @@
     }
   },
   "settings": {
+    "nav_shortcuts": "Keyboard Shortcuts",
+    "shortcuts_desc": "Shortcuts work while the app is focused. Key labels match your operating system.",
+    "shortcuts_refresh": "Refresh current data",
+    "shortcuts_search": "Find in current session (press again to select the query)",
+    "shortcuts_next": "Next match in the search box",
+    "shortcuts_previous": "Previous match in the search box",
+    "shortcuts_sidebar": "Collapse / expand sidebar",
+    "shortcuts_escape": "Clear search or close the current overlay",
+    "shortcuts_refresh_note": "Refresh scans local logs on main pages, only the current project in a project dialog, and only the current session in session details. It is inactive in Settings and other dialogs.",
+    "shortcuts_escape_note": "Esc clears a non-empty search box first, then closes the search bar, then closes the current details. Nested dialogs close one layer at a time.",
+    "shortcuts_navigation_note": "Page, Settings and sidebar shortcuts are paused while a dialog is open.",
     "title": "Settings",
     "subtitle": "Manage local app state and recovery actions.",
     "nav_aria": "Settings sections",

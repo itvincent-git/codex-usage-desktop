@@ -696,6 +696,17 @@
     }
   },
   "settings": {
+    "nav_shortcuts": "키보드 단축키",
+    "shortcuts_desc": "앱에 포커스가 있을 때 사용할 수 있습니다. 키 표시는 운영체제에 맞게 바뀝니다.",
+    "shortcuts_refresh": "현재 데이터 새로고침",
+    "shortcuts_search": "현재 세션에서 찾기 (다시 누르면 검색어 선택)",
+    "shortcuts_next": "검색창에서 다음 일치 항목",
+    "shortcuts_previous": "검색창에서 이전 일치 항목",
+    "shortcuts_sidebar": "사이드바 접기 / 펼치기",
+    "shortcuts_escape": "검색어 지우기 또는 현재 팝업 닫기",
+    "shortcuts_refresh_note": "기본 페이지에서는 로컬 로그를 스캔하고, 프로젝트 팝업에서는 현재 프로젝트만, 세션 상세에서는 현재 세션만 새로고침합니다. 설정 및 다른 팝업에서는 실행되지 않습니다.",
+    "shortcuts_escape_note": "Esc는 검색창의 내용을 먼저 지우고, 다음에는 검색 표시줄을, 그다음에는 현재 상세 화면을 닫습니다. 겹친 팝업은 맨 위부터 하나씩 닫힙니다.",
+    "shortcuts_navigation_note": "팝업이 열려 있는 동안 페이지 전환, 설정 및 사이드바 단축키는 비활성화됩니다.",
     "title": "설정",
     "subtitle": "로컬 앱 상태와 복구 작업을 관리합니다.",
     "nav_aria": "설정 항목",

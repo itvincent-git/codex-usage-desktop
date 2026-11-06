@@ -703,6 +703,17 @@
     }
   },
   "settings": {
+    "nav_shortcuts": "键盘快捷键",
+    "shortcuts_desc": "快捷键仅在应用获得焦点时生效，按键标记会根据操作系统自动适配。",
+    "shortcuts_refresh": "刷新当前数据",
+    "shortcuts_search": "查找当前会话内容（再次按下选中查询词）",
+    "shortcuts_next": "搜索框内：下一个匹配",
+    "shortcuts_previous": "搜索框内：上一个匹配",
+    "shortcuts_sidebar": "折叠／展开侧栏",
+    "shortcuts_escape": "清空搜索或关闭当前浮层",
+    "shortcuts_refresh_note": "刷新在主页面扫描本地日志；在项目弹窗中仅刷新当前项目，在会话详情中仅刷新当前会话。设置页和其他弹窗内不触发刷新。",
+    "shortcuts_escape_note": "Esc 在搜索框有文字时先清空查询，再关闭搜索栏，最后关闭当前详情。嵌套弹窗每次只关闭最上层。",
+    "shortcuts_navigation_note": "弹窗打开时，页面切换、设置和侧栏快捷键暂停生效。",
     "title": "设置",
     "subtitle": "管理本地应用缓存数据和恢复操作。",
     "nav_aria": "设置分类",

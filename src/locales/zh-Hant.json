@@ -703,6 +703,17 @@
     }
   },
   "settings": {
+    "nav_shortcuts": "鍵盤快捷鍵",
+    "shortcuts_desc": "快捷鍵僅在應用程式取得焦點時生效，按鍵標記會依作業系統自動調整。",
+    "shortcuts_refresh": "重新整理目前資料",
+    "shortcuts_search": "搜尋目前對話內容（再次按下選取查詢詞）",
+    "shortcuts_next": "搜尋框內：下一個符合項目",
+    "shortcuts_previous": "搜尋框內：上一個符合項目",
+    "shortcuts_sidebar": "收合／展開側邊欄",
+    "shortcuts_escape": "清除搜尋或關閉目前浮層",
+    "shortcuts_refresh_note": "重新整理會在主頁面掃描本機日誌；在專案彈窗中只更新目前專案，在對話詳情中只更新目前對話。設定頁和其他彈窗內不會觸發重新整理。",
+    "shortcuts_escape_note": "Esc 會先清除搜尋框中的文字，再關閉搜尋列，最後關閉目前詳情。巢狀彈窗每次只關閉最上層。",
+    "shortcuts_navigation_note": "彈窗開啟時，頁面切換、設定及側邊欄快捷鍵會暫停生效。",
     "title": "設定",
     "subtitle": "管理本地應用程式快取資料和恢復操作。",
     "nav_aria": "設定分類",
