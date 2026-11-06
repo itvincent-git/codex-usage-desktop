@@ -329,6 +329,53 @@ fn equal_or_missing_refresh_times_cannot_authorize_overwriting_a_rotated_bundle(
 }
 
 #[test]
+fn readded_current_account_keeps_newer_saved_credentials() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    let old = credentials("a", "a", 1);
+    f.live(&old);
+    let removed = f.service.import_current().unwrap();
+    f.service.remove(&removed).unwrap();
+    let newer = credentials("a", "a", 2);
+    let id = f.service.upsert(&newer.to_string(), None).unwrap();
+    let result = f
+        .service
+        .valid_account_with(&id, false, |_| panic!("New login is still valid"));
+    // Restore the global environment before assertions, including on failure.
+    crate::codex_environment::select_codex_home(Some(previous.home));
+    assert_eq!(result.unwrap().credentials, newer);
+    assert_eq!(f.service.account(&id).unwrap().credentials, newer);
+    assert_eq!(
+        fs::read_to_string(f.environment.home.join("auth.json")).unwrap(),
+        old.to_string()
+    );
+}
+
+#[test]
+fn ambiguous_current_credentials_still_conflict() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    for timestamp in [Some("2026-11-06T00:00:01Z"), None, Some("invalid")] {
+        let f = Fixture::new();
+        crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+        let mut live = credentials("a", "a", 2);
+        live["last_refresh"] = timestamp.into();
+        f.live(&live);
+        let id = f
+            .service
+            .upsert(&credentials("a", "a", 1).to_string(), None)
+            .unwrap();
+        let result = f.service.valid_account_with(&id, false, |_| {
+            panic!("Ambiguous credentials must be rejected")
+        });
+        crate::codex_environment::select_codex_home(Some(previous.home.clone()));
+        assert_eq!(result.err().as_deref(), Some("accountAuthConflict"));
+    }
+}
+
+#[test]
 fn refresh_persists_the_rotated_bundle_and_rejects_late_responses() {
     let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
     let previous = selected_codex_environment();

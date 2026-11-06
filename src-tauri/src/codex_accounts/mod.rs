@@ -296,15 +296,19 @@ impl AccountService {
             let credentials: Value =
                 serde_json::from_str(content).map_err(|_| "codexAuthInvalid")?;
             if credentials != account.credentials {
-                if !can_adopt(&credentials, &account.credentials) {
+                if can_adopt(&credentials, &account.credentials) {
+                    let (_lock, mut store) = self.store()?;
+                    let saved = current_version(&mut store, &account)?;
+                    saved.credentials = credentials;
+                    saved.credential_version += 1;
+                    account = saved.clone();
+                    self.save(&store)?;
+                } else if refresh_time(&credentials).is_none()
+                    || !can_adopt(&account.credentials, &credentials)
+                {
                     return Err("accountAuthConflict".into());
                 }
-                let (_lock, mut store) = self.store()?;
-                let saved = current_version(&mut store, &account)?;
-                saved.credentials = credentials;
-                saved.credential_version += 1;
-                account = saved.clone();
-                self.save(&store)?;
+                // A newer saved login can coexist with the older Codex login.
             }
         }
         let expires = account.credentials["tokens"]["access_token"]
@@ -509,11 +513,14 @@ impl AccountService {
                 serde_json::from_str(content).map_err(|_| "codexAuthInvalid")?;
             if let Some(account) = store.accounts.iter_mut().find(|a| a.identity == identity) {
                 if account.credentials != credentials {
-                    if !can_adopt(&credentials, &account.credentials) {
+                    if can_adopt(&credentials, &account.credentials) {
+                        account.credentials = credentials;
+                        account.credential_version += 1;
+                    } else if refresh_time(&credentials).is_none()
+                        || !can_adopt(&account.credentials, &credentials)
+                    {
                         return Err("accountAuthConflict".into());
                     }
-                    account.credentials = credentials;
-                    account.credential_version += 1;
                 }
             } else if !store.removed_identities.contains(&identity_key(&identity)) {
                 store.accounts.push(Account {

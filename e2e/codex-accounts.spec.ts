@@ -127,4 +127,46 @@ describe("native saved Codex accounts", () => {
     expect((await control()).refresh - (before.refresh ?? 0)).toBe(2);
     expect(readFileSync(join(process.env.CODEX_HOME!, "config.toml"), "utf8")).toBe(config);
   });
+
+  run("refreshes a readded current account with newer credentials and preserves them when switching", async () => {
+    await browser.execute(() => { localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    const tab = $('[data-testid="accounts-nav-tab"]');
+    await tab.waitForDisplayed({ timeout: 90_000 });
+    await tab.click();
+    const authPath = join(process.env.CODEX_HOME!, "auth.json");
+    const old = accountCredentials("charlie");
+    writeFileSync(authPath, JSON.stringify(old));
+    const newer = accountCredentials("charlie");
+    newer.tokens.refresh_token = "fixture-new-login-charlie";
+    newer.last_refresh = new Date().toISOString();
+    writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH!, JSON.stringify(newer));
+    await invoke("import_current_codex_account");
+    const list = await invoke<AccountList>("list_codex_accounts");
+    const removed = list.accounts.find((account) => account.email === "charlie@example.test")!;
+    const oldCard = $(`[data-account-id="${removed.id}"]`);
+    await expect(oldCard).toBeDisplayed();
+    await invoke("remove_codex_account", { accountId: removed.id });
+    await oldCard.waitForExist({ reverse: true });
+    await $('button=Add account').click();
+    let addedId: string;
+    await browser.waitUntil(async () => {
+      const next = await invoke<AccountList>("list_codex_accounts");
+      const added = next.accounts.find((account) => account.email === "charlie@example.test");
+      if (added) addedId = added.id;
+      return !!added && added.id !== removed.id;
+    });
+    const card = $(`[data-account-id="${addedId!}"]`);
+    await expect(card).toHaveText(expect.stringContaining("25% remaining"));
+    await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(card).not.toHaveText(expect.stringContaining("Stale data"));
+    const status = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === addedId!)!.status;
+    expect(status?.errors).toEqual({});
+    expect(readFileSync(authPath, "utf8")).toBe(JSON.stringify(old));
+    await $('[data-account-id="bob"]').$("button=Switch Codex sign-in").click();
+    await expect(card).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await card.$("button=Switch Codex sign-in").click();
+    await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(newer);
+  });
 });
