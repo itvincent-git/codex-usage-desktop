@@ -1,4 +1,8 @@
 {
+  "5.7.0": {
+    "zh": "- chore(homebrew): update cask to 5.6.0\n- fix: use app icon for system tray\n- chore: remove unused tray template icons\n- feat: add contextual keyboard shortcuts\n- feat: document keyboard shortcuts in settings",
+    "en": "- chore(homebrew): update cask to 5.6.0\n- fix: use app icon for system tray\n- chore: remove unused tray template icons\n- feat: add contextual keyboard shortcuts\n- feat: document keyboard shortcuts in settings"
+  },
   "5.6.0": {
     "zh": "- chore(homebrew): update cask to 5.5.0\n- feat(tray): reuse usage popover on Windows\n- fix(release): shorten release titles to version numbers\n- docs: explain session credits usage and privacy\n- docs: translate session credits guidance for all readmes\n- chore: merge remote main before push\n- fix: add startup diagnostics and preserve usage on scan failures\n- fix: guide recovery from usage data failures",
     "en": "- chore(homebrew): update cask to 5.5.0\n- feat(tray): reuse usage popover on Windows\n- fix(release): shorten release titles to version numbers\n- docs: explain session credits usage and privacy\n- docs: translate session credits guidance for all readmes\n- chore: merge remote main before push\n- fix: add startup diagnostics and preserve usage on scan failures\n- fix: guide recovery from usage data failures"
