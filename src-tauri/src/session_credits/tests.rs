@@ -169,6 +169,7 @@ fn cache_is_account_scoped_and_tracks_activity_expiry_and_attempts() {
 
 fn auth() -> CodexAuth {
     CodexAuth {
+        credential_fingerprint: "fixture".into(),
         access_token: "fixture-token".into(),
         account_id: Some("fixture-account".into()),
         user_id: Some("fixture-user".into()),

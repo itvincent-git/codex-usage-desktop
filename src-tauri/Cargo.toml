@@ -31,6 +31,8 @@ rusqlite = { version = "0.41.1", features = ["bundled", "fallible_uint"] }
 rust_xlsxwriter = "0.102.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+sha2 = "0.10"
+toml = "1"
 tauri = { version = "2.12.5", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-log = "2.10.1"
@@ -49,3 +51,6 @@ tauri-plugin-autostart = "2.7.0"
 
 [features]
 e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }

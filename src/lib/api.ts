@@ -174,6 +174,8 @@ export type CodexLimitsResponse = {
   workspaceName?: string | null;
   subscriptionExpiresAt?: string | null;
   subscriptionWillRenew?: boolean | null;
+  subscriptionActive?: boolean | null;
+  authContext?: string | null;
 };
 
 export type CodexWindowActivationStatus = "started" | "alreadyActive" | "recentlyRequested";

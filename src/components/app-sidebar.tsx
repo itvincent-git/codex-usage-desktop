@@ -1,5 +1,5 @@
 import { shortcutAria, shortcutLabel } from "@/lib/keyboard-shortcuts";
-import { CalendarDays, ChartColumn, Folder, LayoutDashboard, Logs, PanelLeftClose, PanelLeftOpen, Settings, Terminal, Wallet } from "lucide-react";
+import { CalendarDays, ChartColumn, Folder, LayoutDashboard, Logs, PanelLeftClose, PanelLeftOpen, Settings, Terminal, Users, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DashboardView } from "@/components/dashboard-header";
@@ -22,6 +22,7 @@ const pages = [
   { view: "daily", label: "daily", icon: CalendarDays },
   { view: "monthly", label: "monthly", icon: Wallet },
   { view: "projects", label: "project", icon: Folder },
+  { view: "accounts", label: "accounts", icon: Users },
   { view: "logs", label: "logs", icon: Logs },
 ] as const;
 

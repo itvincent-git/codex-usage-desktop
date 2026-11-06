@@ -1,3 +1,4 @@
+import { currentCodexAuthContext } from "@/lib/codex-accounts";
 import { useCodexForecast } from "@/hooks/use-codex-forecast";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
@@ -355,6 +356,8 @@ export function useUsageDashboard() {
     try {
       const data = await fetchCodexLimits();
       if (generation !== limitsGeneration.current) return;
+      if (data.authContext && data.authContext !== await currentCodexAuthContext()) return;
+      if (generation !== limitsGeneration.current) return;
       setCodexLimits(data);
       setCodexLimitsError(null);
     } catch (limitsError) {
@@ -367,6 +370,23 @@ export function useUsageDashboard() {
       }
     }
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const listener = listen("codex-accounts-changed", () => {
+      limitsGeneration.current++;
+      limitsFetchInFlightRef.current = false;
+      lastLimitsFetchTimeRef.current = 0;
+      setCodexLimits(null);
+      setCodexLimitsError(null);
+      setWindowActivationStatus(null);
+      setWindowActivationError(null);
+      window.dispatchEvent(new Event("session-credits-identity-changed"));
+      void loadCodexLimits({ force: true });
+    });
+    void listener.then((stop) => { if (cancelled) stop(); });
+    return () => { cancelled = true; void listener.then((stop) => stop()); };
+  }, []);
 
   const loadLatestCodexReset = useEffectEvent(async () => {
     setIsResetLoading(true);
@@ -614,13 +634,14 @@ export function useUsageDashboard() {
   });
 
   const handleBackgroundRefreshCompleted = useEffectEvent(async (refresh: UsageRefreshResponse) => {
-    if (refresh.limits) {
+    const generation = limitsGeneration.current;
+    const matches = !refresh.limits?.authContext || refresh.limits.authContext === await currentCodexAuthContext().catch(() => null);
+    if (refresh.limits && matches && generation === limitsGeneration.current) {
       setCodexLimits(refresh.limits);
       setCodexLimitsError(null);
       lastLimitsFetchTimeRef.current = Date.now();
     } else if (refresh.limitsError) {
-      setCodexLimitsError(refresh.limitsError);
-      lastLimitsFetchTimeRef.current = Date.now();
+      await loadCodexLimits({ force: true });
     } else if (refresh.limitsSkipped && (codexLimitsError !== null || hasExpiredCodexLimitWindow(codexLimits))) {
       await loadCodexLimits({ force: true });
     }
@@ -1077,7 +1098,10 @@ export function useUsageDashboard() {
     setWindowActivationStatus(null);
     setWindowActivationError(null);
     try {
+      const generation = limitsGeneration.current;
       const response = await activateCodexWindow();
+      if (generation !== limitsGeneration.current || (response.limits.authContext && response.limits.authContext !== await currentCodexAuthContext())) return;
+      if (generation !== limitsGeneration.current) return;
       setCodexLimits(response.limits);
       setCodexLimitsError(null);
       setWindowActivationStatus(response.status);

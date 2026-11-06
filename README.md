@@ -58,6 +58,8 @@ You can also show limit information directly in the **macOS menu bar or Windows 
 
 Live limits use your existing local Codex login.
 
+The **Accounts** page can compare saved ChatGPT accounts, add accounts through the official Codex CLI, and manually switch the selected Codex login. Credentials are stored locally in private plaintext files. Switching requires restarting related clients; historical usage still covers the selected Codex directory. See [account management and verification](docs/codex-accounts.md) for supported authentication and release checks.
+
 ![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
 
 The menu bar can also show today's token usage and estimated cost. On macOS, right-click the menu bar widget to open a compact panel with 5-hour and weekly quota progress, reset times, today's tokens, and estimated cost. You can open the main window or quit the app directly from this panel.

@@ -5,12 +5,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startCreditsFixture } from "./e2e/fixtures/session-credits-server";
+import { startAccountsFixture } from "./e2e/fixtures/codex-accounts";
 
 const binaryName = process.platform === "win32" ? "codex-usage-desktop.exe" : "codex-usage-desktop";
 const appBinaryPath = `./src-tauri/target/debug/${binaryName}`;
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 let archivedSessionsHome: string | undefined;
 let creditsFixture: Awaited<ReturnType<typeof startCreditsFixture>> | undefined;
+let accountsFixture: Awaited<ReturnType<typeof startAccountsFixture>> | undefined;
 
 export const config: WebdriverIO.Config = {
   async onPrepare() {
@@ -25,6 +27,17 @@ export const config: WebdriverIO.Config = {
       writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.db-wal"), "startup wal fixture");
       writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.rebuild-on-start"), "");
       buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.recovery" }));
+    } else if (process.argv.some((arg) => arg.includes("codex-accounts.spec.ts"))) {
+      archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-accounts-e2e-"));
+      accountsFixture = await startAccountsFixture(archivedSessionsHome);
+      process.env.CODEX_HOME = accountsFixture.codexHome;
+      process.env.CODEX_USAGE_TEST_DATA_DIR = accountsFixture.appData;
+      process.env.CODEX_CLI_PATH = accountsFixture.cli;
+      process.env.CODEX_USAGE_ACCOUNTS_TEST_URL = accountsFixture.url;
+      process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH = accountsFixture.loginAuth;
+      process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE = join(archivedSessionsHome, "login-process.json");
+      process.env.CODEX_USAGE_LOGIN_TIMEOUT_SECONDS = "5";
+      buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.accounts" }));
     } else if (process.argv.some((arg) => arg.includes("session-credits.spec.ts"))) {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-session-credits-e2e-"));
       process.env.CODEX_HOME = archivedSessionsHome;
@@ -50,14 +63,17 @@ export const config: WebdriverIO.Config = {
 
     if (result.status !== 0) {
       await creditsFixture?.close();
+      await accountsFixture?.close();
       if (archivedSessionsHome) rmSync(archivedSessionsHome, { recursive: true, force: true });
       throw result.error ?? new Error(`E2E build failed with status ${result.status}`);
     }
     console.log(`[e2e] Build completed in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   },
-  async onComplete() {
+  async onComplete(exitCode) {
     await creditsFixture?.close();
-    if (archivedSessionsHome) rmSync(archivedSessionsHome, { recursive: true, force: true });
+    await accountsFixture?.close();
+    if (accountsFixture && exitCode !== 0) console.error(`[e2e] Kept isolated account fixtures at ${archivedSessionsHome}`);
+    else if (archivedSessionsHome) rmSync(archivedSessionsHome, { recursive: true, force: true });
   },
   runner: "local",
   async before() {

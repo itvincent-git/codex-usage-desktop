@@ -474,6 +474,7 @@ dependencies = [
  "rust_xlsxwriter",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -482,8 +483,10 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-wdio",
  "tauri-plugin-wdio-webdriver",
+ "toml 1.1.8+spec-1.1.0",
  "uuid",
  "walkdir",
+ "windows-sys 0.61.2",
  "zstd",
 ]
 

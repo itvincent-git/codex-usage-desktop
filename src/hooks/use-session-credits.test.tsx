@@ -63,4 +63,17 @@ describe("optional session credits", () => {
     fireEvent(window, new Event("focus"));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("{}"));
   });
+  it("clears credits immediately on a native switch and ignores the old in-flight result", async () => {
+    let old!: (value: SessionCreditsResult) => void;
+    vi.mocked(fetchSessionCredits).mockReturnValueOnce(new Promise((done) => { old = done; }));
+    render(<Harness />);
+    await waitFor(() => expect(fetchSessionCredits).toHaveBeenCalledTimes(1));
+    vi.mocked(sessionCreditsIdentity).mockResolvedValue("account-b");
+    vi.mocked(fetchSessionCredits).mockResolvedValue({ ...result, identity: "account-b", rows: [] });
+    fireEvent(window, new Event("session-credits-identity-changed"));
+    await waitFor(() => expect(fetchSessionCredits).toHaveBeenCalledTimes(3));
+    await act(async () => old(result));
+    expect(screen.getByRole("status")).toHaveTextContent("{}");
+  });
+
 });

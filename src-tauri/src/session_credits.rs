@@ -68,6 +68,10 @@ pub fn set_scope(scope: String, revision: u64, active: bool) -> Result<(), Strin
     Ok(())
 }
 
+pub(crate) fn invalidate_scopes() {
+    for (_, active) in SCOPES.get_or_init(Default::default).lock().unwrap().values_mut() { *active = false; }
+}
+
 fn is_active(scope: &str, revision: u64) -> bool {
     SCOPES
         .get_or_init(Default::default)

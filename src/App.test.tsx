@@ -1304,7 +1304,7 @@ describe("App", () => {
     await user.tab({ shift: true });
     expect(screen.getByRole("button", { name: "Check limits" })).toHaveFocus();
     await user.tab({ shift: true });
-    expect(screen.getByRole("tab", { name: "Project" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Accounts" })).toHaveFocus();
     loadMoreButton.focus();
     await user.tab({ shift: true });
     expect(collapse).toHaveFocus();
@@ -3188,4 +3188,30 @@ describe("App", () => {
     expect(parsedCache.hasUpdate).toBe(false);
     expect(parsedCache.currentVersion).toBe(tauriConfig.version);
   });
+  it("rejects late limits and background data after the native account changes", async () => {
+    mockLoadedDashboard();
+    const fallback = invokeMock.getMockImplementation()!;
+    let completeA!: (value: ReturnType<typeof limits> & { authContext: string }) => void;
+    const pendingA = new Promise((resolve) => { completeA = resolve; });
+    let fetches = 0;
+    invokeMock.mockImplementation(async (command: string, ...args: any[]) => {
+      if (command === "fetch_codex_limits") {
+        fetches++;
+        return fetches === 1 ? pendingA : { ...limits(25), authContext: "context-b" };
+      }
+      if (command === "current_codex_auth_context") return "context-b";
+      return fallback(command, ...args);
+    });
+    render(<App />);
+    await waitFor(() => expect(eventListeners.get("codex-accounts-changed")?.length).toBe(1));
+    await act(async () => { eventListeners.get("codex-accounts-changed")![0]({ payload: null }); });
+    await waitFor(() => expect(screen.getByTestId("limit-row-monthly")).toHaveTextContent("25%"));
+    await act(async () => completeA({ ...limits(90), authContext: "context-a" }));
+    expect(screen.getByTestId("limit-row-monthly")).toHaveTextContent("25%");
+    await waitFor(() => expect(eventListeners.get("background-refresh-completed")?.length).toBe(1));
+    await act(async () => { await eventListeners.get("background-refresh-completed")![0]({ payload: { scan: scan(0), limits: { ...limits(90), authContext: "context-a" }, limitsError: null, limitsSkipped: false } }); });
+    expect(screen.getByTestId("limit-row-monthly")).toHaveTextContent("25%");
+    expect(updateTrayMock.mock.calls.at(-1)?.[0].payload.popover.quotas[0].remainingPercent).toBe(25);
+  });
+
 });

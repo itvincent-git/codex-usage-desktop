@@ -3,16 +3,25 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::Value;
 use std::fs;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct CodexAuth {
     pub access_token: String,
     pub account_id: Option<String>,
     pub user_id: Option<String>,
     pub is_chatgpt: bool,
+    pub credential_fingerprint: String,
+}
+
+impl std::fmt::Debug for CodexAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CodexAuth").field("account_id", &self.account_id).field("user_id", &self.user_id).finish_non_exhaustive()
+    }
 }
 
 pub(crate) fn load_codex_auth() -> Result<CodexAuth, String> {
-    let path = selected_codex_environment().home.join("auth.json");
+    let environment = selected_codex_environment();
+    crate::codex_accounts::native::check_backend(&environment)?;
+    let path = environment.home.join("auth.json");
     let content = read_auth_file(&path)?;
     parse_codex_auth(&content)
 }
@@ -33,6 +42,7 @@ pub(crate) fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
             account_id: None,
             user_id: None,
             is_chatgpt: false,
+            credential_fingerprint: credential_fingerprint(content),
         });
     }
     let tokens = value
@@ -52,6 +62,7 @@ pub(crate) fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
         .and_then(|claims| claims.get("https://api.openai.com/auth"));
     Ok(CodexAuth {
         access_token,
+        credential_fingerprint: credential_fingerprint(content),
         account_id: string_field(tokens, "account_id")
             .or_else(|| string_field(tokens, "accountId"))
             .or_else(|| auth_claims.and_then(|claims| string_field(claims, "chatgpt_account_id"))),
@@ -61,6 +72,11 @@ pub(crate) fn parse_codex_auth(content: &str) -> Result<CodexAuth, String> {
             .and_then(Value::as_str)
             .is_none_or(|mode| mode == "chatgpt"),
     })
+}
+
+fn credential_fingerprint(content: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(content.as_bytes()))
 }
 
 fn string_field(value: &Value, key: &str) -> Option<String> {

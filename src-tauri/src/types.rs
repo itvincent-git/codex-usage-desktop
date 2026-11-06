@@ -258,7 +258,7 @@ pub struct ExportResponse {
     pub exported_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexLimitWindow {
     pub used_percent: f64,
@@ -267,7 +267,7 @@ pub struct CodexLimitWindow {
     pub resets_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexResetCredit {
     pub id: String,
@@ -283,13 +283,14 @@ pub struct CodexCredits {
     pub balance: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexLimitsResponse {
     pub session: Option<CodexLimitWindow>,
     pub weekly: Option<CodexLimitWindow>,
     pub credits: Option<CodexCredits>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
     pub credits_is_mock: bool,
     pub reset_credits_available_count: Option<i64>,
     pub reset_credits: Option<Vec<CodexResetCredit>>,
@@ -300,6 +301,8 @@ pub struct CodexLimitsResponse {
     pub workspace_name: Option<String>,
     pub subscription_expires_at: Option<String>,
     pub subscription_will_renew: Option<bool>,
+    pub subscription_active: Option<bool>,
+    pub auth_context: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]

@@ -1,3 +1,4 @@
+import { AccountsPage } from "@/components/accounts-page";
 import { UsageRecoveryCard } from "@/components/usage-recovery-card";
 import { ScanWaitNotice } from "@/components/scan-wait-notice";
 import { CodexForecastCard } from "@/components/codex-forecast-card";
@@ -194,7 +195,7 @@ export default function App() {
 
   const hasModal = !!(selectedProjectForModal || selectedSession || isResetHistoryOpen);
   useRefreshShortcut(() => {
-    if (!hasModal && !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') && view !== "settings" && !isLoading && !isScanning && !isRefreshing && !isResetting && isExporting === null) {
+    if (!hasModal && !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') && view !== "settings" && view !== "accounts" && !isLoading && !isScanning && !isRefreshing && !isResetting && isExporting === null) {
       void handleRefresh();
     }
   });
@@ -394,8 +395,8 @@ export default function App() {
             </div>
           ) : null}
 
-          <ScanWaitNotice active={isLoading || isScanning} diagnostics={diagnostics} />
-          {showRecovery && view !== "settings" ? (
+          <ScanWaitNotice active={view !== "accounts" && (isLoading || isScanning)} diagnostics={diagnostics} />
+          {showRecovery && view !== "settings" && view !== "accounts" ? (
             <UsageRecoveryCard
               scanning={isScanning}
               pending={awaitingFirstScan && isScanning}
@@ -411,7 +412,9 @@ export default function App() {
             />
           ) : null}
 
-          {isLoading ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
+          {isLoading && view !== "accounts" ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
+
+          {view === "accounts" ? <AccountsPage /> : null}
 
           {view === "monthly" && isMonthlyLoading ? (
             <LoadingState title={t("loading.loading_monthly")} description={t("loading.natural_month_desc")} />

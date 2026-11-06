@@ -1,6 +1,6 @@
 #[cfg(test)]
 use crate::codex_auth::parse_codex_auth;
-use crate::codex_auth::{load_codex_auth, CodexAuth};
+use crate::codex_auth::CodexAuth;
 use crate::{
     codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
     types::{
@@ -125,7 +125,8 @@ struct ResetCreditsCache {
 
 static RESET_CREDITS_CACHE: OnceLock<ResetCreditsCache> = OnceLock::new();
 static WINDOW_ACTIVATION_LOCK: Mutex<()> = Mutex::new(());
-static LIMITS_FETCH_IN_FLIGHT: Mutex<Option<Arc<LimitsFetchFlight>>> = Mutex::new(None);
+static LIMITS_FETCH_IN_FLIGHT: OnceLock<Mutex<HashMap<String, Arc<LimitsFetchFlight>>>> = OnceLock::new();
+static HTTP_COOLDOWNS: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
 
 #[derive(Default)]
 struct LimitsFetchFlight {
@@ -166,9 +167,26 @@ struct SubscriptionInfo {
 }
 
 pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
-    fetch_codex_limits_single_flight(|| {
+    crate::codex_accounts::refresh_managed_current()?;
+    let snapshot = crate::codex_accounts::native::snapshot(&selected_codex_environment())?;
+    let result = fetch_limits_for_snapshot(snapshot.clone());
+    if result.as_ref().err().is_some_and(|e| e == "accountUnauthorized")
+        && crate::codex_accounts::refresh_current_after_unauthorized(&snapshot)? {
+        return fetch_current_snapshot();
+    }
+    result
+}
+
+fn fetch_current_snapshot() -> Result<CodexLimitsResponse, String> {
+    fetch_limits_for_snapshot(crate::codex_accounts::native::snapshot(&selected_codex_environment())?)
+}
+
+fn fetch_limits_for_snapshot(snapshot: crate::codex_accounts::native::Snapshot) -> Result<CodexLimitsResponse, String> {
+    let auth = crate::codex_auth::parse_codex_auth(snapshot.content.as_deref().ok_or("chatgptLoginRequired")?)?;
+    let context = snapshot.context();
+    fetch_codex_limits_single_flight_key(context.clone(), || {
         log::info!("Starting fetch_codex_limits...");
-        let limits = fetch_codex_limits_with(fetch_oauth_limits, fetch_account_snapshot)?;
+        let limits = fetch_codex_limits_with(|| fetch_oauth_limits(&auth), || fetch_account_snapshot(&auth))?;
         #[cfg(debug_assertions)]
         let limits = if window_activation_debug_enabled() {
             let mut debug_limits = limits;
@@ -185,6 +203,8 @@ pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
             }
             limits
         };
+        let mut limits = limits;
+        limits.auth_context = Some(context);
         Ok(limits)
     })
 }
@@ -215,18 +235,23 @@ fn apply_debug_credits(limits: &mut CodexLimitsResponse, value: &str) {
     limits.credits_is_mock = true;
 }
 
-fn fetch_codex_limits_single_flight(
+#[cfg(test)]
+fn fetch_codex_limits_single_flight(fetch: impl FnOnce() -> Result<CodexLimitsResponse, String>) -> Result<CodexLimitsResponse, String> {
+    fetch_codex_limits_single_flight_key("test".into(), fetch)
+}
+
+fn fetch_codex_limits_single_flight_key(
+    key: String,
     fetch: impl FnOnce() -> Result<CodexLimitsResponse, String>,
 ) -> Result<CodexLimitsResponse, String> {
+    let flights = LIMITS_FETCH_IN_FLIGHT.get_or_init(Default::default);
     let (flight, should_fetch) = {
-        let mut in_flight = LIMITS_FETCH_IN_FLIGHT
-            .lock()
-            .map_err(|_| "Codex limits fetch lock was poisoned.".to_string())?;
-        match in_flight.as_ref() {
+        let mut in_flight = flights.lock().map_err(|_| "Codex limits fetch lock was poisoned.")?;
+        match in_flight.get(&key) {
             Some(flight) => (Arc::clone(flight), false),
             None => {
                 let flight = Arc::new(LimitsFetchFlight::default());
-                *in_flight = Some(Arc::clone(&flight));
+                in_flight.insert(key.clone(), Arc::clone(&flight));
                 (flight, true)
             }
         }
@@ -255,9 +280,7 @@ fn fetch_codex_limits_single_flight(
         *stored = Some(result.clone());
         flight.ready.notify_all();
     }
-    *LIMITS_FETCH_IN_FLIGHT
-        .lock()
-        .map_err(|_| "Codex limits fetch lock was poisoned.".to_string())? = None;
+    flights.lock().map_err(|_| "Codex limits fetch lock was poisoned.")?.remove(&key);
     result
 }
 
@@ -275,6 +298,8 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
         });
     }
 
+    crate::codex_accounts::refresh_managed_current()?;
+    let _auth_guard = crate::codex_accounts::native::AUTH_OPERATION.lock().unwrap();
     let _guard = WINDOW_ACTIVATION_LOCK
         .lock()
         .map_err(|_| "Codex window activation lock was poisoned.".to_string())?;
@@ -284,7 +309,7 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
     activate_codex_window_with(
         marker_path,
         Utc::now().timestamp(),
-        fetch_codex_limits,
+        fetch_current_snapshot,
         || run_codex_window_activation(working_directory),
     )
 }
@@ -408,7 +433,15 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
         "Starting Codex window activation command. command={display}, args={:?}",
         codex_activation_args()
     );
+    let environment = selected_codex_environment();
     let mut command = codex_activation_process_command(&codex, working_directory);
+    if let CodexRuntime::Wsl { distribution } = &environment.runtime {
+        let CodexCommand::Wsl { path, .. } = &codex else { return Err("accountBackendUnsupported".into()); };
+        let home = crate::codex_accounts::native::wsl_home(&environment)?;
+        let invocation = format!("export CODEX_HOME={}; exec {} {}", shell_quote(&home), shell_quote(path), codex_activation_args().iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" "));
+        command = Command::new("wsl.exe");
+        command.args(["-d", distribution, "--", "sh", "-lc", &invocation]);
+    } else { command.env("CODEX_HOME", &environment.home); }
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -476,9 +509,13 @@ fn fetch_codex_limits_with(
     Ok(make_response(limits, fetch_account()))
 }
 
-fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
-    log::info!("Attempting to load codex auth...");
-    let auth = load_codex_auth()?;
+fn fetch_oauth_limits(auth: &CodexAuth) -> Result<LimitsSnapshot, String> {
+    let usage = fetch_oauth_usage(auth)?;
+    let client = reqwest::blocking::Client::new();
+    make_oauth_snapshot(usage, fetch_oauth_reset_credits(&client, auth))
+}
+
+fn fetch_oauth_usage(auth: &CodexAuth) -> Result<OAuthUsageResponse, String> {
     if !auth.is_chatgpt {
         return Err("chatgptQuotaNotApplicable".to_string());
     }
@@ -489,7 +526,7 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
         .map_err(|error| format!("Failed to create Codex usage client: {error}"))?;
 
     let mut request = client
-        .get(CODEX_USAGE_URL)
+        .get(account_endpoint(CODEX_USAGE_URL))
         .bearer_auth(&auth.access_token)
         .header("Accept", "application/json")
         .header("Origin", "https://chatgpt.com")
@@ -500,36 +537,65 @@ fn fetch_oauth_limits() -> Result<LimitsSnapshot, String> {
         request = request.header("ChatGPT-Account-Id", account_id);
     }
 
-    let response = request.send().map_err(|error| {
-        log::error!("Request failed: {error:?}");
-        format!("Failed to fetch Codex usage API: {error}")
-    })?;
-    let status = response.status();
-    let body = response
-        .text()
-        .map_err(|error| format!("Failed to read Codex usage API response: {error}"))?;
+    let response = send_account_request(request, auth, "limits")?;
+    response.json::<OAuthUsageResponse>().map_err(|_| "accountResponseInvalid".into())
+}
 
-    if !status.is_success() {
-        log::error!("Codex API error status: {status}, body: {body}");
-        return Err(format!("Codex usage API returned {status}: {body}"));
+pub(crate) fn auth_cache_key(auth: &CodexAuth) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{}:{}:{:x}", auth.user_id.as_deref().unwrap_or(""), auth.account_id.as_deref().unwrap_or(""), Sha256::digest(auth.credential_fingerprint.as_bytes()))
+}
+
+pub(crate) fn account_endpoint(url: &str) -> String {
+    #[cfg(feature = "e2e")]
+    if let Ok(base) = env::var("CODEX_USAGE_ACCOUNTS_TEST_URL") {
+        if base.starts_with("http://127.0.0.1:") { return format!("{}{}", base.trim_end_matches('/'), url.strip_prefix("https://chatgpt.com").or_else(|| url.strip_prefix("https://auth.openai.com")).unwrap_or(url)); }
     }
+    url.to_owned()
+}
 
-    let usage = serde_json::from_str::<OAuthUsageResponse>(&body)
-        .map_err(|error| format!("Failed to parse Codex usage API response: {error}"))?;
-    let reset_credits = fetch_oauth_reset_credits(&client, &auth);
+pub(crate) fn send_account_request(request: reqwest::blocking::RequestBuilder, auth: &CodexAuth, endpoint: &str) -> Result<reqwest::blocking::Response, String> {
+    let key = format!("{}:{endpoint}", auth_cache_key(auth));
+    let cooldowns = HTTP_COOLDOWNS.get_or_init(Default::default);
+    if cooldowns.lock().unwrap().get(&key).is_some_and(|until| *until > Instant::now()) {
+        return Err("accountRateLimited".into());
+    }
+    let response = request.send().map_err(|_| "accountNetworkError")?;
+    let status = response.status();
+    if status.as_u16() == 429 {
+        let retry = response.headers().get("Retry-After").and_then(|h| h.to_str().ok()).and_then(|s| s.parse::<u64>().ok().or_else(|| chrono::DateTime::parse_from_rfc2822(s).ok().map(|d| (d.timestamp() - Utc::now().timestamp()).max(1) as u64))).unwrap_or(300);
+        cooldowns.lock().unwrap().insert(key, Instant::now() + Duration::from_secs(retry.min(86400 * 365)));
+        return Err("accountRateLimited".into());
+    }
+    if status.as_u16() == 401 { return Err("accountUnauthorized".into()); }
+    if !status.is_success() { return Err(format!("accountHttpError:{}", status.as_u16())); }
+    Ok(response)
+}
 
-    make_oauth_snapshot(usage, reset_credits)
+/// Each endpoint uses the same credential snapshot and reports its own failure.
+pub(crate) fn fetch_account_parts(auth: &CodexAuth) -> (CodexLimitsResponse, HashMap<String, String>) {
+    let mut errors = HashMap::new();
+    let subscription = fetch_subscription_info(auth).unwrap_or_else(|e| { errors.insert("subscription".into(), e); SubscriptionInfo::default() });
+    let (account, membership_level) = decode_jwt_info(&auth.access_token);
+    let mut response = match fetch_oauth_usage(auth).and_then(|u| make_oauth_snapshot(u, Err("accountResponseUnavailable".into()))) {
+        Ok(limits) => make_response(limits, AccountSnapshot { account, membership_level, subscription }),
+        Err(e) => {
+            errors.insert("limits".into(), e);
+            make_response(LimitsSnapshot { primary: None, secondary: None, credits: None, reset_credits_available_count: None, reset_credits: None, source: "oauth" }, AccountSnapshot { account, membership_level, subscription })
+        }
+    };
+    match fetch_oauth_reset_credits_uncached(&reqwest::blocking::Client::new(), auth) {
+        Ok(details) => { response.reset_credits_available_count = details.available_count.or(Some(details.credits.len() as i64)); response.reset_credits = Some(details.credits); }
+        Err(e) => { errors.insert("resetCredits".into(), e); }
+    }
+    (response, errors)
 }
 
 fn fetch_oauth_reset_credits(
     client: &reqwest::blocking::Client,
     auth: &CodexAuth,
 ) -> Result<OAuthResetCreditsSnapshot, String> {
-    let account_key = auth
-        .account_id
-        .as_deref()
-        .unwrap_or(&auth.access_token)
-        .to_string();
+    let account_key = auth_cache_key(auth);
     RESET_CREDITS_CACHE
         .get_or_init(ResetCreditsCache::default)
         .fetch(account_key, RESET_CREDITS_CACHE_TTL, || {
@@ -542,7 +608,7 @@ fn fetch_oauth_reset_credits_uncached(
     auth: &CodexAuth,
 ) -> Result<OAuthResetCreditsSnapshot, String> {
     let mut request = client
-        .get(CODEX_RESET_CREDITS_URL)
+        .get(account_endpoint(CODEX_RESET_CREDITS_URL))
         .timeout(Duration::from_secs(5))
         .bearer_auth(&auth.access_token)
         .header("Accept", "application/json")
@@ -554,22 +620,8 @@ fn fetch_oauth_reset_credits_uncached(
         request = request.header("ChatGPT-Account-Id", account_id);
     }
 
-    let response = request
-        .send()
-        .map_err(|error| format!("Failed to fetch Codex reset credit details: {error}"))?;
-    let status = response.status();
-    let body = response
-        .text()
-        .map_err(|error| format!("Failed to read Codex reset credit details: {error}"))?;
-
-    if !status.is_success() {
-        return Err(format!(
-            "Codex reset credit details API returned {status}: {body}"
-        ));
-    }
-
-    let details = serde_json::from_str::<OAuthResetCreditsResponse>(&body)
-        .map_err(|error| format!("Failed to parse Codex reset credit details: {error}"))?;
+    let response = send_account_request(request, auth, "resetCredits")?;
+    let details = response.json::<OAuthResetCreditsResponse>().map_err(|_| "accountResponseInvalid")?;
     Ok(OAuthResetCreditsSnapshot {
         available_count: details.available_count,
         credits: normalize_oauth_reset_credits(details.credits),
@@ -690,10 +742,7 @@ impl ResetCreditsCache {
     }
 }
 
-fn fetch_account_snapshot() -> AccountSnapshot {
-    let Ok(auth) = load_codex_auth() else {
-        return AccountSnapshot::default();
-    };
+fn fetch_account_snapshot(auth: &CodexAuth) -> AccountSnapshot {
     let (account, membership_level) = decode_jwt_info(&auth.access_token);
     let subscription = match fetch_subscription_info(&auth) {
         Ok(subscription) => subscription,
@@ -751,6 +800,8 @@ fn make_response(limits: LimitsSnapshot, account: AccountSnapshot) -> CodexLimit
         workspace_name: account.subscription.workspace_name,
         subscription_expires_at: account.subscription.expires_at,
         subscription_will_renew: account.subscription.will_renew,
+        subscription_active: account.subscription.has_active_subscription,
+        auth_context: None,
     }
 }
 
@@ -762,7 +813,7 @@ fn fetch_subscription_info(auth: &CodexAuth) -> Result<SubscriptionInfo, String>
 
     let timezone_offset_min = chatgpt_timezone_offset_min();
     let mut request = client
-        .get(CHATGPT_ACCOUNT_CHECK_URL)
+        .get(account_endpoint(CHATGPT_ACCOUNT_CHECK_URL))
         .query(&[("timezone_offset_min", timezone_offset_min.to_string())])
         .bearer_auth(&auth.access_token)
         .header("Accept", "application/json")
@@ -774,22 +825,9 @@ fn fetch_subscription_info(auth: &CodexAuth) -> Result<SubscriptionInfo, String>
         request = request.header("ChatGPT-Account-Id", account_id);
     }
 
-    let response = request
-        .send()
-        .map_err(|error| format!("Failed to fetch ChatGPT account check API: {error}"))?;
-    let status = response.status();
-    let body = response
-        .text()
-        .map_err(|error| format!("Failed to read ChatGPT account check response: {error}"))?;
-
-    if !status.is_success() {
-        return Err(format!(
-            "ChatGPT account check API returned {status}: {body}"
-        ));
-    }
-
-    let value = serde_json::from_str::<Value>(&body)
-        .map_err(|error| format!("Failed to parse ChatGPT account check response: {error}"))?;
+    let response = send_account_request(request, auth, "subscription")?;
+    let value = response.json::<Value>().map_err(|_| "accountResponseInvalid")?;
+    if subscription_account_value(&value, auth.account_id.as_deref()).is_none() { return Err("accountWorkspaceMissing".into()); }
     Ok(parse_subscription_info(&value, auth.account_id.as_deref()))
 }
 
@@ -827,15 +865,10 @@ fn parse_subscription_info(value: &Value, account_id: Option<&str>) -> Subscript
 
 fn subscription_account_value<'a>(value: &'a Value, account_id: Option<&str>) -> Option<&'a Value> {
     let accounts = value.get("accounts")?;
-    account_id
-        .and_then(|account_id| accounts.get(account_id))
-        .or_else(|| accounts.get("default"))
-        .or_else(|| {
-            accounts
-                .as_object()?
-                .values()
-                .find(|account| account.get("entitlement").is_some())
-        })
+    match account_id {
+        Some(id) => accounts.get(id).or_else(|| accounts.as_object()?.values().find(|account| account.get("account").and_then(|a| a.get("account_id")).and_then(Value::as_str) == Some(id))),
+        None => accounts.get("default"),
+    }
 }
 
 fn decode_jwt_info(token: &str) -> (Option<String>, Option<String>) {
@@ -1042,7 +1075,7 @@ fn window_role(window: &RateLimitWindow) -> WindowRole {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum CodexCommand {
+pub(crate) enum CodexCommand {
     Native(PathBuf),
     WindowsCmd(PathBuf),
     Wsl { distribution: String, path: String },
@@ -1069,7 +1102,7 @@ fn codex_activation_args() -> [&'static str; 16] {
     ]
 }
 
-fn resolve_codex_command(environment: &CodexEnvironment) -> Option<CodexCommand> {
+pub(crate) fn resolve_codex_command(environment: &CodexEnvironment) -> Option<CodexCommand> {
     match &environment.runtime {
         CodexRuntime::Native => resolve_native_codex_binary()
             .map(|path| classify_native_command(path, cfg!(target_os = "windows"))),
@@ -1241,7 +1274,10 @@ fn classify_native_command(path: PathBuf, windows: bool) -> CodexCommand {
 }
 
 fn codex_activation_process_command(codex: &CodexCommand, working_directory: &Path) -> Command {
-    let args = codex_activation_args();
+    codex_process_command(codex, working_directory, &codex_activation_args())
+}
+
+pub(crate) fn codex_process_command(codex: &CodexCommand, working_directory: &Path, args: &[&str]) -> Command {
     let mut command = match codex {
         CodexCommand::Native(path) => {
             #[cfg(target_os = "windows")]
@@ -1266,7 +1302,7 @@ fn codex_activation_process_command(codex: &CodexCommand, working_directory: &Pa
         }
         CodexCommand::Wsl { distribution, path } => {
             let inner_command = std::iter::once(path.as_str())
-                .chain(args)
+                .chain(args.iter().copied())
                 .map(shell_quote)
                 .collect::<Vec<_>>()
                 .join(" ");
@@ -1442,10 +1478,10 @@ mod tests {
             fetch_codex_limits_single_flight(|| Err("duplicate fetch".to_string()))
         });
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !LIMITS_FETCH_IN_FLIGHT
+        while !LIMITS_FETCH_IN_FLIGHT.get().unwrap()
             .lock()
             .unwrap()
-            .as_ref()
+            .get("test")
             .is_some_and(|flight| Arc::strong_count(flight) >= 3)
         {
             assert!(Instant::now() < deadline, "second fetch did not join");
@@ -1459,6 +1495,50 @@ mod tests {
 
         let fresh = fetch_codex_limits_single_flight(|| Err("new fetch".to_string()));
         assert_eq!(fresh.unwrap_err(), "new fetch");
+    }
+
+    #[test]
+    fn a_missing_target_workspace_never_falls_back_to_another_subscription() {
+        let response = json!({"accounts":{"default":{"account":{"account_id":"personal"},"entitlement":{"has_active_subscription":true}},"other":{"entitlement":{"has_active_subscription":true}}}});
+        assert!(subscription_account_value(&response, Some("missing")).is_none());
+        assert_eq!(parse_subscription_info(&response, Some("missing")), SubscriptionInfo::default());
+        assert!(subscription_account_value(&response, Some("personal")).is_some());
+    }
+
+    #[test]
+    fn different_credential_contexts_never_join_one_limits_request() {
+        let (started, ready) = mpsc::channel();
+        let (release, wait) = mpsc::channel();
+        let first = thread::spawn(move || fetch_codex_limits_single_flight_key("context-a".into(), || {
+            started.send(()).unwrap(); wait.recv().unwrap(); Err("account-a".into())
+        }));
+        ready.recv().unwrap();
+        assert_eq!(fetch_codex_limits_single_flight_key("context-b".into(), || Err("account-b".into())).unwrap_err(), "account-b");
+        release.send(()).unwrap();
+        assert_eq!(first.join().unwrap().unwrap_err(), "account-a");
+    }
+
+    #[test]
+    fn retry_after_is_enforced_without_leaking_bodies_or_crossing_users() {
+        use std::{io::{Read, Write}, net::TcpListener};
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            for status in ["429 Too Many Requests", "200 OK"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096]; stream.read(&mut request).unwrap();
+                let body = "private-echoed-token";
+                write!(stream, "HTTP/1.1 {status}\r\nRetry-After: 60\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let a = CodexAuth { access_token: "fixture".into(), account_id: Some("shared".into()), user_id: Some(uuid::Uuid::new_v4().to_string()), credential_fingerprint: "generation-1".into(), is_chatgpt: true };
+        let mut b = a.clone(); b.user_id = Some(uuid::Uuid::new_v4().to_string());
+        assert_ne!(auth_cache_key(&a), auth_cache_key(&b));
+        let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(2)).build().unwrap();
+        assert_eq!(send_account_request(client.get(&url), &a, "limits").unwrap_err(), "accountRateLimited");
+        assert_eq!(send_account_request(client.get(&url), &a, "limits").unwrap_err(), "accountRateLimited");
+        assert!(send_account_request(client.get(&url), &b, "limits").is_ok());
+        server.join().unwrap();
     }
 
     fn window(used_percent: f64, window_minutes: Option<i64>) -> RateLimitWindow {
@@ -1489,6 +1569,8 @@ mod tests {
             workspace_name: None,
             subscription_expires_at: None,
             subscription_will_renew: None,
+            subscription_active: None,
+            auth_context: None,
         }
     }
 

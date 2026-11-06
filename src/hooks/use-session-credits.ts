@@ -73,10 +73,18 @@ export function useSessionCredits(enabled: boolean, threads: SessionCreditThread
   useEffect(() => {
     if (!enabled) return;
     const revalidate = () => { if (document.visibilityState !== "hidden") setReload((value) => value + 1); };
+    const identityChanged = () => {
+      revision.current++;
+      identity.current = null;
+      setState({ rows: {}, loading: false, error: null });
+      setReload((value) => value + 1);
+    };
+    window.addEventListener("session-credits-identity-changed", identityChanged);
     window.addEventListener("focus", revalidate);
     window.addEventListener("session-credits-revalidate", revalidate);
     document.addEventListener("visibilitychange", revalidate);
     return () => {
+      window.removeEventListener("session-credits-identity-changed", identityChanged);
       window.removeEventListener("focus", revalidate);
       window.removeEventListener("session-credits-revalidate", revalidate);
       document.removeEventListener("visibilitychange", revalidate);

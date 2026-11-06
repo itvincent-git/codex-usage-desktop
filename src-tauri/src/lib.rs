@@ -1,5 +1,6 @@
 mod cache_recovery;
 mod codex_auth;
+mod codex_accounts;
 mod codex_environment;
 mod codex_forecast;
 mod codex_limits;
@@ -76,6 +77,7 @@ async fn configure_codex_home(
 ) -> Result<(), String> {
     let settings_path = state.codex_home_path.clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = codex_accounts::native::AUTH_OPERATION.lock().unwrap();
         usage_diagnostics::configure(&settings_path, home.map(PathBuf::from))
     })
     .await
@@ -1217,6 +1219,8 @@ pub fn run() {
             #[cfg(feature = "e2e")]
             let app_data_dir = std::env::var_os("CODEX_USAGE_TEST_DATA_DIR").map(PathBuf::from).unwrap_or(app_data_dir);
             std::fs::create_dir_all(&app_data_dir)?;
+            let accounts = codex_accounts::initialize(app_data_dir.join("codex-accounts"))?;
+            app.manage(accounts.clone());
             let database_path = app_data_dir.join("codex-usage-desktop.db");
             if let Err(error) = cache_recovery::apply_on_start(&database_path) {
                 log::error!("Cache recovery failed: {error}");
@@ -1291,25 +1295,31 @@ pub fn run() {
             let pricing_cache_path = pricing_cache_path.clone();
             let app_handle = app.handle().clone();
 
-            tauri::async_runtime::spawn_blocking(move || loop {
-                let interval = background_refresh_schedule.interval.lock().unwrap();
-                let interval_duration = *interval;
-                let (interval, wait_result) = background_refresh_schedule
-                    .changed
-                    .wait_timeout(interval, interval_duration)
-                    .unwrap();
-                if !wait_result.timed_out() {
-                    continue;
-                }
-                drop(interval);
-
-                match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
-                    Ok(refresh_response) => {
-                        let _ = app_handle.emit("background-refresh-completed", refresh_response);
+            tauri::async_runtime::spawn_blocking(move || {
+                accounts.refresh_all();
+                let _ = app_handle.emit("codex-account-statuses-updated", ());
+                loop {
+                    let interval = background_refresh_schedule.interval.lock().unwrap();
+                    let interval_duration = *interval;
+                    let (interval, wait_result) = background_refresh_schedule
+                        .changed
+                        .wait_timeout(interval, interval_duration)
+                        .unwrap();
+                    if !wait_result.timed_out() {
+                        continue;
                     }
-                    Err(error) => {
-                        log::warn!("Background usage refresh failed: {error}");
-                        let _ = app_handle.emit("background-refresh-failed", error);
+                    drop(interval);
+
+                    accounts.refresh_all();
+                    let _ = app_handle.emit("codex-account-statuses-updated", ());
+                    match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
+                        Ok(refresh_response) => {
+                            let _ = app_handle.emit("background-refresh-completed", refresh_response);
+                        }
+                        Err(error) => {
+                            log::warn!("Background usage refresh failed: {error}");
+                            let _ = app_handle.emit("background-refresh-failed", error);
+                        }
                     }
                 }
             });
@@ -1317,6 +1327,15 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            codex_accounts::current_codex_auth_context,
+            codex_accounts::list_codex_accounts,
+            codex_accounts::import_current_codex_account,
+            codex_accounts::fetch_codex_account_status,
+            codex_accounts::switch_codex_account,
+            codex_accounts::remove_codex_account,
+            codex_accounts::login::start_codex_account_login,
+            codex_accounts::login::get_codex_account_login,
+            codex_accounts::login::cancel_codex_account_login,
             fetch_usage_diagnostics,
             schedule_cache_rebuild,
             configure_codex_home,
@@ -1356,6 +1375,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<Arc<codex_accounts::AccountService>>().cancel_all_logins();
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 if let Some(window) = app.get_webview_window("main") {
@@ -1401,6 +1423,8 @@ mod tests {
             workspace_name: None,
             subscription_expires_at: None,
             subscription_will_renew: None,
+            subscription_active: None,
+            auth_context: None,
         }
     }
 
