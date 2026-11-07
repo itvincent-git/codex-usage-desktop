@@ -1001,6 +1001,7 @@
     "login_cancelled": "Login cancelled",
     "login_timedOut": "Login timed out",
     "login_failed": "Login failed",
+    "data_updated": "Data updated",
     "updated_subscription": "Subscription info updated",
     "updated_limits": "Quota and balance updated",
     "updated_resetCredits": "Reset credits updated",

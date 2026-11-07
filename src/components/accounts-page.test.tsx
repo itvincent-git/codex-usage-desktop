@@ -149,6 +149,32 @@ describe("saved Codex accounts", () => {
 });
 
 describe("account card presentation", () => {
+  it.each(["matching", "different", "missing"])("shows %s update times without hiding older or missing data", async (state) => {
+    const status = list.accounts[0].status!;
+    status.updatedAt = { limits: "2030-01-01T00:00:00.100Z", subscription: "2030-01-01T00:00:00.200Z", resetCredits: "2030-01-01T00:00:00.300Z" };
+    if (state === "different") {
+      status.updatedAt.subscription = "2029-12-31T23:00:00Z";
+      status.errors.subscription = "accountNetworkError";
+    }
+    if (state === "missing") delete status.updatedAt.subscription;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    const a = within(card("a@example.test"));
+    fireEvent.click(a.getByText(/Data details/));
+    if (state === "matching") {
+      expect(a.getByText(`Data updated · ${new Date(status.updatedAt.limits).toLocaleString("en")}`)).toBeVisible();
+      expect(a.queryByText(/Quota and balance updated/)).not.toBeInTheDocument();
+      expect(a.queryByText(/Subscription info updated/)).not.toBeInTheDocument();
+      expect(a.queryByText(/Reset credits updated/)).not.toBeInTheDocument();
+    } else {
+      expect(a.queryByText(/^Data updated/)).not.toBeInTheDocument();
+      expect(a.getByText(/^Quota and balance updated/)).toBeVisible();
+      expect(a.getByText(/^Reset credits updated/)).toBeVisible();
+      if (state === "different") expect(a.getByText(`Subscription info updated · ${new Date(status.updatedAt.subscription).toLocaleString("en")}`)).toBeVisible();
+      else expect(a.queryByText(/Subscription info updated/)).not.toBeInTheDocument();
+    }
+  });
+
   it.each([
     [{ hasCredits: false, unlimited: false, balance: "0" }, "0"],
     [{ hasCredits: true, unlimited: false, balance: "1250.500001" }, "1250.500001"],

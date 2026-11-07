@@ -1044,6 +1044,7 @@
     "login_cancelled": "Anmeldung abgebrochen",
     "login_timedOut": "Zeitüberschreitung bei der Anmeldung",
     "login_failed": "Anmeldung fehlgeschlagen",
+    "data_updated": "Daten aktualisiert",
     "updated_subscription": "Abonnementdaten aktualisiert",
     "updated_limits": "Kontingent und Guthaben aktualisiert",
     "updated_resetCredits": "Zurücksetzungsguthaben aktualisiert",

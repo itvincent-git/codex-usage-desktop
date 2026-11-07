@@ -36,10 +36,10 @@ describe("native saved Codex accounts", () => {
     await browser.saveScreenshot("/tmp/codex-accounts-credits-balance.png");
   });
 
-  run("labels data refresh timestamps and keeps subscription status and renewal in the header", async () => {
-    for (const [language, active, renewal, source, expires, subscription, limits, resets] of [
-      ["en", "Active", "Auto-renews", "Source", "Expires", "Subscription info updated", "Quota and balance updated", "Reset credits updated"],
-      ["zh", "订阅有效", "自动续订", "数据来源", "到期时间", "订阅信息更新于", "额度与余额更新于", "重置次数更新于"],
+  run("combines matching data refresh timestamps and keeps subscription status and renewal in the header", async () => {
+    for (const [language, active, renewal, source, expires, updated] of [
+      ["en", "Active", "Auto-renews", "Source", "Expires", "Data updated"],
+      ["zh", "订阅有效", "自动续订", "数据来源", "到期时间", "数据更新于"],
     ]) {
       await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
       await browser.refresh();
@@ -54,12 +54,10 @@ describe("native saved Codex accounts", () => {
       await expect(details).toBeDisplayed();
       const status = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === "alice")!.status!;
       const timestamp = (at: string) => browser.execute((value, locale) => new Date(value).toLocaleString(locale), at, language);
-      await expect(details.$$("p")).toBeElementsArrayOfSize(5);
+      await expect(details.$$("p")).toBeElementsArrayOfSize(3);
       await expect(details.$(`p=${source} · oauth`)).toBeDisplayed();
       await expect(details.$(`p=${expires} · ${await timestamp(status.data!.subscriptionExpiresAt!)}`)).toBeDisplayed();
-      for (const [part, label] of [["subscription", subscription], ["limits", limits], ["resetCredits", resets]]) {
-        await expect(details.$(`p=${label} · ${await timestamp(status.updatedAt[part])}`)).toBeDisplayed();
-      }
+      await expect(details.$(`p=${updated} · ${await timestamp(status.updatedAt.subscription)}`)).toBeDisplayed();
       await expect(details).not.toHaveText(expect.stringContaining(active));
       await expect(details).not.toHaveText(expect.stringContaining(renewal));
     }
@@ -184,7 +182,7 @@ describe("native saved Codex accounts", () => {
     await expect(alice.$(".account-details .account-detail-body")).not.toBeDisplayed();
     await alice.$(".account-details summary").click();
     await expect(alice.$(".account-details .account-detail-body")).toBeDisplayed();
-    await expect(alice.$(".account-details .account-detail-body")).toHaveText(expect.stringContaining("Subscription"));
+    await expect(alice.$(".account-details .account-detail-body")).toHaveText(expect.stringContaining("Data updated"));
     await alice.$(".account-details summary").click();
     const more = bob.$('button[aria-label="More"]');
     await expect(more).toHaveText("");

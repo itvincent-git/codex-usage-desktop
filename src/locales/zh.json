@@ -1007,6 +1007,7 @@
     "login_cancelled": "登录已取消",
     "login_timedOut": "登录超时",
     "login_failed": "登录失败",
+    "data_updated": "数据更新于",
     "updated_subscription": "订阅信息更新于",
     "updated_limits": "额度与余额更新于",
     "updated_resetCredits": "重置次数更新于",

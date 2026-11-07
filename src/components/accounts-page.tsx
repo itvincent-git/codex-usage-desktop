@@ -169,6 +169,8 @@ export function AccountsPage() {
         const resetStale = partStale("resetCredits");
         const stale = limitsStale || subscriptionStale || resetStale || Object.keys(status?.errors ?? {}).length > 0;
         const updatedAt = Object.values(status?.updatedAt ?? {}).sort()[0];
+        const partUpdates = Object.entries(status?.updatedAt ?? {}).map(([part, at]) => ({ part, time: new Date(at).toLocaleString(locale) }));
+        const sharedUpdateTime = partUpdates.length === 3 && partUpdates.every(({ time }) => time === partUpdates[0].time) ? partUpdates[0].time : null;
         const switchAccount = () => void run(account.id, async () => { const result = await switchCodexAccount(account.id, list.authContext!); if (result.verified && result.restartRequired) setNotice(t("accounts.restart_required")); });
         const switchDisabled = !!busy || !!list.switchError || !list.authContext || account.current;
         return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
@@ -221,7 +223,7 @@ export function AccountsPage() {
               <div className="account-detail-body">
                 {data ? <p>{t("accounts.data_source")} · {data.source}</p> : null}
                 {data?.subscriptionExpiresAt ? <p>{t("accounts.expires")} · {new Date(data.subscriptionExpiresAt).toLocaleString(locale)}</p> : null}
-                {Object.entries(status?.updatedAt ?? {}).map(([part, at]) => <p key={part}>{t(`accounts.updated_${part}`)} · {new Date(at).toLocaleString(locale)}</p>)}
+                {sharedUpdateTime ? <p>{t("accounts.data_updated")} · {sharedUpdateTime}</p> : partUpdates.map(({ part, time }) => <p key={part}>{t(`accounts.updated_${part}`)} · {time}</p>)}
                 {Object.entries(status?.errors ?? {}).map(([part, code]) => <p key={part} className="text-error">{t(`accounts.part_${part}`)}: {message(code)}</p>)}
               </div>
             </details>

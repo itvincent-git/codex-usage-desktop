@@ -1007,6 +1007,7 @@
     "login_cancelled": "登入已取消",
     "login_timedOut": "登入逾時",
     "login_failed": "登入失敗",
+    "data_updated": "資料更新於",
     "updated_subscription": "訂閱資訊更新於",
     "updated_limits": "額度與餘額更新於",
     "updated_resetCredits": "重設次數更新於",

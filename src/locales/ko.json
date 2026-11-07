@@ -1001,6 +1001,7 @@
     "login_cancelled": "로그인 취소됨",
     "login_timedOut": "로그인 시간 초과",
     "login_failed": "로그인 실패",
+    "data_updated": "데이터 업데이트",
     "updated_subscription": "구독 정보 업데이트",
     "updated_limits": "사용 한도 및 잔액 업데이트",
     "updated_resetCredits": "초기화 횟수 업데이트",

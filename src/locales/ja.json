@@ -1037,6 +1037,7 @@
     "login_cancelled": "ログインをキャンセルしました",
     "login_timedOut": "ログインがタイムアウトしました",
     "login_failed": "ログイン失敗",
+    "data_updated": "データの更新日時",
     "updated_subscription": "サブスクリプション情報の更新日時",
     "updated_limits": "利用枠と残高の更新日時",
     "updated_resetCredits": "リセット回数の更新日時",
