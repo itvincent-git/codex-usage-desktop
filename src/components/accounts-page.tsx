@@ -220,10 +220,8 @@ export function AccountsPage() {
               <summary>{refreshing.has(account.id) ? t("accounts.refreshing") : relativeUpdate(updatedAt)} · {t("accounts.data_details")}</summary>
               <div className="account-detail-body">
                 {data ? <p>{t("accounts.data_source")} · {data.source}</p> : null}
-                {data?.subscriptionActive != null ? <p>{t("accounts.subscription")}{subscriptionStale ? ` · ${t("accounts.last_data")}` : ""} · {t(data.subscriptionActive ? "accounts.active" : "accounts.inactive")}</p> : null}
-                {data?.subscriptionWillRenew != null ? <p>{t("accounts.renews")}{subscriptionStale ? ` · ${t("accounts.last_data")}` : ""} · {t(data.subscriptionWillRenew ? "accounts.yes" : "accounts.no")}</p> : null}
                 {data?.subscriptionExpiresAt ? <p>{t("accounts.expires")} · {new Date(data.subscriptionExpiresAt).toLocaleString(locale)}</p> : null}
-                {Object.entries(status?.updatedAt ?? {}).map(([part, at]) => <p key={part}>{t(`accounts.part_${part}`)} · {new Date(at).toLocaleString(locale)}</p>)}
+                {Object.entries(status?.updatedAt ?? {}).map(([part, at]) => <p key={part}>{t(`accounts.updated_${part}`)} · {new Date(at).toLocaleString(locale)}</p>)}
                 {Object.entries(status?.errors ?? {}).map(([part, code]) => <p key={part} className="text-error">{t(`accounts.part_${part}`)}: {message(code)}</p>)}
               </div>
             </details>

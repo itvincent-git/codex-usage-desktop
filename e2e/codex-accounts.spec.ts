@@ -17,6 +17,36 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("labels data refresh timestamps and keeps subscription status and renewal in the header", async () => {
+    for (const [language, active, renewal, source, expires, subscription, limits, resets] of [
+      ["en", "Active", "Auto-renews", "Source", "Expires", "Subscription info updated", "Quota and balance updated", "Reset credits updated"],
+      ["zh", "订阅有效", "自动续订", "数据来源", "到期时间", "订阅信息更新于", "额度与余额更新于", "重置次数更新于"],
+    ]) {
+      await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      const alice = $('[data-account-id="alice"]');
+      await expect(alice.$(".account-membership")).toHaveText(expect.stringContaining(active));
+      await expect(alice.$(".account-membership")).toHaveText(expect.stringContaining(renewal));
+      const details = alice.$(".account-details .account-detail-body");
+      await expect(details).not.toBeDisplayed();
+      await alice.$(".account-details summary").click();
+      await expect(details).toBeDisplayed();
+      const status = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === "alice")!.status!;
+      const timestamp = (at: string) => browser.execute((value, locale) => new Date(value).toLocaleString(locale), at, language);
+      await expect(details.$$("p")).toBeElementsArrayOfSize(5);
+      await expect(details.$(`p=${source} · oauth`)).toBeDisplayed();
+      await expect(details.$(`p=${expires} · ${await timestamp(status.data!.subscriptionExpiresAt!)}`)).toBeDisplayed();
+      for (const [part, label] of [["subscription", subscription], ["limits", limits], ["resetCredits", resets]]) {
+        await expect(details.$(`p=${label} · ${await timestamp(status.updatedAt[part])}`)).toBeDisplayed();
+      }
+      await expect(details).not.toHaveText(expect.stringContaining(active));
+      await expect(details).not.toHaveText(expect.stringContaining(renewal));
+    }
+    await browser.saveScreenshot("/tmp/codex-accounts-data-details.png");
+  });
+
   run("shows and copies the nine-digit device code and explains where to enter it", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
