@@ -16,6 +16,39 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("highlights the current account card and moves the highlight when switching", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const alice = $('[data-account-id="alice"]');
+    const bob = $('[data-account-id="bob"]');
+    const appearance = (id: string) => browser.execute((accountId) => {
+      const style = getComputedStyle(document.querySelector(`[data-account-id="${accountId}"]`)!);
+      return { border: style.borderTopColor, background: style.backgroundImage, shadow: style.boxShadow };
+    }, id);
+    await expect(alice).toHaveAttribute("aria-current", "true");
+    await expect(bob).not.toHaveAttribute("aria-current");
+    const current = await appearance("alice");
+    const inactive = await appearance("bob");
+    expect(current.border).not.toBe(inactive.border);
+    expect(current.background).not.toBe(inactive.background);
+    expect(current.shadow).not.toBe("none");
+    await browser.saveScreenshot("/tmp/codex-accounts-current.png");
+
+    await bob.$("button=Switch Codex sign-in").click();
+    await expect(bob).toHaveAttribute("aria-current", "true");
+    await expect(alice).not.toHaveAttribute("aria-current");
+    expect(await appearance("bob")).toEqual(current);
+    expect(await appearance("alice")).toEqual(inactive);
+
+    await alice.$("button=Switch Codex sign-in").click();
+    await expect(alice).toHaveAttribute("aria-current", "true");
+    await expect(bob).not.toHaveAttribute("aria-current");
+    expect(await appearance("alice")).toEqual(current);
+    expect(await appearance("bob")).toEqual(inactive);
+  });
+
   run("lays out account cards, cached states, details, and menus at wide and narrow widths", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();

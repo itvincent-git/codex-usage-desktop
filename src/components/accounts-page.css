@@ -7,6 +7,7 @@
 .accounts-environment[open] { display: block; margin: 4px 0 0; }
 .accounts-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
 .account-card { min-width: 0; border: 1px solid rgb(var(--border)); border-radius: 12px; background: rgb(var(--surface)); padding: 18px 18px 0; }
+.account-card[aria-current="true"] { border-color: rgb(var(--primary)); background: linear-gradient(rgb(var(--primary) / .06), rgb(var(--primary) / .06)), rgb(var(--surface)); box-shadow: 0 0 0 1px rgb(var(--primary)); }
 .account-identity { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .account-identity h2 { font-size: 16px; line-height: 1.4; font-weight: 600; letter-spacing: -.3px; overflow-wrap: anywhere; }
 .account-current { display: inline-flex; align-items: center; gap: 4px; background: rgb(var(--primary) / .1); color: rgb(var(--primary)); border-radius: 20px; padding: 2px 7px; font-size: 11px; font-weight: 500; }

@@ -142,7 +142,7 @@ export function AccountsPage() {
         const updatedAt = Object.values(status?.updatedAt ?? {}).sort()[0];
         const switchAccount = () => void run(account.id, async () => { const result = await switchCodexAccount(account.id, list.authContext!); if (result.verified && result.restartRequired) setNotice(t("accounts.restart_required")); });
         const switchDisabled = !!busy || !!list.switchError || !list.authContext || account.current;
-        return <article key={account.id} data-account-id={account.id} className="account-card">
+        return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
           <header>
             <div className="account-identity"><h2>{account.email ?? account.identity.userId}</h2>{account.current ? <span className="account-current"><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>
             <p className="account-workspace">{data?.workspaceName ?? account.identity.workspaceId}</p>
