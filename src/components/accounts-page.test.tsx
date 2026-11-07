@@ -23,12 +23,41 @@ function account(id: string, plan: string, remaining: number): api.CodexAccount 
 let list: api.AccountList;
 beforeEach(async () => {
   vi.resetAllMocks(); events.clear(); await i18n.changeLanguage("en");
+  // jsdom does not implement the native dialog API.
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   list = { accounts: [account("a", "plus", 80), account("b", "pro", 25)], environment: "/isolated/codex", authContext: "context-a", currentIdentity: { userId: "user-a", workspaceId: "shared-workspace" }, switchError: null, recoveryConflict: false };
   vi.mocked(api.listCodexAccounts).mockImplementation(async () => structuredClone(list));
 });
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
 
 describe("saved Codex accounts", () => {
+  it.each(["a", "b"])("requires confirmation before removing account %s", async (id) => {
+    vi.mocked(api.removeCodexAccount).mockImplementation(async (removedId) => { list.accounts = list.accounts.filter((a) => a.id !== removedId); });
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: `${id}@example.test` });
+    const openRemoval = async () => {
+      await userEvent.click(within(card(`${id}@example.test`)).getByRole("button", { name: "More" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+      return within(screen.getByRole("alertdialog", { name: "Remove" }));
+    };
+    const dialog = await openRemoval();
+    expect(dialog.getByText(`${id}@example.test`)).toBeVisible();
+    expect(dialog.getByText(id === "a" ? "Remove this saved account and its cache? Codex will remain signed in to this account." : "Remove this saved account and its cache?")).toBeVisible();
+    expect(api.removeCodexAccount).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(card(`${id}@example.test`)).toBeVisible();
+    expect(api.removeCodexAccount).not.toHaveBeenCalled();
+    await openRemoval();
+    fireEvent(screen.getByRole("alertdialog"), new Event("cancel", { cancelable: true }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(api.removeCodexAccount).not.toHaveBeenCalled();
+    const reopened = await openRemoval();
+    await userEvent.click(reopened.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: `${id}@example.test` })).not.toBeInTheDocument());
+    expect(api.removeCodexAccount).toHaveBeenCalledExactlyOnceWith(id);
+  });
+
   it("allows retrying when copying an authorization code fails", async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("Clipboard denied")).mockResolvedValue(undefined);
@@ -92,7 +121,6 @@ describe("saved Codex accounts", () => {
   it("does not resurrect a removed account from an in-flight query", async () => {
     let resolve!: (status: api.AccountStatus) => void;
     vi.mocked(api.fetchCodexAccountStatus).mockReturnValue(new Promise((done) => { resolve = done; }));
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.mocked(api.removeCodexAccount).mockImplementation(async () => { list.accounts = list.accounts.filter((a) => a.id !== "b"); });
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "b@example.test" });
@@ -100,6 +128,7 @@ describe("saved Codex accounts", () => {
     fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Refresh" }));
     await userEvent.click(within(card("b@example.test")).getByRole("button", { name: "More" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "b@example.test" })).not.toBeInTheDocument());
     await act(async () => resolve(previous));
     expect(screen.queryByRole("heading", { name: "b@example.test" })).not.toBeInTheDocument();

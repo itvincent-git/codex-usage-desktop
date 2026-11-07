@@ -16,11 +16,15 @@ export function AccountsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<CodexAccount | null>(null);
+  const removalDialog = useRef<HTMLDialogElement>(null);
   const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const generation = useRef(0);
   const inFlight = useRef(new Set<string>());
   const mounted = useRef(true);
   const message = (code: string) => t(`accounts.errors.${code.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") });
+
+  useEffect(() => { if (pendingRemoval) removalDialog.current?.showModal(); }, [pendingRemoval]);
 
   const reload = useEffectEvent(async () => {
     const request = ++generation.current;
@@ -228,7 +232,7 @@ export function AccountsPage() {
                 <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.more")} title={t("accounts.more")}><Ellipsis className="h-3.5 w-3.5" aria-hidden="true" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {status?.needsLogin ? <DropdownMenuItem disabled={switchDisabled} onSelect={switchAccount}>{t("accounts.switch")}</DropdownMenuItem> : <DropdownMenuItem disabled={!!busy || loginRunning} onSelect={() => void login(false, account.id)}>{t("accounts.relogin")}</DropdownMenuItem>}
-                  <DropdownMenuItem className="text-error" disabled={!!busy} onSelect={() => { if (window.confirm(t(account.current ? "accounts.remove_current_confirm" : "accounts.remove_confirm"))) void run(account.id, () => removeCodexAccount(account.id)); }}>{t("accounts.remove")}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-error" disabled={!!busy} onSelect={() => setPendingRemoval(account)}>{t("accounts.remove")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -237,5 +241,14 @@ export function AccountsPage() {
       })}
     </div>
     <p className="accounts-context"><Info aria-hidden="true" /><span>{t("accounts.history_scope")}</span></p>
+    {pendingRemoval ? <dialog ref={removalDialog} role="alertdialog" aria-modal="true" aria-labelledby="account-removal-title" aria-describedby="account-removal-description" className="!m-auto w-[min(28rem,calc(100%-2rem))] space-y-4 rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl backdrop:bg-black/40" onCancel={(event) => { event.preventDefault(); setPendingRemoval(null); }}>
+      <h2 id="account-removal-title" className="text-lg font-semibold">{t("accounts.remove")}</h2>
+      <p className="break-words text-sm font-medium">{pendingRemoval.email ?? pendingRemoval.id}</p>
+      <p id="account-removal-description" className="text-sm text-muted-foreground">{t(pendingRemoval.current ? "accounts.remove_current_confirm" : "accounts.remove_confirm")}</p>
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" autoFocus onClick={() => setPendingRemoval(null)}>{t("common.cancel")}</Button>
+        <Button disabled={!!busy} onClick={() => { const id = pendingRemoval.id; setPendingRemoval(null); void run(id, () => removeCodexAccount(id)); }}>{t("accounts.remove")}</Button>
+      </div>
+    </dialog> : null}
   </section>;
 }

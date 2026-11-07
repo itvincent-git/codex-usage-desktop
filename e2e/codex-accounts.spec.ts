@@ -361,4 +361,59 @@ describe("native saved Codex accounts", () => {
     await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(newer);
   });
+
+  run("requires confirmation before removing saved accounts", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const alice = $('[data-account-id="alice"]');
+    if (!(await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === "alice")!.current) {
+      await alice.$("button=切换到此账号").click();
+    }
+    await expect(alice).toHaveAttribute("aria-current", "true");
+    const authPath = join(process.env.CODEX_HOME!, "auth.json");
+    const credentials = readFileSync(authPath, "utf8");
+    for (const id of ["free", "alice"]) {
+      const card = $(`[data-account-id="${id}"]`);
+      let dialog = $('[role="alertdialog"]');
+      const openRemoval = async () => {
+        await expect(card).toBeDisplayed();
+        await card.$('button[aria-label="更多"]').execute((element) => element.focus());
+        await browser.keys("Enter");
+        const remove = $('//*[@role="menuitem" and normalize-space(.)="移除"]');
+        await expect(remove).toBeDisplayed();
+        await remove.execute((element) => element.focus());
+        await browser.keys("Enter");
+        dialog = $('[role="alertdialog"]');
+        await expect(dialog).toBeDisplayed();
+        await expect(dialog).toHaveText(expect.stringContaining(`${id}@example.test`));
+        expect((await invoke<AccountList>("list_codex_accounts")).accounts.some((account) => account.id === id)).toBe(true);
+      };
+      await openRemoval();
+      await expect(dialog).toHaveText(expect.stringContaining(id === "alice" ? "Codex 仍会保持此账号的登录。" : "删除此账号的托管凭据与缓存？"));
+      await expect(dialog.$("button=取消")).toBeFocused();
+      const centerOffset = await dialog.execute((element) => {
+        const rect = element.getBoundingClientRect();
+        return Math.abs((rect.top + rect.bottom) / 2 - window.innerHeight / 2);
+      });
+      expect(centerOffset).toBeLessThan(2);
+      await browser.saveScreenshot(`/tmp/codex-account-removal-${id}.png`);
+      await dialog.$("button=取消").click();
+      await expect(dialog).not.toExist();
+      await expect(card).toBeDisplayed();
+      expect((await invoke<AccountList>("list_codex_accounts")).accounts.some((account) => account.id === id)).toBe(true);
+      await openRemoval();
+      await browser.keys("Escape");
+      await expect(dialog).not.toExist();
+      await expect(card).toBeDisplayed();
+      expect((await invoke<AccountList>("list_codex_accounts")).accounts.some((account) => account.id === id)).toBe(true);
+      await openRemoval();
+      await dialog.$("button=移除").click();
+      await expect(dialog).not.toExist();
+      await expect(card).not.toExist();
+      expect((await invoke<AccountList>("list_codex_accounts")).accounts.some((account) => account.id === id)).toBe(false);
+      expect(readFileSync(authPath, "utf8")).toBe(credentials);
+    }
+  });
 });
