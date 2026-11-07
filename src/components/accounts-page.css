@@ -41,6 +41,7 @@
 .account-details[open] { flex-basis: 100%; }
 .account-detail-body { margin: 8px 0 3px; font-size: 11px; line-height: 1.9; overflow-wrap: anywhere; }
 .account-actions { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.account-actions .account-icon-button { width: 32px; padding: 0; }
 .account-actions > button:first-child, .account-actions > button:last-child { color: rgb(var(--muted-foreground)); }
 .account-warning { display: flex; align-items: flex-start; gap: 6px; padding: 12px 0; color: #a86208; font-size: 11px; }
 .account-warning svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }

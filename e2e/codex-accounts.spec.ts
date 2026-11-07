@@ -73,11 +73,15 @@ describe("native saved Codex accounts", () => {
     await expect(alice.$(".account-detail-body")).toBeDisplayed();
     await expect(alice.$(".account-detail-body")).toHaveText(expect.stringContaining("Subscription"));
     await alice.$("summary").click();
-    await expect(bob.$("button=More")).toHaveAttribute("aria-expanded", "false");
+    const more = bob.$('button[aria-label="More"]');
+    await expect(more).toHaveText("");
+    await expect(more).toHaveAttribute("title", "More");
+    await expect(more.$("svg.lucide-ellipsis")).toBeDisplayed();
+    await expect(more).toHaveAttribute("aria-expanded", "false");
     // The embedded driver does not emit the pointerdown event Radix menus require.
-    await bob.$("button=More").execute((element) => element.focus());
+    await more.execute((element) => element.focus());
     await browser.keys("Enter");
-    await expect(bob.$("button=More")).toHaveAttribute("aria-expanded", "true");
+    await expect(more).toHaveAttribute("aria-expanded", "true");
     await browser.saveScreenshot("/tmp/codex-accounts-menu.png");
     await expect($('//*[@role="menuitem" and normalize-space(.)="Sign in again"]')).toBeDisplayed();
     await expect($('//*[@role="menuitem" and normalize-space(.)="Remove"]')).toBeDisplayed();
@@ -135,7 +139,9 @@ describe("native saved Codex accounts", () => {
     const alice = $('[data-account-id="alice"]');
     const bob = $('[data-account-id="bob"]');
     await alice.waitForDisplayed();
-    await $('button=Refresh all').click();
+    const refreshAll = $('button=Refresh all');
+    await expect(refreshAll.$("svg.lucide-refresh-cw")).toBeDisplayed();
+    await refreshAll.click();
     await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
     await expect(bob.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
     await expect(alice).toHaveText(expect.stringContaining("plus"));
@@ -145,8 +151,16 @@ describe("native saved Codex accounts", () => {
     const configPath = join(process.env.CODEX_HOME!, "config.toml");
     const original = readFileSync(authPath, "utf8");
     const config = readFileSync(configPath, "utf8");
-    await bob.$("button=Refresh").click();
-    await bob.$("button=Refresh").waitForEnabled();
+    const refresh = bob.$('button[aria-label="Refresh"]');
+    await expect(refresh).toHaveText("");
+    await expect(refresh).toHaveAttribute("title", "Refresh");
+    await expect(refresh.$("svg.lucide-refresh-cw")).toBeDisplayed();
+    await refresh.waitForEnabled();
+    const beforeRefresh = await control();
+    await refresh.click();
+    await browser.waitUntil(async () => (await control())["bob:/backend-api/wham/usage"] > beforeRefresh["bob:/backend-api/wham/usage"]);
+    await refresh.waitForEnabled();
+    await expect(refresh).toHaveAttribute("aria-busy", "false");
     expect(readFileSync(authPath, "utf8")).toBe(original);
     await control({ failSubscription: true, limitRateLimited: true });
     const status = await invoke<AccountStatus>("fetch_codex_account_status", { accountId: "bob" });
@@ -159,7 +173,7 @@ describe("native saved Codex accounts", () => {
     const after = await control();
     expect(after["bob:/backend-api/wham/usage"]).toBe(before["bob:/backend-api/wham/usage"]);
     await control({ failSubscription: false, limitRateLimited: false });
-    await bob.$("button=Refresh").click();
+    await refresh.click();
     await expect(bob).toHaveText(expect.stringContaining("Stale data"));
     await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
 

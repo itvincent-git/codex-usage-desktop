@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Info, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Check, Ellipsis, Info, Plus, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
@@ -106,7 +106,7 @@ export function AccountsPage() {
       <div className="flex flex-wrap gap-2">
         <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void login(false)}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
         <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => void run("import", importCurrentCodexAccount)}>{t("accounts.import")}</Button>
-        <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}>{t("accounts.refresh_all")}</Button>
+        <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t("accounts.more")}</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end"><DropdownMenuItem disabled={!!busy || loginRunning} onSelect={() => void login(true)}>{t("accounts.device_login")}</DropdownMenuItem></DropdownMenuContent>
@@ -189,10 +189,10 @@ export function AccountsPage() {
               </div>
             </details>
             <div className="account-actions">
-              <Button size="sm" variant="ghost" disabled={refreshing.has(account.id)} onClick={() => void refresh(account)}>{t("accounts.refresh")}</Button>
+              <Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.refresh")} title={t("accounts.refresh")} aria-busy={refreshing.has(account.id)} disabled={refreshing.has(account.id)} onClick={() => void refresh(account)}><RefreshCw className={`h-3.5 w-3.5${refreshing.has(account.id) ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" /></Button>
               {status?.needsLogin ? <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void login(false, account.id)}>{t("accounts.relogin")}</Button> : <Button size="sm" variant={account.current ? "secondary" : "primary"} disabled={switchDisabled} onClick={switchAccount}>{t(account.current ? "accounts.current_account" : "accounts.switch")}</Button>}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button size="sm" variant="ghost">{t("accounts.more")}</Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.more")} title={t("accounts.more")}><Ellipsis className="h-3.5 w-3.5" aria-hidden="true" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {status?.needsLogin ? <DropdownMenuItem disabled={switchDisabled} onSelect={switchAccount}>{t("accounts.switch")}</DropdownMenuItem> : <DropdownMenuItem disabled={!!busy || loginRunning} onSelect={() => void login(false, account.id)}>{t("accounts.relogin")}</DropdownMenuItem>}
                   <DropdownMenuItem className="text-error" disabled={!!busy} onSelect={() => { if (window.confirm(t(account.current ? "accounts.remove_current_confirm" : "accounts.remove_confirm"))) void run(account.id, () => removeCodexAccount(account.id)); }}>{t("accounts.remove")}</DropdownMenuItem>
