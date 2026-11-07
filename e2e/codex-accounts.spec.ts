@@ -1,4 +1,5 @@
 import { $, browser, expect } from "@wdio/globals";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { accountCredentials } from "./fixtures/codex-accounts";
@@ -16,7 +17,7 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
-  run("shows the nine-digit device code and explains where to enter it", async () => {
+  run("shows and copies the nine-digit device code and explains where to enter it", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
@@ -24,6 +25,7 @@ describe("native saved Codex accounts", () => {
     const page = $('section[aria-label="账号"]');
     const code = page.$("p=1234-56789");
     await expect(code).not.toExist();
+    await expect(page.$("button=复制授权码")).not.toExist();
     await page.$("button=更多").execute((element) => element.focus());
     await browser.keys("Enter");
     const deviceLogin = $('//*[@role="menuitem" and normalize-space(.)="设备码登录"]');
@@ -33,10 +35,14 @@ describe("native saved Codex accounts", () => {
     await expect(code).toBeDisplayed();
     await expect(page).toHaveText(expect.stringContaining("在打开的授权网页中输入此设备码，完成后账号将自动保存。"));
     await expect(page.$("button=打开授权页面")).toBeDisplayed();
+    await page.$("button=复制授权码").click();
+    await expect(page.$("button=已复制")).toBeDisplayed();
+    if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" }) === "1234-56789").toBe(true);
     await browser.saveScreenshot("/tmp/codex-accounts-device-code.png");
     await page.$("button=取消登录").click();
     await expect(page).toHaveText(expect.stringContaining("登录已取消"));
     await expect(code).not.toExist();
+    await expect(page.$("button=已复制")).not.toExist();
     await expect(page.$("button=打开授权页面")).not.toExist();
   });
 

@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Ellipsis, Info, Plus, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, Copy, Ellipsis, Info, Plus, RefreshCw, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ export function AccountsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
+  const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const generation = useRef(0);
   const inFlight = useRef(new Set<string>());
   const mounted = useRef(true);
@@ -59,7 +60,14 @@ export function AccountsPage() {
   const missingAccounts = (list?.accounts ?? []).filter((account) => !account.status).map((account) => account.id).join("|");
   const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (!account.status) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
-  const login = (device: boolean, id: string | null = null) => run("login", async () => { setTask(await startCodexAccountLogin(device, id)); });
+  const login = (device: boolean, id: string | null = null) => run("login", async () => { setCodeCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  const copyDeviceCode = async () => {
+    if (!task?.deviceCode) return;
+    try {
+      await navigator.clipboard.writeText(task.deviceCode);
+      setCodeCopyState("copied");
+    } catch { setCodeCopyState("failed"); }
+  };
 
   useEffect(() => {
     if (task?.state !== "running") return;
@@ -121,8 +129,15 @@ export function AccountsPage() {
       <p>{t(`accounts.login_${task.state}`)}</p>
       {task.authorizationUrl && loginRunning ? <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button> : null}
       {task.deviceCode && loginRunning ? <div>
-        <p className="font-mono text-lg select-text">{task.deviceCode}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="font-mono text-lg select-text">{task.deviceCode}</p>
+          <Button size="sm" variant="secondary" onClick={() => void copyDeviceCode()}>
+            {codeCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+            {t(codeCopyState === "copied" ? "accounts.device_code_copied" : "accounts.copy_device_code")}
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">{t("accounts.device_code_hint")}</p>
+        {codeCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.device_code_copy_failed")}</p> : null}
       </div> : null}
       {task.error ? <p role="alert">{message(task.error)}</p> : null}
       {loginRunning ? <Button variant="secondary" onClick={() => void run("cancel", async () => { await cancelCodexAccountLogin(task.id); setTask(await getCodexAccountLogin(task.id)); })}>{t("accounts.cancel")}</Button> : null}

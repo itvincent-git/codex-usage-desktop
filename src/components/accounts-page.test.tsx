@@ -29,6 +29,21 @@ beforeEach(async () => {
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
 
 describe("saved Codex accounts", () => {
+  it("allows retrying when copying an authorization code fails", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("Clipboard denied")).mockResolvedValue(undefined);
+    list.loginTask = { id: "device-login", state: "running", authorizationUrl: "https://auth.openai.com/codex/device", deviceCode: "1234-56789", accountId: null, error: null };
+    vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
+    render(<AccountsPage />);
+    await user.click(await screen.findByRole("button", { name: "Copy authorization code" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Copy failed");
+    expect(screen.queryByRole("button", { name: "Copied" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy authorization code" }));
+    expect(writeText).toHaveBeenLastCalledWith("1234-56789");
+    expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows distinct users in the same workspace and refreshes without switching", async () => {
     let resolve!: (status: api.AccountStatus) => void;
     vi.mocked(api.fetchCodexAccountStatus).mockReturnValue(new Promise((done) => { resolve = done; }));
