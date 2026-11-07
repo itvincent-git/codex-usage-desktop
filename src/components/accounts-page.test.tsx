@@ -95,7 +95,7 @@ describe("saved Codex accounts", () => {
     const b = within(card("b@example.test"));
     expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "25");
     expect(b.getByText("Subscription unconfirmed")).toBeInTheDocument();
-    expect(b.getByText("$17.50")).toBeInTheDocument();
+    expect(b.getByText("17.5")).toBeInTheDocument();
     fireEvent.click(b.getByText(/Data details/));
     expect(b.getByText(/Stale data/)).toBeInTheDocument();
     expect(b.getByText(/Rate limited/)).toBeInTheDocument();
@@ -149,6 +149,19 @@ describe("saved Codex accounts", () => {
 });
 
 describe("account card presentation", () => {
+  it.each([
+    [{ hasCredits: false, unlimited: false, balance: "0" }, "0"],
+    [{ hasCredits: true, unlimited: false, balance: "1250.500001" }, "1250.500001"],
+    [{ hasCredits: true, unlimited: true, balance: null }, "Unlimited"],
+    [{ hasCredits: true, unlimited: false, balance: null }, "Unknown"],
+  ])("displays credits balance %j without assuming a currency", async (credits, expected) => {
+    list.accounts[0].status!.data!.credits = credits;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    const balance = within(card("a@example.test")).getByText("Credits balance").nextElementSibling;
+    expect(balance?.textContent).toBe(expected);
+  });
+
   it("shows workspace names and personal workspace labels without exposing workspace IDs", async () => {
     list.accounts[1].status!.data!.workspaceName = "Example workspace";
     render(<AccountsPage />);
@@ -188,7 +201,7 @@ describe("account card presentation", () => {
     await screen.findByRole("heading", { name: "b@example.test" });
     const b = within(card("b@example.test"));
     expect(b.getByRole("meter", { name: "5-hour quota" })).not.toHaveAttribute("aria-valuenow");
-    expect(b.queryByText("$0.00")).not.toBeInTheDocument();
+    expect(b.getByText("Credits balance").nextElementSibling).toHaveTextContent("Unknown");
     expect(b.queryByText("Inactive")).not.toBeInTheDocument();
   });
   it("marks only failed parts as cached and keeps renewal cancellation separate from subscription status", async () => {
@@ -202,7 +215,7 @@ describe("account card presentation", () => {
     expect(b.getByText("Active")).toBeInTheDocument();
     expect(b.getByText(/Does not renew/)).toBeInTheDocument();
     expect(b.getByText("Last reset credits")).toBeInTheDocument();
-    expect(b.getByText("Balance")).toBeInTheDocument();
+    expect(b.getByText("Credits balance")).toBeInTheDocument();
     expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).toHaveClass("account-quota-low");
     expect(b.getByRole("status")).toHaveTextContent("Reset credits");
   });

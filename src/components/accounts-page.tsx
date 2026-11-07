@@ -200,7 +200,7 @@ export function AccountsPage() {
             })}
           </div>
           <dl className="account-resources">
-            <div><dt>{t(limitsStale ? "accounts.last_balance" : "accounts.credits")}</dt><dd>{data?.credits ? data.credits.unlimited ? t("accounts.unlimited") : data.credits.balance != null ? new Intl.NumberFormat(locale, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol" }).format(Number(data.credits.balance)) : t("accounts.unknown") : t("accounts.unknown")}</dd></div>
+            <div><dt>{t(limitsStale ? "accounts.last_balance" : "accounts.credits")}</dt><dd>{data?.credits ? data.credits.unlimited ? t("accounts.unlimited") : data.credits.balance != null ? data.credits.balance : t("accounts.unknown") : t("accounts.unknown")}</dd></div>
             <div><dt>{t(resetStale ? "accounts.last_reset_credits" : "accounts.reset_credits")}</dt><dd>
               <details className="account-reset-details">
                 <summary aria-label={`${t(resetStale ? "accounts.last_reset_credits" : "accounts.reset_credits")} · ${resetCount == null ? t("accounts.unknown") : t("limits.reset_credits_available", { count: resetCount })}`}>

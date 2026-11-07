@@ -17,6 +17,25 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("shows credits balances without currency symbols in English and Chinese", async () => {
+    for (const [language, label, cachedLabel] of [
+      ["en", "Credits balance", "Last credits balance"],
+      ["zh", "Credits 余额", "上次 Credits 余额"],
+    ]) {
+      await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      for (const [id, title, value] of [["alice", label, "20"], ["free", label, "0"], ["archive", cachedLabel, "8.50"]]) {
+        const balance = $(`[data-account-id="${id}"] .account-resources > div:first-child`);
+        await expect(balance.$("dt")).toHaveText(title);
+        await expect(balance.$("dd")).toHaveText(value);
+      }
+      await expect($('[data-account-id="free"] [role="meter"][aria-label="' + (language === "en" ? "Monthly quota" : "月额度") + '"]')).toHaveAttribute("aria-valuenow", "85");
+    }
+    await browser.saveScreenshot("/tmp/codex-accounts-credits-balance.png");
+  });
+
   run("labels data refresh timestamps and keeps subscription status and renewal in the header", async () => {
     for (const [language, active, renewal, source, expires, subscription, limits, resets] of [
       ["en", "Active", "Auto-renews", "Source", "Expires", "Subscription info updated", "Quota and balance updated", "Reset credits updated"],
