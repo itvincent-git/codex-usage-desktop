@@ -120,7 +120,10 @@ export function AccountsPage() {
     {task ? <div className="space-y-2 rounded-xl border border-border p-4" aria-live="polite">
       <p>{t(`accounts.login_${task.state}`)}</p>
       {task.authorizationUrl && loginRunning ? <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button> : null}
-      {task.deviceCode && loginRunning ? <p className="font-mono text-lg select-text">{task.deviceCode}</p> : null}
+      {task.deviceCode && loginRunning ? <div>
+        <p className="font-mono text-lg select-text">{task.deviceCode}</p>
+        <p className="text-sm text-muted-foreground">{t("accounts.device_code_hint")}</p>
+      </div> : null}
       {task.error ? <p role="alert">{message(task.error)}</p> : null}
       {loginRunning ? <Button variant="secondary" onClick={() => void run("cancel", async () => { await cancelCodexAccountLogin(task.id); setTask(await getCodexAccountLogin(task.id)); })}>{t("accounts.cancel")}</Button> : null}
     </div> : null}

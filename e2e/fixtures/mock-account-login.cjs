@@ -8,7 +8,7 @@ if (!home || realpathSync(process.cwd()) !== realpathSync(home) || existsSync(jo
 if (process.argv.includes("--device-auth")) {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE, JSON.stringify({ pid: process.pid, child: child.pid, home }));
-  process.stdout.write("https://auth.openai.com/codex/device\nABCD-1234\n");
+  process.stdout.write("\x1b[94mhttps://auth.openai.com/codex/device\x1b[0m\n\x1b[94m1234-56789\x1b[0m\n");
   setInterval(() => {}, 1000);
 } else {
   writeFileSync(join(home, "auth.json"), readFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH), { mode: 0o600 });

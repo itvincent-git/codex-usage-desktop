@@ -16,6 +16,30 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("shows the nine-digit device code and explains where to enter it", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const page = $('section[aria-label="账号"]');
+    const code = page.$("p=1234-56789");
+    await expect(code).not.toExist();
+    await page.$("button=更多").execute((element) => element.focus());
+    await browser.keys("Enter");
+    const deviceLogin = $('//*[@role="menuitem" and normalize-space(.)="设备码登录"]');
+    await expect(deviceLogin).toBeDisplayed();
+    await deviceLogin.execute((element) => element.focus());
+    await browser.keys("Enter");
+    await expect(code).toBeDisplayed();
+    await expect(page).toHaveText(expect.stringContaining("在打开的授权网页中输入此设备码，完成后账号将自动保存。"));
+    await expect(page.$("button=打开授权页面")).toBeDisplayed();
+    await browser.saveScreenshot("/tmp/codex-accounts-device-code.png");
+    await page.$("button=取消登录").click();
+    await expect(page).toHaveText(expect.stringContaining("登录已取消"));
+    await expect(code).not.toExist();
+    await expect(page.$("button=打开授权页面")).not.toExist();
+  });
+
   run("highlights the current account card and moves the highlight when switching", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();
@@ -255,7 +279,7 @@ describe("native saved Codex accounts", () => {
       let processInfo: { pid: number; child: number; home: string };
       await browser.waitUntil(async () => {
         const result = await invoke<LoginTask>("get_codex_account_login", { taskId: task.id });
-        return result.deviceCode === "ABCD-1234";
+        return result.deviceCode === "1234-56789";
       });
       processInfo = JSON.parse(readFileSync(process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE!, "utf8"));
       if (action === "cancel") await invoke("cancel_codex_account_login", { taskId: task.id });

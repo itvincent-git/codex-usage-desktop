@@ -986,6 +986,7 @@
     "history_scope": "Historical usage covers the selected Codex directory across all accounts. Restart related Codex clients after switching.",
     "cancel": "Cancel login",
     "open_authorization": "Open authorization",
+    "device_code_hint": "Enter this device code on the authorization page. Your account will be saved automatically when authorization completes.",
     "login_running": "Waiting for official Codex authorization…",
     "login_completed": "Login completed",
     "login_cancelled": "Login cancelled",

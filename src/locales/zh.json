@@ -992,6 +992,7 @@
     "history_scope": "历史用量按 Codex 目录统计，不随账号切换归属。切换后请重启相关 Codex 客户端。",
     "cancel": "取消登录",
     "open_authorization": "打开授权页面",
+    "device_code_hint": "在打开的授权网页中输入此设备码，完成后账号将自动保存。",
     "login_running": "正在等待官方 Codex 授权…",
     "login_completed": "登录完成",
     "login_cancelled": "登录已取消",

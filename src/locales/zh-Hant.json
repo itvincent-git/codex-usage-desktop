@@ -992,6 +992,7 @@
     "history_scope": "歷史 Token 與成本按所選 Codex 目錄統計，涵蓋所有帳號，不歸屬於這些帳號卡片。",
     "cancel": "取消登入",
     "open_authorization": "開啟授權頁面",
+    "device_code_hint": "在開啟的授權網頁中輸入此裝置碼，完成後帳號將自動儲存。",
     "login_running": "正在等待官方 Codex 授權…",
     "login_completed": "登入完成",
     "login_cancelled": "登入已取消",

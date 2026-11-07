@@ -1029,6 +1029,7 @@
     "history_scope": "Historische Token und Kosten umfassen alle Konten im ausgewählten Codex-Verzeichnis. Sie werden diesen Konten nicht einzeln zugeordnet.",
     "cancel": "Anmeldung abbrechen",
     "open_authorization": "Autorisierung öffnen",
+    "device_code_hint": "Geben Sie diesen Gerätecode auf der Autorisierungsseite ein. Nach Abschluss wird Ihr Konto automatisch gespeichert.",
     "login_running": "Warten auf die offizielle Codex-Autorisierung…",
     "login_completed": "Anmeldung abgeschlossen",
     "login_cancelled": "Anmeldung abgebrochen",

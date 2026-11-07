@@ -986,6 +986,7 @@
     "history_scope": "이전 토큰 및 비용은 선택한 Codex 디렉터리의 모든 계정을 포함합니다. 각 계정 카드별 통계가 아닙니다.",
     "cancel": "로그인 취소",
     "open_authorization": "인증 페이지 열기",
+    "device_code_hint": "인증 페이지에 이 기기 코드를 입력하세요. 인증이 완료되면 계정이 자동으로 저장됩니다.",
     "login_running": "공식 Codex 인증을 기다리는 중…",
     "login_completed": "로그인 완료",
     "login_cancelled": "로그인 취소됨",

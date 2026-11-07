@@ -322,7 +322,7 @@ fn authorization_fields(output: &str) -> (Option<String>, Option<String>) {
     let code = plain
         .split_whitespace()
         .find(|word| {
-            word.len() == 9
+            matches!(word.len(), 9 | 10)
                 && word.as_bytes()[4] == b'-'
                 && word
                     .bytes()
@@ -417,5 +417,27 @@ mod tests {
         );
         assert_eq!(url.as_deref(), Some("https://auth.openai.com/codex/device"));
         assert_eq!(code.as_deref(), Some("ABCD-1234"));
+    }
+
+    #[test]
+    fn extracts_nine_digit_device_code() {
+        let (url, code) = authorization_fields(
+            "Open this link in your browser\n\x1b[94mhttps://auth.openai.com/codex/device\x1b[0m\nEnter this one-time code\n\x1b[94m1234-56789\x1b[0m\n",
+        );
+        assert_eq!(url.as_deref(), Some("https://auth.openai.com/codex/device"));
+        assert_eq!(code.as_deref(), Some("1234-56789"));
+    }
+
+    #[test]
+    fn ignores_invalid_device_codes() {
+        for output in [
+            "1234-567",
+            "1234-567890",
+            "12345-6789",
+            "abcd-12345",
+            "access_token=1234-56789",
+        ] {
+            assert_eq!(authorization_fields(output), (None, None));
+        }
     }
 }
