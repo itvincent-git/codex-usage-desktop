@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountsPage } from "./accounts-page";
 import * as api from "@/lib/codex-accounts";
@@ -36,21 +37,22 @@ describe("saved Codex accounts", () => {
     expect(within(card("a@example.test")).getByText("plus")).toBeInTheDocument();
     expect(within(card("b@example.test")).getByText("pro")).toBeInTheDocument();
     fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Refresh" }));
-    expect(within(card("b@example.test")).getByText("Refreshing…")).toBeInTheDocument();
+    expect(within(card("b@example.test")).getByText(/Refreshing…/)).toBeInTheDocument();
     expect(within(card("a@example.test")).getByRole("button", { name: "Refresh" })).toBeEnabled();
     expect(api.switchCodexAccount).not.toHaveBeenCalled();
     await act(async () => resolve({ ...list.accounts[1].status!, data: data("pro", 60) }));
-    expect(within(card("b@example.test")).getByText(/60% remaining/)).toBeInTheDocument();
-    expect(within(card("a@example.test")).getByText(/80% remaining/)).toBeInTheDocument();
+    expect(within(card("b@example.test")).getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "60");
+    expect(within(card("a@example.test")).getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "80");
   });
   it("retains successful data and shows independent errors without inventing zero or inactive values", async () => {
     list.accounts[1].status = { ...list.accounts[1].status!, errors: { subscription: "accountNetworkError", limits: "accountRateLimited" } };
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "b@example.test" });
     const b = within(card("b@example.test"));
-    expect(b.getByText(/25% remaining/)).toBeInTheDocument();
-    expect(b.getByText("Active")).toBeInTheDocument();
-    expect(b.getByText("17.5")).toBeInTheDocument();
+    expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "25");
+    expect(b.getByText("Subscription unconfirmed")).toBeInTheDocument();
+    expect(b.getByText("$17.50")).toBeInTheDocument();
+    fireEvent.click(b.getByText(/Data details/));
     expect(b.getByText(/Stale data/)).toBeInTheDocument();
     expect(b.getByText(/Rate limited/)).toBeInTheDocument();
     expect(b.getByText(/Subscription: Could not update/)).toBeInTheDocument();
@@ -60,9 +62,9 @@ describe("saved Codex accounts", () => {
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "b@example.test" });
     const b = within(card("b@example.test"));
-    expect(b.getByText("Monthly usage limit")).toBeInTheDocument();
-    expect(b.getByText(/40% remaining/)).toBeInTheDocument();
-    expect(b.queryByText("5-Hour Limit")).not.toBeInTheDocument();
+    expect(b.getByText("Monthly quota")).toBeInTheDocument();
+    expect(b.getByRole("meter", { name: "Monthly quota" })).toHaveAttribute("aria-valuenow", "40");
+    expect(b.queryByRole("meter", { name: "5-hour quota" })).not.toBeInTheDocument();
   });
   it("switches with the expected context and displays the restart requirement", async () => {
     vi.mocked(api.switchCodexAccount).mockResolvedValue({ verified: true, restartRequired: true, authContext: "context-b" });
@@ -81,7 +83,8 @@ describe("saved Codex accounts", () => {
     await screen.findByRole("heading", { name: "b@example.test" });
     const previous = list.accounts[1].status!;
     fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Refresh" }));
-    fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Remove" }));
+    await userEvent.click(within(card("b@example.test")).getByRole("button", { name: "More" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "b@example.test" })).not.toBeInTheDocument());
     await act(async () => resolve(previous));
     expect(screen.queryByRole("heading", { name: "b@example.test" })).not.toBeInTheDocument();
@@ -98,5 +101,73 @@ describe("saved Codex accounts", () => {
     await screen.findByText("new-plan");
     await act(async () => resolve(previous));
     expect(screen.getByText("new-plan")).toBeInTheDocument();
+  });
+});
+
+describe("account card presentation", () => {
+  it("uses remaining quota and the existing 30 percent warning boundary", async () => {
+    list.accounts[0].status!.data = data("plus", 30);
+    list.accounts[1].status!.data = data("pro", 29.9);
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    const a = within(card("a@example.test"));
+    const b = within(card("b@example.test"));
+    expect(a.queryByText(/Low remaining quota/)).not.toBeInTheDocument();
+    expect(b.getByText(/Low remaining quota/)).toBeInTheDocument();
+    expect(b.getByRole("meter", { name: "5-hour quota" }).firstElementChild).toHaveStyle({ width: "30%" });
+    expect(a.getByRole("button", { name: "Current account" })).toBeDisabled();
+  });
+  it("keeps unknown quotas and balances distinct from zero", async () => {
+    list.accounts[1].status!.data = null;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    const b = within(card("b@example.test"));
+    expect(b.getByRole("meter", { name: "5-hour quota" })).not.toHaveAttribute("aria-valuenow");
+    expect(b.queryByText("$0.00")).not.toBeInTheDocument();
+    expect(b.queryByText("Inactive")).not.toBeInTheDocument();
+  });
+  it("marks only failed parts as cached and keeps renewal cancellation separate from subscription status", async () => {
+    const status = list.accounts[1].status!;
+    status.errors = { resetCredits: "accountNetworkError" };
+    status.data!.subscriptionWillRenew = false;
+    status.data!.resetCreditsAvailableCount = 2;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    const b = within(card("b@example.test"));
+    expect(b.getByText("Active")).toBeInTheDocument();
+    expect(b.getByText(/Does not renew/)).toBeInTheDocument();
+    expect(b.getByText("Last reset credits")).toBeInTheDocument();
+    expect(b.getByText("Balance")).toBeInTheDocument();
+    expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).toHaveClass("account-quota-low");
+    expect(b.getByRole("status")).toHaveTextContent("Reset credits");
+  });
+  it("uses the oldest part timestamp and exposes relogin while keeping cached data", async () => {
+    const status = list.accounts[1].status!;
+    status.updatedAt.subscription = new Date(Date.now() - 3 * 3600_000).toISOString();
+    status.needsLogin = true;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    const b = within(card("b@example.test"));
+    expect(b.getByText(/3 hours ago · Data details/)).toBeInTheDocument();
+    expect(b.getByText("Subscription unconfirmed")).toBeInTheDocument();
+    expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "25");
+    expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).toHaveClass("account-quota-stale");
+    expect(b.queryByRole("button", { name: "Switch Codex sign-in" })).not.toBeInTheDocument();
+    vi.mocked(api.startCodexAccountLogin).mockResolvedValue({ id: "login", state: "completed", authorizationUrl: null, deviceCode: null, accountId: "b", error: null });
+    await userEvent.click(b.getByRole("button", { name: "Sign in again" }));
+    expect(api.startCodexAccountLogin).toHaveBeenCalledWith(false, "b");
+  });
+  it("keeps reset credit expiries in collapsed details and device login in the toolbar menu", async () => {
+    list.accounts[0].status!.data!.resetCredits = [{ id: "one", expiresAt: "2030-01-01T00:00:00Z" }];
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    const a = within(card("a@example.test"));
+    const expiry = a.getByText(/Reset credit expires/);
+    expect(expiry).not.toBeVisible();
+    fireEvent.click(a.getByText(/Data details/));
+    expect(expiry).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Device code login" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "More" })[0]);
+    expect(screen.getByRole("menuitem", { name: "Device code login" })).toBeVisible();
   });
 });

@@ -946,7 +946,7 @@
     "quota_not_applicable": "These credentials use an API key rather than a ChatGPT subscription. ChatGPT quota is unavailable for this authentication mode. Local token and cost statistics are still available."
   },
   "accounts": {
-    "description": "View saved ChatGPT accounts side by side. Viewing or refreshing an account keeps the current Codex sign-in.",
+    "description": "Manage saved Codex accounts, check quotas, and switch manually.",
     "add": "Add account",
     "device_login": "Device code login",
     "import": "Import current sign-in",
@@ -966,7 +966,7 @@
     "inactive": "Inactive",
     "yes": "Yes",
     "no": "No",
-    "credits": "Credits",
+    "credits": "Balance",
     "unlimited": "Unlimited",
     "reset_credits": "Reset credits",
     "reset_credit_expiry": "Reset credit expires: {{time}}",
@@ -979,7 +979,7 @@
     "remove": "Remove",
     "remove_current_confirm": "Remove this saved account and its cache? Codex will remain signed in to this account.",
     "remove_confirm": "Remove this saved account and its cache?",
-    "history_scope": "Historical tokens and costs cover the selected Codex directory, across all accounts. They are not attributed to these accounts.",
+    "history_scope": "Historical usage covers the selected Codex directory across all accounts. Restart related Codex clients after switching.",
     "cancel": "Cancel login",
     "open_authorization": "Open authorization",
     "login_running": "Waiting for official Codex authorization…",
@@ -1021,6 +1021,30 @@
       "accountLoginInProgress": "The login task ended or the account is unavailable. Try signing in again.",
       "accountLoginTimedOut": "The login task ended or the account is unavailable. Try signing in again.",
       "accountRemoved": "The login task ended or the account is unavailable. Try signing in again."
-    }
+    },
+    "more": "More",
+    "environment": "Environment",
+    "current_account": "Current account",
+    "window_5hour": "5-hour quota",
+    "window_weekly": "Weekly quota",
+    "window_monthly": "Monthly quota",
+    "subscription_pending": "Subscription unconfirmed",
+    "not_subscribed": "Not subscribed",
+    "free_quota": "Using free quota",
+    "expires_on": "Expires {{date}}",
+    "auto_renew": "Auto-renews",
+    "no_renew": "Does not renew",
+    "last_data": "Last data",
+    "low_quota": "Low remaining quota",
+    "reset_pending": "Reset time needs refresh",
+    "last_balance": "Last balance",
+    "last_reset_credits": "Last reset credits",
+    "reset_count": "total",
+    "reset_available": "available",
+    "not_updated": "Not updated",
+    "just_updated": "Just updated",
+    "reset_in": "Resets in {{time}}",
+    "data_details": "Data details",
+    "data_source": "Source"
   }
 }

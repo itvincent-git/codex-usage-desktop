@@ -16,6 +16,83 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("lays out account cards, cached states, details, and menus at wide and narrow widths", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const page = $('section[aria-label="Accounts"]');
+    const alice = $('[data-account-id="alice"]');
+    const bob = $('[data-account-id="bob"]');
+    const free = $('[data-account-id="free"]');
+    const archive = $('[data-account-id="archive"]');
+    await browser.setWindowSize(1440, 1000);
+    await expect(bob.$(".account-quota-low")).toHaveText(expect.stringContaining("Low remaining quota"));
+    await expect(free.$('[role="meter"][aria-label="Monthly quota"]')).toHaveAttribute("aria-valuenow", "85");
+    await expect(free.$$('[role="meter"]')).toBeElementsArrayOfSize(1);
+    await expect(archive.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "62");
+    await expect(archive.$(".account-membership")).toHaveText(expect.stringContaining("Subscription unconfirmed"));
+    await expect(archive.$(".account-warning")).toBeDisplayed();
+    await expect(archive.$("button=Sign in again")).toBeDisplayed();
+    await expect(archive.$(".account-quota-stale")).toExist();
+    await expect(alice.$(".account-detail-body")).not.toBeDisplayed();
+    await alice.$("summary").click();
+    await expect(alice.$(".account-detail-body")).toBeDisplayed();
+    await expect(alice.$(".account-detail-body")).toHaveText(expect.stringContaining("Subscription"));
+    await alice.$("summary").click();
+    await expect(bob.$("button=More")).toHaveAttribute("aria-expanded", "false");
+    // The embedded driver does not emit the pointerdown event Radix menus require.
+    await bob.$("button=More").execute((element) => element.focus());
+    await browser.keys("Enter");
+    await expect(bob.$("button=More")).toHaveAttribute("aria-expanded", "true");
+    await browser.saveScreenshot("/tmp/codex-accounts-menu.png");
+    await expect($('//*[@role="menuitem" and normalize-space(.)="Sign in again"]')).toBeDisplayed();
+    await expect($('//*[@role="menuitem" and normalize-space(.)="Remove"]')).toBeDisplayed();
+    await browser.keys("Escape");
+    await page.$("button=More").execute((element) => element.focus());
+    await browser.keys("Enter");
+    await expect($('//*[@role="menuitem" and normalize-space(.)="Device code login"]')).toBeDisplayed();
+    await browser.keys("Escape");
+    const layout = () => browser.execute(() => {
+      const grid = document.querySelector(".accounts-grid")!;
+      return {
+        columns: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
+        overflow: document.documentElement.scrollWidth > window.innerWidth,
+        heights: Array.from(grid.children).map((card) => card.getBoundingClientRect().height),
+      };
+    });
+    expect((await layout()).columns).toBe(2);
+    for (const height of (await layout()).heights.slice(0, 3)) {
+      expect(height).toBeGreaterThanOrEqual(280);
+      expect(height).toBeLessThanOrEqual(360);
+    }
+    await browser.execute(() => document.querySelector('[data-app-content] > .overflow-y-auto')?.scrollTo(0, 0));
+    await browser.saveScreenshot("/tmp/codex-accounts-wide.png");
+    // Respect the native 1100px minimum and narrow the content with the resizable sidebar.
+    await browser.setWindowSize(1100, 1000);
+    await browser.execute(() => { localStorage.setItem("sidebar_width", "360"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed();
+    await $('[data-testid="accounts-nav-tab"]').click();
+    await expect(alice).toBeDisplayed();
+    await expect(page.$$("article")).toBeElementsArrayOfSize(4);
+    await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
+    await browser.waitUntil(async () => (await layout()).columns === 1);
+    expect((await layout()).overflow).toBe(false);
+    await browser.saveScreenshot("/tmp/codex-accounts-narrow.png");
+    await browser.setWindowSize(1250, 1000);
+    await browser.execute(() => { localStorage.setItem("language", "zh"); localStorage.setItem("sidebar_width", "240"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed();
+    await $('[data-testid="accounts-nav-tab"]').click();
+    await expect($('[data-account-id="free"]')).toHaveText(expect.stringContaining("月额度"));
+    await browser.saveScreenshot("/tmp/codex-accounts-zh.png");
+    await browser.execute(() => { localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed();
+    await $('[data-testid="accounts-nav-tab"]').click();
+  });
+
   run("compares isolated accounts, preserves stale values, and switches complete authentication", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();
@@ -26,8 +103,8 @@ describe("native saved Codex accounts", () => {
     const bob = $('[data-account-id="bob"]');
     await alice.waitForDisplayed();
     await $('button=Refresh all').click();
-    await expect(alice).toHaveText(expect.stringContaining("80% remaining"));
-    await expect(bob).toHaveText(expect.stringContaining("25% remaining"));
+    await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
+    await expect(bob.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
     await expect(alice).toHaveText(expect.stringContaining("plus"));
     await expect(bob).toHaveText(expect.stringContaining("pro"));
     await expect(alice).toHaveText(expect.stringContaining("Current Codex sign-in"));
@@ -51,7 +128,7 @@ describe("native saved Codex accounts", () => {
     await control({ failSubscription: false, limitRateLimited: false });
     await bob.$("button=Refresh").click();
     await expect(bob).toHaveText(expect.stringContaining("Stale data"));
-    await expect(alice).toHaveText(expect.stringContaining("80% remaining"));
+    await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
 
     await bob.$("button=Switch Codex sign-in").click();
     await expect(alice).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
@@ -157,7 +234,7 @@ describe("native saved Codex accounts", () => {
       return !!added && added.id !== removed.id;
     });
     const card = $(`[data-account-id="${addedId!}"]`);
-    await expect(card).toHaveText(expect.stringContaining("25% remaining"));
+    await expect(card.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
     await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
     await expect(card).not.toHaveText(expect.stringContaining("Stale data"));
     const status = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === addedId!)!.status;

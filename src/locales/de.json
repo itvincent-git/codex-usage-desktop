@@ -1064,6 +1064,30 @@
       "accountLoginInProgress": "Die Anmeldung wurde beendet oder das Konto ist nicht verfügbar. Melden Sie sich erneut an.",
       "accountLoginTimedOut": "Die Anmeldung wurde beendet oder das Konto ist nicht verfügbar. Melden Sie sich erneut an.",
       "accountRemoved": "Die Anmeldung wurde beendet oder das Konto ist nicht verfügbar. Melden Sie sich erneut an."
-    }
+    },
+    "more": "Mehr",
+    "environment": "Aktuelle Umgebung",
+    "current_account": "Aktuelles Konto",
+    "window_5hour": "5-Stunden-Kontingent",
+    "window_weekly": "Wochenkontingent",
+    "window_monthly": "Monatskontingent",
+    "subscription_pending": "Abonnement unbestätigt",
+    "not_subscribed": "Nicht abonniert",
+    "free_quota": "Kostenloses Kontingent",
+    "expires_on": "Läuft am {{date}} ab",
+    "auto_renew": "Automatische Verlängerung",
+    "no_renew": "Keine Verlängerung",
+    "last_data": "Letzte Daten",
+    "low_quota": "Wenig Kontingent übrig",
+    "reset_pending": "Reset-Zeit muss aktualisiert werden",
+    "last_balance": "Letztes Guthaben",
+    "last_reset_credits": "Letzte Reset-Guthaben",
+    "reset_count": "gesamt",
+    "reset_available": "verfügbar",
+    "not_updated": "Noch nicht aktualisiert",
+    "just_updated": "Gerade aktualisiert",
+    "reset_in": "Reset in {{time}}",
+    "data_details": "Datendetails",
+    "data_source": "Quelle"
   }
 }

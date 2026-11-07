@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import type { AccountStatus } from "../../src/lib/codex-accounts";
 import { join, resolve } from "node:path";
 
 export function accountCredentials(user: string, workspace = "shared-workspace") {
-  const claims = { exp: 4_102_444_800, email: `${user}@example.test`, "https://api.openai.com/profile": { email: `${user}@example.test` }, "https://api.openai.com/auth": { chatgpt_user_id: user, chatgpt_account_id: workspace, chatgpt_plan_type: user === "alice" ? "plus" : "pro" } };
+  const claims = { exp: 4_102_444_800, email: `${user}@example.test`, "https://api.openai.com/profile": { email: `${user}@example.test` }, "https://api.openai.com/auth": { chatgpt_user_id: user, chatgpt_account_id: workspace, chatgpt_plan_type: user === "free" ? "free" : user === "alice" || user === "archive" ? "plus" : "pro" } };
   const token = `e30.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.fixture`;
   return { auth_mode: "chatgpt", OPENAI_API_KEY: null, tokens: { access_token: token, id_token: token, refresh_token: `fixture-refresh-${user}`, account_id: workspace, future_field: { keep: true } }, last_refresh: "2026-11-06T00:00:00Z", unknown_native_field: [1, 2, 3] };
 }
@@ -14,7 +15,18 @@ export async function startAccountsFixture(root: string) {
   const library = join(appData, "codex-accounts");
   mkdirSync(codexHome, { recursive: true, mode: 0o700 });
   mkdirSync(library, { recursive: true, mode: 0o700 });
-  const accounts = ["alice", "bob"].map((user) => ({ id: user, identity: { userId: user, workspaceId: "shared-workspace" }, email: `${user}@example.test`, credentialVersion: 1, credentials: accountCredentials(user), status: null }));
+  const accounts = ["alice", "bob", "free", "archive"].map((user) => ({ id: user, identity: { userId: user, workspaceId: "shared-workspace" }, email: `${user}@example.test`, credentialVersion: 1, credentials: accountCredentials(user), status: user === "archive" ? {
+    accountId: user, identity: { userId: user, workspaceId: "shared-workspace" }, credentialVersion: 1, needsLogin: true,
+    errors: { limits: "accountLoginRequired", subscription: "accountLoginRequired" },
+    updatedAt: Object.fromEntries(["limits", "subscription", "resetCredits"].map((part) => [part, new Date(Date.now() - 3 * 3600_000).toISOString()])),
+    data: {
+      session: { usedPercent: 38, remainingPercent: 62, windowMinutes: 300, resetsAt: new Date(Date.now() - 3600_000).toISOString() },
+      weekly: { usedPercent: 69, remainingPercent: 31, windowMinutes: 10080, resetsAt: new Date(Date.now() + 86400_000).toISOString() },
+      membershipLevel: "plus", workspaceName: "Archived workspace", subscriptionActive: true, subscriptionWillRenew: true, subscriptionExpiresAt: "2030-01-01T00:00:00Z",
+      credits: { hasCredits: true, unlimited: false, balance: "8.50" }, resetCreditsAvailableCount: 1,
+      resetCredits: [{ id: "archived-reset", expiresAt: "2030-01-01T00:00:00Z" }], updatedAt: new Date(Date.now() - 3 * 3600_000).toISOString(), source: "oauth",
+    },
+  } satisfies AccountStatus : null }));
   writeFileSync(join(library, "accounts.json"), JSON.stringify({ accounts, pending: null }), { mode: 0o600 });
   writeFileSync(join(codexHome, "auth.json"), JSON.stringify(accountCredentials("alice")), { mode: 0o600 });
   writeFileSync(join(codexHome, "config.toml"), "# Must stay byte-for-byte unchanged\ncli_auth_credentials_store = 'file'\nmodel = 'fixture-model'\nmodel_reasoning_effort = 'xhigh'\n[mcp_servers.fixture]\ncommand = 'fixture'\n");
@@ -34,6 +46,7 @@ export async function startAccountsFixture(root: string) {
       let body = ""; for await (const chunk of req) body += chunk;
       const grant = JSON.parse(body);
       const user = String(grant.refresh_token).split("-").at(-1)!;
+      if (user === "archive") { res.writeHead(400).end('{"error":"invalid_grant"}'); return; }
       const tokens = accountCredentials(user).tokens;
       requests["refresh"] = (requests["refresh"] ?? 0) + 1;
       res.setHeader("Content-Type", "application/json");
@@ -44,19 +57,20 @@ export async function startAccountsFixture(root: string) {
     try { claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()); } catch { res.writeHead(401).end(); return; }
     const identity = claims["https://api.openai.com/auth"];
     if (req.headers["chatgpt-account-id"] !== identity.chatgpt_account_id) { res.writeHead(403).end(); return; }
+    if (identity.chatgpt_user_id === "archive") { res.writeHead(401).end('{"error":"fixture"}'); return; }
     const endpoint = req.url?.split("?")[0] ?? "";
     const key = `${identity.chatgpt_user_id}:${endpoint}`;
     requests[key] = (requests[key] ?? 0) + 1;
     res.setHeader("Content-Type", "application/json");
     if (endpoint.includes("accounts/check")) {
       if (failSubscription) { res.writeHead(503).end('{"error":"fixture"}'); return; }
-      res.end(JSON.stringify({ accounts: { [identity.chatgpt_account_id]: { account: { account_id: identity.chatgpt_account_id, name: `Workspace ${identity.chatgpt_user_id}` }, entitlement: { has_active_subscription: true, expires_at: "2030-01-01T00:00:00Z" }, last_active_subscription: { will_renew: true } } } }));
+      res.end(JSON.stringify({ accounts: { [identity.chatgpt_account_id]: { account: { account_id: identity.chatgpt_account_id, name: `Workspace ${identity.chatgpt_user_id}` }, entitlement: { has_active_subscription: identity.chatgpt_user_id !== "free", expires_at: "2030-01-01T00:00:00Z" }, last_active_subscription: { will_renew: true } } } }));
     } else if (endpoint.endsWith("rate-limit-reset-credits")) {
       res.end(JSON.stringify({ available_count: identity.chatgpt_user_id === "alice" ? 1 : 3, credits: [] }));
     } else if (endpoint.endsWith("/usage")) {
       if (claims.force401) { res.writeHead(401).end('{"error":"fixture"}'); return; }
       if (limitRateLimited && identity.chatgpt_user_id === "bob") { res.writeHead(429, { "Retry-After": "60" }).end('{"error":"fixture"}'); return; }
-      res.end(JSON.stringify({ rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "alice" ? 20 : 75, reset_at: 1_900_000_000, limit_window_seconds: 18_000 }, secondary_window: { used_percent: 40, reset_at: 1_900_050_000, limit_window_seconds: 604_800 } }, credits: { has_credits: true, unlimited: false, balance: identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
+      res.end(JSON.stringify({ rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "free" ? 15 : identity.chatgpt_user_id === "alice" ? 20 : 75, reset_at: Math.floor(Date.now() / 1000) + (identity.chatgpt_user_id === "free" ? 23 * 86400 : 4 * 3600 + 32 * 60), limit_window_seconds: identity.chatgpt_user_id === "free" ? 30 * 86400 : 18_000 }, secondary_window: identity.chatgpt_user_id === "free" ? null : { used_percent: 40, reset_at: Math.floor(Date.now() / 1000) + 3 * 86400 + 6 * 3600, limit_window_seconds: 604_800 } }, credits: { has_credits: true, unlimited: false, balance: identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
     } else { res.writeHead(404).end("{}"); }
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
