@@ -4,7 +4,7 @@ import type { AccountStatus } from "../../src/lib/codex-accounts";
 import { join, resolve } from "node:path";
 
 export function accountCredentials(user: string, workspace = "shared-workspace") {
-  const claims = { exp: 4_102_444_800, email: `${user}@example.test`, "https://api.openai.com/profile": { email: `${user}@example.test` }, "https://api.openai.com/auth": { chatgpt_user_id: user, chatgpt_account_id: workspace, chatgpt_plan_type: user === "free" ? "free" : user === "alice" || user === "archive" ? "plus" : "pro" } };
+  const claims = { exp: 4_102_444_800, email: `${user}@example.test`, "https://api.openai.com/profile": { email: `${user}@example.test` }, "https://api.openai.com/auth": { chatgpt_user_id: user, chatgpt_account_id: workspace, chatgpt_plan_type: user === "free" ? "free" : user === "bob" ? "team" : user === "alice" || user === "archive" ? "plus" : "pro" } };
   const token = `e30.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.fixture`;
   return { auth_mode: "chatgpt", OPENAI_API_KEY: null, tokens: { access_token: token, id_token: token, refresh_token: `fixture-refresh-${user}`, account_id: workspace, future_field: { keep: true } }, last_refresh: "2026-11-06T00:00:00Z", unknown_native_field: [1, 2, 3] };
 }
@@ -64,13 +64,13 @@ export async function startAccountsFixture(root: string) {
     res.setHeader("Content-Type", "application/json");
     if (endpoint.includes("accounts/check")) {
       if (failSubscription) { res.writeHead(503).end('{"error":"fixture"}'); return; }
-      res.end(JSON.stringify({ accounts: { [identity.chatgpt_account_id]: { account: { account_id: identity.chatgpt_account_id, name: `Workspace ${identity.chatgpt_user_id}` }, entitlement: { has_active_subscription: identity.chatgpt_user_id !== "free", expires_at: "2030-01-01T00:00:00Z" }, last_active_subscription: { will_renew: true } } } }));
+      res.end(JSON.stringify({ accounts: { [identity.chatgpt_account_id]: { account: { account_id: identity.chatgpt_account_id, name: identity.chatgpt_user_id === "alice" ? null : `Workspace ${identity.chatgpt_user_id}` }, entitlement: { has_active_subscription: identity.chatgpt_user_id !== "free", expires_at: "2030-01-01T00:00:00Z" }, last_active_subscription: { will_renew: true } } } }));
     } else if (endpoint.endsWith("rate-limit-reset-credits")) {
-      res.end(JSON.stringify({ available_count: identity.chatgpt_user_id === "alice" ? 1 : 3, credits: [] }));
+      res.end(JSON.stringify({ available_count: identity.chatgpt_user_id === "alice" ? 1 : 3, credits: [{ id: "reset-one", status: "available", expires_at: "2030-01-01T00:00:00Z" }] }));
     } else if (endpoint.endsWith("/usage")) {
       if (claims.force401) { res.writeHead(401).end('{"error":"fixture"}'); return; }
       if (limitRateLimited && identity.chatgpt_user_id === "bob") { res.writeHead(429, { "Retry-After": "60" }).end('{"error":"fixture"}'); return; }
-      res.end(JSON.stringify({ rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "free" ? 15 : identity.chatgpt_user_id === "alice" ? 20 : 75, reset_at: Math.floor(Date.now() / 1000) + (identity.chatgpt_user_id === "free" ? 23 * 86400 : 4 * 3600 + 32 * 60), limit_window_seconds: identity.chatgpt_user_id === "free" ? 30 * 86400 : 18_000 }, secondary_window: identity.chatgpt_user_id === "free" ? null : { used_percent: 40, reset_at: Math.floor(Date.now() / 1000) + 3 * 86400 + 6 * 3600, limit_window_seconds: 604_800 } }, credits: { has_credits: true, unlimited: false, balance: identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
+      res.end(JSON.stringify({ plan_type: identity.chatgpt_user_id === "bob" ? "self_serve_business_prolite" : identity.chatgpt_user_id === "free" ? "free" : identity.chatgpt_user_id === "alice" ? "plus" : "pro", rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "free" ? 15 : identity.chatgpt_user_id === "alice" ? 20 : 75, reset_at: Math.floor(Date.now() / 1000) + (identity.chatgpt_user_id === "free" ? 23 * 86400 : 4 * 3600 + 32 * 60), limit_window_seconds: identity.chatgpt_user_id === "free" ? 30 * 86400 : 18_000 }, secondary_window: identity.chatgpt_user_id === "free" ? null : { used_percent: 40, reset_at: Math.floor(Date.now() / 1000) + 3 * 86400 + 6 * 3600, limit_window_seconds: 604_800 } }, credits: { has_credits: true, unlimited: false, balance: identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
     } else { res.writeHead(404).end("{}"); }
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));

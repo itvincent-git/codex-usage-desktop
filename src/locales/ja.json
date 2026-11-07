@@ -982,12 +982,16 @@
     "quota_not_applicable": "現在の認証情報は API キーを使用しています。この方式では ChatGPT の利用枠を取得できません。ローカルのトークンと費用の統計は利用できます。"
   },
   "accounts": {
+    "personal_workspace": "個人用ワークスペース",
+    "workspace_unknown": "ワークスペース名を取得できません",
+    "seat_standard": "Standard シート",
+    "seat_premium": "Premium シート",
+    "seat_codex": "Codex シート",
     "description": "保存した ChatGPT アカウントを並べて表示します。表示や更新では Codex のログインは変わりません。",
     "add": "アカウント追加",
     "device_login": "デバイスコードでログイン",
     "import": "現在のログインを取り込む",
     "refresh_all": "すべて更新",
-    "storage_notice": "認証情報はローカルの非公開の平文ファイルに保存されます。追加しても Codex は切り替わりません。",
     "recovery_conflict": "復旧中に外部の認証変更を検出しました。外部の認証情報を保持しました。",
     "added": "アカウントを保存しました。Codex のログインは変わりません。",
     "restart_required": "認証を切り替えて確認しました。関連する Codex CLI、IDE、デスクトップクライアントを再起動してください。",
@@ -1059,7 +1063,6 @@
       "accountRemoved": "ログイン処理が終了したかアカウントが利用できません。再ログインしてください。"
     },
     "more": "その他",
-    "environment": "現在の環境",
     "current_account": "現在のアカウント",
     "window_5hour": "5時間の上限",
     "window_weekly": "週間上限",

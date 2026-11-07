@@ -989,12 +989,16 @@
     "quota_not_applicable": "Diese Anmeldedaten verwenden einen API-Schlüssel. ChatGPT-Kontingente sind dafür nicht verfügbar. Lokale Token- und Kostenstatistiken bleiben verfügbar."
   },
   "accounts": {
+    "personal_workspace": "Persönlicher Arbeitsbereich",
+    "workspace_unknown": "Arbeitsbereich nicht verfügbar",
+    "seat_standard": "Standard-Sitz",
+    "seat_premium": "Premium-Sitz",
+    "seat_codex": "Codex-Sitz",
     "description": "Gespeicherte ChatGPT-Konten nebeneinander anzeigen. Anzeigen und Aktualisieren behalten die aktuelle Codex-Anmeldung bei.",
     "add": "Konto hinzufügen",
     "device_login": "Mit Gerätecode anmelden",
     "import": "Aktuelle Anmeldung importieren",
     "refresh_all": "Alle aktualisieren",
-    "storage_notice": "Zugangsdaten werden lokal in privaten Klartextdateien gespeichert. Hinzufügen speichert das Konto ohne Codex umzuschalten.",
     "recovery_conflict": "Bei der Wiederherstellung wurde eine externe Änderung erkannt. Die externen Zugangsdaten wurden beibehalten.",
     "added": "Konto gespeichert. Die Codex-Anmeldung bleibt unverändert.",
     "restart_required": "Authentifizierung gewechselt und geprüft. Starten Sie betroffene Codex-CLI-, IDE- und Desktop-Clients neu.",
@@ -1066,7 +1070,6 @@
       "accountRemoved": "Die Anmeldung wurde beendet oder das Konto ist nicht verfügbar. Melden Sie sich erneut an."
     },
     "more": "Mehr",
-    "environment": "Aktuelle Umgebung",
     "current_account": "Aktuelles Konto",
     "window_5hour": "5-Stunden-Kontingent",
     "window_weekly": "Wochenkontingent",

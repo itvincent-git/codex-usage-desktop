@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Ellipsis, Info, Plus, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Check, Ellipsis, Info, Plus, RefreshCw, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,6 @@ export function AccountsPage() {
         </DropdownMenu>
       </div>
     </div>
-    <div className="accounts-context"><ShieldCheck aria-hidden="true" /><div>{t("accounts.storage_notice")} <details className="accounts-environment"><summary>{t("accounts.environment")} <span className="font-mono">{list?.environment.split(/[/\\]/).at(-1)}</span></summary><p className="font-mono break-all">{list?.environment}</p></details></div></div>
     {list?.switchError ? <p role="status" className="text-sm text-warning">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning">{t("accounts.recovery_conflict")}</p> : null}
     {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
@@ -130,9 +129,15 @@ export function AccountsPage() {
       {list?.accounts.map((account) => {
         const status = account.status;
         const data = status?.data;
-        const free = data?.membershipLevel?.toLowerCase() === "free";
+        const plan = data?.membershipLevel?.toLowerCase();
+        const free = plan === "free";
+        const personal = !!plan && ["guest", "free", "go", "plus", "pro", "prolite", "promax"].includes(plan);
+        const seat = plan === "team" ? "standard" : plan === "self_serve_business_prolite" ? "premium" : plan === "self_serve_business_usage_based" ? "codex" : null;
+        const resetCount = data?.resetCreditsAvailableCount;
+        const resetCredits = data?.resetCredits ?? [];
+        const missingResetDetails = resetCount == null ? 0 : Math.max(0, resetCount - resetCredits.length);
         const windows = free
-          ? [{ name: "accounts.window_monthly", window: data.weekly ?? data.session }]
+          ? [{ name: "accounts.window_monthly", window: data?.weekly ?? data?.session }]
           : [{ name: "accounts.window_5hour", window: data?.session }, { name: "accounts.window_weekly", window: data?.weekly }];
         const partStale = (part: string) => !!status && (status.needsLogin || !!status.errors[part] || !!status.updatedAt[part] && Date.now() - Date.parse(status.updatedAt[part]) > 10 * 60_000);
         const limitsStale = partStale("limits");
@@ -145,10 +150,10 @@ export function AccountsPage() {
         return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
           <header>
             <div className="account-identity"><h2>{account.email ?? account.identity.userId}</h2>{account.current ? <span className="account-current"><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>
-            <p className="account-workspace">{data?.workspaceName ?? account.identity.workspaceId}</p>
+            <p className="account-workspace">{data?.workspaceName?.trim() || t(personal ? "accounts.personal_workspace" : "accounts.workspace_unknown")}</p>
           </header>
           <div className="account-membership">
-            <span className="account-plan">{data?.membershipLevel ?? t("accounts.unknown")}</span>
+            <span className="account-plan">{seat ? `Team · ${t(`accounts.seat_${seat}`)}` : data?.membershipLevel ?? t("accounts.unknown")}</span>
             <span className={!subscriptionStale && !free && data?.subscriptionActive ? "account-active" : undefined}>
               {!subscriptionStale && !free && data?.subscriptionActive ? <span className="account-dot" /> : null}
               {t(subscriptionStale ? "accounts.subscription_pending" : free ? "accounts.not_subscribed" : data?.subscriptionActive == null ? "accounts.unknown" : data.subscriptionActive ? "accounts.active" : "accounts.inactive")}
@@ -172,7 +177,18 @@ export function AccountsPage() {
           </div>
           <dl className="account-resources">
             <div><dt>{t(limitsStale ? "accounts.last_balance" : "accounts.credits")}</dt><dd>{data?.credits ? data.credits.unlimited ? t("accounts.unlimited") : data.credits.balance != null ? new Intl.NumberFormat(locale, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol" }).format(Number(data.credits.balance)) : t("accounts.unknown") : t("accounts.unknown")}</dd></div>
-            <div><dt>{t(resetStale ? "accounts.last_reset_credits" : "accounts.reset_credits")}</dt><dd>{data?.resetCreditsAvailableCount ?? t("accounts.unknown")} <small>{data?.resetCreditsAvailableCount != null ? t(resetStale ? "accounts.reset_count" : "accounts.reset_available") : ""}</small></dd></div>
+            <div><dt>{t(resetStale ? "accounts.last_reset_credits" : "accounts.reset_credits")}</dt><dd>
+              <details className="account-reset-details">
+                <summary aria-label={`${t(resetStale ? "accounts.last_reset_credits" : "accounts.reset_credits")} · ${resetCount == null ? t("accounts.unknown") : t("limits.reset_credits_available", { count: resetCount })}`}>
+                  {resetCount ?? t("accounts.unknown")} <small>{resetCount != null ? t(resetStale ? "accounts.reset_count" : "accounts.reset_available") : ""}</small>
+                </summary>
+                <div className="account-detail-body">
+                  {resetCredits.map((credit) => <p key={credit.id}>{t("accounts.reset_credit_expiry", { time: credit.expiresAt ? new Date(credit.expiresAt).toLocaleString(locale) : t("accounts.unknown") })}</p>)}
+                  {missingResetDetails > 0 ? <p>{t("limits.reset_credits_details_partial", { count: missingResetDetails })}</p> : null}
+                  {!resetCredits.length && !missingResetDetails ? <p>{t(resetCount === 0 ? "limits.reset_credits_none" : "limits.reset_credits_details_unavailable")}</p> : null}
+                </div>
+              </details>
+            </dd></div>
           </dl>
           {status?.needsLogin || stale ? <p role="status" className="account-warning"><TriangleAlert aria-hidden="true" />{t(status?.needsLogin ? "accounts.needs_login" : "accounts.stale")}{Object.keys(status?.errors ?? {}).length ? ` · ${Object.keys(status!.errors).map((part) => t(`accounts.part_${part}`)).join(" / ")}` : ""}</p> : null}
           <footer className="account-footer">
@@ -184,7 +200,6 @@ export function AccountsPage() {
                 {data?.subscriptionWillRenew != null ? <p>{t("accounts.renews")}{subscriptionStale ? ` · ${t("accounts.last_data")}` : ""} · {t(data.subscriptionWillRenew ? "accounts.yes" : "accounts.no")}</p> : null}
                 {data?.subscriptionExpiresAt ? <p>{t("accounts.expires")} · {new Date(data.subscriptionExpiresAt).toLocaleString(locale)}</p> : null}
                 {Object.entries(status?.updatedAt ?? {}).map(([part, at]) => <p key={part}>{t(`accounts.part_${part}`)} · {new Date(at).toLocaleString(locale)}</p>)}
-                {data?.resetCredits?.map((credit) => <p key={credit.id}>{t("accounts.reset_credit_expiry", { time: credit.expiresAt ? new Date(credit.expiresAt).toLocaleString(locale) : t("accounts.unknown") })}</p>)}
                 {Object.entries(status?.errors ?? {}).map(([part, code]) => <p key={part} className="text-error">{t(`accounts.part_${part}`)}: {message(code)}</p>)}
               </div>
             </details>

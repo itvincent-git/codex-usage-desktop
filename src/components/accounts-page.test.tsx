@@ -105,6 +105,27 @@ describe("saved Codex accounts", () => {
 });
 
 describe("account card presentation", () => {
+  it("shows workspace names and personal workspace labels without exposing workspace IDs", async () => {
+    list.accounts[1].status!.data!.workspaceName = "Example workspace";
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    expect(within(card("a@example.test")).getByText("Personal workspace")).toBeInTheDocument();
+    expect(within(card("b@example.test")).getByText("Example workspace")).toBeInTheDocument();
+    expect(screen.queryByText("shared-workspace")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Credentials are stored locally/)).not.toBeInTheDocument();
+    expect(document.querySelector(".accounts-environment")).toBeNull();
+  });
+  it.each([
+    ["team", "Standard seat"],
+    ["self_serve_business_prolite", "Premium seat"],
+    ["self_serve_business_usage_based", "Codex seat"],
+  ])("shows the seat level for %s", async (plan, seat) => {
+    list.accounts[1].status!.data!.membershipLevel = plan;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    expect(within(card("b@example.test")).getByText(`Team · ${seat}`)).toBeInTheDocument();
+    expect(within(card("b@example.test")).getByText("Workspace unavailable")).toBeInTheDocument();
+  });
   it("uses remaining quota and the existing 30 percent warning boundary", async () => {
     list.accounts[0].status!.data = data("plus", 30);
     list.accounts[1].status!.data = data("pro", 29.9);
@@ -157,17 +178,31 @@ describe("account card presentation", () => {
     await userEvent.click(b.getByRole("button", { name: "Sign in again" }));
     expect(api.startCodexAccountLogin).toHaveBeenCalledWith(false, "b");
   });
-  it("keeps reset credit expiries in collapsed details and device login in the toolbar menu", async () => {
+  it("expands reset credit expiries from the available count and keeps device login in the toolbar menu", async () => {
+    list.accounts[0].status!.data!.resetCreditsAvailableCount = 2;
     list.accounts[0].status!.data!.resetCredits = [{ id: "one", expiresAt: "2030-01-01T00:00:00Z" }];
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "a@example.test" });
     const a = within(card("a@example.test"));
     const expiry = a.getByText(/Reset credit expires/);
     expect(expiry).not.toBeVisible();
-    fireEvent.click(a.getByText(/Data details/));
+    fireEvent.click(a.getByLabelText("Reset credits · 2 available"));
     expect(expiry).toBeVisible();
+    expect(a.getByText("Expiration details were not returned for 1 more credits")).toBeVisible();
+    fireEvent.click(a.getByLabelText("Reset credits · 2 available"));
+    expect(expiry).not.toBeVisible();
     expect(screen.queryByRole("menuitem", { name: "Device code login" })).not.toBeInTheDocument();
     await userEvent.click(screen.getAllByRole("button", { name: "More" })[0]);
     expect(screen.getByRole("menuitem", { name: "Device code login" })).toBeVisible();
+  });
+  it.each([0, null])("shows an explicit reset details state for count %s", async (count) => {
+    list.accounts[0].status!.data!.resetCreditsAvailableCount = count;
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    const a = within(card("a@example.test"));
+    const text = count === 0 ? "No reset credits available" : "Expiration details are temporarily unavailable";
+    expect(a.getByText(text)).not.toBeVisible();
+    fireEvent.click(a.getByLabelText(`Reset credits · ${count === 0 ? "0 available" : "Unknown"}`));
+    expect(a.getByText(text)).toBeVisible();
   });
 });

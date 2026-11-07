@@ -946,12 +946,16 @@
     "quota_not_applicable": "These credentials use an API key rather than a ChatGPT subscription. ChatGPT quota is unavailable for this authentication mode. Local token and cost statistics are still available."
   },
   "accounts": {
+    "personal_workspace": "Personal workspace",
+    "workspace_unknown": "Workspace unavailable",
+    "seat_standard": "Standard seat",
+    "seat_premium": "Premium seat",
+    "seat_codex": "Codex seat",
     "description": "Manage saved Codex accounts, check quotas, and switch manually.",
     "add": "Add account",
     "device_login": "Device code login",
     "import": "Import current sign-in",
     "refresh_all": "Refresh all",
-    "storage_notice": "Credentials are stored locally in private plaintext files. Adding an account saves it without switching Codex.",
     "recovery_conflict": "Recovery found an external authentication change. The external credentials were preserved.",
     "added": "Account saved. Codex sign-in is unchanged.",
     "restart_required": "Authentication switched and verified. Restart related Codex CLI, IDE, and desktop clients to load the new account.",
@@ -1023,7 +1027,6 @@
       "accountRemoved": "The login task ended or the account is unavailable. Try signing in again."
     },
     "more": "More",
-    "environment": "Environment",
     "current_account": "Current account",
     "window_5hour": "5-hour quota",
     "window_weekly": "Weekly quota",

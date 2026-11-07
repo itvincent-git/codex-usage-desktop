@@ -60,6 +60,7 @@ struct RateLimitWindow {
 
 #[derive(Debug, Deserialize)]
 struct OAuthUsageResponse {
+    plan_type: Option<String>,
     rate_limit: Option<OAuthRateLimitSnapshot>,
     credits: Option<CodexCredits>,
     rate_limit_reset_credits: Option<OAuthRateLimitResetCredits>,
@@ -576,8 +577,11 @@ pub(crate) fn send_account_request(request: reqwest::blocking::RequestBuilder, a
 pub(crate) fn fetch_account_parts(auth: &CodexAuth) -> (CodexLimitsResponse, HashMap<String, String>) {
     let mut errors = HashMap::new();
     let subscription = fetch_subscription_info(auth).unwrap_or_else(|e| { errors.insert("subscription".into(), e); SubscriptionInfo::default() });
-    let (account, membership_level) = decode_jwt_info(&auth.access_token);
-    let mut response = match fetch_oauth_usage(auth).and_then(|u| make_oauth_snapshot(u, Err("accountResponseUnavailable".into()))) {
+    let (account, mut membership_level) = decode_jwt_info(&auth.access_token);
+    let mut response = match fetch_oauth_usage(auth).and_then(|usage| {
+        membership_level = usage.plan_type.clone().filter(|plan| !plan.trim().is_empty()).or(membership_level.take());
+        make_oauth_snapshot(usage, Err("accountResponseUnavailable".into()))
+    }) {
         Ok(limits) => make_response(limits, AccountSnapshot { account, membership_level, subscription }),
         Err(e) => {
             errors.insert("limits".into(), e);

@@ -422,6 +422,7 @@ impl AccountService {
             .unwrap_or_default();
         if let Some(old) = account.status.as_ref().and_then(|s| s.data.as_ref()) {
             if errors.contains_key("limits") {
+                data.membership_level = old.membership_level.clone();
                 data.session = old.session.clone();
                 data.weekly = old.weekly.clone();
                 data.credits = old.credits.clone();

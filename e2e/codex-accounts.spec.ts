@@ -49,6 +49,43 @@ describe("native saved Codex accounts", () => {
     expect(await appearance("bob")).toEqual(inactive);
   });
 
+  run("shows seat levels and workspace labels and expands reset credits from the count", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const alice = $('[data-account-id="alice"]');
+    const bob = $('[data-account-id="bob"]');
+    await expect(alice.$(".account-workspace")).toHaveText("Personal workspace");
+    await expect(bob.$(".account-workspace")).toHaveText("Workspace bob");
+    await expect(bob.$(".account-plan")).toHaveText("Team · Premium seat");
+    await expect($(".accounts-environment")).not.toExist();
+    await expect($('section[aria-label="Accounts"]')).not.toHaveText(expect.stringContaining("Credentials are stored locally"));
+    const details = alice.$(".account-reset-details");
+    await expect(details.$("summary")).toHaveText("1 available");
+    await expect(details.$(".account-detail-body")).not.toBeDisplayed();
+    await details.$("summary").click();
+    await expect(details.$(".account-detail-body")).toBeDisplayed();
+    await expect(details.$(".account-detail-body")).toHaveText(expect.stringContaining("Reset credit expires"));
+    await details.$("summary").click();
+    await expect(details.$(".account-detail-body")).not.toBeDisplayed();
+    await browser.execute(() => { localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed();
+    await $('[data-testid="accounts-nav-tab"]').click();
+    await expect(bob.$(".account-plan")).toHaveText("Team · 高级席位");
+    await expect(alice.$(".account-workspace")).toHaveText("个人工作区");
+    await expect(alice.$(".account-resources")).toHaveText(expect.stringContaining("额度重置"));
+    await expect(alice.$(".account-reset-details summary")).toHaveText("1 次可用");
+    await alice.$(".account-reset-details summary").click();
+    await expect(alice.$(".account-reset-details .account-detail-body")).toBeDisplayed();
+    await browser.saveScreenshot("/tmp/codex-accounts-reset-details.png");
+    await browser.execute(() => { localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed();
+    await $('[data-testid="accounts-nav-tab"]').click();
+  });
+
   run("lays out account cards, cached states, details, and menus at wide and narrow widths", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();
@@ -68,11 +105,11 @@ describe("native saved Codex accounts", () => {
     await expect(archive.$(".account-warning")).toBeDisplayed();
     await expect(archive.$("button=Sign in again")).toBeDisplayed();
     await expect(archive.$(".account-quota-stale")).toExist();
-    await expect(alice.$(".account-detail-body")).not.toBeDisplayed();
-    await alice.$("summary").click();
-    await expect(alice.$(".account-detail-body")).toBeDisplayed();
-    await expect(alice.$(".account-detail-body")).toHaveText(expect.stringContaining("Subscription"));
-    await alice.$("summary").click();
+    await expect(alice.$(".account-details .account-detail-body")).not.toBeDisplayed();
+    await alice.$(".account-details summary").click();
+    await expect(alice.$(".account-details .account-detail-body")).toBeDisplayed();
+    await expect(alice.$(".account-details .account-detail-body")).toHaveText(expect.stringContaining("Subscription"));
+    await alice.$(".account-details summary").click();
     const more = bob.$('button[aria-label="More"]');
     await expect(more).toHaveText("");
     await expect(more).toHaveAttribute("title", "More");
@@ -145,7 +182,7 @@ describe("native saved Codex accounts", () => {
     await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
     await expect(bob.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
     await expect(alice).toHaveText(expect.stringContaining("plus"));
-    await expect(bob).toHaveText(expect.stringContaining("pro"));
+    await expect(bob).toHaveText(expect.stringContaining("Team · Premium seat"));
     await expect(alice).toHaveText(expect.stringContaining("Current Codex sign-in"));
     const authPath = join(process.env.CODEX_HOME!, "auth.json");
     const configPath = join(process.env.CODEX_HOME!, "config.toml");
@@ -166,6 +203,7 @@ describe("native saved Codex accounts", () => {
     const status = await invoke<AccountStatus>("fetch_codex_account_status", { accountId: "bob" });
     expect(status.data?.session?.remainingPercent).toBe(25);
     expect(status.data?.subscriptionActive).toBe(true);
+    expect(status.data?.membershipLevel).toBe("self_serve_business_prolite");
     expect(status.errors.subscription).toBe("accountHttpError:503");
     expect(status.errors.limits).toBe("accountRateLimited");
     const before = await control();

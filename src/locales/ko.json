@@ -946,12 +946,16 @@
     "quota_not_applicable": "현재 인증 정보는 API 키를 사용합니다. 이 방식에서는 ChatGPT 구독 한도를 조회할 수 없습니다. 로컬 토큰 및 비용 통계는 계속 사용할 수 있습니다."
   },
   "accounts": {
+    "personal_workspace": "개인 워크스페이스",
+    "workspace_unknown": "워크스페이스 이름을 확인할 수 없음",
+    "seat_standard": "Standard 좌석",
+    "seat_premium": "Premium 좌석",
+    "seat_codex": "Codex 좌석",
     "description": "저장된 ChatGPT 계정을 나란히 확인합니다. 조회하거나 새로 고쳐도 현재 Codex 로그인은 유지됩니다.",
     "add": "계정 추가",
     "device_login": "기기 코드 로그인",
     "import": "현재 로그인 가져오기",
     "refresh_all": "모두 새로 고침",
-    "storage_notice": "인증 정보는 로컬 비공개 일반 텍스트 파일에 저장됩니다. 계정을 추가해도 Codex는 전환되지 않습니다.",
     "recovery_conflict": "복구 중 외부 인증 변경을 감지했습니다. 외부 인증 정보를 유지했습니다.",
     "added": "계정을 저장했습니다. Codex 로그인은 유지됩니다.",
     "restart_required": "인증을 전환하고 확인했습니다. 관련 Codex CLI, IDE 및 데스크톱 클라이언트를 다시 시작하세요.",
@@ -1023,7 +1027,6 @@
       "accountRemoved": "로그인 작업이 종료되었거나 계정을 사용할 수 없습니다. 다시 로그인하세요."
     },
     "more": "더 보기",
-    "environment": "현재 환경",
     "current_account": "현재 계정",
     "window_5hour": "5시간 한도",
     "window_weekly": "주간 한도",
