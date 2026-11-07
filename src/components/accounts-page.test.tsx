@@ -222,7 +222,7 @@ describe("account card presentation", () => {
     await userEvent.click(b.getByRole("button", { name: "Sign in again" }));
     expect(api.startCodexAccountLogin).toHaveBeenCalledWith(false, "b");
   });
-  it("expands reset credit expiries from the available count and keeps device login in the toolbar menu", async () => {
+  it("expands reset credit expiries from the available count", async () => {
     list.accounts[0].status!.data!.resetCreditsAvailableCount = 2;
     list.accounts[0].status!.data!.resetCredits = [{ id: "one", expiresAt: "2030-01-01T00:00:00Z" }];
     render(<AccountsPage />);
@@ -235,9 +235,6 @@ describe("account card presentation", () => {
     expect(a.getByText("Expiration details were not returned for 1 more credits")).toBeVisible();
     fireEvent.click(a.getByLabelText("Reset credits · 2 available"));
     expect(expiry).not.toBeVisible();
-    expect(screen.queryByRole("menuitem", { name: "Device code login" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole("button", { name: "More" })[0]);
-    expect(screen.getByRole("menuitem", { name: "Device code login" })).toBeVisible();
   });
   it.each([0, null])("shows an explicit reset details state for count %s", async (count) => {
     list.accounts[0].status!.data!.resetCreditsAvailableCount = count;

@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Ellipsis, Info, Plus, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, Copy, Download, Ellipsis, Globe, Info, KeyRound, RefreshCw, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,7 @@ export function AccountsPage() {
   }, [task?.id, task?.state, t]);
 
   const loginRunning = task?.state === "running";
+  const recommendImport = !!list && list.accounts.length === 0 && !!list.currentIdentity;
   const locale = i18n.language;
   const relativeUpdate = (at: string | undefined) => {
     if (!at) return t("accounts.not_updated");
@@ -115,15 +116,16 @@ export function AccountsPage() {
   return <section className="accounts-page space-y-4" aria-label={t("common.accounts")}>
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><h1 className="text-2xl font-semibold">{t("common.accounts")}</h1><p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t("accounts.description")}</p></div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void login(false)}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
-        <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => void run("import", importCurrentCodexAccount)}>{t("accounts.import")}</Button>
-        <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t("accounts.more")}</Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end"><DropdownMenuItem disabled={!!busy || loginRunning} onSelect={() => void login(true)}>{t("accounts.device_login")}</DropdownMenuItem></DropdownMenuContent>
-        </DropdownMenu>
+      <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
+    </div>
+    <div className="max-w-2xl space-y-2">
+      <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint" className="accounts-add-methods">
+        <Button size="sm" variant={list && !recommendImport ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+        <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void login(true)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
+        <Button size="sm" variant={recommendImport ? "primary" : "secondary"} aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void run("import", importCurrentCodexAccount)}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
       </div>
+      {list ? <p id="accounts-add-hint" className="text-xs text-muted-foreground">{t(recommendImport ? "accounts.import_first_hint" : list.accounts.length ? "accounts.add_more_hint" : "accounts.login_first_hint")}</p> : null}
+      <p id="accounts-import-hint" className="text-xs text-muted-foreground">{t("accounts.import_hint")}</p>
     </div>
     {list?.switchError ? <p role="status" className="text-sm text-warning">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning">{t("accounts.recovery_conflict")}</p> : null}

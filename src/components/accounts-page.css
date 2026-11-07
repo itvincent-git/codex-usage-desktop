@@ -1,5 +1,7 @@
 .accounts-page { container: accounts / inline-size; }
 .accounts-page .h-8 { font-size: 12px; padding-inline: 10px; }
+.accounts-add-methods { display: flex; flex-wrap: wrap; gap: 8px; }
+.accounts-add-methods > button { flex: 1 1 160px; }
 .accounts-context { display: flex; align-items: flex-start; gap: 7px; color: rgb(var(--muted-foreground)); font-size: 11px; }
 .accounts-context > svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
 .accounts-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }

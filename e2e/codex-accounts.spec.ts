@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { accountCredentials } from "./fixtures/codex-accounts";
 import type { AccountList, AccountStatus, LoginTask } from "../src/lib/codex-accounts";
@@ -26,12 +26,9 @@ describe("native saved Codex accounts", () => {
     const code = page.$("p=1234-56789");
     await expect(code).not.toExist();
     await expect(page.$("button=复制授权码")).not.toExist();
-    await page.$("button=更多").execute((element) => element.focus());
-    await browser.keys("Enter");
-    const deviceLogin = $('//*[@role="menuitem" and normalize-space(.)="设备码登录"]');
+    const deviceLogin = page.$("button=设备码登录");
     await expect(deviceLogin).toBeDisplayed();
-    await deviceLogin.execute((element) => element.focus());
-    await browser.keys("Enter");
+    await deviceLogin.click();
     await expect(code).toBeDisplayed();
     await expect(page).toHaveText(expect.stringContaining("在打开的授权网页中输入此设备码，完成后账号将自动保存。"));
     await expect(page.$("button=打开授权页面")).toBeDisplayed();
@@ -265,7 +262,7 @@ describe("native saved Codex accounts", () => {
 
   run("delegates login to an empty home and rejects a mismatched re-login", async () => {
     const original = readFileSync(join(process.env.CODEX_HOME!, "auth.json"), "utf8");
-    await $('button=Add account').click();
+    await $('button=Browser login').click();
     await expect($('section[aria-label="Accounts"]')).toHaveText(expect.stringContaining("Login completed"));
     const list = await invoke<AccountList>("list_codex_accounts");
     const charlie = list.accounts.find((account) => account.email === "charlie@example.test");
@@ -340,7 +337,7 @@ describe("native saved Codex accounts", () => {
     await expect(oldCard).toBeDisplayed();
     await invoke("remove_codex_account", { accountId: removed.id });
     await oldCard.waitForExist({ reverse: true });
-    await $('button=Add account').click();
+    await $('button=Browser login').click();
     let addedId: string;
     await browser.waitUntil(async () => {
       const next = await invoke<AccountList>("list_codex_accounts");
@@ -415,5 +412,67 @@ describe("native saved Codex accounts", () => {
       expect((await invoke<AccountList>("list_codex_accounts")).accounts.some((account) => account.id === id)).toBe(false);
       expect(readFileSync(authPath, "utf8")).toBe(credentials);
     }
+  });
+
+  run("offers three direct account methods and adapts the recommendation after importing", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const page = $('section[aria-label="账号"]');
+    const methods = page.$('[role="group"][aria-label="添加账号"]');
+    const browserLogin = methods.$("button=浏览器登录");
+    const deviceLogin = methods.$("button=设备码登录");
+    const importCurrent = methods.$("button=导入当前账号");
+    const order = async () => methods.$$("button").map((button) => button.getText());
+    const waitForPrimary = async (button: typeof browserLogin) => browser.waitUntil(() => button.execute((element) => {
+      const style = getComputedStyle(element);
+      return style.backgroundColor === `rgb(${style.getPropertyValue("--primary").trim().split(/\s+/).join(", ")})`;
+    }), { timeoutMsg: "The recommended button should finish its color transition" });
+    const expectedOrder = ["浏览器登录", "设备码登录", "导入当前账号"];
+    await expect(browserLogin).toHaveElementClass("bg-primary");
+    expect(await order()).toEqual(expectedOrder);
+    await expect(deviceLogin).toBeDisplayed();
+    await expect(methods.$("button=刷新全部")).not.toExist();
+    await expect(page).toHaveText(expect.stringContaining("添加其他账号，可使用浏览器登录或设备码登录。"));
+    await waitForPrimary(browserLogin);
+    await browser.saveScreenshot("/tmp/codex-accounts-methods-saved.png");
+
+    const saved = await invoke<AccountList>("list_codex_accounts");
+    // Removing saved records leaves the native Codex sign-in available to import.
+    for (const account of saved.accounts) await invoke("remove_codex_account", { accountId: account.id });
+    await expect(importCurrent).toHaveElementClass("bg-primary");
+    await expect(browserLogin).not.toHaveElementClass("bg-primary");
+    await expect(page).toHaveText(expect.stringContaining("已在本机 Codex 登录？直接导入即可。"));
+    expect(await order()).toEqual(expectedOrder);
+    await waitForPrimary(importCurrent);
+    await browser.saveScreenshot("/tmp/codex-accounts-methods-empty.png");
+
+    const authPath = join(process.env.CODEX_HOME!, "auth.json");
+    const backupPath = `${authPath}.methods-backup`;
+    renameSync(authPath, backupPath);
+    try {
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      await expect(browserLogin).toHaveElementClass("bg-primary");
+      await expect(importCurrent).not.toHaveElementClass("bg-primary");
+      await expect(page).toHaveText(expect.stringContaining("使用浏览器登录或设备码登录，添加第一个账号。"));
+      expect(await order()).toEqual(expectedOrder);
+    } finally { renameSync(backupPath, authPath); }
+
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    await expect(importCurrent).toHaveElementClass("bg-primary");
+    await importCurrent.click();
+    await expect(page.$("h2=alice@example.test")).toBeDisplayed();
+    await expect(browserLogin).toHaveElementClass("bg-primary");
+    await expect(importCurrent).not.toHaveElementClass("bg-primary");
+    expect(await order()).toEqual(expectedOrder);
+    await expect(page).toHaveText(expect.stringContaining("导入当前账号：读取本机 Codex 当前登录的账号。"));
+    await browserLogin.click();
+    await expect(page).toHaveText(expect.stringContaining("登录完成"));
+    await expect(page.$("h2=charlie@example.test")).toBeDisplayed();
   });
 });
