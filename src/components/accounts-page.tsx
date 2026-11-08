@@ -25,7 +25,7 @@ function AddAccountDialog({ children, onClose }: { children: ReactNode; onClose:
     return () => { background.inert = false; background.removeAttribute("aria-hidden"); };
   }, [content]);
   useModalFocus(dialogRef, closeButtonRef, onClose);
-  return createPortal(<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="account-add-overlay">
+  return createPortal(<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4" data-testid="account-add-overlay">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="account-add-title" className="max-h-full w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl">
       <div className="flex items-center justify-between gap-4">
         <h2 id="account-add-title" className="text-lg font-semibold">{t("accounts.add")}</h2>
