@@ -4,8 +4,8 @@ use crate::codex_auth::CodexAuth;
 use crate::{
     codex_environment::{selected_codex_environment, CodexEnvironment, CodexRuntime},
     types::{
-        CodexCredits, CodexLimitWindow, CodexLimitsResponse, CodexQuotaForecastResponse,
-        CodexResetCredit, CodexWindowActivationResponse, CodexWindowActivationStatus,
+        CodexCredits, CodexLimitWindow, CodexLimitsResponse, CodexResetCredit,
+        CodexWindowActivationResponse, CodexWindowActivationStatus,
     },
 };
 use chrono::{Local, SecondsFormat, TimeZone, Utc};
