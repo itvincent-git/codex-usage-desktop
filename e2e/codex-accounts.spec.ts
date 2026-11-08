@@ -1,6 +1,6 @@
 import { $, browser, expect } from "@wdio/globals";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { accountCredentials } from "./fixtures/codex-accounts";
 import type { AccountList, AccountStatus, LoginTask } from "../src/lib/codex-accounts";
@@ -73,25 +73,35 @@ describe("native saved Codex accounts", () => {
     const dialog = $('[role="dialog"][aria-labelledby="account-add-title"]');
     const code = $("p=1234-56789");
     await expect(code).not.toExist();
-    await expect($("button=复制授权码")).not.toExist();
-    await expect($("button=复制授权链接")).not.toExist();
+    await expect($("button=复制设备码")).not.toExist();
+    await expect($("button=复制链接")).not.toExist();
     await expect(page.$("button=设备码登录")).not.toExist();
     await page.$("button=添加账号").click();
     const deviceLogin = dialog.$("button=设备码登录");
     await expect(deviceLogin).toBeDisplayed();
     await deviceLogin.click();
     await expect(code).toBeDisplayed();
-    await expect(dialog).toHaveText(expect.stringContaining("在打开的授权网页中输入此设备码，完成后账号将自动保存。"));
+    await expect(dialog).toHaveText(expect.stringContaining("打开授权页面，输入下方设备码以完成登录。"));
+    await expect(dialog.$("h3")).toHaveText("等待 Codex 授权");
+    await expect(dialog.$(".accounts-login-code-label")).toHaveText("设备码");
+    await expect(dialog.$(".accounts-login-auto-save")).toHaveText("授权完成后，账号将自动保存");
+    const layout = await dialog.execute((element) => {
+      const code = element.querySelector(".accounts-login-code")!;
+      const actions = element.querySelector(".accounts-login-actions")!;
+      return { codeBottom: code.getBoundingClientRect().bottom, actionsTop: actions.getBoundingClientRect().top, overflow: element.scrollWidth > element.clientWidth };
+    });
+    expect(layout.codeBottom).toBeLessThan(layout.actionsTop);
+    expect(layout.overflow).toBe(false);
+    await browser.saveScreenshot("/tmp/codex-accounts-device-code.png");
     await expect(dialog.$("button=打开授权页面")).toBeDisplayed();
-    await expect(dialog.$("button=复制授权链接")).toBeDisplayed();
-    await dialog.$("button=复制授权链接").click();
+    await expect(dialog.$("button=复制链接")).toBeDisplayed();
+    await dialog.$("button=复制链接").click();
     await expect(dialog.$("button=链接已复制")).toBeDisplayed();
     if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" })).toBe("https://auth.openai.com/codex/device");
-    await expect(dialog.$("button=复制授权码")).toBeDisplayed();
-    await dialog.$("button=复制授权码").click();
+    await expect(dialog.$("button=复制设备码")).toBeDisplayed();
+    await dialog.$("button=复制设备码").click();
     await expect(dialog.$("button=已复制")).toBeDisplayed();
     if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" }) === "1234-56789").toBe(true);
-    await browser.saveScreenshot("/tmp/codex-accounts-device-code.png");
     await dialog.$("button=取消登录").click();
     await expect(dialog).toHaveText(expect.stringContaining("登录已取消"));
     await expect(code).not.toExist();
@@ -100,6 +110,55 @@ describe("native saved Codex accounts", () => {
     await expect(dialog.$("button=链接已复制")).not.toExist();
     await dialog.$("button[aria-label='关闭']").click();
     await expect(dialog).not.toExist();
+  });
+
+  run("groups browser authorization actions without overflow in Chinese, German, and English", async () => {
+    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.browser-pending`;
+    writeFileSync(pending, "");
+    try {
+      await browser.setWindowSize(1100, 760);
+      for (const [language, add, login, title, hint, open, copy, copied, cancel, cancelled, close] of [
+        ["zh", "添加账号", "浏览器登录", "等待 Codex 授权", "请在浏览器中完成账号登录与授权。", "打开授权页面", "复制链接", "链接已复制", "取消登录", "登录已取消", "关闭"],
+        ["de", "Konto hinzufügen", "Im Browser anmelden", "Warten auf Codex-Autorisierung", "Schließen Sie die Anmeldung und Autorisierung in Ihrem Browser ab.", "Autorisierung öffnen", "Link kopieren", "Link kopiert", "Anmeldung abbrechen", "Anmeldung abgebrochen", "Schließen"],
+        ["en", "Add account", "Browser login", "Waiting for Codex authorization", "Complete account sign-in and authorization in your browser.", "Open authorization", "Copy link", "Link copied", "Cancel login", "Login cancelled", "Close"],
+      ]) {
+        await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
+        await browser.refresh();
+        await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+        await $('[data-testid="accounts-nav-tab"]').click();
+        await $(`button=${add}`).click();
+        const dialog = $('[role="dialog"][aria-labelledby="account-add-title"]');
+        await dialog.$(`button=${login}`).click();
+        await expect(dialog.$(`button=${copy}`)).toBeDisplayed();
+        await expect(dialog.$("h3")).toHaveText(title);
+        await expect(dialog.$(".accounts-login-description")).toHaveText(hint);
+        await expect(dialog.$(".accounts-login-code")).not.toExist();
+        const layout = await dialog.execute((element) => {
+          const actions = element.querySelector(".accounts-login-actions")!;
+          const buttons = [...actions.querySelectorAll("button")];
+          const bounds = actions.getBoundingClientRect();
+          return {
+            overflow: element.scrollWidth > element.clientWidth || buttons.some((button) => button.getBoundingClientRect().right > bounds.right),
+            primary: getComputedStyle(buttons[0]).backgroundColor,
+            secondary: getComputedStyle(buttons[1]).backgroundColor,
+            sameRow: buttons.every((button) => Math.abs(button.getBoundingClientRect().top - buttons[0].getBoundingClientRect().top) < 1),
+          };
+        });
+        expect(layout.overflow).toBe(false);
+        expect(layout.primary).not.toBe(layout.secondary);
+        expect(layout.sameRow).toBe(true);
+        await expect(dialog.$(`button=${open}`)).toBeDisplayed();
+        await browser.saveScreenshot(`/tmp/codex-accounts-browser-${language}.png`);
+        await dialog.$(`button=${copy}`).click();
+        await expect(dialog.$(`button=${copied}`)).toBeDisplayed();
+        if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" })).toBe("https://auth.openai.com/authorize?state=fixture");
+        await dialog.$(`button=${cancel}`).click();
+        await expect(dialog.$("h3")).toHaveText(cancelled);
+        await expect(dialog.$(".accounts-login-actions")).not.toExist();
+        await expect(dialog.$(".accounts-login-auto-save")).not.toExist();
+        await dialog.$(`button[aria-label="${close}"]`).click();
+      }
+    } finally { unlinkSync(pending); }
   });
 
   run("reminds users to restart Codex after switching and remembers dismissal preferences", async () => {

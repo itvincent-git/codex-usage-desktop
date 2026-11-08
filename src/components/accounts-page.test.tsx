@@ -118,7 +118,7 @@ describe("saved Codex accounts", () => {
     vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
     render(<AccountsPage />);
     await user.click(screen.getByRole("button", { name: "Add account" }));
-    const copy = await screen.findByRole("button", { name: "Copy authorization link" });
+    const copy = await screen.findByRole("button", { name: "Copy link" });
     expect(copy.previousElementSibling).toHaveTextContent("Open authorization");
     await user.click(copy);
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to copy the authorization link");
@@ -127,7 +127,7 @@ describe("saved Codex accounts", () => {
     expect(writeText).toHaveBeenLastCalledWith(list.loginTask.authorizationUrl);
     expect(screen.getByRole("button", { name: "Link copied" })).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    if (deviceCode) expect(screen.getByRole("button", { name: "Copy authorization code" })).toBeVisible();
+    if (deviceCode) expect(screen.getByRole("button", { name: "Copy device code" })).toBeVisible();
     list.loginTask.state = "completed";
     await act(async () => events.get("codex-accounts-changed")!());
     expect(screen.queryByRole("button", { name: "Link copied" })).not.toBeInTheDocument();
@@ -141,10 +141,10 @@ describe("saved Codex accounts", () => {
     vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
     render(<AccountsPage />);
     await user.click(screen.getByRole("button", { name: "Add account" }));
-    await user.click(await screen.findByRole("button", { name: "Copy authorization code" }));
+    await user.click(await screen.findByRole("button", { name: "Copy device code" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Copy failed");
     expect(screen.queryByRole("button", { name: "Copied" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Copy authorization code" }));
+    await user.click(screen.getByRole("button", { name: "Copy device code" }));
     expect(writeText).toHaveBeenLastCalledWith("1234-56789");
     expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

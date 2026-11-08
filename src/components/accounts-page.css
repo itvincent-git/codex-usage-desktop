@@ -2,6 +2,23 @@
 .accounts-page .h-8 { font-size: 12px; padding-inline: 10px; }
 .accounts-add-methods { display: flex; flex-wrap: wrap; gap: 8px; }
 .accounts-add-methods > button { flex: 1 1 160px; }
+.accounts-login { border: 1px solid rgb(var(--border)); border-radius: 12px; overflow: hidden; }
+.accounts-login-body { padding: 18px; }
+.accounts-login-status { display: flex; align-items: center; gap: 10px; }
+.accounts-login-status h3 { font-size: 14px; font-weight: 600; }
+.accounts-login-status-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; background: rgb(var(--primary) / .05); color: rgb(var(--primary)); }
+.accounts-login-status-icon svg { width: 16px; height: 16px; }
+.accounts-login-description { margin-top: 12px; color: rgb(var(--muted-foreground)); font-size: 12px; line-height: 1.75; }
+.accounts-login-code { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 12px 14px; border: 1px solid rgb(var(--border)); border-radius: 8px; background: rgb(var(--muted)); }
+.accounts-login-code-label { color: rgb(var(--muted-foreground)); font-size: 11px; }
+.accounts-login-code-value { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: 23px; font-weight: 500; line-height: 1.4; letter-spacing: 2px; overflow-wrap: anywhere; }
+.accounts-login .h-8 { height: 34px; padding-inline: 12px; font-size: 12px; }
+.accounts-login button svg { width: 15px; height: 15px; flex-shrink: 0; }
+.accounts-login-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-top: 1px solid rgb(var(--border)); }
+.accounts-login-actions > button:not(:first-child) { padding-inline: 8px; color: rgb(var(--muted-foreground)); }
+.accounts-login-cancel { margin-left: auto; }
+.accounts-login-auto-save { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 12px; color: rgb(var(--muted-foreground)); font-size: 11px; }
+.accounts-login-auto-save svg { width: 12px; height: 12px; flex-shrink: 0; }
 .accounts-context { display: flex; align-items: flex-start; gap: 7px; color: rgb(var(--muted-foreground)); font-size: 11px; }
 .accounts-context > svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
 .accounts-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
