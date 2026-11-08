@@ -339,6 +339,8 @@ export function AccountsPage() {
       <div id="account-restart-cli" className="space-y-2 text-sm text-muted-foreground">
         <p>{t("accounts.restart_cli")}</p>
         <code className="block select-text rounded-lg bg-muted p-3 font-mono text-foreground">codex --no-daemon</code>
+        <p>{t("accounts.restart_cli_stop")}</p>
+        <code className="block select-text rounded-lg bg-muted p-3 font-mono text-foreground">codex app-server daemon stop</code>
       </div>
       <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked={dontRemindAgain} onChange={(event) => setDontRemindAgain(event.target.checked)} />{t("accounts.dont_remind_again")}</label>
       <div className="flex justify-end"><Button onClick={dismissRestartReminder}>{t("accounts.got_it")}</Button></div>

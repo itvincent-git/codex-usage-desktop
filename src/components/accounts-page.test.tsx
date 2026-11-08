@@ -196,6 +196,8 @@ describe("saved Codex accounts", () => {
     expect(dialog.getByText("Restart the Codex client (desktop app or IDE) to load the new account.")).toBeVisible();
     expect(dialog.getByText(/exit the current session and restart in non-daemon mode/)).toBeVisible();
     expect(dialog.getByText("codex --no-daemon")).toBeVisible();
+    expect(dialog.getByText(/stop the Codex background server/)).toBeVisible();
+    expect(dialog.getByText("codex app-server daemon stop")).toBeVisible();
     expect(dialog.getByRole("button", { name: "Got it" })).toHaveFocus();
     expect(api.switchCodexAccount).toHaveBeenCalledWith("b", "context-a");
     await userEvent.click(dialog.getByRole("button", { name: "Got it" }));

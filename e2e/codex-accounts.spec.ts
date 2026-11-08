@@ -162,9 +162,9 @@ describe("native saved Codex accounts", () => {
   });
 
   run("reminds users to restart Codex after switching and remembers dismissal preferences", async () => {
-    for (const [language, title, restart, cli, dontRemind, gotIt, switchLabel] of [
-      ["en", "Account switched", "Restart the Codex client", "exit the current session and restart in non-daemon mode", "Don't remind me again", "Got it", "Switch Codex sign-in"],
-      ["zh", "账号已切换", "请重启 Codex 客户端", "请退出当前会话，并以非后台模式重新启动", "不再提醒", "我知道了", "切换到此账号"],
+    for (const [language, title, restart, cli, stop, dontRemind, gotIt, switchLabel] of [
+      ["en", "Account switched", "Restart the Codex client", "exit the current session and restart in non-daemon mode", "stop the Codex background server", "Don't remind me again", "Got it", "Switch Codex sign-in"],
+      ["zh", "账号已切换", "请重启 Codex 客户端", "请退出当前会话，并以非后台模式重新启动", "结束 Codex 后台 server", "不再提醒", "我知道了", "切换到此账号"],
     ]) {
       await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
       await browser.refresh();
@@ -181,7 +181,8 @@ describe("native saved Codex accounts", () => {
       await expect(dialog.$("h2")).toHaveText(title);
       await expect(dialog).toHaveText(expect.stringContaining(restart));
       await expect(dialog).toHaveText(expect.stringContaining(cli));
-      await expect(dialog.$("code")).toHaveText("codex --no-daemon");
+      await expect(dialog).toHaveText(expect.stringContaining(stop));
+      await expect(dialog.$$("code")).toHaveText(["codex --no-daemon", "codex app-server daemon stop"]);
       await expect(dialog.$(`button=${gotIt}`)).toBeFocused();
       await browser.saveScreenshot(`/tmp/codex-account-restart-${language}.png`);
       await dialog.$(`button=${gotIt}`).click();

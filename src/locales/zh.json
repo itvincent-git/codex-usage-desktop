@@ -973,6 +973,7 @@
     "switched": "账号已切换",
     "restart_required": "请重启 Codex 客户端（桌面应用或 IDE）以加载新账号。",
     "restart_cli": "如果使用 Codex CLI，请退出当前会话，并以非后台模式重新启动：",
+    "restart_cli_stop": "或者执行以下命令结束 Codex 后台 server，再重新启动 Codex CLI：",
     "dont_remind_again": "不再提醒",
     "got_it": "我知道了",
     "empty": "暂无已保存账号，请通过上方任一方式添加第一个账号。",

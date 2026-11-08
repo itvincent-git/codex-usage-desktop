@@ -967,6 +967,7 @@
     "switched": "계정이 전환되었습니다",
     "restart_required": "새 계정을 적용하려면 Codex 클라이언트(데스크톱 앱 또는 IDE)를 다시 시작하세요.",
     "restart_cli": "Codex CLI를 사용하는 경우 현재 세션을 종료하고 데몬을 사용하지 않는 모드로 다시 시작하세요:",
+    "restart_cli_stop": "또는 다음 명령으로 Codex 백그라운드 서버를 중지한 뒤 Codex CLI를 다시 시작하세요:",
     "dont_remind_again": "다시 알리지 않기",
     "got_it": "확인",
     "empty": "저장된 계정이 없습니다. 위 방법 중 하나로 첫 계정을 추가하세요.",

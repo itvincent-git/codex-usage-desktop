@@ -967,6 +967,7 @@
     "switched": "Account switched",
     "restart_required": "Restart the Codex client (desktop app or IDE) to load the new account.",
     "restart_cli": "For Codex CLI, exit the current session and restart in non-daemon mode:",
+    "restart_cli_stop": "Or stop the Codex background server with the following command, then start Codex CLI again:",
     "dont_remind_again": "Don't remind me again",
     "got_it": "Got it",
     "empty": "No saved accounts yet. Choose a method above to add your first account.",
