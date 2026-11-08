@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { openUrl } from "@/lib/api";
 import { cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin, importCurrentCodexAccount, listCodexAccounts, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type AccountList, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
 
+const restartReminderKey = "accounts_hide_restart_reminder:v1";
+
 export function AccountsPage() {
   const { t, i18n } = useTranslation();
   const [list, setList] = useState<AccountList | null>(null);
@@ -18,6 +20,9 @@ export function AccountsPage() {
   const [task, setTask] = useState<LoginTask | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CodexAccount | null>(null);
   const removalDialog = useRef<HTMLDialogElement>(null);
+  const [showRestartReminder, setShowRestartReminder] = useState(false);
+  const [dontRemindAgain, setDontRemindAgain] = useState(false);
+  const restartDialog = useRef<HTMLDialogElement>(null);
   const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const generation = useRef(0);
   const inFlight = useRef(new Set<string>());
@@ -25,6 +30,20 @@ export function AccountsPage() {
   const message = (code: string) => t(`accounts.errors.${code.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") });
 
   useEffect(() => { if (pendingRemoval) removalDialog.current?.showModal(); }, [pendingRemoval]);
+  useEffect(() => {
+    if (showRestartReminder) {
+      restartDialog.current?.showModal();
+      restartDialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+  }, [showRestartReminder]);
+
+  const dismissRestartReminder = () => {
+    if (dontRemindAgain) {
+      try { localStorage.setItem(restartReminderKey, "true"); } catch { /* Keep reminders enabled when storage is unavailable. */ }
+    }
+    setShowRestartReminder(false);
+    setDontRemindAgain(false);
+  };
 
   const reload = useEffectEvent(async () => {
     const request = ++generation.current;
@@ -171,7 +190,16 @@ export function AccountsPage() {
         const updatedAt = Object.values(status?.updatedAt ?? {}).sort()[0];
         const partUpdates = Object.entries(status?.updatedAt ?? {}).map(([part, at]) => ({ part, time: new Date(at).toLocaleString(locale) }));
         const sharedUpdateTime = partUpdates.length === 3 && partUpdates.every(({ time }) => time === partUpdates[0].time) ? partUpdates[0].time : null;
-        const switchAccount = () => void run(account.id, async () => { const result = await switchCodexAccount(account.id, list.authContext!); if (result.verified && result.restartRequired) setNotice(t("accounts.restart_required")); });
+        const switchAccount = () => void run(account.id, async () => {
+          const result = await switchCodexAccount(account.id, list.authContext!);
+          if (!result.verified) return;
+          setNotice(t("accounts.switched"));
+          if (result.restartRequired) {
+            let hidden = false;
+            try { hidden = localStorage.getItem(restartReminderKey) === "true"; } catch { /* Show the reminder when storage is unavailable. */ }
+            if (!hidden) setShowRestartReminder(true);
+          }
+        });
         const switchDisabled = !!busy || !!list.switchError || !list.authContext || account.current;
         return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
           <header>
@@ -243,6 +271,16 @@ export function AccountsPage() {
       })}
     </div>
     <p className="accounts-context"><Info aria-hidden="true" /><span>{t("accounts.history_scope")}</span></p>
+    {showRestartReminder ? <dialog ref={restartDialog} aria-modal="true" aria-labelledby="account-restart-title" aria-describedby="account-restart-description account-restart-cli" className="!m-auto w-[min(28rem,calc(100%-2rem))] space-y-4 rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl backdrop:bg-black/40" onCancel={(event) => { event.preventDefault(); dismissRestartReminder(); }}>
+      <h2 id="account-restart-title" className="text-lg font-semibold">{t("accounts.switched")}</h2>
+      <p id="account-restart-description" className="text-sm text-muted-foreground">{t("accounts.restart_required")}</p>
+      <div id="account-restart-cli" className="space-y-2 text-sm text-muted-foreground">
+        <p>{t("accounts.restart_cli")}</p>
+        <code className="block select-text rounded-lg bg-muted p-3 font-mono text-foreground">codex --no-daemon</code>
+      </div>
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked={dontRemindAgain} onChange={(event) => setDontRemindAgain(event.target.checked)} />{t("accounts.dont_remind_again")}</label>
+      <div className="flex justify-end"><Button onClick={dismissRestartReminder}>{t("accounts.got_it")}</Button></div>
+    </dialog> : null}
     {pendingRemoval ? <dialog ref={removalDialog} role="alertdialog" aria-modal="true" aria-labelledby="account-removal-title" aria-describedby="account-removal-description" className="!m-auto w-[min(28rem,calc(100%-2rem))] space-y-4 rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl backdrop:bg-black/40" onCancel={(event) => { event.preventDefault(); setPendingRemoval(null); }}>
       <h2 id="account-removal-title" className="text-lg font-semibold">{t("accounts.remove")}</h2>
       <p className="break-words text-sm font-medium">{pendingRemoval.email ?? pendingRemoval.id}</p>

@@ -90,6 +90,55 @@ describe("native saved Codex accounts", () => {
     await expect(page.$("button=打开授权页面")).not.toExist();
   });
 
+  run("reminds users to restart Codex after switching and remembers dismissal preferences", async () => {
+    for (const [language, title, restart, cli, dontRemind, gotIt, switchLabel] of [
+      ["en", "Account switched", "Restart the Codex client", "exit the current session and restart in non-daemon mode", "Don't remind me again", "Got it", "Switch Codex sign-in"],
+      ["zh", "账号已切换", "请重启 Codex 客户端", "请退出当前会话，并以非后台模式重新启动", "不再提醒", "我知道了", "切换到此账号"],
+    ]) {
+      await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      let alice = $('[data-account-id="alice"]');
+      let bob = $('[data-account-id="bob"]');
+      let dialog = $('dialog[aria-labelledby="account-restart-title"]');
+      await expect(alice).toHaveAttribute("aria-current", "true");
+      await expect(dialog).not.toExist();
+      await bob.$(`button=${switchLabel}`).click();
+      await expect(bob).toHaveAttribute("aria-current", "true");
+      await expect(dialog).toBeDisplayed();
+      await expect(dialog.$("h2")).toHaveText(title);
+      await expect(dialog).toHaveText(expect.stringContaining(restart));
+      await expect(dialog).toHaveText(expect.stringContaining(cli));
+      await expect(dialog.$("code")).toHaveText("codex --no-daemon");
+      await expect(dialog.$(`button=${gotIt}`)).toBeFocused();
+      await browser.saveScreenshot(`/tmp/codex-account-restart-${language}.png`);
+      await dialog.$(`button=${gotIt}`).click();
+      await expect(dialog).not.toExist();
+      await alice.$(`button=${switchLabel}`).click();
+      await expect(alice).toHaveAttribute("aria-current", "true");
+      dialog = $('dialog[aria-labelledby="account-restart-title"]');
+      await expect(dialog).toBeDisplayed();
+      await expect(dialog.$("label")).toHaveText(dontRemind);
+      await dialog.$('input[type="checkbox"]').click();
+      await dialog.$(`button=${gotIt}`).click();
+      await expect(dialog).not.toExist();
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      alice = $('[data-account-id="alice"]');
+      bob = $('[data-account-id="bob"]');
+      dialog = $('dialog[aria-labelledby="account-restart-title"]');
+      await bob.$(`button=${switchLabel}`).click();
+      await expect(bob).toHaveAttribute("aria-current", "true");
+      await expect($(".accounts-page > [role='status']")).toHaveText(title);
+      await expect(dialog).not.toExist();
+      await alice.$(`button=${switchLabel}`).click();
+      await expect(alice).toHaveAttribute("aria-current", "true");
+      await expect(dialog).not.toExist();
+    }
+  }).timeout(120_000);
+
   run("highlights the current account card and moves the highlight when switching", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();
@@ -115,12 +164,14 @@ describe("native saved Codex accounts", () => {
     await expect(alice).not.toHaveAttribute("aria-current");
     expect(await appearance("bob")).toEqual(current);
     expect(await appearance("alice")).toEqual(inactive);
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
 
     await alice.$("button=Switch Codex sign-in").click();
     await expect(alice).toHaveAttribute("aria-current", "true");
     await expect(bob).not.toHaveAttribute("aria-current");
     expect(await appearance("alice")).toEqual(current);
     expect(await appearance("bob")).toEqual(inactive);
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
   });
 
   run("shows seat levels and workspace labels and expands reset credits from the count", async () => {
@@ -292,11 +343,13 @@ describe("native saved Codex accounts", () => {
     await bob.$("button=Switch Codex sign-in").click();
     await expect(alice).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
     await expect(bob).toHaveText(expect.stringContaining("Current Codex sign-in"));
-    await expect($('section[aria-label="Accounts"]')).toHaveText(expect.stringContaining("Restart related Codex CLI"));
+    await expect($('dialog[aria-labelledby="account-restart-title"]')).toHaveText(expect.stringContaining("Restart the Codex client"));
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(accountCredentials("bob"));
     expect(readFileSync(configPath, "utf8")).toBe(config);
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     await alice.$("button=Switch Codex sign-in").click();
     await expect(alice).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(accountCredentials("alice"));
     expect(readFileSync(configPath, "utf8")).toBe(config);
     const list = await invoke<AccountList>("list_codex_accounts");
@@ -400,8 +453,10 @@ describe("native saved Codex accounts", () => {
     expect(status?.errors).toEqual({});
     expect(readFileSync(authPath, "utf8")).toBe(JSON.stringify(old));
     await $('[data-account-id="bob"]').$("button=Switch Codex sign-in").click();
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     await expect(card).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
     await card.$("button=Switch Codex sign-in").click();
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(newer);
   });
@@ -414,6 +469,7 @@ describe("native saved Codex accounts", () => {
     const alice = $('[data-account-id="alice"]');
     if (!(await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === "alice")!.current) {
       await alice.$("button=切换到此账号").click();
+      await $('dialog[aria-labelledby="account-restart-title"]').$("button=我知道了").click();
     }
     await expect(alice).toHaveAttribute("aria-current", "true");
     const authPath = join(process.env.CODEX_HOME!, "auth.json");

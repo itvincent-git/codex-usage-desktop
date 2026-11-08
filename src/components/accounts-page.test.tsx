@@ -23,6 +23,7 @@ function account(id: string, plan: string, remaining: number): api.CodexAccount 
 let list: api.AccountList;
 beforeEach(async () => {
   vi.resetAllMocks(); events.clear(); await i18n.changeLanguage("en");
+  localStorage.clear();
   // jsdom does not implement the native dialog API.
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   list = { accounts: [account("a", "plus", 80), account("b", "pro", 25)], environment: "/isolated/codex", authContext: "context-a", currentIdentity: { userId: "user-a", workspaceId: "shared-workspace" }, switchError: null, recoveryConflict: false };
@@ -115,8 +116,46 @@ describe("saved Codex accounts", () => {
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "b@example.test" });
     fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" }));
-    await screen.findByText(/Restart related Codex CLI/);
+    const dialog = within(await screen.findByRole("dialog", { name: "Account switched" }));
+    expect(dialog.getByText("Restart the Codex client (desktop app or IDE) to load the new account.")).toBeVisible();
+    expect(dialog.getByText(/exit the current session and restart in non-daemon mode/)).toBeVisible();
+    expect(dialog.getByText("codex --no-daemon")).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Got it" })).toHaveFocus();
     expect(api.switchCodexAccount).toHaveBeenCalledWith("b", "context-a");
+    await userEvent.click(dialog.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Account switched");
+    fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" }));
+    await screen.findByRole("dialog", { name: "Account switched" });
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  it("remembers the choice to hide restart reminders after remounting", async () => {
+    vi.mocked(api.switchCodexAccount).mockResolvedValue({ verified: true, restartRequired: true, authContext: "context-b" });
+    const view = render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Account switched" }));
+    await userEvent.click(dialog.getByRole("checkbox", { name: "Don't remind me again" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Got it" }));
+    view.unmount();
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" }));
+    await screen.findByText("Account switched");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(api.switchCodexAccount).toHaveBeenCalledTimes(2);
+  });
+  it.each(["failed", "unverified", "no restart"])("does not show a restart reminder when switching is %s", async (result) => {
+    if (result === "failed") vi.mocked(api.switchCodexAccount).mockRejectedValue(new Error("accountAuthChanged"));
+    else vi.mocked(api.switchCodexAccount).mockResolvedValue({ verified: result !== "unverified", restartRequired: result !== "no restart", authContext: "context-b" });
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" }));
+    await waitFor(() => expect(within(card("b@example.test")).getByRole("button", { name: "Switch Codex sign-in" })).toBeEnabled());
+    expect(api.switchCodexAccount).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    if (result !== "no restart") expect(screen.queryByText("Account switched")).not.toBeInTheDocument();
   });
   it("does not resurrect a removed account from an in-flight query", async () => {
     let resolve!: (status: api.AccountStatus) => void;
