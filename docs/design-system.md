@@ -1,99 +1,99 @@
-# 现有页面设计风格与账号卡片设计依据
+# Existing Page Styles and Account Card Design Rationale
 
-本文提炼账号页以外的现有界面，供后续页面与卡片设计复用。项目的视觉特点是中性底色、轻边框、小面积靛紫强调，以及有明显主次的数据排版。紧凑感来自关联信息的组合、对齐和次要信息收束，而不是把所有文字缩小。
+This document distills the design of existing screens outside the Accounts page for reuse in future pages and cards. The project's visual style combines neutral backgrounds, subtle borders, restrained indigo accents, and a clear hierarchy for data. Compactness comes from grouping related information, alignment, and consolidating secondary details, rather than shrinking all the text.
 
-## 页面风格
+## Page Styles
 
-| 页面或区域 | 现有设计特点 | 可复用的原则 |
+| Page or area | Existing design characteristics | Reusable principles |
 | --- | --- | --- |
-| 仪表盘 | 主费用使用 36–48px 粗体；小标签与辅助数据明显降级；主卡仅有很淡的靛紫渐变；趋势与摘要并列 | 一组内容只保留少量视觉重点；主指标、说明、时间分层 |
-| 模型 | 顶部摘要用 18px 粗体数值和 12px 灰色标签；同一模型的配额以横条组合；详细估算可展开 | 同类数据并排，复杂数据渐进展开；保留比较能力 |
-| 项目 | 名称、路径、Token 构成和费用各有层级；路径使用等宽字体；标签与数值相邻；细条表达比例 | 以业务关系组织内容，避免逐项标签值平铺 |
-| 每日与每月 | 14px 表格正文；12px 灰色表头；费用右对齐；同一单元格容纳汇总、明细和比例；连续无活动记录合并 | 大量信息靠对齐与合并压缩，维持可读性 |
-| 会话及详情 | 列表承载主要信息，详情承载对话、分项用量与配额；模型、状态、时间作为辅助信息 | 主视图服务快速识别与选择，详细解释按需查看 |
-| 设置 | 标题与描述成组；12px 圆角卡片；分组间留白和细分隔线；输入、开关与说明按操作关系排列 | 容器用于划分任务，不为每个字段添加小卡片 |
-| 日志 | 等宽 12px 正文；时间退灰；等级使用语义色；固定工具栏与独立滚动内容区 | 技术细节集中在专门区域，状态色只强调需要识别的部分 |
-| 侧栏与公共顶栏 | 侧栏浅紫灰底；选中项靛紫文字与低透明度背景；小尺寸线性图标；同步状态和时间使用小字 | 颜色承担状态和交互语义；后台信息不抢占主内容 |
+| Dashboard | Primary cost uses bold 36–48px text; small labels and supporting data are visually subdued; the main card has a very subtle indigo gradient; trends and summaries sit side by side | Limit each content group to a few visual focal points; give primary metrics, descriptions, and timestamps distinct levels |
+| Models | Top summaries use bold 18px values and gray 12px labels; quotas for the same model are grouped into horizontal bars; detailed estimates can be expanded | Place comparable data side by side and reveal complex data progressively; preserve the ability to compare |
+| Projects | Names, paths, token breakdowns, and costs have distinct levels; paths use a monospace font; labels sit next to values; thin bars show proportions | Organize content by its relationships rather than presenting a flat sequence of label-value pairs |
+| Daily and Monthly | 14px table body text; gray 12px headers; right-aligned costs; each cell can contain totals, breakdowns, and proportions; consecutive inactive records are merged | Use alignment and merging to make dense information compact while preserving readability |
+| Sessions and details | Lists carry primary information; details contain conversations, usage breakdowns, and quotas; models, status, and time are supporting information | Use the main view for quick recognition and selection, with detailed explanations available on demand |
+| Settings | Titles and descriptions are grouped; cards have 12px corners; whitespace and subtle dividers separate groups; inputs, switches, and explanations follow their operational relationships | Use containers to separate tasks rather than adding a small card for every field |
+| Logs | Monospace 12px body text; subdued timestamps; semantic colors for log levels; a fixed toolbar and independently scrolling content | Keep technical details in a dedicated area; use status colors only for parts that need to be identified |
+| Sidebar and shared header | Light purple-gray sidebar background; selected items use indigo text and a low-opacity background; small line icons; small text for sync status and time | Use color to convey status and interaction; keep background information from competing with primary content |
 
-## 色彩与表面
+## Colors and Surfaces
 
-以下为现有样式的实际值，来自 `src/styles.css` 与 `tailwind.config.ts`。
+The following are actual values from `src/styles.css` and `tailwind.config.ts`.
 
-| 语义 | 浅色 | 深色 | 用途 |
+| Meaning | Light | Dark | Usage |
 | --- | --- | --- | --- |
-| 页面背景 | `#FAFAFA` | `#0E0E11` | 主内容底色 |
-| 卡片表面 | `#FFFFFF` | `#18181B` | 有边界的内容块 |
-| 侧栏 | `#F5F4F9` | `#18181B` | 全局导航 |
-| 主文字 | `#0A0A0A` | `#FAFAFA` | 标题、核心数值 |
-| 次要文字 | `#6B6B6B` | `#A1A1AA` | 标签、时间、辅助说明 |
-| 分隔边框 | `#E8E8EC` | `#303036` | 1px 轻边框与分隔线 |
-| 主色 | `#6366F1` | 同浅色 | 主操作、选中、小面积强调 |
-| 成功 | `#10B981` | 同浅色 | 正常状态与成功反馈 |
-| 警告 | `#F59E0B` | 同浅色 | 数据过期、需关注状态 |
-| 错误 | `#EF4444` | 同浅色 | 请求错误或失败 |
+| Page background | `#FAFAFA` | `#0E0E11` | Main content background |
+| Card surface | `#FFFFFF` | `#18181B` | Bounded content blocks |
+| Sidebar | `#F5F4F9` | `#18181B` | Global navigation |
+| Primary text | `#0A0A0A` | `#FAFAFA` | Headings and key values |
+| Secondary text | `#6B6B6B` | `#A1A1AA` | Labels, timestamps, and supporting descriptions |
+| Borders and dividers | `#E8E8EC` | `#303036` | Subtle 1px borders and dividers |
+| Primary color | `#6366F1` | Same as light | Primary actions, selection, and small accents |
+| Success | `#10B981` | Same as light | Normal status and success feedback |
+| Warning | `#F59E0B` | Same as light | Stale data and states requiring attention |
+| Error | `#EF4444` | Same as light | Request errors or failures |
 
-图表另有 sky、emerald、violet 等分类色，以及 amber、rose 等费用程度色，均配合标签使用。它们不是把普通字段逐个染色的依据。现有界面有部分局部渐变和高亮徽标，账号卡片应延续其克制程度。
+Charts also use category colors such as sky, emerald, and violet, as well as cost intensity colors such as amber and rose, always paired with labels. These are not a reason to color every ordinary field individually. Some existing screens use localized gradients and highlighted badges; account cards should maintain the same restraint.
 
-## 字体与信息层级
+## Typography and Information Hierarchy
 
-| 层级 | 现有用法 | 账号卡片建议 |
+| Level | Existing usage | Account card recommendation |
 | --- | --- | --- |
-| 页面与卡片标题 | General Sans，常见 24px，`tracking-display: -0.04em` | 页面标题 24px；邮箱 16–18px，中粗体 |
-| 主指标 | 仪表盘 36–48px；模型摘要 18px 粗体 | 剩余额度 28px 粗体；两个窗口同等重要 |
-| 正文与操作 | DM Sans，常见 14px，400–500 字重 | 工作区、订阅摘要和操作 12–14px |
-| 辅助标签 | 10–12px，灰色；英文分组常有大写与字距 | 主要辅助信息至少 11px；中文不强行增加字距 |
-| 数字与技术信息 | `tabular-nums` 对齐数值；路径和部分金额使用 JetBrains Mono | 配额、余额、次数使用等宽数字；完整路径放在详细信息中 |
+| Page and card titles | General Sans, commonly 24px, `tracking-display: -0.04em` | 24px page titles; 16–18px semibold email addresses |
+| Primary metrics | 36–48px on the dashboard; bold 18px model summaries | Bold 28px remaining quota values; give both windows equal importance |
+| Body text and actions | DM Sans, commonly 14px with weights of 400–500 | 12–14px for workspaces, subscription summaries, and actions |
+| Supporting labels | Gray 10–12px text; English group labels often use uppercase and letter spacing | At least 11px for key supporting information; do not force extra letter spacing on Chinese text |
+| Numbers and technical information | `tabular-nums` aligns values; paths and some monetary amounts use JetBrains Mono | Use tabular numerals for quotas, balances, and counts; put full paths in the details |
 
-中文由系统无衬线字体回退。设计稿中的字号用于表达审阅目标，落地时复用现有字体配置。
+Chinese text falls back to the system sans-serif font. Font sizes in the mockups express review targets; reuse the existing font configuration during implementation.
 
-## 几何与间距
+## Geometry and Spacing
 
-- 基础卡片圆角为 12px，按钮为 6px；标签可用胶囊形。卡片通常为 1px 边框，静止时不依赖明显阴影。
-- 通用卡片头和内容默认 24px 内边距，仪表盘主卡采用更紧凑的 16–20px。页面与卡片间常见 16px 间距。
-- 核心内容与辅助说明常以 4–8px 间隔成组，业务分区使用 12–16px 间距。分隔线用于跨组，不逐字段画线。
-- 图标来自 Lucide，常用 14–16px；数据条多为 4–8px 高的细圆角条。
-- 公共内容区最大宽度 1280px，左右内边距随内容宽度变化为 24、32、40px。
-- 现有 `content-sm/md/lg` 容器断点为 640、768、1024px，按主内容区宽度判断，不按整个窗口宽度判断。账号设计稿建议在内容区至少 760px 时允许两列，单卡约 370px 起；最终实现需用真实 Tauri 窗口验证。
+- Base cards have 12px corners and buttons have 6px corners; labels may use a pill shape. Cards typically have a 1px border and do not rely on prominent shadows at rest.
+- Shared card headers and content default to 24px padding; the main dashboard card uses a more compact 16–20px. Spacing between pages and cards is commonly 16px.
+- Core content and supporting descriptions are often grouped with 4–8px gaps; functional sections use 12–16px gaps. Dividers separate groups rather than individual fields.
+- Icons come from Lucide and are commonly 14–16px; data bars are usually thin rounded bars, 4–8px high.
+- The shared content area has a maximum width of 1280px, with horizontal padding of 24, 32, or 40px depending on content width.
+- The existing `content-sm/md/lg` container breakpoints are 640, 768, and 1024px. They depend on the main content area's width rather than the whole window's width. The account mockups recommend allowing two columns when the content area is at least 760px wide, with individual cards starting at about 370px; the final implementation must be verified in a real Tauri window.
 
-## 账号卡片提案
+## Account Card Proposal
 
-审阅稿见 [账号卡片设计图](design/accounts-card-review.png)，[对话预览源](design/accounts-card-review.html)用于在对话中查看可展开的详情与菜单。数据、邮箱、工作区和日期均为示例；按钮不执行真实账号操作。
+See the [account card mockup](design/accounts-card-review.png) for review. The [conversation preview source](design/accounts-card-review.html) provides expandable details and menus for viewing in the conversation. All data, email addresses, workspaces, and dates are examples; buttons do not perform real account operations.
 
-### 信息结构
+### Information Structure
 
-1. 身份区：邮箱为标题，工作区为次要文字；“当前使用”作为小型靛紫徽标。套餐名紧接订阅摘要，不再单列四行属性。
-2. 订阅摘要：组合成“Plus · 订阅有效 · 12/07 到期 · 自动续订”。完整年份、时间及数据来源可在详情查看。取消续订表达为“到期不续订”，不能误写为订阅已失效。
-3. 配额区：5 小时与周额度并排；28px 数值突出“剩余”，灰色小字给出重置倒计时。进度条统一表达剩余额度，不再同时重复剩余与消耗百分比。Free 账号只显示接口实际提供的月窗口。
-4. 资源区：余额与可用重置次数横向组合，数值与单位紧邻；重置券到期时间放进可展开详情，条目多时不撑高常态卡片。
-5. 底部：更新时间与详情在一侧，“刷新”“切换到此账号”和“更多”在另一侧；重新登录与移除收进更多菜单。需重新登录时直接展示该操作。
+1. Identity: use the email address as the title and the workspace as secondary text; show “Currently in use” as a small indigo badge. Place the plan name directly in the subscription summary instead of listing four separate property rows.
+2. Subscription summary: combine details into “Plus · Active subscription · Expires Dec 7 · Auto-renewal.” Full years, times, and data sources are available in the details. Describe canceled renewal as “Will not renew at expiration”; do not incorrectly describe the subscription as expired.
+3. Quotas: place the 5-hour and weekly quotas side by side; use 28px values to emphasize the remaining quota, with small gray text for the reset countdown. Progress bars consistently show remaining quota without also repeating both remaining and consumed percentages. Free accounts show only the monthly window actually provided by the API.
+4. Resources: group the balance and available reset count horizontally, keeping values next to their units; put reset voucher expiration dates in expandable details so that many entries do not increase the card's default height.
+5. Footer: place the update time and details on one side, with “Refresh,” “Switch to this account,” and “More” on the other; put sign-in and removal actions in the More menu. Show the sign-in action directly when the account requires signing in again.
 
-### 状态规则
+### State Rules
 
-- 正常：中性主数值，成功状态用小色点与文字；不把整块区域涂绿。深色主题调整文字对比度。
-- 配额偏低：只突出对应窗口，并明确写“余量偏低”。本稿用剩余 12% 展示该情形；最终阈值沿用项目已有配额规则，不在设计阶段新增业务规则。
-- 数据陈旧或分项失败：保留上次成功值，写明“上次数据”和失败项。不得将未知或查询失败显示成 0、100% 或“订阅无效”。
-- 需重新登录：卡片内显示可见提示与重新登录按钮；其他缓存指标依然可以查看。
-- 时间：常态显示紧凑时间；分项更新时间、错误、完整有效期和重置券逐条期限在“数据详情”中保留。分项不同步时不能用一个“刚刚更新”掩盖旧值。
-- 切换、移除、重新登录只调整入口呈现，不改变既有行为、禁用条件与确认要求。历史用量不归属到某张账号卡片。
+- Normal: use neutral primary values, with a small colored dot and text for success status; do not fill the whole area with green. Adjust text contrast for the dark theme.
+- Low quota: highlight only the affected window and explicitly label it “Low remaining quota.” This mockup uses 12% remaining to illustrate the state; the final threshold follows the project's existing quota rules rather than introducing new business rules during design.
+- Stale data or partial failure: retain the last successful values and identify them as “Previous data,” along with the failed item. Never display unknown or failed queries as 0, 100%, or “Invalid subscription.”
+- Sign-in required: show a visible message and a sign-in button within the card; keep other cached metrics available for viewing.
+- Time: show compact timestamps by default; retain per-item update times, errors, full validity periods, and individual reset voucher expiration dates in “Data details.” When items are out of sync, do not hide older values behind a single “Just updated” label.
+- Switching, removal, and signing in again only change where actions appear; preserve existing behavior, disabled conditions, and confirmation requirements. Historical usage is not attributed to an individual account card.
 
-### 审阅标准
+### Review Criteria
 
-- 第一眼识别账号与当前身份，第二眼读到可用额度，第三层才是订阅说明、余额与更新时间。
-- 正常卡片目标高度约 300–340px；随文字换行自然增长，避免固定高度造成裁切。窄屏单列，邮箱允许换行。
-- 所有现有字段都有归属；折叠详情只收纳低频信息，关键异常保持可见。
-- 不新增头像、评分、筛选器、统计总览或营销装饰。
+- Identify the account and whether it is currently in use at first glance, read the available quota next, and leave subscription details, balances, and update times at the third level.
+- Target a normal card height of about 300–340px; allow natural growth as text wraps, avoiding clipping from fixed heights. Use a single column on narrow screens and allow email addresses to wrap.
+- Give every existing field a place; collapsible details contain only infrequently needed information, while critical exceptions remain visible.
+- Do not add avatars, scores, filters, statistical overviews, or marketing decoration.
 
-## 参考源码
+## Source References
 
-- [主题色与基础字体](../src/styles.css)
-- [字体、圆角、阴影与容器断点](../tailwind.config.ts)
-- [基础卡片](../src/components/ui/card.tsx) 与 [按钮](../src/components/ui/button.tsx)
-- [仪表盘主卡](../src/components/dashboard-hero-card.tsx) 与 [公共顶栏](../src/components/dashboard-header.tsx)
-- [模型数据组织](../src/components/model-usage-card.tsx)
-- [项目数据组织](../src/components/project-usage-card.tsx)
-- [每日表格](../src/components/daily-usage-table.tsx) 与 [每月表格](../src/components/monthly-usage-table.tsx)
-- [会话列表](../src/components/session-usage-table.tsx) 与 [设置](../src/components/settings-page.tsx)
-- [日志](../src/components/log-panel.tsx)
-- [侧栏](../src/components/app-sidebar.tsx) 与 [公共布局](../src/App.tsx)
+- [Theme colors and base typography](../src/styles.css)
+- [Fonts, corner radii, shadows, and container breakpoints](../tailwind.config.ts)
+- [Base card](../src/components/ui/card.tsx) and [button](../src/components/ui/button.tsx)
+- [Dashboard hero card](../src/components/dashboard-hero-card.tsx) and [shared header](../src/components/dashboard-header.tsx)
+- [Model data organization](../src/components/model-usage-card.tsx)
+- [Project data organization](../src/components/project-usage-card.tsx)
+- [Daily table](../src/components/daily-usage-table.tsx) and [monthly table](../src/components/monthly-usage-table.tsx)
+- [Session list](../src/components/session-usage-table.tsx) and [settings](../src/components/settings-page.tsx)
+- [Logs](../src/components/log-panel.tsx)
+- [Sidebar](../src/components/app-sidebar.tsx) and [shared layout](../src/App.tsx)
 
-账号页仅用于核对待重组字段及现有行为，不作为上述风格结论的来源。
+The Accounts page is used only to check the fields to be reorganized and existing behavior; it is not a source for the style observations above.

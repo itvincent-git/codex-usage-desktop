@@ -17,3 +17,4 @@ src-tauri/gen
 .codegraph/daemon.pid
 .codegraph
 build.sh
+/docs/design/
