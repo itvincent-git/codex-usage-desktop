@@ -85,11 +85,11 @@ describe("native saved Codex accounts", () => {
     await expect(dialog.$("h3")).toHaveText("等待 Codex 授权");
     await expect(dialog.$(".accounts-login-code-label")).toHaveText("设备码");
     await expect(dialog.$(".accounts-login-auto-save")).toHaveText("授权完成后，账号将自动保存");
-    const layout = await dialog.execute((element) => {
+    const layout = await browser.execute((element) => {
       const code = element.querySelector(".accounts-login-code")!;
       const actions = element.querySelector(".accounts-login-actions")!;
       return { codeBottom: code.getBoundingClientRect().bottom, actionsTop: actions.getBoundingClientRect().top, overflow: element.scrollWidth > element.clientWidth };
-    });
+    }, await dialog);
     expect(layout.codeBottom).toBeLessThan(layout.actionsTop);
     expect(layout.overflow).toBe(false);
     await browser.saveScreenshot("/tmp/codex-accounts-device-code.png");
@@ -133,7 +133,7 @@ describe("native saved Codex accounts", () => {
         await expect(dialog.$("h3")).toHaveText(title);
         await expect(dialog.$(".accounts-login-description")).toHaveText(hint);
         await expect(dialog.$(".accounts-login-code")).not.toExist();
-        const layout = await dialog.execute((element) => {
+        const layout = await browser.execute((element) => {
           const actions = element.querySelector(".accounts-login-actions")!;
           const buttons = [...actions.querySelectorAll("button")];
           const bounds = actions.getBoundingClientRect();
@@ -143,7 +143,7 @@ describe("native saved Codex accounts", () => {
             secondary: getComputedStyle(buttons[1]).backgroundColor,
             sameRow: buttons.every((button) => Math.abs(button.getBoundingClientRect().top - buttons[0].getBoundingClientRect().top) < 1),
           };
-        });
+        }, await dialog);
         expect(layout.overflow).toBe(false);
         expect(layout.primary).not.toBe(layout.secondary);
         expect(layout.sameRow).toBe(true);
@@ -608,7 +608,7 @@ describe("native saved Codex accounts", () => {
     await add.click();
     await expect(dialog).toBeDisplayed();
     await expect(dialog.$("h2")).toHaveText("添加账号");
-    const bounds = await dialog.execute((element) => {
+    const bounds = await browser.execute((element) => {
       const content = document.querySelector("[data-app-content]")!.getBoundingClientRect();
       const overlay = element.parentElement!.getBoundingClientRect();
       const panel = element.getBoundingClientRect();
@@ -620,7 +620,7 @@ describe("native saved Codex accounts", () => {
         centerOffset: Math.abs((panel.left + panel.right - content.left - content.right) / 2),
         sidebarInteractive: !document.querySelector("[data-app-sidebar]")!.closest("[inert]"),
       };
-    });
+    }, await dialog);
     expect(bounds.left).toBe(bounds.contentLeft);
     expect(bounds.right).toBe(bounds.contentRight);
     expect(bounds.top).toBe(bounds.contentTop);
