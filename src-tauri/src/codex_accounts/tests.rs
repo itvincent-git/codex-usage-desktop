@@ -503,6 +503,64 @@ fn auth_sidecar_locks_block_commit_until_released() {
     worker.join().unwrap();
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_credentials_replace_existing_grants_and_stay_private_after_overwrite() {
+    fn powershell(path: &std::path::Path, script: &str) {
+        let output = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("CODEX_USAGE_TEST_ACL_PATH", path)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "Windows ACL check failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let f = Fixture::new();
+    let directory = f.root.join("accounts [private] O'Neil 用户");
+    fs::create_dir_all(&directory).unwrap();
+    let target = directory.join("credentials.json");
+    fs::write(&target, "old credentials").unwrap();
+    // Seed explicit grants as well as inherited permissions. Restricting storage
+    // must remove both without relying on PowerShell's security module.
+    powershell(
+        &directory,
+        r#"$ErrorActionPreference='Stop'
+        $everyone=[System.Security.Principal.SecurityIdentifier]::new('S-1-1-0')
+        $rule=[System.Security.AccessControl.FileSystemAccessRule]::new($everyone,'FullControl','Allow')
+        $acl=[System.IO.Directory]::GetAccessControl($env:CODEX_USAGE_TEST_ACL_PATH)
+        $acl.AddAccessRule($rule)
+        [System.IO.Directory]::SetAccessControl($env:CODEX_USAGE_TEST_ACL_PATH,$acl)
+        $file=[System.IO.Path]::Combine($env:CODEX_USAGE_TEST_ACL_PATH,'credentials.json')
+        $acl=[System.IO.File]::GetAccessControl($file)
+        $acl.AddAccessRule($rule)
+        [System.IO.File]::SetAccessControl($file,$acl)"#,
+    );
+    storage::private_directory(&directory).unwrap();
+    storage::atomic_write(&target, b"first credentials").unwrap();
+    storage::atomic_write(&target, b"rotated credentials").unwrap();
+    assert_eq!(fs::read(&target).unwrap(), b"rotated credentials");
+    powershell(
+        &directory,
+        r#"$ErrorActionPreference='Stop'
+        $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User
+        $file=[System.IO.Path]::Combine($env:CODEX_USAGE_TEST_ACL_PATH,'credentials.json')
+        $acls=@([System.IO.Directory]::GetAccessControl($env:CODEX_USAGE_TEST_ACL_PATH),[System.IO.File]::GetAccessControl($file))
+        foreach ($acl in $acls) {
+            if (!$acl.AreAccessRulesProtected) { throw 'ACL inheritance is enabled' }
+            if ($acl.GetOwner([System.Security.Principal.SecurityIdentifier]) -ne $sid) { throw 'Unexpected owner' }
+            $rules=$acl.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])
+            if ($rules.Count -ne 1) { throw 'Unexpected access rules' }
+            $rule=$rules[0]
+            if ($rule.IdentityReference -ne $sid -or $rule.AccessControlType -ne 'Allow' -or $rule.FileSystemRights -ne 'FullControl') { throw 'Unexpected access grant' }
+        }
+        if ([System.IO.Directory]::GetFiles($env:CODEX_USAGE_TEST_ACL_PATH).Length -ne 1) { throw 'Temporary credentials were left behind' }"#,
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn follows_auth_symlinks_and_uses_private_files() {
