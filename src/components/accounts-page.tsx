@@ -24,6 +24,7 @@ export function AccountsPage() {
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
   const restartDialog = useRef<HTMLDialogElement>(null);
   const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [urlCopyState, setUrlCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const generation = useRef(0);
   const inFlight = useRef(new Set<string>());
   const mounted = useRef(true);
@@ -83,7 +84,14 @@ export function AccountsPage() {
   const missingAccounts = (list?.accounts ?? []).filter((account) => !account.status).map((account) => account.id).join("|");
   const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (!account.status) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
-  const login = (device: boolean, id: string | null = null) => run("login", async () => { setCodeCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  const login = (device: boolean, id: string | null = null) => run("login", async () => { setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  const copyAuthorizationUrl = async () => {
+    if (!task?.authorizationUrl) return;
+    try {
+      await navigator.clipboard.writeText(task.authorizationUrl);
+      setUrlCopyState("copied");
+    } catch { setUrlCopyState("failed"); }
+  };
   const copyDeviceCode = async () => {
     if (!task?.deviceCode) return;
     try {
@@ -152,7 +160,16 @@ export function AccountsPage() {
     {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
     {task ? <div className="space-y-2 rounded-xl border border-border p-4" aria-live="polite">
       <p>{t(`accounts.login_${task.state}`)}</p>
-      {task.authorizationUrl && loginRunning ? <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button> : null}
+      {task.authorizationUrl && loginRunning ? <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button>
+          <Button variant="secondary" onClick={() => void copyAuthorizationUrl()}>
+            {urlCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+            {t(urlCopyState === "copied" ? "accounts.authorization_url_copied" : "accounts.copy_authorization_url")}
+          </Button>
+        </div>
+        {urlCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.authorization_url_copy_failed")}</p> : null}
+      </div> : null}
       {task.deviceCode && loginRunning ? <div>
         <div className="flex flex-wrap items-center gap-3">
           <p className="font-mono text-lg select-text">{task.deviceCode}</p>

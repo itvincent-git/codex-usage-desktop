@@ -73,12 +73,18 @@ describe("native saved Codex accounts", () => {
     const code = page.$("p=1234-56789");
     await expect(code).not.toExist();
     await expect(page.$("button=复制授权码")).not.toExist();
+    await expect(page.$("button=复制授权链接")).not.toExist();
     const deviceLogin = page.$("button=设备码登录");
     await expect(deviceLogin).toBeDisplayed();
     await deviceLogin.click();
     await expect(code).toBeDisplayed();
     await expect(page).toHaveText(expect.stringContaining("在打开的授权网页中输入此设备码，完成后账号将自动保存。"));
     await expect(page.$("button=打开授权页面")).toBeDisplayed();
+    await expect(page.$("button=复制授权链接")).toBeDisplayed();
+    await page.$("button=复制授权链接").click();
+    await expect(page.$("button=链接已复制")).toBeDisplayed();
+    if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" })).toBe("https://auth.openai.com/codex/device");
+    await expect(page.$("button=复制授权码")).toBeDisplayed();
     await page.$("button=复制授权码").click();
     await expect(page.$("button=已复制")).toBeDisplayed();
     if (process.platform === "darwin") expect(execFileSync("/usr/bin/pbpaste", { encoding: "utf8" }) === "1234-56789").toBe(true);
@@ -88,6 +94,7 @@ describe("native saved Codex accounts", () => {
     await expect(code).not.toExist();
     await expect(page.$("button=已复制")).not.toExist();
     await expect(page.$("button=打开授权页面")).not.toExist();
+    await expect(page.$("button=链接已复制")).not.toExist();
   });
 
   run("reminds users to restart Codex after switching and remembers dismissal preferences", async () => {

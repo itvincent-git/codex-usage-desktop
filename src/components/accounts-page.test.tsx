@@ -59,6 +59,28 @@ describe("saved Codex accounts", () => {
     expect(api.removeCodexAccount).toHaveBeenCalledExactlyOnceWith(id);
   });
 
+  it.each([null, "1234-56789"])("copies the authorization link and allows retrying with device code %s", async (deviceCode) => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("Clipboard denied")).mockResolvedValue(undefined);
+    list.loginTask = { id: "login", state: "running", authorizationUrl: "https://auth.openai.com/authorize?state=test&code_challenge=challenge", deviceCode, accountId: null, error: null };
+    vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
+    render(<AccountsPage />);
+    const copy = await screen.findByRole("button", { name: "Copy authorization link" });
+    expect(copy.previousElementSibling).toHaveTextContent("Open authorization");
+    await user.click(copy);
+    expect(screen.getByRole("alert")).toHaveTextContent("Failed to copy the authorization link");
+    expect(screen.queryByRole("button", { name: "Link copied" })).not.toBeInTheDocument();
+    await user.click(copy);
+    expect(writeText).toHaveBeenLastCalledWith(list.loginTask.authorizationUrl);
+    expect(screen.getByRole("button", { name: "Link copied" })).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    if (deviceCode) expect(screen.getByRole("button", { name: "Copy authorization code" })).toBeVisible();
+    list.loginTask.state = "completed";
+    await act(async () => events.get("codex-accounts-changed")!());
+    expect(screen.queryByRole("button", { name: "Link copied" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open authorization" })).not.toBeInTheDocument();
+  });
+
   it("allows retrying when copying an authorization code fails", async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("Clipboard denied")).mockResolvedValue(undefined);
