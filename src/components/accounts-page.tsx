@@ -1,14 +1,40 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Download, Ellipsis, Globe, Info, KeyRound, RefreshCw, TriangleAlert } from "lucide-react";
+import { Check, Copy, Download, Ellipsis, Globe, Info, KeyRound, Plus, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { openUrl } from "@/lib/api";
 import { cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin, importCurrentCodexAccount, listCodexAccounts, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type AccountList, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
 
 const restartReminderKey = "accounts_hide_restart_reminder:v1";
+
+function AddAccountDialog({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const content = document.querySelector<HTMLElement>("[data-app-content]");
+  useEffect(() => {
+    const background = content?.querySelector<HTMLElement>(":scope > .overflow-y-auto");
+    if (!background) return;
+    background.inert = true;
+    background.setAttribute("aria-hidden", "true");
+    return () => { background.inert = false; background.removeAttribute("aria-hidden"); };
+  }, [content]);
+  useModalFocus(dialogRef, closeButtonRef, onClose);
+  return createPortal(<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4" data-testid="account-add-overlay">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="account-add-title" className="max-h-full w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl">
+      <div className="flex items-center justify-between gap-4">
+        <h2 id="account-add-title" className="text-lg font-semibold">{t("accounts.add")}</h2>
+        <Button ref={closeButtonRef} size="sm" variant="ghost" className="h-8 w-8 !p-0" aria-label={t("common.close")} onClick={onClose}><X className="h-4 w-4" aria-hidden="true" /></Button>
+      </div>
+      {children}
+    </div>
+  </div>, content ?? document.body);
+}
 
 export function AccountsPage() {
   const { t, i18n } = useTranslation();
@@ -18,6 +44,7 @@ export function AccountsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
+  const [showAddAccount, setShowAddAccount] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<CodexAccount | null>(null);
   const removalDialog = useRef<HTMLDialogElement>(null);
   const [showRestartReminder, setShowRestartReminder] = useState(false);
@@ -84,7 +111,10 @@ export function AccountsPage() {
   const missingAccounts = (list?.accounts ?? []).filter((account) => !account.status).map((account) => account.id).join("|");
   const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (!account.status) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
-  const login = (device: boolean, id: string | null = null) => run("login", async () => { setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  const login = (device: boolean, id: string | null = null) => {
+    setShowAddAccount(true);
+    return run("login", async () => { setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  };
   const copyAuthorizationUrl = async () => {
     if (!task?.authorizationUrl) return;
     try {
@@ -143,47 +173,54 @@ export function AccountsPage() {
   return <section className="accounts-page space-y-4" aria-label={t("common.accounts")}>
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><h1 className="text-2xl font-semibold">{t("common.accounts")}</h1><p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t("accounts.description")}</p></div>
-      <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
-    </div>
-    <div className="max-w-2xl space-y-2">
-      <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint" className="accounts-add-methods">
-        <Button size="sm" variant={list && !recommendImport ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
-        <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void login(true)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
-        <Button size="sm" variant={recommendImport ? "primary" : "secondary"} aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void run("import", importCurrentCodexAccount)}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
+        <Button size="sm" onClick={() => setShowAddAccount(true)}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
       </div>
-      {list ? <p id="accounts-add-hint" className="text-xs text-muted-foreground">{t(recommendImport ? "accounts.import_first_hint" : list.accounts.length ? "accounts.add_more_hint" : "accounts.login_first_hint")}</p> : null}
-      <p id="accounts-import-hint" className="text-xs text-muted-foreground">{t("accounts.import_hint")}</p>
     </div>
     {list?.switchError ? <p role="status" className="text-sm text-warning">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning">{t("accounts.recovery_conflict")}</p> : null}
-    {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
-    {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
-    {task ? <div className="space-y-2 rounded-xl border border-border p-4" aria-live="polite">
-      <p>{t(`accounts.login_${task.state}`)}</p>
-      {task.authorizationUrl && loginRunning ? <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button>
-          <Button variant="secondary" onClick={() => void copyAuthorizationUrl()}>
-            {urlCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-            {t(urlCopyState === "copied" ? "accounts.authorization_url_copied" : "accounts.copy_authorization_url")}
-          </Button>
+    {!showAddAccount && error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
+    {!showAddAccount && notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
+    {showAddAccount ? <AddAccountDialog onClose={() => setShowAddAccount(false)}>
+      <div className="space-y-2">
+        <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint" className="accounts-add-methods">
+          <Button size="sm" variant={list && !recommendImport ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+          <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void login(true)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
+          <Button size="sm" variant={recommendImport ? "primary" : "secondary"} aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void run("import", async () => { await importCurrentCodexAccount(); setNotice(t("accounts.added")); })}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
         </div>
-        {urlCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.authorization_url_copy_failed")}</p> : null}
+        {list ? <p id="accounts-add-hint" className="text-xs text-muted-foreground">{t(recommendImport ? "accounts.import_first_hint" : list.accounts.length ? "accounts.add_more_hint" : "accounts.login_first_hint")}</p> : null}
+        <p id="accounts-import-hint" className="text-xs text-muted-foreground">{t("accounts.import_hint")}</p>
+      </div>
+      {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
+      {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
+      {task ? <div className="space-y-2 rounded-xl border border-border p-4" aria-live="polite">
+        <p>{t(`accounts.login_${task.state}`)}</p>
+        {task.authorizationUrl && loginRunning ? <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="secondary" onClick={() => void openUrl(task.authorizationUrl!)}>{t("accounts.open_authorization")}</Button>
+            <Button variant="secondary" onClick={() => void copyAuthorizationUrl()}>
+              {urlCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+              {t(urlCopyState === "copied" ? "accounts.authorization_url_copied" : "accounts.copy_authorization_url")}
+            </Button>
+          </div>
+          {urlCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.authorization_url_copy_failed")}</p> : null}
+        </div> : null}
+        {task.deviceCode && loginRunning ? <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="font-mono text-lg select-text">{task.deviceCode}</p>
+            <Button size="sm" variant="secondary" onClick={() => void copyDeviceCode()}>
+              {codeCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+              {t(codeCopyState === "copied" ? "accounts.device_code_copied" : "accounts.copy_device_code")}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">{t("accounts.device_code_hint")}</p>
+          {codeCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.device_code_copy_failed")}</p> : null}
+        </div> : null}
+        {task.error ? <p role="alert">{message(task.error)}</p> : null}
+        {loginRunning ? <Button variant="secondary" onClick={() => void run("cancel", async () => { await cancelCodexAccountLogin(task.id); setTask(await getCodexAccountLogin(task.id)); })}>{t("accounts.cancel")}</Button> : null}
       </div> : null}
-      {task.deviceCode && loginRunning ? <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="font-mono text-lg select-text">{task.deviceCode}</p>
-          <Button size="sm" variant="secondary" onClick={() => void copyDeviceCode()}>
-            {codeCopyState === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
-            {t(codeCopyState === "copied" ? "accounts.device_code_copied" : "accounts.copy_device_code")}
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">{t("accounts.device_code_hint")}</p>
-        {codeCopyState === "failed" ? <p role="alert" className="text-sm text-error">{t("accounts.device_code_copy_failed")}</p> : null}
-      </div> : null}
-      {task.error ? <p role="alert">{message(task.error)}</p> : null}
-      {loginRunning ? <Button variant="secondary" onClick={() => void run("cancel", async () => { await cancelCodexAccountLogin(task.id); setTask(await getCodexAccountLogin(task.id)); })}>{t("accounts.cancel")}</Button> : null}
-    </div> : null}
+    </AddAccountDialog> : null}
     {list && list.accounts.length === 0 ? <p className="py-10 text-center text-muted-foreground">{t("accounts.empty")}</p> : null}
     <div className="accounts-grid">
       {list?.accounts.map((account) => {

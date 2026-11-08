@@ -32,6 +32,58 @@ beforeEach(async () => {
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
 
 describe("saved Codex accounts", () => {
+  it("groups all three add methods in a dismissible dialog", async () => {
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    expect(screen.queryByRole("button", { name: "Browser login" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Device code login" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import current sign-in" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add account" }));
+    expect(dialog.getByRole("button", { name: "Browser login" })).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Device code login" })).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Import current sign-in" })).toBeVisible();
+    await userEvent.click(dialog.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Add account" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("starts login with device auth %s and preserves progress when reopening", async (device) => {
+    const task: api.LoginTask = { id: "login", state: "running", authorizationUrl: "https://auth.openai.com/codex/device", deviceCode: device ? "1234-56789" : null, accountId: null, error: null };
+    vi.mocked(api.startCodexAccountLogin).mockResolvedValue(task);
+    vi.mocked(api.getCodexAccountLogin).mockResolvedValue(task);
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    await userEvent.click(screen.getByRole("button", { name: "Add account" }));
+    await userEvent.click(screen.getByRole("button", { name: device ? "Device code login" : "Browser login" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add account" }));
+    expect(api.startCodexAccountLogin).toHaveBeenCalledExactlyOnceWith(device, null);
+    expect(dialog.getByRole("button", { name: "Open authorization" })).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Browser login" })).toBeDisabled();
+    if (device) expect(dialog.getByText("1234-56789")).toBeVisible();
+    await userEvent.click(dialog.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("button", { name: "Open authorization" })).not.toBeInTheDocument();
+    expect(api.cancelCodexAccountLogin).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Add account" }));
+    expect(screen.getByRole("button", { name: "Open authorization" })).toBeVisible();
+    expect(api.startCodexAccountLogin).toHaveBeenCalledOnce();
+  });
+
+  it("shows import errors and success inside the add dialog", async () => {
+    vi.mocked(api.importCurrentCodexAccount).mockRejectedValueOnce(new Error("accountNetworkError")).mockResolvedValue("imported");
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
+    await userEvent.click(screen.getByRole("button", { name: "Add account" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add account" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Import current sign-in" }));
+    expect(await dialog.findByRole("alert")).toBeVisible();
+    await userEvent.click(dialog.getByRole("button", { name: "Import current sign-in" }));
+    expect(await dialog.findByRole("status")).toHaveTextContent("Account saved");
+    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it.each(["a", "b"])("requires confirmation before removing account %s", async (id) => {
     vi.mocked(api.removeCodexAccount).mockImplementation(async (removedId) => { list.accounts = list.accounts.filter((a) => a.id !== removedId); });
     render(<AccountsPage />);
@@ -65,6 +117,7 @@ describe("saved Codex accounts", () => {
     list.loginTask = { id: "login", state: "running", authorizationUrl: "https://auth.openai.com/authorize?state=test&code_challenge=challenge", deviceCode, accountId: null, error: null };
     vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
     render(<AccountsPage />);
+    await user.click(screen.getByRole("button", { name: "Add account" }));
     const copy = await screen.findByRole("button", { name: "Copy authorization link" });
     expect(copy.previousElementSibling).toHaveTextContent("Open authorization");
     await user.click(copy);
@@ -87,6 +140,7 @@ describe("saved Codex accounts", () => {
     list.loginTask = { id: "device-login", state: "running", authorizationUrl: "https://auth.openai.com/codex/device", deviceCode: "1234-56789", accountId: null, error: null };
     vi.mocked(api.getCodexAccountLogin).mockResolvedValue(list.loginTask);
     render(<AccountsPage />);
+    await user.click(screen.getByRole("button", { name: "Add account" }));
     await user.click(await screen.findByRole("button", { name: "Copy authorization code" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Copy failed");
     expect(screen.queryByRole("button", { name: "Copied" })).not.toBeInTheDocument();
