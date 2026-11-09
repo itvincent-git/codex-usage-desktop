@@ -41,10 +41,10 @@
 .account-number small { font-size: 16px; font-weight: 500; letter-spacing: 0; }
 .account-remaining { color: rgb(var(--muted-foreground)); font-size: 11px; }
 .account-meter { margin-top: 9px; height: 4px; border-radius: 8px; overflow: hidden; background: rgb(var(--muted)); }
-.account-meter span { display: block; height: 100%; border-radius: 8px; background: rgb(var(--primary)); }
+.account-meter span { display: block; height: 100%; border-radius: 8px; background: #36b883; }
+.account-meter[data-quota="weekly"] span, .account-meter[data-quota="monthly"] span { background: #9971f5; }
 .account-reset { color: rgb(var(--muted-foreground)); font-size: 11px; margin-top: 6px; }
 .account-quota-low .account-number, .account-quota-low .account-quota-name { color: #a86208; }
-.account-quota-low .account-meter span { background: #a86208; }
 .account-quota-stale .account-meter span { background: rgb(var(--muted-foreground)); }
 .account-resources { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 20px; padding: 13px 0 12px; margin-top: 14px; border-top: 1px solid rgb(var(--border)); font-size: 11px; color: rgb(var(--muted-foreground)); }
 .account-resources > div { display: flex; align-items: baseline; gap: 7px; max-width: 100%; }
@@ -70,5 +70,4 @@
 @media (prefers-color-scheme: dark) {
   .account-active { color: #52d4a6; }
   .account-warning, .account-quota-low .account-number, .account-quota-low .account-quota-name { color: #f5bd63; }
-  .account-quota-low .account-meter span { background: #f5bd63; }
 }

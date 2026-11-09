@@ -24,6 +24,7 @@ import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { getReleaseNotes } from "@/lib/release-notes";
 import type { SessionDetailRow } from "@/lib/api";
+import type { AccountList } from "@/lib/codex-accounts";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import { useTranslation } from "react-i18next";
 export default function App() {
   const { t, i18n } = useTranslation();
   const [showNotes, setShowNotes] = useState(false);
+  const [accounts, setAccounts] = useState<AccountList | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("sidebar_collapsed") === "true";
@@ -414,7 +416,7 @@ export default function App() {
 
           {isLoading && view !== "accounts" ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
 
-          {view === "accounts" ? <AccountsPage /> : null}
+          {view === "accounts" ? <AccountsPage initialList={accounts} onListChange={setAccounts} /> : null}
 
           {view === "monthly" && isMonthlyLoading ? (
             <LoadingState title={t("loading.loading_monthly")} description={t("loading.natural_month_desc")} />

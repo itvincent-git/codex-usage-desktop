@@ -1,4 +1,4 @@
-import { $, browser, expect } from "@wdio/globals";
+import { $, $$, browser, expect } from "@wdio/globals";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,6 +17,59 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("keeps saved account cards when returning through navigation", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const accounts = (await invoke<AccountList>("list_codex_accounts")).accounts;
+    expect(accounts).toHaveLength(4);
+    const assertCards = async () => {
+      await expect($$(".account-card")).toBeElementsArrayOfSize(accounts.length);
+      for (const account of accounts) await expect($(`[data-account-id="${account.id}"] h2`)).toHaveText(account.email!);
+    };
+    await assertCards();
+    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-pending`;
+    try {
+      for (const [leave, back] of [
+        ['[data-testid="dashboard-nav-tab"]', '[data-testid="accounts-nav-tab"]'],
+        ['button[aria-label="Settings"]', 'button=Back'],
+        ['[data-testid="dashboard-nav-tab"]', '[data-testid="accounts-nav-tab"]'],
+      ]) {
+        writeFileSync(pending, "");
+        await $(leave).click();
+        await expect($(".accounts-page")).not.toExist();
+        await $(back).click();
+        await browser.waitUntil(() => existsSync(`${pending}.started`));
+        expect(await browser.execute(() => document.querySelectorAll(".account-card").length)).toBe(accounts.length);
+        unlinkSync(pending);
+        unlinkSync(`${pending}.started`);
+        await assertCards();
+      }
+    } finally {
+      if (existsSync(pending)) unlinkSync(pending);
+      if (existsSync(`${pending}.started`)) unlinkSync(`${pending}.started`);
+    }
+  });
+
+  run("matches menu bar quota colors on account cards", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    for (const [account, quota, remaining, color] of [
+      ["alice", "5h", "80", "rgb(54, 184, 131)"],
+      ["alice", "weekly", "60", "rgb(153, 113, 245)"],
+      ["bob", "5h", "25", "rgb(54, 184, 131)"],
+      ["free", "monthly", "85", "rgb(153, 113, 245)"],
+    ]) {
+      const meter = $(`[data-account-id="${account}"] [role="meter"][data-quota="${quota}"]`);
+      await expect(meter).toHaveAttribute("aria-valuenow", remaining);
+      expect(await meter.$("span").execute((element) => getComputedStyle(element).backgroundColor)).toBe(color);
+    }
+    await browser.saveScreenshot("/tmp/codex-accounts-quota-colors.png");
+  });
+
   run("shows credits balances without currency symbols in English and Chinese", async () => {
     for (const [language, label, cachedLabel] of [
       ["en", "Credits balance", "Last credits balance"],

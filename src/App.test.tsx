@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import App from "./App";
 import i18n from "./i18n";
 import tauriConfig from "../src-tauri/tauri.conf.json";
+import type { AccountList } from "./lib/codex-accounts";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const forecastInvokeMock = vi.hoisted(() => vi.fn());
@@ -3188,6 +3189,34 @@ describe("App", () => {
     expect(parsedCache.hasUpdate).toBe(false);
     expect(parsedCache.currentVersion).toBe(tauriConfig.version);
   });
+  it("keeps saved account cards visible while reloading after navigation", async () => {
+    mockLoadedDashboard();
+    const fallback = invokeMock.getMockImplementation()!;
+    const identity = { userId: "alice", workspaceId: "personal" };
+    const saved: AccountList = { accounts: [{ id: "alice", identity, email: "alice@example.test", credentialVersion: 1, current: true, lastRefresh: null,
+      status: { accountId: "alice", identity, credentialVersion: 1, data: limits(80), errors: {}, updatedAt: {}, needsLogin: false } }],
+      environment: "/codex", authContext: "context-a", currentIdentity: identity, switchError: null, recoveryConflict: false };
+    let complete!: (value: AccountList) => void;
+    let reads = 0;
+    let reloading = false;
+    invokeMock.mockImplementation(async (command: string, ...args: any[]) => {
+      if (command === "list_codex_accounts") { reads++; return reloading ? new Promise<AccountList>((resolve) => { complete = resolve; }) : saved; }
+      return fallback(command, ...args);
+    });
+    render(<StrictMode><App /></StrictMode>);
+    await userEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+    await screen.findByRole("heading", { name: "alice@example.test" });
+    reloading = true;
+    await userEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    expect(screen.queryByRole("heading", { name: "alice@example.test" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Accounts" }));
+    expect(reads).toBeGreaterThan(1);
+    expect(screen.getByRole("heading", { name: "alice@example.test" })).toBeVisible();
+    await act(async () => complete({ ...saved, accounts: [] }));
+    expect(screen.queryByRole("heading", { name: "alice@example.test" })).not.toBeInTheDocument();
+    expect(screen.getByText(i18n.t("accounts.empty"))).toBeVisible();
+  });
+
   it("rejects late limits and background data after the native account changes", async () => {
     mockLoadedDashboard();
     const fallback = invokeMock.getMockImplementation()!;

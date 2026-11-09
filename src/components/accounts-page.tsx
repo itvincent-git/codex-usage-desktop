@@ -36,9 +36,9 @@ function AddAccountDialog({ children, onClose }: { children: ReactNode; onClose:
   </div>, content ?? document.body);
 }
 
-export function AccountsPage() {
+export function AccountsPage({ initialList = null, onListChange }: { initialList?: AccountList | null; onListChange?: (list: AccountList | null) => void } = {}) {
   const { t, i18n } = useTranslation();
-  const [list, setList] = useState<AccountList | null>(null);
+  const [list, setList] = useState<AccountList | null>(initialList);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export function AccountsPage() {
   const mounted = useRef(true);
   const message = (code: string) => t(`accounts.errors.${code.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") });
 
+  useEffect(() => { onListChange?.(list); }, [list, onListChange]);
   useEffect(() => { if (pendingRemoval) removalDialog.current?.showModal(); }, [pendingRemoval]);
   useEffect(() => {
     if (showRestartReminder) {
@@ -242,8 +243,8 @@ export function AccountsPage() {
         const resetCredits = data?.resetCredits ?? [];
         const missingResetDetails = resetCount == null ? 0 : Math.max(0, resetCount - resetCredits.length);
         const windows = free
-          ? [{ name: "accounts.window_monthly", window: data?.weekly ?? data?.session }]
-          : [{ name: "accounts.window_5hour", window: data?.session }, { name: "accounts.window_weekly", window: data?.weekly }];
+          ? [{ kind: "monthly", name: "accounts.window_monthly", window: data?.weekly ?? data?.session }]
+          : [{ kind: "5h", name: "accounts.window_5hour", window: data?.session }, { kind: "weekly", name: "accounts.window_weekly", window: data?.weekly }];
         const partStale = (part: string) => !!status && (status.needsLogin || !!status.errors[part] || !!status.updatedAt[part] && Date.now() - Date.parse(status.updatedAt[part]) > 10 * 60_000);
         const limitsStale = partStale("limits");
         const subscriptionStale = partStale("subscription");
@@ -280,13 +281,13 @@ export function AccountsPage() {
             </>}
           </div>
           <div className={`account-quotas${free ? " account-quotas-free" : ""}`}>
-            {windows.map(({ name, window }) => {
+            {windows.map(({ kind, name, window }) => {
               const remaining = window ? Math.max(0, Math.min(100, Math.round(window.remainingPercent))) : null;
               const low = !limitsStale && !!window && window.remainingPercent < 30;
               return <section key={name} aria-label={t(name)} className={limitsStale ? "account-quota-stale" : low ? "account-quota-low" : undefined}>
                 <div className="account-quota-name">{t(name)}{limitsStale ? ` · ${t("accounts.last_data")}` : low ? ` · ${t("accounts.low_quota")}` : ""}</div>
                 <div className="account-amount"><span className="account-number">{remaining ?? "—"}{remaining != null ? <small>%</small> : null}</span><span className="account-remaining">{remaining != null ? t("limits.remaining") : t("accounts.unknown")}</span></div>
-                <div className="account-meter" role="meter" aria-label={t(name)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={remaining ?? undefined} aria-valuetext={remaining == null ? t("accounts.unknown") : `${remaining}% ${t("limits.remaining")}`}><span style={{ width: `${remaining ?? 0}%` }} /></div>
+                <div className="account-meter" data-quota={kind} role="meter" aria-label={t(name)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={remaining ?? undefined} aria-valuetext={remaining == null ? t("accounts.unknown") : `${remaining}% ${t("limits.remaining")}`}><span style={{ width: `${remaining ?? 0}%` }} /></div>
                 <p className="account-reset">{limitsStale ? t("accounts.reset_pending") : resetTime(window?.resetsAt ?? null)}</p>
               </section>;
             })}
