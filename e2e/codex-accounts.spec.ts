@@ -688,7 +688,7 @@ describe("native saved Codex accounts", () => {
     await expect(dialog().$("button=使用设备码登录")).not.toHaveElementClass("bg-primary");
     await expect(dialog().$("button=添加当前 Codex 账号")).not.toExist();
     await expect(dialog()).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
-    const bounds = await dialog().execute((element) => {
+    const bounds = await browser.execute((element) => {
       const content = document.querySelector("[data-app-content]")!.getBoundingClientRect();
       const overlay = element.parentElement!.getBoundingClientRect();
       const panel = element.getBoundingClientRect();
@@ -700,7 +700,7 @@ describe("native saved Codex accounts", () => {
         centerOffset: Math.abs((panel.left + panel.right - content.left - content.right) / 2),
         sidebarInteractive: !document.querySelector("[data-app-sidebar]")!.closest("[inert]"),
       };
-    });
+    }, await dialog());
     expect(bounds.left).toBe(bounds.contentLeft);
     expect(bounds.right).toBe(bounds.contentRight);
     expect(bounds.top).toBe(bounds.contentTop);
