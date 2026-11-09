@@ -2,6 +2,7 @@ use super::*;
 use std::{
     io::{Read, Write},
     net::TcpListener,
+    sync::mpsc,
     thread,
     time::Duration,
 };
@@ -177,7 +178,11 @@ fn auth() -> CodexAuth {
     }
 }
 
-fn fixture(status: u16, payload: String, delay: Duration) -> (String, thread::JoinHandle<String>) {
+fn fixture(
+    status: u16,
+    payload: String,
+    response_gate: Option<mpsc::Receiver<()>>,
+) -> (String, thread::JoinHandle<String>) {
     let server = TcpListener::bind("127.0.0.1:0").unwrap();
     let endpoint = format!(
         "http://{}/backend-api/wham/usage/thread_usage/query_v2",
@@ -206,7 +211,11 @@ fn fixture(status: u16, payload: String, delay: Duration) -> (String, thread::Jo
                 }
             }
         }
-        thread::sleep(delay);
+        if let Some(gate) = response_gate {
+            // Hold the response until the caller returns, even if CI delays its timeout polling.
+            // The fallback response makes a missing client timeout fail instead of hanging.
+            let _ = gate.recv_timeout(Duration::from_secs(5));
+        }
         let _ = write!(stream, "HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nContent-Type: application/json\r\nRetry-After: 600\r\nConnection: close\r\n\r\n{payload}", payload.len());
         String::from_utf8(buffer).unwrap()
     });
@@ -216,7 +225,7 @@ fn fixture(status: u16, payload: String, delay: Duration) -> (String, thread::Jo
 #[test]
 fn http_contract_and_error_fixtures() {
     let root = id(1);
-    let (url, server) = fixture(200, body(&[&root], json!("12.34")), Duration::ZERO);
+    let (url, server) = fixture(200, body(&[&root], json!("12.34")), None);
     let rows = http_request(&auth(), &[&root], &url, Duration::from_secs(5)).unwrap();
     assert_eq!(rows[0].balance_usage_credits.as_deref(), Some("12.34"));
     let request = server.join().unwrap();
@@ -240,7 +249,7 @@ fn http_contract_and_error_fixtures() {
         (503, "serviceUnavailable"),
         (200, "invalidResponse"),
     ] {
-        let (url, server) = fixture(status, "invalid".into(), Duration::ZERO);
+        let (url, server) = fixture(status, "invalid".into(), None);
         let error = http_request(&auth(), &[&root], &url, Duration::from_secs(5)).unwrap_err();
         assert_eq!(error.status, reason);
         if status == 429 {
@@ -248,18 +257,22 @@ fn http_contract_and_error_fixtures() {
         }
         server.join().unwrap();
     }
-    let (url, server) = fixture(200, body(&[&root], json!("1")), Duration::from_millis(100));
-    assert_eq!(
-        http_request(&auth(), &[&root], &url, Duration::from_millis(20))
-            .unwrap_err()
-            .status,
-        "networkError"
-    );
-    server.join().unwrap();
     assert_eq!(
         retry_after("Wed, 21 Oct 2015 07:28:00 GMT", 0),
         1445412480000
     );
+}
+
+#[test]
+fn http_timeout_returns_network_error() {
+    let root = id(1);
+    let (release, gate) = mpsc::channel();
+    let (url, server) = fixture(200, body(&[&root], json!("1")), Some(gate));
+    let result = http_request(&auth(), &[&root], &url, Duration::from_millis(100));
+    let _ = release.send(());
+    let request = server.join().unwrap();
+    assert!(request.starts_with("POST /backend-api/wham/usage/thread_usage/query_v2 HTTP/1.1"));
+    assert_eq!(result.unwrap_err().status, "networkError");
 }
 
 #[test]
