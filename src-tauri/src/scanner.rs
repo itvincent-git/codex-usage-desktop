@@ -132,7 +132,24 @@ pub fn rescan_session(
     }) {
         return Err("Session file is not indexed".into());
     }
-    let files = find_session_files(Some(home.clone()))?;
+    // Most refreshes already have the indexed path. Only search the tree if it moved
+    // (for example into archived_sessions or to a compressed replacement).
+    let files = if cached.iter().any(|rollup| rollup.path == path)
+        && ["sessions", "archived_sessions"]
+            .iter()
+            .any(|directory| Path::new(path).starts_with(home.join(directory)))
+        && Path::new(path).is_file()
+    {
+        let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+        vec![SessionFile {
+            path: PathBuf::from(path),
+            cache_key: path.into(),
+            modified_at_ms: modified_at_ms(&metadata),
+            size_bytes: metadata.len() as i64,
+        }]
+    } else {
+        find_session_files(Some(home.clone()))?
+    };
     let file = files
         .iter()
         .find(|file| file.cache_key == path)
@@ -148,7 +165,7 @@ pub fn rescan_session(
     let rollup = parse_rollup(file, &raw, &timezone, &scanned_at, pricing)?;
     remove_duplicate_rollups(&tx, file, &cached)?;
     upsert_session_file_rollups(&tx, &[rollup], &scanned_at)?;
-    let scan = finish_scoped_scan(
+    let mut scan = finish_scoped_scan(
         &tx,
         &home,
         &timezone,
@@ -185,6 +202,7 @@ pub fn rescan_session(
     crate::codex_projects::CodexProjectCatalog::load(&home)
         .enrich_sessions(std::slice::from_mut(&mut session));
     tx.commit().map_err(|error| error.to_string())?;
+    scan.metrics.total_ms = started.elapsed().as_millis();
     Ok(crate::types::SessionRescanResponse {
         scan,
         session,
@@ -2627,6 +2645,7 @@ mod tests {
                 a.to_str().unwrap(),
             )
             .unwrap();
+            assert_eq!(result.scan.metrics.files_scanned, 1);
             assert_eq!(result.scan.metrics.files_parsed, 1);
             assert_eq!(result.session.total_tokens, 510);
             assert_eq!(
@@ -2663,6 +2682,32 @@ mod tests {
         .unwrap_err()
         .contains("no longer exists"));
         assert_eq!(scoped_snapshot(&db), snapshot);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn session_rescan_does_not_walk_unrelated_directories() {
+        use std::os::unix::fs::PermissionsExt;
+        let (_directory, home, mut db) = scoped_fixture();
+        let target = home.join("sessions/target.jsonl");
+        fs::write(&target, scoped_log("/repo/a", 100, "before")).unwrap();
+        let pricing = PricingSource::embedded();
+        scan_codex_usage(&mut db, &pricing, Some(home.clone()), Some("UTC".into())).unwrap();
+        let unrelated = home.join("sessions/private");
+        fs::create_dir(&unrelated).unwrap();
+        fs::set_permissions(&unrelated, fs::Permissions::from_mode(0o000)).unwrap();
+        fs::write(&target, scoped_log("/repo/a", 500, "after")).unwrap();
+        let result = rescan_session(
+            &mut db,
+            &pricing,
+            Some(home),
+            Some("UTC".into()),
+            target.to_str().unwrap(),
+        );
+        fs::set_permissions(&unrelated, fs::Permissions::from_mode(0o755)).unwrap();
+        let result = result.unwrap();
+        assert_eq!(result.scan.metrics.files_scanned, 1);
+        assert_eq!(result.session.total_tokens, 510);
     }
 
     #[test]
@@ -2768,6 +2813,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.session.path, archived.to_string_lossy());
+        // Once the archived path is indexed, subsequent refreshes need no discovery.
+        let archived_refresh = rescan_session(
+            &mut db,
+            &pricing,
+            Some(home.clone()),
+            Some("UTC".into()),
+            archived.to_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(archived_refresh.scan.metrics.files_scanned, 1);
         assert_eq!(crate::db::query_session_details(&db).unwrap().len(), 1);
         assert_eq!(
             crate::db::query_all_daily_rows(&db).unwrap()[0].total_tokens,

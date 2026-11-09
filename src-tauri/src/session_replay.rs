@@ -5,8 +5,8 @@ use crate::{
     },
     session_file::{open_session_file, read_session_file},
     types::{
-        DailyUsageRow, ModelUsage, SessionReplayAgent, SessionReplayDetail, SessionReplayItem,
-        SessionReplayMessage, SessionReplayPatchResult, SessionReplaySummary,
+        DailyUsageRow, ModelUsage, SessionDetailRow, SessionReplayAgent, SessionReplayDetail,
+        SessionReplayItem, SessionReplayMessage, SessionReplayPatchResult, SessionReplaySummary,
         SessionReplayTokenEvent, SessionReplayToolCall, SessionReplayTurn,
     },
 };
@@ -305,9 +305,46 @@ fn build_agent_hierarchy(
 }
 
 pub fn load_session_agents(db: &Connection) -> Result<Vec<SessionReplayAgent>, String> {
+    // The project index already stores agent metadata for the indexed file version.
+    // Reuse it instead of reopening every rollout when a single session is refreshed.
+    let mut statement = db
+        .prepare(
+            "SELECT i.path, i.detail_json FROM project_session_index i
+         JOIN session_file_rollups f ON f.path = i.path
+         WHERE i.source_updated_at = f.updated_at",
+        )
+        .map_err(|error| error.to_string())?;
+    let cached = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?
+        .collect::<Result<BTreeMap<_, _>, _>>()
+        .map_err(|error| error.to_string())?;
     Ok(query_session_hierarchy_records(db)?
         .into_iter()
-        .filter_map(read_session_agent)
+        .filter_map(|record| {
+            let session = cached
+                .get(&record.path)
+                .and_then(|json| serde_json::from_str::<SessionDetailRow>(json).ok());
+            if let Some(session) = session {
+                return Some(SessionReplayAgent {
+                    path: record.path,
+                    session_id: session.agent_session_id?,
+                    parent_session_id: session.parent_session_id,
+                    depth: session.agent_depth,
+                    agent_path: session.agent_path.unwrap_or_else(|| "/root".into()),
+                    nickname: session.agent_nickname,
+                    role: session.agent_role,
+                    thread_name: record.prompt_title.filter(|title| !title.is_empty()),
+                    input_tokens: record.input_tokens,
+                    cached_input_tokens: record.cached_input_tokens,
+                    output_tokens: record.output_tokens,
+                    cost_usd: record.cost_usd,
+                });
+            }
+            read_session_agent(record)
+        })
         .collect())
 }
 
@@ -3723,6 +3760,31 @@ mod tests {
             120
         );
         assert!((total_cost - 0.06).abs() < 1e-9);
+        crate::project_sessions::sync_index(&db, &temp_dir, "UTC").unwrap();
+        // Related sessions remain available without opening their logs.
+        fs::remove_file(&root_path).unwrap();
+        fs::remove_file(&grandchild_path).unwrap();
+        let cached = fetch_session_detail(&db, &child_path.to_string_lossy()).unwrap();
+        assert_eq!(cached.agents.len(), 3);
+        assert_eq!(cached.agents[0].session_id, "root-id");
+        assert_eq!(cached.agents[1].nickname.as_deref(), Some("Curie"));
+        assert_eq!(cached.agents[2].depth, 2);
+        assert_eq!(
+            cached.agents.iter().map(|agent| agent.cost_usd).sum::<f64>(),
+            total_cost
+        );
+        // A changed rollup must still read fresh metadata until its index is synced.
+        fs::write(&child_path, child_meta.replace("Curie", "Updated agent")).unwrap();
+        upsert_session_file_rollups(
+            &db,
+            &[rollup(&child_path, 4, "Updated task", 0.04)],
+            "2026-06-02T00:00:00.000Z",
+        )
+        .unwrap();
+        let updated = fetch_session_detail(&db, &child_path.to_string_lossy()).unwrap();
+        assert_eq!(updated.agents.len(), 3);
+        assert_eq!(updated.agents[1].nickname.as_deref(), Some("Updated agent"));
+        assert_eq!(updated.agents[1].cost_usd, 0.04);
     }
 
     fn tempfile_dir() -> std::path::PathBuf {

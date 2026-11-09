@@ -1,7 +1,7 @@
 import { $, browser, expect } from "@wdio/globals";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { OverviewResponse, SessionDetailRow } from "../src/lib/api";
+import type { OverviewResponse, SessionDetailRow, SessionRescanResponse } from "../src/lib/api";
 
 // CODEX_USAGE_REFRESH_E2E=1 isolates both the Codex home and the application database.
 describe("keyboard navigation and targeted refresh", () => {
@@ -98,8 +98,18 @@ describe("keyboard navigation and targeted refresh", () => {
     ]));
     const refreshSession = detail.$('button=Refresh this session');
     await refreshSession.waitForEnabled();
-    await browser.keys([modifier, "r"]);
+    const refreshStarted = Date.now();
+    await refreshSession.click();
     await expect(detail).toHaveText(expect.stringContaining("Appended reply from session refresh"));
+    await refreshSession.waitForEnabled();
+    const buttonDurationMs = Date.now() - refreshStarted;
+    const scan = await browser.execute(async (path) => {
+      const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: <T>(command: string, args: Record<string, unknown>) => Promise<T> } }).__TAURI_INTERNALS__;
+      return (await runtime.invoke<SessionRescanResponse>("rescan_session", { path })).scan;
+    }, target);
+    expect(scan.metrics?.filesScanned).toBe(1);
+    expect(scan.metrics?.filesParsed).toBe(1);
+    console.log(`[session refresh] native=${scan.metrics?.totalMs}ms, button-to-ready=${buttonDurationMs}ms`);
     await expect(detail.$('[aria-label="Session summary"]')).toHaveText(expect.stringContaining("520"));
     await browser.keys("Escape");
     await detail.waitForExist({ reverse: true });
