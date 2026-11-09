@@ -151,9 +151,9 @@ describe("native saved Codex accounts", () => {
     await expect(code).not.toExist();
     await expect($("button=复制设备码")).not.toExist();
     await expect($("button=复制链接")).not.toExist();
-    await expect(page.$("button=设备码登录")).not.toExist();
+    await expect(page.$("button=使用设备码登录")).not.toExist();
     await page.$("button=添加账号").click();
-    const deviceLogin = dialog.$("button=设备码登录");
+    const deviceLogin = dialog.$("button=使用设备码登录");
     await expect(deviceLogin).toBeDisplayed();
     await deviceLogin.click();
     await expect(code).toBeDisplayed();
@@ -194,9 +194,9 @@ describe("native saved Codex accounts", () => {
     try {
       await browser.setWindowSize(1100, 760);
       for (const [language, add, login, title, hint, open, copy, copied, cancel, cancelled, close] of [
-        ["zh", "添加账号", "浏览器登录", "等待 Codex 授权", "请在浏览器中完成账号登录与授权。", "打开授权页面", "复制链接", "链接已复制", "取消登录", "登录已取消", "关闭"],
+        ["zh", "添加账号", "在浏览器中登录", "等待 Codex 授权", "请在浏览器中完成账号登录与授权。", "打开授权页面", "复制链接", "链接已复制", "取消登录", "登录已取消", "关闭"],
         ["de", "Konto hinzufügen", "Im Browser anmelden", "Warten auf Codex-Autorisierung", "Schließen Sie die Anmeldung und Autorisierung in Ihrem Browser ab.", "Autorisierung öffnen", "Link kopieren", "Link kopiert", "Anmeldung abbrechen", "Anmeldung abgebrochen", "Schließen"],
-        ["en", "Add account", "Browser login", "Waiting for Codex authorization", "Complete account sign-in and authorization in your browser.", "Open authorization", "Copy link", "Link copied", "Cancel login", "Login cancelled", "Close"],
+        ["en", "Add account", "Sign in with browser", "Waiting for Codex authorization", "Complete account sign-in and authorization in your browser.", "Open authorization", "Copy link", "Link copied", "Cancel login", "Login cancelled", "Close"],
       ]) {
         await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
         await browser.refresh();
@@ -239,8 +239,8 @@ describe("native saved Codex accounts", () => {
 
   run("reminds users to restart Codex after switching and remembers dismissal preferences", async () => {
     for (const [language, title, restart, cli, stop, dontRemind, gotIt, switchLabel] of [
-      ["en", "Account switched", "Restart the Codex client", "exit the current session and restart in non-daemon mode", "stop the Codex background server", "Don't remind me again", "Got it", "Switch Codex sign-in"],
-      ["zh", "账号已切换", "请重启 Codex 客户端", "请退出当前会话，并以非后台模式重新启动", "结束 Codex 后台 server", "不再提醒", "我知道了", "切换到此账号"],
+      ["en", "Codex sign-in configuration updated", "Restart the Codex client", "exit the current session and restart in non-daemon mode", "stop the Codex background server", "Don't remind me again", "Got it", "Switch Codex sign-in"],
+      ["zh", "Codex 登录配置已切换", "请重启 Codex 客户端", "请退出当前会话，并以非后台模式重新启动", "结束 Codex 后台 server", "不再提醒", "我知道了", "切换到此账号"],
     ]) {
       await browser.execute((locale) => { localStorage.clear(); localStorage.setItem("language", locale); }, language);
       await browser.refresh();
@@ -279,7 +279,7 @@ describe("native saved Codex accounts", () => {
       dialog = $('dialog[aria-labelledby="account-restart-title"]');
       await bob.$(`button=${switchLabel}`).click();
       await expect(bob).toHaveAttribute("aria-current", "true");
-      await expect($(".accounts-page > [role='status']")).toHaveText(title);
+      await expect($(".accounts-page > [role='status']")).toHaveText(language === "en" ? "Sign-in configuration updated. Restart related Codex clients to load the new account." : "登录配置已切换。请重启相关 Codex 客户端以加载新账号。");
       await expect(dialog).not.toExist();
       await alice.$(`button=${switchLabel}`).click();
       await expect(alice).toHaveAttribute("aria-current", "true");
@@ -398,7 +398,7 @@ describe("native saved Codex accounts", () => {
     await browser.keys("Escape");
     await page.$("button=More").execute((element) => element.focus());
     await browser.keys("Enter");
-    await expect($('//*[@role="menuitem" and normalize-space(.)="Device code login"]')).toBeDisplayed();
+    await expect($('//*[@role="menuitem" and normalize-space(.)="Use device code"]')).toBeDisplayed();
     await browser.keys("Escape");
     const layout = () => browser.execute(() => {
       const grid = document.querySelector(".accounts-grid")!;
@@ -456,7 +456,7 @@ describe("native saved Codex accounts", () => {
     await expect(bob.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
     await expect(alice).toHaveText(expect.stringContaining("plus"));
     await expect(bob).toHaveText(expect.stringContaining("Team · Premium seat"));
-    await expect(alice).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(alice).toHaveText(expect.stringContaining("Configured in Codex"));
     const authPath = join(process.env.CODEX_HOME!, "auth.json");
     const configPath = join(process.env.CODEX_HOME!, "config.toml");
     const original = readFileSync(authPath, "utf8");
@@ -489,14 +489,14 @@ describe("native saved Codex accounts", () => {
     await expect(alice.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "80");
 
     await bob.$("button=Switch Codex sign-in").click();
-    await expect(alice).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
-    await expect(bob).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(alice).not.toHaveText(expect.stringContaining("Configured in Codex"));
+    await expect(bob).toHaveText(expect.stringContaining("Configured in Codex"));
     await expect($('dialog[aria-labelledby="account-restart-title"]')).toHaveText(expect.stringContaining("Restart the Codex client"));
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(accountCredentials("bob"));
     expect(readFileSync(configPath, "utf8")).toBe(config);
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     await alice.$("button=Switch Codex sign-in").click();
-    await expect(alice).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(alice).toHaveText(expect.stringContaining("Configured in Codex"));
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(accountCredentials("alice"));
     expect(readFileSync(configPath, "utf8")).toBe(config);
@@ -509,9 +509,13 @@ describe("native saved Codex accounts", () => {
   }).timeout(120_000);
 
   run("delegates login to an empty home and rejects a mismatched re-login", async () => {
+    await browser.execute(() => { localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
     const original = readFileSync(join(process.env.CODEX_HOME!, "auth.json"), "utf8");
     await $('button=Add account').click();
-    await $('button=Browser login').click();
+    await $('button=Sign in with browser').click();
     await expect($('[role="dialog"][aria-labelledby="account-add-title"]')).toHaveText(expect.stringContaining("Login completed"));
     const list = await invoke<AccountList>("list_codex_accounts");
     const charlie = list.accounts.find((account) => account.email === "charlie@example.test");
@@ -588,7 +592,7 @@ describe("native saved Codex accounts", () => {
     await invoke("remove_codex_account", { accountId: removed.id });
     await oldCard.waitForExist({ reverse: true });
     await $('button=Add account').click();
-    await $('button=Browser login').click();
+    await $('button=Sign in with browser').click();
     let addedId: string;
     await browser.waitUntil(async () => {
       const next = await invoke<AccountList>("list_codex_accounts");
@@ -599,17 +603,17 @@ describe("native saved Codex accounts", () => {
     await $('[role="dialog"][aria-labelledby="account-add-title"] button[aria-label="Close"]').click();
     const card = $(`[data-account-id="${addedId!}"]`);
     await expect(card.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
-    await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(card).toHaveText(expect.stringContaining("Configured in Codex"));
     await expect(card).not.toHaveText(expect.stringContaining("Stale data"));
     const status = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.id === addedId!)!.status;
     expect(status?.errors).toEqual({});
     expect(readFileSync(authPath, "utf8")).toBe(JSON.stringify(old));
     await $('[data-account-id="bob"]').$("button=Switch Codex sign-in").click();
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
-    await expect(card).not.toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(card).not.toHaveText(expect.stringContaining("Configured in Codex"));
     await card.$("button=Switch Codex sign-in").click();
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
-    await expect(card).toHaveText(expect.stringContaining("Current Codex sign-in"));
+    await expect(card).toHaveText(expect.stringContaining("Configured in Codex"));
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(newer);
   });
 
@@ -669,22 +673,22 @@ describe("native saved Codex accounts", () => {
     }
   });
 
-  run("guides first account onboarding and groups three add methods in one dialog", async () => {
+  run("guides contextual first account onboarding and resumes authorization", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
     await $('[data-testid="accounts-nav-tab"]').click();
-    const page = $('section[aria-label="账号"]');
-    const add = page.$("button=添加账号");
-    const dialog = $('[role="dialog"][aria-labelledby="account-add-title"]');
-    await expect(dialog).not.toExist();
-    await expect(page.$("button=浏览器登录")).not.toExist();
-    await expect(page.$("button=设备码登录")).not.toExist();
-    await expect(page.$("button=导入当前账号")).not.toExist();
-    await add.click();
-    await expect(dialog).toBeDisplayed();
-    await expect(dialog.$("h2")).toHaveText("添加账号");
-    const bounds = await browser.execute((element) => {
+    const page = () => $('section[aria-label="账号"]');
+    const add = () => page().$("button=添加账号");
+    const dialog = () => $('[role="dialog"][aria-labelledby="account-add-title"]');
+    await expect(dialog()).not.toExist();
+    await add().click();
+    await expect(dialog().$("h2")).toHaveText("添加其他账号");
+    await expect(dialog().$("button=在浏览器中登录")).toHaveElementClass("bg-primary");
+    await expect(dialog().$("button=使用设备码登录")).not.toHaveElementClass("bg-primary");
+    await expect(dialog().$("button=添加当前 Codex 账号")).not.toExist();
+    await expect(dialog()).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
+    const bounds = await dialog().execute((element) => {
       const content = document.querySelector("[data-app-content]")!.getBoundingClientRect();
       const overlay = element.parentElement!.getBoundingClientRect();
       const panel = element.getBoundingClientRect();
@@ -696,7 +700,7 @@ describe("native saved Codex accounts", () => {
         centerOffset: Math.abs((panel.left + panel.right - content.left - content.right) / 2),
         sidebarInteractive: !document.querySelector("[data-app-sidebar]")!.closest("[inert]"),
       };
-    }, await dialog);
+    });
     expect(bounds.left).toBe(bounds.contentLeft);
     expect(bounds.right).toBe(bounds.contentRight);
     expect(bounds.top).toBe(bounds.contentTop);
@@ -704,99 +708,87 @@ describe("native saved Codex accounts", () => {
     expect(bounds.left).toBeGreaterThanOrEqual(bounds.sidebarRight);
     expect(bounds.centerOffset).toBeLessThan(2);
     expect(bounds.sidebarInteractive).toBe(true);
-    await browser.saveScreenshot("/tmp/codex-accounts-add-dialog.png");
-    await dialog.$('button[aria-label="关闭"]').click();
-    await expect(dialog).not.toExist();
-    await expect(add).toBeFocused();
-    await add.click();
+    await browser.saveScreenshot("/tmp/codex-accounts-nng-login.png");
+    await dialog().$('button[aria-label="关闭"]').click();
+    await expect(add()).toBeFocused();
+    await add().click();
     await browser.keys("Escape");
-    await expect(dialog).not.toExist();
-    await expect(add).toBeFocused();
-    await add.click();
-    const methods = dialog.$('[role="group"][aria-label="添加账号"]');
-    const browserLogin = methods.$("button=浏览器登录");
-    const deviceLogin = methods.$("button=设备码登录");
-    const importCurrent = methods.$("button=导入当前账号");
-    const order = async () => methods.$$("button").map((button) => button.getText());
-    const waitForPrimary = async (button: typeof browserLogin) => browser.waitUntil(() => button.execute((element) => {
-      const style = getComputedStyle(element);
-      return style.backgroundColor === `rgb(${style.getPropertyValue("--primary").trim().split(/\s+/).join(", ")})`;
-    }), { timeoutMsg: "The recommended button should finish its color transition" });
-    const expectedOrder = ["浏览器登录", "设备码登录", "导入当前账号"];
-    await expect(browserLogin).toHaveElementClass("bg-primary");
-    expect(await order()).toEqual(expectedOrder);
-    await expect(deviceLogin).toBeDisplayed();
-    await expect(methods.$("button=刷新全部")).not.toExist();
-    await expect(dialog).toHaveText(expect.stringContaining("添加其他账号，可使用浏览器登录或设备码登录。"));
-    await waitForPrimary(browserLogin);
-    await browser.saveScreenshot("/tmp/codex-accounts-methods-saved.png");
+    await expect(dialog()).not.toExist();
+    await expect(add()).toBeFocused();
 
     const saved = await invoke<AccountList>("list_codex_accounts");
-    // Removing saved records leaves the native Codex sign-in available to import.
     for (const account of saved.accounts) await invoke("remove_codex_account", { accountId: account.id });
-    await expect(browserLogin).toHaveElementClass("bg-primary");
-    await expect(importCurrent).not.toHaveElementClass("bg-primary");
-    await expect(dialog).toHaveText(expect.stringContaining("已在本机 Codex 登录？直接导入即可。"));
-    expect(await order()).toEqual(expectedOrder);
-    await waitForPrimary(browserLogin);
-    await browser.saveScreenshot("/tmp/codex-accounts-methods-empty.png");
-    await expect(dialog).toHaveText(expect.stringContaining("推荐使用浏览器登录；浏览器登录不便时，可选择设备码登录，在授权页面输入设备码。"));
-    await expect(dialog).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
-    await dialog.$('button[aria-label="关闭"]').click();
-    const empty = page.$('section[aria-labelledby="accounts-empty-title"]');
-    await expect(empty.$("h2")).toHaveText("查看多个 Codex 账号的剩余额度，并按需切换");
-    await expect(empty.$("button=导入当前账号")).toHaveElementClass("bg-primary");
-    await expect(empty).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
+    const empty = () => page().$('section[aria-labelledby="accounts-empty-title"]');
+    await expect(empty().$("h2")).toHaveText("查看 Codex 账号额度");
+    await expect(empty()).toHaveText(expect.stringContaining("检测到本机已有 Codex 登录。"));
+    await expect(empty().$("button=添加当前 Codex 账号")).toHaveElementClass("bg-primary");
+    await expect(add()).not.toExist();
+    await expect(page().$("button=全部刷新")).not.toExist();
     for (const width of [1440, 1100]) {
       await browser.setWindowSize(width, 900);
-      const overflow = await empty.execute((element) => element.scrollWidth > element.clientWidth);
-      expect(overflow).toBe(false);
-      await browser.saveScreenshot(`/tmp/codex-accounts-onboarding-${width}.png`);
+      expect(await empty().execute((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+      await browser.saveScreenshot(`/tmp/codex-accounts-nng-empty-${width}.png`);
     }
-    await empty.$("button=登录其他账号").click();
-    await expect(browserLogin).toHaveElementClass("bg-primary");
-    await dialog.$('button[aria-label="关闭"]').click();
+    await empty().$("button=添加其他账号").click();
+    await expect(dialog().$("h2")).toHaveText("添加其他账号");
+    await expect(dialog().$("button=添加当前 Codex 账号")).not.toExist();
+    await dialog().$('button[aria-label="关闭"]').click();
 
     const authPath = join(process.env.CODEX_HOME!, "auth.json");
-    const backupPath = `${authPath}.methods-backup`;
+    const nativeAuth = readFileSync(authPath, "utf8");
+    const email = JSON.parse(Buffer.from(JSON.parse(nativeAuth).tokens.id_token.split(".")[1], "base64url").toString()).email;
+    await empty().$("button=添加当前 Codex 账号").click();
+    await expect(page().$(`h2=${email}`)).toBeDisplayed();
+    await expect(empty()).not.toExist();
+    expect(readFileSync(authPath, "utf8")).toBe(nativeAuth);
+    await expect(page().$('[role="status"]')).toHaveText("账号已保存，Codex 登录保持不变。");
+    await expect(page().$(".account-current")).toHaveText("Codex 已配置");
+    const imported = await invoke<AccountList>("list_codex_accounts");
+    for (const account of imported.accounts) await invoke("remove_codex_account", { accountId: account.id });
+
+    const backupPath = `${authPath}.onboarding-backup`;
+    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.browser-pending`;
     renameSync(authPath, backupPath);
+    writeFileSync(pending, "");
     try {
       await browser.refresh();
       await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
       await $('[data-testid="accounts-nav-tab"]').click();
-      await expect(empty.$("button=导入当前账号")).not.toExist();
-      await expect(empty).toHaveText(expect.stringContaining("登录 Codex，添加第一个账号，即可查看剩余额度和订阅状态。"));
-      await browser.saveScreenshot("/tmp/codex-accounts-onboarding-no-sign-in.png");
-      await empty.$("button=浏览器登录").click();
-      await expect(browserLogin).toHaveElementClass("bg-primary");
-      await expect(importCurrent).not.toHaveElementClass("bg-primary");
-      await expect(dialog).toHaveText(expect.stringContaining("使用浏览器登录或设备码登录，添加第一个账号。"));
-      expect(await order()).toEqual(expectedOrder);
-    } finally { renameSync(backupPath, authPath); }
-
-    await browser.refresh();
-    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
-    await $('[data-testid="accounts-nav-tab"]').click();
-    const nativeAuth = readFileSync(authPath, "utf8");
-    const email = JSON.parse(Buffer.from(JSON.parse(nativeAuth).tokens.id_token.split(".")[1], "base64url").toString()).email;
-    await empty.$("button=导入当前账号").click();
-    await expect(page.$(`h2=${email}`)).toBeDisplayed();
-    await expect(empty).not.toExist();
-    expect(readFileSync(authPath, "utf8")).toBe(nativeAuth);
-    await expect(page.$('[role="status"]')).toHaveText("账号已保存，Codex 登录保持不变。");
-    await add.click();
-    await expect(browserLogin).toHaveElementClass("bg-primary");
-    await expect(importCurrent).not.toHaveElementClass("bg-primary");
-    expect(await order()).toEqual(expectedOrder);
-    await expect(dialog).toHaveText(expect.stringContaining("导入当前账号：读取本机 Codex 当前登录的账号。"));
-    await browserLogin.click();
-    await expect(dialog).toHaveText(expect.stringContaining("登录完成"));
-    await expect(page.$("h2=charlie@example.test")).toBeDisplayed();
-    await dialog.$('button[aria-label="关闭"]').click();
-    await expect(dialog).not.toExist();
-    await add.click();
-    await $('[data-testid="dashboard-nav-tab"]').click();
-    await expect(dialog).not.toExist();
-    await expect($('[data-testid="dashboard-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+      await expect(empty().$("h2")).toHaveText("添加第一个 Codex 账号");
+      await expect(empty().$("button=添加当前 Codex 账号")).not.toExist();
+      await expect(empty().$("button=在浏览器中登录")).toHaveElementClass("bg-primary");
+      await expect(empty().$("button=使用设备码登录")).toBeDisplayed();
+      await browser.saveScreenshot("/tmp/codex-accounts-nng-no-sign-in.png");
+      await empty().$("button=在浏览器中登录").click();
+      await expect(dialog().$("h2")).toHaveText("添加第一个 Codex 账号");
+      await expect(dialog().$("h3")).toHaveText("等待 Codex 授权");
+      await expect(dialog().$("button=在浏览器中登录")).not.toExist();
+      await expect(dialog()).toHaveText(expect.stringContaining("关闭弹窗后，登录仍会继续。"));
+      const task = (await invoke<AccountList>("list_codex_accounts")).loginTask!;
+      await dialog().$('button[aria-label="关闭"]').click();
+      await expect(dialog()).not.toExist();
+      await expect(page().$("button=继续登录")).toBeDisplayed();
+      await expect(page().$("button=继续登录")).toBeFocused();
+      await expect(empty().$("button=在浏览器中登录")).toBeDisabled();
+      await page().$("button=继续登录").click();
+      await expect(dialog().$("button=打开授权页面")).toBeDisplayed();
+      expect((await invoke<AccountList>("list_codex_accounts")).loginTask!.id).toBe(task.id);
+      await browser.saveScreenshot("/tmp/codex-accounts-nng-waiting.png");
+      await dialog().$("button=取消登录").click();
+      await expect(dialog().$("h3")).toHaveText("登录已取消");
+      await dialog().$('button[aria-label="关闭"]').click();
+      await expect(page().$("button=继续登录")).not.toExist();
+      await expect(empty().$("button=使用设备码登录")).toBeEnabled();
+      await empty().$("button=使用设备码登录").click();
+      await expect(dialog().$(".accounts-login-code-value")).toHaveText("1234-56789");
+      await expect(dialog().$(".accounts-login-description")).toHaveText("打开授权页面，输入下方设备码以完成登录。");
+      await browser.saveScreenshot("/tmp/codex-accounts-nng-device.png");
+      await dialog().$("button=取消登录").click();
+      await expect(dialog().$("h3")).toHaveText("登录已取消");
+      await dialog().$('button[aria-label="关闭"]').click();
+    } finally {
+      unlinkSync(pending);
+      renameSync(backupPath, authPath);
+    }
   });
 });

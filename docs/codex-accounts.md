@@ -2,6 +2,8 @@
 
 The Accounts page keeps a separate local library of complete ChatGPT credentials. Viewing or refreshing a card does not select that account in Codex. Adding an account runs the official CLI in an empty temporary `CODEX_HOME` and saves the result without switching. Browser and device-code login can be cancelled and time out after ten minutes.
 
+On first use, an existing local Codex sign-in is offered as **Add current Codex account**. Without a local sign-in, **Sign in with browser** starts authorization directly; **Use device code** is a secondary option. **Add another account** opens a login dialog without import options. Closing a running login leaves it active and focuses **Continue sign-in** on the Accounts page; **Cancel login** stops it. Account badges describe the saved Codex sign-in configuration, rather than asserting that running clients have loaded it.
+
 Import saves the current file-based ChatGPT login. Re-login replaces only the same user and workspace. Accounts are identified by both `chatgpt_user_id` and `chatgpt_account_id`; email is only a display label. Remove deletes this application's record and cached status. Codex stays logged in, including when the removed account is current.
 
 ## Storage and refresh

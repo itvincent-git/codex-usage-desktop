@@ -1,7 +1,5 @@
 .accounts-page { container: accounts / inline-size; }
 .accounts-page .h-8 { font-size: 12px; padding-inline: 10px; }
-.accounts-add-methods { display: flex; flex-wrap: wrap; gap: 8px; }
-.accounts-add-methods > button { flex: 1 1 160px; }
 .accounts-login { border: 1px solid rgb(var(--border)); border-radius: 12px; overflow: hidden; }
 .accounts-login-body { padding: 18px; }
 .accounts-login-status { display: flex; align-items: center; gap: 10px; }

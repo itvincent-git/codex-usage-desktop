@@ -12,7 +12,7 @@ import { cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin,
 
 const restartReminderKey = "accounts_hide_restart_reminder:v1";
 
-function AddAccountDialog({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+function AddAccountDialog({ children, title, onClose }: { children: ReactNode; title: string; onClose: () => void }) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -28,7 +28,7 @@ function AddAccountDialog({ children, onClose }: { children: ReactNode; onClose:
   return createPortal(<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4" data-testid="account-add-overlay">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="account-add-title" className="max-h-full w-full max-w-xl space-y-4 overflow-y-auto rounded-xl border border-border bg-surface p-6 text-foreground shadow-xl">
       <div className="flex items-center justify-between gap-4">
-        <h2 id="account-add-title" className="text-lg font-semibold">{t("accounts.add")}</h2>
+        <h2 id="account-add-title" className="text-lg font-semibold">{title}</h2>
         <Button ref={closeButtonRef} size="sm" variant="ghost" className="h-8 w-8 !p-0" aria-label={t("common.close")} onClick={onClose}><X className="h-4 w-4" aria-hidden="true" /></Button>
       </div>
       {children}
@@ -45,6 +45,8 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
+  const [loginAccountId, setLoginAccountId] = useState<string | null>(null);
+  const continueLoginButton = useRef<HTMLButtonElement>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CodexAccount | null>(null);
   const removalDialog = useRef<HTMLDialogElement>(null);
   const [showRestartReminder, setShowRestartReminder] = useState(false);
@@ -113,8 +115,14 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (!account.status) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
   const login = (device: boolean, id: string | null = null) => {
+    if (busy || task?.state === "running") return;
+    setLoginAccountId(id);
     setShowAddAccount(true);
-    return run("login", async () => { setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+    return run("login", async () => { setTask(null); setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
+  };
+  const openAddAccount = () => {
+    if (task?.state !== "running") { setTask(null); setLoginAccountId(null); setError(null); setNotice(null); }
+    setShowAddAccount(true);
   };
   const importAccount = () => run("import", async () => { await importCurrentCodexAccount(); setNotice(t("accounts.added")); });
   const copyAuthorizationUrl = async () => {
@@ -150,6 +158,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   }, [task?.id, task?.state, t]);
 
   const loginRunning = task?.state === "running";
+  useEffect(() => { if (!showAddAccount && loginRunning) continueLoginButton.current?.focus(); }, [showAddAccount, loginRunning]);
   const recommendImport = !!list && list.accounts.length === 0 && !!list.currentIdentity;
   const locale = i18n.language;
   const relativeUpdate = (at: string | undefined) => {
@@ -175,27 +184,28 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   return <section className="accounts-page space-y-4" aria-label={t("common.accounts")}>
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><h1 className="text-2xl font-semibold">{t("common.accounts")}</h1><p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t("accounts.description")}</p></div>
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="secondary" disabled={!list?.accounts.length || refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
-        <Button size="sm" onClick={() => setShowAddAccount(true)}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
-      </div>
+      {list?.accounts.length ? <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="secondary" disabled={refreshing.size > 0} onClick={() => void refreshAll()}><RefreshCw className={`h-3.5 w-3.5${refreshing.size > 0 ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />{t("accounts.refresh_all")}</Button>
+        {list.currentIdentity ? <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t(busy === "import" ? "accounts.importing" : "accounts.import")}</Button> : null}
+        <Button size="sm" disabled={!!busy} onClick={openAddAccount}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
+      </div> : null}
     </div>
     {list?.switchError ? <p role="status" className="text-sm text-warning">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning">{t("accounts.recovery_conflict")}</p> : null}
     {!showAddAccount && error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
     {!showAddAccount && notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
-    {showAddAccount ? <AddAccountDialog onClose={() => setShowAddAccount(false)}>
-      <div className="space-y-2">
-        <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint accounts-login-methods-hint" className="accounts-add-methods">
-          <Button size="sm" variant={list && !(loginRunning && task.deviceCode) ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
-          <Button size="sm" variant={loginRunning && task.deviceCode ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(true)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
-          <Button size="sm" variant="secondary" aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
+    {!showAddAccount && loginRunning ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
+      <span>{t("accounts.login_running")}</span><Button ref={continueLoginButton} size="sm" variant="secondary" onClick={() => setShowAddAccount(true)}>{t("accounts.continue_login")}</Button>
+    </div> : null}
+    {showAddAccount ? <AddAccountDialog title={t(loginAccountId ? "accounts.relogin" : list && !list.accounts.length && !list.currentIdentity ? "accounts.empty_first" : "accounts.login_other")} onClose={() => setShowAddAccount(false)}>
+      {!loginRunning && busy !== "login" && task?.state !== "completed" ? <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{t("accounts.login_intro")}</p>
+        <div className="flex flex-col items-start gap-2">
+          <Button size="sm" disabled={!!busy} onClick={() => void login(false, loginAccountId)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+          <Button size="sm" variant="ghost" className="!px-0 text-muted-foreground underline underline-offset-4" disabled={!!busy} onClick={() => void login(true, loginAccountId)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
         </div>
-        {list ? <p id="accounts-add-hint" className="text-xs text-muted-foreground">{t(recommendImport ? "accounts.import_first_hint" : list.accounts.length ? "accounts.add_more_hint" : "accounts.login_first_hint")}</p> : null}
-        <p id="accounts-login-methods-hint" className="text-xs text-muted-foreground">{t("accounts.login_methods_hint")}</p>
-        <p id="accounts-import-hint" className="text-xs text-muted-foreground">{t("accounts.import_hint")}</p>
-        <p className="text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
-      </div>
+      </div> : null}
+      {busy === "login" ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t("accounts.login_starting")}</p> : null}
       {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
       {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
       {task ? <div aria-live="polite">
@@ -230,20 +240,26 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
             {urlCopyState === "failed" ? <p role="alert" className="w-full text-xs text-error">{t("accounts.authorization_url_copy_failed")}</p> : null}
           </div> : null}
         </div>
-        {loginRunning ? <p className="accounts-login-auto-save"><Check aria-hidden="true" />{t("accounts.login_auto_save")}</p> : null}
+        {loginRunning ? <>
+          <p className="accounts-login-auto-save"><Check aria-hidden="true" />{t("accounts.login_auto_save")}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">{t("accounts.login_close_hint")}</p>
+        </> : null}
       </div> : null}
+      <p className="text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
+      {task?.state === "completed" ? <Button size="sm" onClick={() => setShowAddAccount(false)}>{t("accounts.view_accounts")}</Button> : null}
     </AddAccountDialog> : null}
     {!list && !error ? <div role="status" aria-live="polite" aria-label={t("common.loading")} className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
       <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
       <span>{t("common.loading")}</span>
     </div> : null}
     {list && list.accounts.length === 0 ? <section aria-labelledby="accounts-empty-title" className="rounded-xl border border-border bg-surface px-6 py-10 text-center">
-      <h2 id="accounts-empty-title" className="text-lg font-semibold">{t("accounts.empty")}</h2>
+      <h2 id="accounts-empty-title" className="text-lg font-semibold">{t(recommendImport ? "accounts.empty" : "accounts.empty_first")}</h2>
       <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">{t(recommendImport ? "accounts.empty_import_hint" : "accounts.empty_login_hint")}</p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {recommendImport ? <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button> : null}
-        <Button size="sm" variant={recommendImport ? "secondary" : "primary"} onClick={() => setShowAddAccount(true)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t(recommendImport ? "accounts.login_other" : "accounts.browser_login")}</Button>
+        {recommendImport ? <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t(busy === "import" ? "accounts.importing" : "accounts.import")}</Button> : null}
+        <Button size="sm" variant={recommendImport ? "secondary" : "primary"} disabled={!!busy || loginRunning} onClick={recommendImport ? openAddAccount : () => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t(recommendImport ? "accounts.login_other" : "accounts.browser_login")}</Button>
       </div>
+      {!recommendImport ? <Button size="sm" variant="ghost" className="mt-2 text-muted-foreground underline underline-offset-4" disabled={!!busy || loginRunning} onClick={() => void login(true)}>{t("accounts.device_login")}</Button> : null}
       <p className="mt-4 text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
     </section> : null}
     <div className="accounts-grid">
@@ -271,7 +287,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         const switchAccount = () => void run(account.id, async () => {
           const result = await switchCodexAccount(account.id, list.authContext!);
           if (!result.verified) return;
-          setNotice(t("accounts.switched"));
+          setNotice(t(result.restartRequired ? "accounts.switch_notice" : "accounts.switched"));
           if (result.restartRequired) {
             let hidden = false;
             try { hidden = localStorage.getItem(restartReminderKey) === "true"; } catch { /* Show the reminder when storage is unavailable. */ }
@@ -281,7 +297,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         const switchDisabled = !!busy || !!list.switchError || !list.authContext || account.current;
         return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
           <header>
-            <div className="account-identity"><h2>{account.email ?? account.identity.userId}</h2>{account.current ? <span className="account-current"><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>
+            <div className="account-identity"><h2>{account.email ?? account.identity.userId}</h2>{account.current ? <span className="account-current" title={t("accounts.current_hint")}><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>
             <p className="account-workspace">{data?.workspaceName?.trim() || t(personal ? "accounts.personal_workspace" : "accounts.workspace_unknown")}</p>
           </header>
           <div className="account-membership">
