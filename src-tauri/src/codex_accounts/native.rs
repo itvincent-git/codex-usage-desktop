@@ -116,13 +116,21 @@ fn system_directory() -> Result<PathBuf, String> {
 }
 
 #[cfg(windows)]
+fn backend_powershell_command(script: &str) -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+    let mut command = std::process::Command::new("powershell.exe");
+    command
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .creation_flags(0x08000000); // CREATE_NO_WINDOW
+    command
+}
+
+#[cfg(windows)]
 fn system_directory() -> Result<PathBuf, String> {
-    use std::process::Command;
     // Match Codex's CommonApplicationData known folder. Any policy namespace is
     // conservatively rejected, including a registry RequirementsPath override.
     let script = "$ErrorActionPreference='Stop'; if (Test-Path 'Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\OpenAI\\Codex') { exit 1 }; [Console]::Write([Environment]::GetFolderPath('CommonApplicationData'))";
-    let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+    let output = backend_powershell_command(script)
         .output()
         .map_err(|_| "accountBackendUnsupported")?;
     if !output.status.success() {
@@ -133,6 +141,22 @@ fn system_directory() -> Result<PathBuf, String> {
         return Err("accountBackendUnsupported".into());
     }
     Ok(PathBuf::from(path.trim()).join("OpenAI").join("Codex"))
+}
+
+#[cfg(all(test, windows))]
+#[test]
+fn backend_powershell_does_not_create_a_console() {
+    let output = backend_powershell_command(
+        r#"$ErrorActionPreference='Stop'; Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ConsoleProbe { [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); }'; [Console]::Write([ConsoleProbe]::GetConsoleWindow() -eq [IntPtr]::Zero)"#,
+    )
+    .output()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "True");
 }
 
 #[cfg(not(target_os = "macos"))]
