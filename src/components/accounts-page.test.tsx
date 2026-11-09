@@ -81,6 +81,43 @@ describe("saved Codex accounts", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it.each([false, true])("guides the first account with a current Codex sign-in: %s", async (signedIn) => {
+    list.accounts = [];
+    if (!signedIn) list.currentIdentity = null;
+    render(<AccountsPage />);
+    const empty = within(await screen.findByRole("region", { name: i18n.t("accounts.empty") }));
+    expect(empty.getByText(i18n.t(signedIn ? "accounts.empty_import_hint" : "accounts.empty_login_hint"))).toBeVisible();
+    expect(empty.getByText(i18n.t("accounts.add_hint"))).toBeVisible();
+    expect(empty.queryByRole("button", { name: "Import current sign-in" }) !== null).toBe(signedIn);
+    expect(api.importCurrentCodexAccount).not.toHaveBeenCalled();
+    expect(api.startCodexAccountLogin).not.toHaveBeenCalled();
+    await userEvent.click(empty.getByRole("button", { name: signedIn ? "Sign in to another account" : "Browser login" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add account" }));
+    expect(dialog.getByRole("button", { name: "Browser login" })).toHaveClass("bg-primary");
+    expect(dialog.getByText(i18n.t("accounts.login_methods_hint"))).toBeVisible();
+    expect(dialog.getByText(i18n.t("accounts.add_hint"))).toBeVisible();
+  });
+
+  it("imports the first account from the empty state without switching Codex", async () => {
+    list.accounts = [];
+    vi.mocked(api.importCurrentCodexAccount).mockRejectedValueOnce(new Error("accountNetworkError")).mockImplementationOnce(async () => {
+      list.accounts = [account("a", "plus", 80)];
+      return "a";
+    });
+    render(<AccountsPage />);
+    const empty = await screen.findByRole("region", { name: i18n.t("accounts.empty") });
+    await userEvent.click(within(empty).getByRole("button", { name: "Import current sign-in" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(empty).toBeVisible();
+    await userEvent.click(within(empty).getByRole("button", { name: "Import current sign-in" }));
+    expect(await screen.findByRole("heading", { name: "a@example.test" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: i18n.t("accounts.empty") })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(i18n.t("accounts.added"));
+    expect(api.importCurrentCodexAccount).toHaveBeenCalledTimes(2);
+    expect(api.switchCodexAccount).not.toHaveBeenCalled();
+    expect(api.startCodexAccountLogin).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])("starts login with device auth %s and preserves progress when reopening", async (device) => {
     const task: api.LoginTask = { id: "login", state: "running", authorizationUrl: "https://auth.openai.com/codex/device", deviceCode: device ? "1234-56789" : null, accountId: null, error: null };
     vi.mocked(api.startCodexAccountLogin).mockResolvedValue(task);

@@ -116,6 +116,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     setShowAddAccount(true);
     return run("login", async () => { setCodeCopyState("idle"); setUrlCopyState("idle"); setTask(await startCodexAccountLogin(device, id)); });
   };
+  const importAccount = () => run("import", async () => { await importCurrentCodexAccount(); setNotice(t("accounts.added")); });
   const copyAuthorizationUrl = async () => {
     if (!task?.authorizationUrl) return;
     try {
@@ -185,13 +186,15 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     {!showAddAccount && notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
     {showAddAccount ? <AddAccountDialog onClose={() => setShowAddAccount(false)}>
       <div className="space-y-2">
-        <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint" className="accounts-add-methods">
-          <Button size="sm" variant={list && !recommendImport && !(loginRunning && task.deviceCode) ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+        <div role="group" aria-label={t("accounts.add")} aria-describedby="accounts-add-hint accounts-login-methods-hint" className="accounts-add-methods">
+          <Button size="sm" variant={list && !(loginRunning && task.deviceCode) ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
           <Button size="sm" variant={loginRunning && task.deviceCode ? "primary" : "secondary"} disabled={!!busy || loginRunning} onClick={() => void login(true)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
-          <Button size="sm" variant={recommendImport ? "primary" : "secondary"} aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void run("import", async () => { await importCurrentCodexAccount(); setNotice(t("accounts.added")); })}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
+          <Button size="sm" variant="secondary" aria-describedby="accounts-import-hint" disabled={!!busy} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button>
         </div>
         {list ? <p id="accounts-add-hint" className="text-xs text-muted-foreground">{t(recommendImport ? "accounts.import_first_hint" : list.accounts.length ? "accounts.add_more_hint" : "accounts.login_first_hint")}</p> : null}
+        <p id="accounts-login-methods-hint" className="text-xs text-muted-foreground">{t("accounts.login_methods_hint")}</p>
         <p id="accounts-import-hint" className="text-xs text-muted-foreground">{t("accounts.import_hint")}</p>
+        <p className="text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
       </div>
       {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
       {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
@@ -234,7 +237,15 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
       <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
       <span>{t("common.loading")}</span>
     </div> : null}
-    {list && list.accounts.length === 0 ? <p className="py-10 text-center text-muted-foreground">{t("accounts.empty")}</p> : null}
+    {list && list.accounts.length === 0 ? <section aria-labelledby="accounts-empty-title" className="rounded-xl border border-border bg-surface px-6 py-10 text-center">
+      <h2 id="accounts-empty-title" className="text-lg font-semibold">{t("accounts.empty")}</h2>
+      <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">{t(recommendImport ? "accounts.empty_import_hint" : "accounts.empty_login_hint")}</p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {recommendImport ? <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.import")}</Button> : null}
+        <Button size="sm" variant={recommendImport ? "secondary" : "primary"} onClick={() => setShowAddAccount(true)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t(recommendImport ? "accounts.login_other" : "accounts.browser_login")}</Button>
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
+    </section> : null}
     <div className="accounts-grid">
       {list?.accounts.map((account) => {
         const status = account.status;

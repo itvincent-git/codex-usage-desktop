@@ -669,7 +669,7 @@ describe("native saved Codex accounts", () => {
     }
   });
 
-  run("groups three add methods in one dialog and adapts the recommendation after importing", async () => {
+  run("guides first account onboarding and groups three add methods in one dialog", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
@@ -734,12 +734,28 @@ describe("native saved Codex accounts", () => {
     const saved = await invoke<AccountList>("list_codex_accounts");
     // Removing saved records leaves the native Codex sign-in available to import.
     for (const account of saved.accounts) await invoke("remove_codex_account", { accountId: account.id });
-    await expect(importCurrent).toHaveElementClass("bg-primary");
-    await expect(browserLogin).not.toHaveElementClass("bg-primary");
+    await expect(browserLogin).toHaveElementClass("bg-primary");
+    await expect(importCurrent).not.toHaveElementClass("bg-primary");
     await expect(dialog).toHaveText(expect.stringContaining("已在本机 Codex 登录？直接导入即可。"));
     expect(await order()).toEqual(expectedOrder);
-    await waitForPrimary(importCurrent);
+    await waitForPrimary(browserLogin);
     await browser.saveScreenshot("/tmp/codex-accounts-methods-empty.png");
+    await expect(dialog).toHaveText(expect.stringContaining("推荐使用浏览器登录；浏览器登录不便时，可选择设备码登录，在授权页面输入设备码。"));
+    await expect(dialog).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
+    await dialog.$('button[aria-label="关闭"]').click();
+    const empty = page.$('section[aria-labelledby="accounts-empty-title"]');
+    await expect(empty.$("h2")).toHaveText("查看多个 Codex 账号的剩余额度，并按需切换");
+    await expect(empty.$("button=导入当前账号")).toHaveElementClass("bg-primary");
+    await expect(empty).toHaveText(expect.stringContaining("添加只会保存账号，不会切换当前 Codex 登录。"));
+    for (const width of [1440, 1100]) {
+      await browser.setWindowSize(width, 900);
+      const overflow = await empty.execute((element) => element.scrollWidth > element.clientWidth);
+      expect(overflow).toBe(false);
+      await browser.saveScreenshot(`/tmp/codex-accounts-onboarding-${width}.png`);
+    }
+    await empty.$("button=登录其他账号").click();
+    await expect(browserLogin).toHaveElementClass("bg-primary");
+    await dialog.$('button[aria-label="关闭"]').click();
 
     const authPath = join(process.env.CODEX_HOME!, "auth.json");
     const backupPath = `${authPath}.methods-backup`;
@@ -748,7 +764,10 @@ describe("native saved Codex accounts", () => {
       await browser.refresh();
       await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
       await $('[data-testid="accounts-nav-tab"]').click();
-      await add.click();
+      await expect(empty.$("button=导入当前账号")).not.toExist();
+      await expect(empty).toHaveText(expect.stringContaining("登录 Codex，添加第一个账号，即可查看剩余额度和订阅状态。"));
+      await browser.saveScreenshot("/tmp/codex-accounts-onboarding-no-sign-in.png");
+      await empty.$("button=浏览器登录").click();
       await expect(browserLogin).toHaveElementClass("bg-primary");
       await expect(importCurrent).not.toHaveElementClass("bg-primary");
       await expect(dialog).toHaveText(expect.stringContaining("使用浏览器登录或设备码登录，添加第一个账号。"));
@@ -758,10 +777,14 @@ describe("native saved Codex accounts", () => {
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
     await $('[data-testid="accounts-nav-tab"]').click();
+    const nativeAuth = readFileSync(authPath, "utf8");
+    const email = JSON.parse(Buffer.from(JSON.parse(nativeAuth).tokens.id_token.split(".")[1], "base64url").toString()).email;
+    await empty.$("button=导入当前账号").click();
+    await expect(page.$(`h2=${email}`)).toBeDisplayed();
+    await expect(empty).not.toExist();
+    expect(readFileSync(authPath, "utf8")).toBe(nativeAuth);
+    await expect(page.$('[role="status"]')).toHaveText("账号已保存，Codex 登录保持不变。");
     await add.click();
-    await expect(importCurrent).toHaveElementClass("bg-primary");
-    await importCurrent.click();
-    await expect(page.$("h2=alice@example.test")).toBeDisplayed();
     await expect(browserLogin).toHaveElementClass("bg-primary");
     await expect(importCurrent).not.toHaveElementClass("bg-primary");
     expect(await order()).toEqual(expectedOrder);
