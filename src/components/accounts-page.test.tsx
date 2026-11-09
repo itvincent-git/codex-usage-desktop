@@ -32,6 +32,37 @@ beforeEach(async () => {
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
 
 describe("saved Codex accounts", () => {
+  it.each([false, true])("shows loading until the first account list resolves (empty: %s)", async (empty) => {
+    let resolveList!: (value: api.AccountList) => void;
+    vi.mocked(api.listCodexAccounts).mockReturnValue(new Promise((resolve) => { resolveList = resolve; }));
+    if (empty) list.accounts = [];
+    render(<AccountsPage />);
+    expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
+    expect(screen.queryByText(i18n.t("accounts.empty"))).not.toBeInTheDocument();
+    await act(async () => { resolveList(list); });
+    expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
+    if (empty) expect(screen.getByText(i18n.t("accounts.empty"))).toBeVisible();
+    else expect(screen.getByRole("heading", { name: "a@example.test" })).toBeVisible();
+  });
+
+  it("replaces initial loading with an error when the list request fails", async () => {
+    vi.mocked(api.listCodexAccounts).mockRejectedValue(new Error("accountNetworkError"));
+    render(<AccountsPage />);
+    expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("accounts.empty"))).not.toBeInTheDocument();
+  });
+
+  it("keeps cached accounts visible while reloading", async () => {
+    let resolveList!: (value: api.AccountList) => void;
+    vi.mocked(api.listCodexAccounts).mockReturnValue(new Promise((resolve) => { resolveList = resolve; }));
+    render(<AccountsPage initialList={list} />);
+    expect(screen.getByRole("heading", { name: "a@example.test" })).toBeVisible();
+    expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
+    await act(async () => { resolveList(list); });
+  });
+
   it("groups all three add methods in a dismissible dialog", async () => {
     render(<AccountsPage />);
     await screen.findByRole("heading", { name: "a@example.test" });

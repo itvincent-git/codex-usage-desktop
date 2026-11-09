@@ -230,6 +230,10 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         {loginRunning ? <p className="accounts-login-auto-save"><Check aria-hidden="true" />{t("accounts.login_auto_save")}</p> : null}
       </div> : null}
     </AddAccountDialog> : null}
+    {!list && !error ? <div role="status" aria-live="polite" aria-label={t("common.loading")} className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+      <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+      <span>{t("common.loading")}</span>
+    </div> : null}
     {list && list.accounts.length === 0 ? <p className="py-10 text-center text-muted-foreground">{t("accounts.empty")}</p> : null}
     <div className="accounts-grid">
       {list?.accounts.map((account) => {

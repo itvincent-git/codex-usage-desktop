@@ -17,6 +17,29 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("shows loading while the first native account list is pending", async () => {
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-pending`;
+    const loading = $('.accounts-page [role="status"][aria-label="加载中"]');
+    try {
+      writeFileSync(pending, "");
+      await $('[data-testid="accounts-nav-tab"]').click();
+      await browser.waitUntil(() => existsSync(`${pending}.started`));
+      await expect(loading).toBeDisplayed();
+      await expect(loading).toHaveText("加载中");
+      await expect($$(".account-card")).toBeElementsArrayOfSize(0);
+      await browser.saveScreenshot("/tmp/codex-accounts-loading.png");
+      unlinkSync(pending);
+      await expect($$(".account-card")).toBeElementsArrayOfSize(4);
+      await expect(loading).not.toExist();
+    } finally {
+      if (existsSync(pending)) unlinkSync(pending);
+      if (existsSync(`${pending}.started`)) unlinkSync(`${pending}.started`);
+    }
+  });
+
   run("keeps saved account cards when returning through navigation", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
     await browser.refresh();
