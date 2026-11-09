@@ -25,7 +25,7 @@ import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { getReleaseNotes } from "@/lib/release-notes";
 import type { SessionDetailRow } from "@/lib/api";
 import type { AccountList } from "@/lib/codex-accounts";
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
@@ -61,6 +61,7 @@ export default function App() {
     costUSD: number;
   } | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
+  const clearProjectFilter = useCallback(() => setSelectedProjectFilter(null), []);
   const [projectDataRevision, setProjectDataRevision] = useState(0);
   const [selectedSession, setSelectedSession] = useState<SessionDetailRow | null>(null);
   const [isResetHistoryOpen, setIsResetHistoryOpen] = useState(false);
@@ -520,7 +521,7 @@ export default function App() {
               creditsActive={!selectedProjectForModal && !selectedSession && !isResetHistoryOpen}
               initialExpandedDate={selectedSessionDate}
               selectedProject={selectedProjectFilter}
-              onClearProjectFilter={() => setSelectedProjectFilter(null)}
+              onClearProjectFilter={clearProjectFilter}
               onSessionClick={setSelectedSession}
             />
           ) : null}

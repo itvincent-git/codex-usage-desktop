@@ -1341,6 +1341,54 @@ describe("App", () => {
     expect(await screen.findByText("Filtering by Project")).toBeInTheDocument();
   }, 15_000);
 
+  it("updates the refreshed session without reloading the complete session list", async () => {
+    mockLoadedDashboard();
+    const fallback = invokeMock.getMockImplementation()!;
+    const row = {
+      path: "/tmp/refresh.jsonl", sessionId: "refresh.jsonl", threadName: "Refresh target",
+      modifiedAtMs: Date.parse("2026-06-11T00:00:00Z"), sizeBytes: 100,
+      inputTokens: 100, cachedInputTokens: 20, outputTokens: 40, reasoningOutputTokens: 0,
+      totalTokens: 140, costUSD: 0.001, models: ["gpt-5"], projects: ["/repo/app"],
+      dailyUsage: [{ date: "2026-06-11", inputTokens: 100, cachedInputTokens: 20,
+        outputTokens: 40, reasoningOutputTokens: 0, totalTokens: 140, costUSD: 0.001,
+        models: ["gpt-5"], projects: ["/repo/app"] }],
+    };
+    const updated = { ...row, threadName: "Refreshed target", totalTokens: 240,
+      inputTokens: 200, dailyUsage: [{ ...row.dailyUsage[0], totalTokens: 240, inputTokens: 200 }] };
+    const detail = {
+      path: row.path, sessionId: row.sessionId, threadName: row.threadName,
+      modifiedAtMs: row.modifiedAtMs, sizeBytes: row.sizeBytes, rawJsonl: "", agents: [], turns: [],
+      summary: { startTime: null, endTime: null, durationMs: null, timeToFirstTokenMs: null,
+        cwd: "/repo/app", projects: row.projects, models: row.models, cliVersion: null, git: {},
+        inputTokens: 100, cachedInputTokens: 20, outputTokens: 40, reasoningOutputTokens: 0,
+        totalTokens: 140, costUSD: 0.001, turnCount: 0, messageCount: 0, toolCallCount: 0,
+        patchCount: 0, errorCount: 0 },
+    };
+    invokeMock.mockImplementation(async (command: string, args?: unknown) => {
+      if (command === "fetch_session_details") return [row];
+      if (command === "fetch_session_detail") return detail;
+      if (command === "rescan_session") return {
+        scan: scan(1), session: updated,
+        detail: { ...detail, threadName: updated.threadName, summary: { ...detail.summary, totalTokens: 240, inputTokens: 200 } },
+      };
+      return fallback(command, args);
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rescan local logs" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("tab", { name: "Sessions" }));
+    await userEvent.click(await screen.findByText("Refresh target"));
+    const refresh = await screen.findByRole("button", { name: "Refresh this session" });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    const overviewRequests = invokeMock.mock.calls.filter(([command]) => command === "fetch_overview").length;
+    await userEvent.click(refresh);
+    await waitFor(() => expect(refresh).toHaveAttribute("aria-busy", "false"));
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_session_details")).toHaveLength(1);
+    expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_overview")).toHaveLength(overviewRequests + 1);
+    await userEvent.click(screen.getByRole("button", { name: "Close session detail" }));
+    expect(screen.getByText("Refreshed target")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open session Refreshed target" })).toHaveTextContent("240");
+  });
+
   it("opens a session replay modal from a session row", async () => {
     const longToolOutput = `${"tool output preview ".repeat(160)}LONG_TOOL_OUTPUT_TAIL`;
     const longArguments = `first command\nsecond command\n${"argument preview ".repeat(30)}LONG_ARGUMENT_TAIL`;

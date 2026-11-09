@@ -17,7 +17,11 @@ let accountsFixture: Awaited<ReturnType<typeof startAccountsFixture>> | undefine
 export const config: WebdriverIO.Config = {
   async onPrepare() {
     const buildArgs = ["test:e2e:build"];
-    if (process.env.CODEX_USAGE_RECOVERY_E2E === "1") {
+    if (process.env.CODEX_USAGE_PERF_FIXTURE) {
+      process.env.CODEX_HOME = join(process.env.CODEX_USAGE_PERF_FIXTURE, "codex");
+      process.env.CODEX_USAGE_TEST_DATA_DIR = join(process.env.CODEX_USAGE_PERF_FIXTURE, "app-data");
+      buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.sessionperf" }));
+    } else if (process.env.CODEX_USAGE_RECOVERY_E2E === "1") {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-usage-recovery-e2e-"));
       process.env.CODEX_HOME = join(archivedSessionsHome, "codex-not-found");
       process.env.CODEX_USAGE_TEST_DATA_DIR = join(archivedSessionsHome, "app-data");

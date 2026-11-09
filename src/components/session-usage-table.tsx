@@ -1,6 +1,6 @@
 import { useSessionCredits } from "@/hooks/use-session-credits";
 import { SessionCredits } from "./session-credits";
-import { useState, useMemo, useEffect } from "react";
+import { memo, useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { SessionDetailRow, SessionQuotaWindowUsage } from "@/lib/api";
 import { formatCompactNumber, formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
@@ -353,7 +353,7 @@ function costTone(cost: number, maxCost: number) {
   };
 }
 
-export function SessionUsageTable({
+export const SessionUsageTable = memo(function SessionUsageTable({
   sessions,
   initialExpandedDate,
   selectedProject = null,
@@ -970,4 +970,4 @@ export function SessionUsageTable({
       </div>
     </div>
   );
-}
+});

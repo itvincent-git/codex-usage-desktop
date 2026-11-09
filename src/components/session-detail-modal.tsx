@@ -1321,7 +1321,10 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
         const previousKeys = new Set(detail.turns.map((turn, index) => `${turn.turnId}-${index}`));
         setExpandedTurns((current) => new Set(result.detail.turns.map((turn, index) => `${turn.turnId}-${index}`)
           .filter((key) => !previousKeys.has(key) || current.has(key))));
-        setDetail(result.detail);
+        setDetail((current) => ({
+          ...result.detail,
+          turns: current?.rawJsonl === result.detail.rawJsonl ? current.turns : result.detail.turns,
+        }));
         setRefreshedSession(result.session);
         credits.refresh();
       }
@@ -1355,14 +1358,14 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
   const displayedSessionId = cleanSessionId(detail?.sessionId ?? session.sessionId);
   const rawPreview = useMemo(() => detail ? buildRawPreview(detail.rawJsonl) : "", [detail]);
   const rawJsonlLines = useMemo(() => detail?.rawJsonl.split("\n") ?? [], [detail?.rawJsonl]);
-  const conversation = useMemo(() => detail ? buildSessionConversation(detail.turns) : [], [detail]);
-  const turnPreviews = useMemo(() => detail?.turns.map(firstUserPreview) ?? [], [detail]);
+  const conversation = useMemo(() => detail ? buildSessionConversation(detail.turns) : [], [detail?.turns]);
+  const turnPreviews = useMemo(() => detail?.turns.map(firstUserPreview) ?? [], [detail?.turns]);
   const navigationPreviews = useMemo(() => detail?.turns.map((turn) => turn.userMessages.find((message) => {
     const text = message.text.trim();
     return text.length > 0
       && !text.startsWith("# AGENTS.md instructions for ")
       && !text.startsWith("<environment_context>");
-  })?.text.trim().slice(0, 600) ?? "") ?? [], [detail]);
+  })?.text.trim().slice(0, 600) ?? "") ?? [], [detail?.turns]);
   const searchResult = showSearch && search?.active && search.source === detail && search.scope === activeTab ? search : null;
   const searchHit = searchResult?.hit;
   const searchMatches = useMemo(() => {

@@ -1015,7 +1015,7 @@ export function useUsageDashboard() {
     const nextRange = range;
     const [nextOverview, nextSessions, nextMonthly] = await Promise.all([
       fetchOverview(nextRange),
-      hasLoadedSessions ? fetchSessionDetails() : Promise.resolve(null),
+      hasLoadedSessions && !updatedSession ? fetchSessionDetails() : Promise.resolve(null),
       monthlyUsage ? fetchMonthlyUsage() : Promise.resolve(null),
     ]);
     if (generation !== localReloadGeneration.current) return;
