@@ -507,8 +507,10 @@ fn auth_sidecar_locks_block_commit_until_released() {
 #[test]
 fn windows_credentials_replace_existing_grants_and_stay_private_after_overwrite() {
     fn powershell(path: &std::path::Path, script: &str) {
+        use std::os::windows::process::CommandExt;
         let output = std::process::Command::new("powershell.exe")
             .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW (test oracle only)
             .env("CODEX_USAGE_TEST_ACL_PATH", path)
             .output()
             .unwrap();
@@ -557,6 +559,10 @@ fn windows_credentials_replace_existing_grants_and_stay_private_after_overwrite(
             $rule=$rules[0]
             if ($rule.IdentityReference -ne $sid -or $rule.AccessControlType -ne 'Allow' -or $rule.FileSystemRights -ne 'FullControl') { throw 'Unexpected access grant' }
         }
+        $directoryRule=$acls[0].GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])[0]
+        if ($directoryRule.InheritanceFlags -ne [System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit') { throw 'Directory grant does not propagate to children' }
+        $fileRule=$acls[1].GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])[0]
+        if ($fileRule.InheritanceFlags -ne [System.Security.AccessControl.InheritanceFlags]::None) { throw 'Unexpected file inheritance flags' }
         if ([System.IO.Directory]::GetFiles($env:CODEX_USAGE_TEST_ACL_PATH).Length -ne 1) { throw 'Temporary credentials were left behind' }"#,
     );
 }

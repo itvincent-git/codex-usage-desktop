@@ -1,6 +1,8 @@
 pub(crate) mod login;
 pub(crate) mod native;
 mod storage;
+#[cfg(windows)]
+mod windows;
 
 use crate::{
     codex_auth::parse_codex_auth,

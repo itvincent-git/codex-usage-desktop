@@ -20,74 +20,8 @@ pub(super) fn private_directory(path: &Path) -> Result<(), String> {
             .map_err(|_| "accountStorageUnavailable")?;
     }
     #[cfg(windows)]
-    restrict_windows(path, true)?;
+    super::windows::restrict_permissions(path, true)?;
     Ok(())
-}
-
-#[cfg(windows)]
-fn windows_storage_command(program: &str) -> std::process::Command {
-    use std::os::windows::process::CommandExt;
-    let mut command = std::process::Command::new(program);
-    // Account status refreshes also write storage and reapply its private ACL.
-    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    command
-}
-
-#[cfg(windows)]
-fn restrict_windows(path: &Path, directory: bool) -> Result<(), String> {
-    use std::process::Stdio;
-    let output = windows_storage_command("whoami")
-        .args(["/user", "/fo", "csv", "/nh"])
-        .output()
-        .map_err(|_| "accountStorageUnavailable")?;
-    let output = String::from_utf8_lossy(&output.stdout);
-    let sid = output
-        .split(',')
-        .nth(1)
-        .map(|s| s.trim().trim_matches('"'))
-        .filter(|s| s.starts_with("S-1-"))
-        .ok_or("accountStorageUnavailable")?;
-    // Replace the DACL, including pre-existing explicit grants. User-controlled
-    // paths are passed as environment values, never interpolated into PS code.
-    // Use .NET directly: an inherited PowerShell 7 PSModulePath can prevent
-    // Windows PowerShell from loading the module that provides Set-Acl.
-    let script = "$ErrorActionPreference='Stop'; $sid=[System.Security.Principal.SecurityIdentifier]::new($env:CODEX_USAGE_ACL_SID); if ($env:CODEX_USAGE_ACL_DIRECTORY -eq '1') { $acl=[System.Security.AccessControl.DirectorySecurity]::new(); $inherit=[System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit' } else { $acl=[System.Security.AccessControl.FileSecurity]::new(); $inherit=[System.Security.AccessControl.InheritanceFlags]::None }; $acl.SetOwner($sid); $acl.SetAccessRuleProtection($true,$false); $rule=[System.Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl',$inherit,'None','Allow'); $acl.AddAccessRule($rule); if ($env:CODEX_USAGE_ACL_DIRECTORY -eq '1') { [System.IO.Directory]::SetAccessControl($env:CODEX_USAGE_ACL_PATH,$acl) } else { [System.IO.File]::SetAccessControl($env:CODEX_USAGE_ACL_PATH,$acl) }";
-    let status = windows_storage_command("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", script])
-        .env("CODEX_USAGE_ACL_SID", sid)
-        .env("CODEX_USAGE_ACL_PATH", path)
-        .env(
-            "CODEX_USAGE_ACL_DIRECTORY",
-            if directory { "1" } else { "0" },
-        )
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|_| "accountStorageUnavailable")?;
-    if !status.success() {
-        return Err("accountStorageUnavailable".into());
-    }
-    Ok(())
-}
-
-#[cfg(all(test, windows))]
-#[test]
-fn windows_storage_commands_do_not_create_a_console() {
-    let output = windows_storage_command("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            r#"$ErrorActionPreference='Stop'; Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ConsoleProbe { [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); }'; [Console]::Write([ConsoleProbe]::GetConsoleWindow() -eq [IntPtr]::Zero)"#,
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(String::from_utf8(output.stdout).unwrap(), "True");
 }
 
 pub(super) fn lock(path: &Path) -> Result<File, String> {
@@ -139,7 +73,7 @@ pub(super) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
             .open(&temporary)
             .map_err(|_| "accountStorageUnavailable")?;
         #[cfg(windows)]
-        restrict_windows(&temporary, false)?;
+        super::windows::restrict_permissions(&temporary, false)?;
         file.write_all(bytes)
             .and_then(|_| file.sync_all())
             .map_err(|_| "accountStorageUnavailable")?;
