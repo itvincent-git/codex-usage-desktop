@@ -1561,7 +1561,7 @@ mod tests {
     #[ignore = "Set CODEX_USAGE_ZSTD_FIXTURE to a local rollout.jsonl.zst; requires the zstd CLI"]
     fn real_compressed_session_matches_independently_decompressed_jsonl() {
         let source = PathBuf::from(std::env::var_os("CODEX_USAGE_ZSTD_FIXTURE").unwrap());
-        let output = std::process::Command::new("zstd")
+        let output = crate::background_process::command("zstd")
             .args(["-d", "-c", "--"])
             .arg(&source)
             .output()

@@ -908,7 +908,7 @@ async fn open_url(url: String) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd")
+        background_process::command("cmd")
             .args(["/C", "start", &url])
             .spawn()
             .map_err(|e| e.to_string())?;
@@ -932,7 +932,7 @@ async fn reveal_in_file_manager(path: String) -> Result<(), String> {
         .map_err(|error| error.to_string())?;
 
     #[cfg(target_os = "windows")]
-    std::process::Command::new("explorer")
+    background_process::command("explorer")
         .args(["/select,", &path])
         .spawn()
         .map_err(|error| error.to_string())?;

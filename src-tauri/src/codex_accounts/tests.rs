@@ -507,10 +507,9 @@ fn auth_sidecar_locks_block_commit_until_released() {
 #[test]
 fn windows_credentials_replace_existing_grants_and_stay_private_after_overwrite() {
     fn powershell(path: &std::path::Path, script: &str) {
-        use std::os::windows::process::CommandExt;
-        let output = std::process::Command::new("powershell.exe")
+        // PowerShell is only an independent ACL oracle, never an application backend.
+        let output = crate::background_process::command("powershell.exe")
             .args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW (test oracle only)
             .env("CODEX_USAGE_TEST_ACL_PATH", path)
             .output()
             .unwrap();

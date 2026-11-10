@@ -29,16 +29,29 @@ mod tests {
             println!("background child verified");
             return;
         }
-        let output = command(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "background_process::tests::background_child_has_no_console",
-                "--nocapture",
-            ])
-            .env(CHILD, "1")
-            .output()
-            .unwrap();
-        assert!(output.status.success(), "{output:?}");
-        assert!(String::from_utf8_lossy(&output.stdout).contains("background child verified"));
+        let executable = std::env::current_exe().unwrap();
+        let args = [
+            "--exact",
+            "background_process::tests::background_child_has_no_console",
+            "--nocapture",
+        ];
+        let mut native = command(&executable);
+        native.args(args);
+        let mut cmd = command("cmd.exe");
+        cmd.arg("/C").arg(&executable).args(args);
+        let mut powershell = command("powershell.exe");
+        powershell.args([
+            "-NoProfile", "-NonInteractive", "-Command",
+            "& $env:CODEX_USAGE_CONSOLE_TEST_EXE --exact background_process::tests::background_child_has_no_console --nocapture; exit $LASTEXITCODE",
+        ]);
+        for mut child in [native, cmd, powershell] {
+            let output = child
+                .env(CHILD, "1")
+                .env("CODEX_USAGE_CONSOLE_TEST_EXE", &executable)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{child:?}: {output:?}");
+            assert!(String::from_utf8_lossy(&output.stdout).contains("background child verified"));
+        }
     }
 }

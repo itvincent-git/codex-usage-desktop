@@ -1179,6 +1179,7 @@ fn resolve_native_codex_binary() -> Option<PathBuf> {
     candidates.into_iter().find(|path| is_executable(&path))
 }
 
+#[cfg(not(target_os = "windows"))]
 fn command_v_codex() -> Option<PathBuf> {
     let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let mut child = Command::new(shell)
@@ -2355,8 +2356,6 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[test]
     fn windows_cli_launch_preserves_arguments_and_hides_activation_console() {
-        use std::os::windows::process::CommandExt;
-
         let root = command_v_fixture("windows cli & activation");
         fs::create_dir_all(&root).unwrap();
         let source = root.join("capture.rs");
@@ -2374,11 +2373,12 @@ fn main() {
 "#,
         )
         .unwrap();
-        let compiled = Command::new(env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        let compiled = crate::background_process::command(
+            env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()),
+        )
             .arg(&source)
             .arg("-o")
             .arg(&executable)
-            .creation_flags(0x08000000)
             .output()
             .unwrap();
         assert!(
