@@ -292,12 +292,12 @@ fn wsl_request(
 ) -> Result<Value, String> {
     use std::{
         io::Write,
-        process::{Command, Stdio},
+        process::Stdio,
         time::{Duration, Instant},
     };
     let home = wsl_home(environment)?;
     request["home"] = home.into();
-    let mut child = Command::new("wsl.exe")
+    let mut child = crate::background_process::command("wsl.exe")
         .args([
             "-d",
             distribution,

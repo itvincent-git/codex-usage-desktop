@@ -440,7 +440,7 @@ fn run_codex_window_activation(working_directory: &Path) -> Result<(), String> {
         let CodexCommand::Wsl { path, .. } = &codex else { return Err("accountBackendUnsupported".into()); };
         let home = crate::codex_accounts::native::wsl_home(&environment)?;
         let invocation = format!("export CODEX_HOME={}; exec {} {}", shell_quote(&home), shell_quote(path), codex_activation_args().iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" "));
-        command = Command::new("wsl.exe");
+        command = crate::background_process::command("wsl.exe");
         command.args(["-d", distribution, "--", "sh", "-lc", &invocation]);
     } else { command.env("CODEX_HOME", &environment.home); }
     let mut child = command
@@ -1216,7 +1216,7 @@ fn parse_command_v_output(output: &str) -> Option<PathBuf> {
 fn command_v_wsl_codex(distribution: &str) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let mut child = Command::new("wsl.exe")
+        let mut child = crate::background_process::command("wsl.exe")
             .args([
                 "-d",
                 distribution,
@@ -1285,7 +1285,7 @@ pub(crate) fn codex_process_command(codex: &CodexCommand, working_directory: &Pa
     let mut command = match codex {
         CodexCommand::Native(path) => {
             #[cfg(target_os = "windows")]
-            let mut command = Command::new(path);
+            let mut command = crate::background_process::command(path);
             #[cfg(not(target_os = "windows"))]
             let mut command = {
                 let mut command = Command::new("/usr/bin/env");
@@ -1298,7 +1298,7 @@ pub(crate) fn codex_process_command(codex: &CodexCommand, working_directory: &Pa
             command
         }
         CodexCommand::WindowsCmd(path) => {
-            let mut command = Command::new(path);
+            let mut command = crate::background_process::command(path);
             command
                 .args(args)
                 .env("PATH", effective_path_with_codex(path));
@@ -1311,7 +1311,7 @@ pub(crate) fn codex_process_command(codex: &CodexCommand, working_directory: &Pa
                 .collect::<Vec<_>>()
                 .join(" ");
             let login_command = format!("exec \"$SHELL\" -lic {}", shell_quote(&inner_command));
-            let mut command = Command::new("wsl.exe");
+            let mut command = crate::background_process::command("wsl.exe");
             command
                 .args(["-d", distribution, "--", "sh", "-lc"])
                 .arg(login_command);
@@ -1319,11 +1319,6 @@ pub(crate) fn codex_process_command(codex: &CodexCommand, working_directory: &Pa
         }
     };
     command.current_dir(working_directory);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
     command
 }
 

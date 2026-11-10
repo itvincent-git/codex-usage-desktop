@@ -1,3 +1,4 @@
+mod background_process;
 mod cache_recovery;
 mod codex_auth;
 mod codex_accounts;

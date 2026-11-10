@@ -1,8 +1,10 @@
 use super::*;
 use crate::codex_limits::{codex_process_command, resolve_codex_command, CodexCommand};
+#[cfg(unix)]
+use std::process::Command;
 use std::{
     io::Read,
-    process::{Child, Command, Stdio},
+    process::{Child, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -62,7 +64,7 @@ impl AccountService {
                 "exec \"$SHELL\" -lic {}",
                 quote(&format!("exec setsid sh -c {}", quote(&inner)))
             );
-            let mut command = Command::new("wsl.exe");
+            let mut command = crate::background_process::command("wsl.exe");
             command.args(["-d", distribution, "--", "sh", "-lc", &invocation]);
             command
         } else {
@@ -224,7 +226,7 @@ fn terminate(state: &mut RunningLogin) {
     if let Some((distribution, directory)) = &state.wsl {
         // The cancellation marker closes the race before the Linux PID is written.
         let script = "cd \"$1\" || exit 1; touch .cancelled; if test -f .login.pid; then read -r pid < .login.pid; case \"$pid\" in *[!0-9]*|\"\") exit 1;; esac; kill -KILL -- -\"$pid\" 2>/dev/null || true; fi";
-        let _ = Command::new("wsl.exe")
+        let _ = crate::background_process::command("wsl.exe")
             .args([
                 "-d",
                 distribution,
@@ -247,7 +249,7 @@ fn terminate(state: &mut RunningLogin) {
             .stderr(Stdio::null())
             .status();
         #[cfg(windows)]
-        let _ = Command::new("taskkill")
+        let _ = crate::background_process::command("taskkill")
             .args(["/PID", &child.id().to_string(), "/T", "/F"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -338,7 +340,7 @@ fn login_directory(
     id: &str,
 ) -> Result<(PathBuf, Option<String>), String> {
     if let CodexRuntime::Wsl { distribution } = &environment.runtime {
-        let output = Command::new("wsl.exe").args(["-d", distribution, "--", "sh", "-lc", "command -v setsid >/dev/null && umask 077 && mktemp -d /tmp/codex-usage-login-XXXXXXXX"]).output().map_err(|_| "accountWslToolsRequired")?;
+        let output = crate::background_process::command("wsl.exe").args(["-d", distribution, "--", "sh", "-lc", "command -v setsid >/dev/null && umask 077 && mktemp -d /tmp/codex-usage-login-XXXXXXXX"]).output().map_err(|_| "accountWslToolsRequired")?;
         let linux = String::from_utf8(output.stdout)
             .map_err(|_| "accountWslToolsRequired")?
             .trim()
@@ -367,7 +369,7 @@ fn cleanup_directory(
     linux: Option<&str>,
 ) {
     if let (CodexRuntime::Wsl { distribution }, Some(linux)) = (&environment.runtime, linux) {
-        let _ = Command::new("wsl.exe")
+        let _ = crate::background_process::command("wsl.exe")
             .args(["-d", distribution, "--", "rm", "-rf", "--", linux])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
