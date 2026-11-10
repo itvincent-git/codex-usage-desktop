@@ -1,4 +1,8 @@
 {
+  "6.1.4": {
+    "zh": "- docs: require full typecheck through RTK proxy\n- fix(windows): hide startup WSL probes and background consoles\n- fix(windows): hide remaining shell launches across the app",
+    "en": "- docs: require full typecheck through RTK proxy\n- fix(windows): hide startup WSL probes and background consoles\n- fix(windows): hide remaining shell launches across the app"
+  },
   "6.1.3": {
     "zh": "- chore(homebrew): update cask to 6.1.2\n- fix(accounts): hide Windows storage permission consoles\n- fix(accounts): replace Windows account shell checks with native APIs",
     "en": "- chore(homebrew): update cask to 6.1.2\n- fix(accounts): hide Windows storage permission consoles\n- fix(accounts): replace Windows account shell checks with native APIs"
