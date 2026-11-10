@@ -561,7 +561,11 @@ pub(crate) fn send_account_request(request: reqwest::blocking::RequestBuilder, a
     if cooldowns.lock().unwrap().get(&key).is_some_and(|until| *until > Instant::now()) {
         return Err("accountRateLimited".into());
     }
-    let response = request.send().map_err(|_| "accountNetworkError")?;
+    let started = Instant::now();
+    let response = request.send().map_err(|error| {
+        log_account_network_error(endpoint, started.elapsed(), error);
+        "accountNetworkError"
+    })?;
     let status = response.status();
     if status.as_u16() == 429 {
         let retry = response.headers().get("Retry-After").and_then(|h| h.to_str().ok()).and_then(|s| s.parse::<u64>().ok().or_else(|| chrono::DateTime::parse_from_rfc2822(s).ok().map(|d| (d.timestamp() - Utc::now().timestamp()).max(1) as u64))).unwrap_or(300);
@@ -571,6 +575,21 @@ pub(crate) fn send_account_request(request: reqwest::blocking::RequestBuilder, a
     if status.as_u16() == 401 { return Err("accountUnauthorized".into()); }
     if !status.is_success() { return Err(format!("accountHttpError:{}", status.as_u16())); }
     Ok(response)
+}
+
+fn log_account_network_error(endpoint: &str, elapsed: Duration, error: reqwest::Error) {
+    // Keep transport causes (DNS, proxy, TLS, timeout) without logging request URLs or credentials.
+    let error = error.without_url();
+    let mut details = error.to_string();
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        details.push_str(&format!(": {cause}"));
+        source = cause.source();
+    }
+    log::warn!(
+        "ChatGPT {endpoint} request failed after {elapsed:?} (timeout={}, connect={}, request={}, builder={}): {details}",
+        error.is_timeout(), error.is_connect(), error.is_request(), error.is_builder()
+    );
 }
 
 /// Each endpoint uses the same credential snapshot and reports its own failure.
