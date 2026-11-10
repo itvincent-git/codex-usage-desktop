@@ -84,7 +84,8 @@ Known pitfalls to avoid:
 
 ## Git
 - After completing the task, if there are no issues, commit the changes to Git. Write by Conventional Commits style in English.
-- Run `pnpm typecheck` before commit to git.
+- Before committing, run `rtk proxy pnpm typecheck` and require exit code 0. This must execute the full `package.json` script, currently `tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json`, including both application and e2e type checks.
+- Do not use `rtk pnpm typecheck` as verification: RTK 1.0.1 replaces it with a direct `tsc` invocation, skipping the e2e check and potentially reporting a false success. A standalone `tsc` check does not satisfy the pre-commit requirement.
 
 ---
 
