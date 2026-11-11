@@ -58,8 +58,6 @@ You can also show limit information directly in the **macOS menu bar or Windows 
 
 Live limits use your existing local Codex login.
 
-The **Accounts** page can compare saved ChatGPT accounts, add accounts through the official Codex CLI, and manually switch the selected Codex login. Credentials are stored locally in private plaintext files. Switching requires restarting related clients; historical usage still covers the selected Codex directory. See [account management and verification](docs/codex-accounts.md) for supported authentication and release checks.
-
 ![Codex quota and reset countdowns in the macOS menu bar](docs/menubar.jpg)
 
 The menu bar can also show today's token usage and estimated cost. On macOS, right-click the menu bar widget to open a compact panel with 5-hour and weekly quota progress, reset times, today's tokens, and estimated cost. You can open the main window or quit the app directly from this panel.
@@ -67,6 +65,21 @@ The menu bar can also show today's token usage and estimated cost. On macOS, rig
 <img src="docs/menubar-menu.jpg" alt="macOS menu bar right-click panel with remaining quotas, reset times, and today's usage" width="436" />
 
 *Menu bar screenshots use illustrative account and usage data.*
+
+### 👤 Manage and switch Codex accounts
+
+Open **Accounts** to compare saved ChatGPT accounts and manually choose which login Codex uses.
+
+1. Choose **Add current Codex account** to save an existing local login, or **Sign in with browser** / **Use device code** to authorize an account through the official Codex CLI. Use **Add account** to save more accounts. Adding or refreshing an account leaves the current Codex login unchanged.
+2. Compare remaining 5-hour, weekly, or monthly quotas, reset times, subscription status, credits balance, and available reset credits. Refresh one account or choose **Refresh all**; background refresh also keeps saved accounts up to date.
+3. Click **Switch Codex sign-in** on the desired account card to update the selected Codex environment's login configuration.
+4. Restart the Codex desktop app or IDE to load the new account. For Codex CLI, exit the current session and restart with `codex --no-daemon`, or run `codex app-server daemon stop` before starting Codex CLI again. The restart reminder can be hidden with **Don't remind me again**.
+
+Switching currently supports **Codex CLI 0.167.0** with ChatGPT authentication and `cli_auth_credentials_store` unset or set to `file`. Other CLI versions can still add accounts. API-key authentication, other credential backends, and managed or incompatible authentication settings prevent switching. Switching preserves `config.toml`, model settings, reasoning effort, and MCP configuration.
+
+Credentials are saved locally as **private plaintext files** in the application's data directory. Removing a saved account deletes its local record and cached status while leaving Codex signed in. Historical tokens and costs cover the selected Codex directory across all accounts; switching does not split that history by account.
+
+See [account management and verification](docs/codex-accounts.md) for authentication restrictions, Windows/WSL requirements, and the status of manual platform validation.
 
 ### 🔍 Find what is using your tokens
 
@@ -248,7 +261,8 @@ Live account limits require an authenticated local Codex CLI session. If needed,
 
 Your Codex session content is sensitive. The app is designed to keep it on your device:
 
-- Source files under `~/.codex` are read locally and are never uploaded, shared, or modified by the app.
+- Session logs under `~/.codex` are read locally and are never uploaded, shared, or modified by the app.
+- Account management stores private plaintext credentials locally. Manual switching and credential refresh can update the selected Codex environment's authentication file; session logs and `config.toml` remain unchanged.
 - No OpenAI or LiteLLM API key needs to be entered into or stored by the app.
 - Aggregated usage data is stored in a SQLite cache in the operating system's app data directory.
 - Live limits are requested directly from ChatGPT using your existing local Codex authentication; the app does not send session logs with those requests.
