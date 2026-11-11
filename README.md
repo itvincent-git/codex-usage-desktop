@@ -66,20 +66,15 @@ The menu bar can also show today's token usage and estimated cost. On macOS, rig
 
 *Menu bar screenshots use illustrative account and usage data.*
 
-### 👤 Manage and switch Codex accounts
+### 👤 Keep your Codex accounts in one place
 
-Open **Accounts** to compare saved ChatGPT accounts and manually choose which login Codex uses.
+Use more than one Codex account? See which accounts have quota left and when their limits reset, then choose the account for your next session.
 
-1. Choose **Add current Codex account** to save an existing local login, or **Sign in with browser** / **Use device code** to authorize an account through the official Codex CLI. Use **Add account** to save more accounts. Adding or refreshing an account leaves the current Codex login unchanged.
-2. Compare remaining 5-hour, weekly, or monthly quotas, reset times, subscription status, credits balance, and available reset credits. Refresh one account or choose **Refresh all**; background refresh also keeps saved accounts up to date.
-3. Click **Switch Codex sign-in** on the desired account card to update the selected Codex environment's login configuration.
-4. Restart the Codex desktop app or IDE to load the new account. For Codex CLI, exit the current session and restart with `codex --no-daemon`, or run `codex app-server daemon stop` before starting Codex CLI again. The restart reminder can be hidden with **Don't remind me again**.
+- Save multiple accounts and compare their remaining quotas, reset times, and subscription status side by side
+- Keep account quotas up to date with background refresh, without switching logins to check each one
+- Switch to a saved account with one click, without signing in again each time
 
-Switching currently supports **Codex CLI 0.167.0** with ChatGPT authentication and `cli_auth_credentials_store` unset or set to `file`. Other CLI versions can still add accounts. API-key authentication, other credential backends, and managed or incompatible authentication settings prevent switching. Switching preserves `config.toml`, model settings, reasoning effort, and MCP configuration.
-
-Credentials are saved locally as **private plaintext files** in the application's data directory. Removing a saved account deletes its local record and cached status while leaving Codex signed in. Historical tokens and costs cover the selected Codex directory across all accounts; switching does not split that history by account.
-
-See [account management and verification](docs/codex-accounts.md) for authentication restrictions, Windows/WSL requirements, and the status of manual platform validation.
+Restart the related Codex client after switching to load the new account. See [account switching details](docs/codex-accounts.md) for supported versions and requirements.
 
 ### 🔍 Find what is using your tokens
 
