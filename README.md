@@ -76,6 +76,10 @@ Use more than one Codex account? See which accounts have quota left and when the
 
 Restart the related Codex client after switching to load the new account. See [account switching details](docs/codex-accounts.md) for supported versions and requirements.
 
+![Saved Codex accounts with remaining quotas and subscription status](docs/accounts.png)
+
+*Account identities, subscription dates, and usage values in this screenshot are illustrative.*
+
 ### 🔍 Find what is using your tokens
 
 Break usage down by:

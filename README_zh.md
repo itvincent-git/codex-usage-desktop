@@ -76,6 +76,10 @@ Codex Usage Desktop 将电脑上已有的 Codex 会话数据整理成清晰的�
 
 切换后需重启相关 Codex 客户端以加载新账号。支持的版本与使用条件见[账号切换详情](docs/codex-accounts.md)。
 
+![已保存的 Codex 账号、剩余额度与订阅状态](docs/accounts.png)
+
+*截图中的账号信息、订阅日期及用量均为示例数据。*
+
 ### 🔍 找出 Token 消耗来源
 
 按以下维度拆分用量：
