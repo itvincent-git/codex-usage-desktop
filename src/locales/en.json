@@ -125,6 +125,10 @@
   "limits": {
     "sidebar_title": "Quota overview",
     "sidebar_updated": "Updated",
+    "refresh_failed": "Update failed",
+    "cached_data": "Showing the last successful data.",
+    "last_success": "Last success: {{time}}",
+    "window_expired": "Expired · awaiting update",
     "sidebar_5hour": "5-Hour Limit",
     "sidebar_weekly": "Weekly Limit",
     "sidebar_monthly": "Monthly usage limit",

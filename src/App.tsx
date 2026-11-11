@@ -237,7 +237,7 @@ export default function App() {
               compact={sidebarCollapsed}
               limits={codexLimits}
               error={codexLimitsError}
-              isLimitsRefreshing={isLimitsRefreshing}
+              isLimitsRefreshing={isLimitsRefreshing || isLimitsLoading}
               isWindowActivating={isWindowActivating}
               windowActivationStatus={windowActivationStatus}
               windowActivationError={windowActivationError}

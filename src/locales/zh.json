@@ -125,6 +125,10 @@
   "limits": {
     "sidebar_title": "额度概览",
     "sidebar_updated": "已更新",
+    "refresh_failed": "更新失败",
+    "cached_data": "当前显示上次成功获取的数据。",
+    "last_success": "上次成功：{{time}}",
+    "window_expired": "已过期，待更新",
     "sidebar_5hour": "5小时限制",
     "sidebar_weekly": "周限制",
     "sidebar_monthly": "月限制",

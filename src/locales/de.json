@@ -125,6 +125,10 @@
   "limits": {
     "sidebar_title": "Kontingentübersicht",
     "sidebar_updated": "Aktualisiert",
+    "refresh_failed": "Aktualisierung fehlgeschlagen",
+    "cached_data": "Die zuletzt erfolgreich abgerufenen Daten werden angezeigt.",
+    "last_success": "Zuletzt erfolgreich: {{time}}",
+    "window_expired": "Abgelaufen · Aktualisierung ausstehend",
     "sidebar_5hour": "5-Stunden-Limit",
     "sidebar_weekly": "Wochenlimit",
     "sidebar_monthly": "Monatliches Verbrauchslimit",

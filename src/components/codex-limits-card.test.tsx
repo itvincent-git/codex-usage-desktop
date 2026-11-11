@@ -158,6 +158,63 @@ describe("sidebar quota colors", () => {
   });
 });
 
+describe("sidebar quota refresh failures", () => {
+  const limits = {
+    session: { usedPercent: 25, remainingPercent: 75, windowMinutes: 300, resetsAt: "2099-11-11T16:00:00Z" },
+    weekly: { usedPercent: 50, remainingPercent: 50, windowMinutes: 10080, resetsAt: "2099-11-17T16:00:00Z" },
+    updatedAt: "2026-11-11T08:00:00Z", source: "oauth", membershipLevel: "plus",
+  };
+
+  it.each([false, true])("keeps loaded quotas through refresh failure and recovery (compact=%s)", (compact) => {
+    const { rerender } = render(<CodexSidebarLimits compact={compact} limits={limits} error={null} />);
+    expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+
+    rerender(<CodexSidebarLimits compact={compact} limits={limits} error={null} isLimitsRefreshing />);
+    expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+
+    rerender(<CodexSidebarLimits compact={compact} limits={limits} error="request timeout" />);
+    expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+    expect(screen.getByTestId("limit-row-weekly")).toHaveTextContent("50%");
+    expect(screen.getByRole("status")).toHaveTextContent("Last success:");
+    expect(screen.getByRole("status")).toHaveTextContent(dayjs(limits.updatedAt).format("MM/DD HH:mm"));
+    expect(screen.getByText("Update failed")).toBeInTheDocument();
+
+    rerender(<CodexSidebarLimits compact={compact} limits={{ ...limits, session: { ...limits.session, remainingPercent: 60, usedPercent: 40 } }} error={null} />);
+    expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("60%");
+    expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Last success:/)).not.toBeInTheDocument();
+  });
+
+  it("shows login guidance with cached data and drops quotas when the data is cleared", () => {
+    const { rerender } = render(<CodexSidebarLimits limits={limits} error="401 Unauthorized" />);
+    expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+    expect(screen.getByText("codex auth login")).toBeInTheDocument();
+    rerender(<CodexSidebarLimits limits={null} error={null} isLimitsRefreshing />);
+    expect(screen.queryByTestId("limit-row-5-hour")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+    rerender(<CodexSidebarLimits limits={null} error="request timeout" />);
+    expect(screen.queryByTestId("limit-row-monthly")).not.toBeInTheDocument();
+    expect(screen.getByText(/timed out/i)).toBeInTheDocument();
+  });
+
+  it.each([false, true])("marks expired windows without inferring a new balance (compact=%s)", (compact) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2099-11-11T15:59:50Z"));
+    try {
+      const { unmount } = render(<CodexSidebarLimits compact={compact} limits={limits} error={null} />);
+      expect(screen.queryByText("Expired · awaiting update")).not.toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(30_000); });
+      expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("Expired · awaiting update");
+      expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+      expect(screen.getByTestId("limit-row-5-hour").querySelector("[data-quota-countdown]")).toBeNull();
+      expect(screen.getByTestId("limit-row-weekly")).not.toHaveTextContent("Expired");
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("CodexLimitsCard component", () => {
   it("enables activation at zero usage and disables it after usage starts", () => {
     vi.useFakeTimers();

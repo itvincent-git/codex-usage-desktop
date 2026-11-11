@@ -125,6 +125,10 @@
   "limits": {
     "sidebar_title": "한도 개요",
     "sidebar_updated": "업데이트됨",
+    "refresh_failed": "업데이트 실패",
+    "cached_data": "마지막으로 가져온 데이터를 표시합니다.",
+    "last_success": "마지막 성공: {{time}}",
+    "window_expired": "만료됨 · 업데이트 대기 중",
     "sidebar_5hour": "5시간 한도",
     "sidebar_weekly": "주간 한도",
     "sidebar_monthly": "월간 한도",

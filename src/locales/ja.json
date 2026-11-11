@@ -125,6 +125,10 @@
   "limits": {
     "sidebar_title": "上限の概要",
     "sidebar_updated": "更新済み",
+    "refresh_failed": "更新に失敗",
+    "cached_data": "最後に取得できたデータを表示しています。",
+    "last_success": "最終取得：{{time}}",
+    "window_expired": "期限切れ・更新待ち",
     "sidebar_5hour": "5時間の上限",
     "sidebar_weekly": "週間上限",
     "sidebar_monthly": "月間上限",

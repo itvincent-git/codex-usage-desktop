@@ -106,7 +106,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         <h2 className="font-semibold">{t("limits.sidebar_title")}</h2>
         <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={limits ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm") }) : undefined}>
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", error ? "bg-warning" : limits ? "bg-success" : "bg-muted-foreground")} />
-          <span className="truncate">{t(error ? "limits.unavailable" : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
+          <span className="truncate">{t(isLimitsRefreshing ? "common.loading" : error ? (limits ? "limits.refresh_failed" : "limits.unavailable") : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
         </span>
       </div> : null}
       {!compact && onRefreshLimits && onActivateWindow ? (
@@ -121,7 +121,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           onActivate={onActivateWindow}
         />
       ) : null}
-      {error ? (
+      {error && !limits ? (
         compact ? <p className="break-words text-center text-[9px] text-warning" title={error}>{t("limits.unavailable")}</p> : isOAuthLoginError(error) ? (
           <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
             <div className="space-y-2">
@@ -147,6 +147,8 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           </div>
         )
 
+      ) : !limits && isLimitsRefreshing ? (
+        <p role="status" className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground"><LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />{t("common.loading")}</p>
       ) : (
         <div className="space-y-3">
           {hasSubscription(limits) ? (
@@ -159,6 +161,16 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           )}
         </div>
       )}
+      {error && limits ? (
+        <div role="status" className={cn("break-words text-muted-foreground", compact ? "text-center text-[9px]" : "space-y-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-2 text-[10px]")}>
+          {compact ? <p className="text-warning">{t("limits.refresh_failed")}</p> : <>
+            <p>{t("limits.cached_data")}</p>
+            <p>{t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
+            {isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
+          </>}
+          <p title={t("limits.updated", { time: dayjs(limits.updatedAt).format("YYYY-MM-DD HH:mm") })}>{t("limits.last_success", { time: dayjs(limits.updatedAt).format("MM/DD HH:mm") })}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -327,25 +339,27 @@ function LimitRow({ label, window, now, compact }: LimitRowProps & { now: number
   const remaining = window && Number.isFinite(window.remainingPercent) ? Math.min(100, Math.max(0, window.remainingPercent)) : 0;
   const outlineClass = remaining < 30 ? "stroke-error" : remaining < 70 ? "stroke-warning" : "stroke-success";
   const countdown = formatSidebarCountdown(window?.resetsAt ?? null, now);
+  const expired = countdown === "0m";
   const reset = countdown !== null ? dayjs(window!.resetsAt).format(label === "5 hour" ? "HH:mm" : "MM/DD HH:mm") : null;
 
   return (
     <div data-testid={`limit-row-${label.toLowerCase().replaceAll(" ", "-")}`} className={cn("relative rounded-xl bg-primary/[0.025]", compact ? "px-1 py-2 text-center" : "px-3 pb-2.5 pt-3.5")}>
       <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible fill-none">
         <rect ref={outlineTrackRef} x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
-        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)", strokeDashoffset: "var(--quota-start-offset)" }} pathLength="100" strokeDasharray={`${remaining} ${100 - remaining}`} className={cn("transition-[stroke-dasharray] duration-300", outlineClass)} strokeWidth="1.5" /> : null}
+        {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)", strokeDashoffset: "var(--quota-start-offset)" }} pathLength="100" strokeDasharray={`${remaining} ${100 - remaining}`} className={cn("transition-[stroke-dasharray] duration-300", expired ? "stroke-muted-foreground" : outlineClass)} strokeWidth="1.5" /> : null}
       </svg>
       <span data-quota-label className={cn("text-[9px] font-medium text-primary", compact ? "relative block leading-tight" : "absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 leading-none")}>{friendlyLabel}</span>
       <div className={cn("flex items-baseline gap-1.5", compact && "mt-1 justify-center")}>
         {!compact ? <span className="text-xs">{t("limits.remaining")}</span> : null}
-        <span className="text-xl font-bold tabular-nums tracking-tight text-primary">{window ? `${Math.round(remaining)}%` : "—"}</span>
+        <span className={cn("text-xl font-bold tabular-nums tracking-tight", expired ? "text-muted-foreground" : "text-primary")}>{window ? `${Math.round(remaining)}%` : "—"}</span>
       </div>
       {!compact ? <div className="quota-reset-row mt-1 flex items-center justify-between gap-1 whitespace-nowrap text-[11px] tabular-nums">
         <span className="min-w-0 text-muted-foreground" title={reset ? t("limits.sidebar_reset_at", { time: dayjs(window!.resetsAt).format("YYYY-MM-DD HH:mm") }) : t("limits.no_window_returned")}>
           {reset ? <>{reset}<span className="quota-reset-word"> {t("limits.sidebar_reset")}</span></> : t("limits.reset_unavailable")}
         </span>
-        {countdown !== null ? <span className="flex shrink-0 items-center gap-1 font-medium text-primary" title={t("limits.sidebar_countdown")}><Clock3 className="h-3 w-3" aria-hidden="true" /><span data-quota-countdown>{countdown}</span></span> : null}
+        {countdown !== null && !expired ? <span className="flex shrink-0 items-center gap-1 font-medium text-primary" title={t("limits.sidebar_countdown")}><Clock3 className="h-3 w-3" aria-hidden="true" /><span data-quota-countdown>{countdown}</span></span> : null}
       </div> : null}
+      {expired ? <p className="mt-1 break-words text-[9px] text-muted-foreground">{t("limits.window_expired")}</p> : null}
     </div>
   );
 }
