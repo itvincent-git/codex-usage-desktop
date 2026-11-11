@@ -66,6 +66,20 @@ Die Menüleiste kann auch den heutigen Token-Verbrauch und die geschätzten Kost
 
 *Die Menüleisten-Screenshots enthalten beispielhafte Konto- und Verbrauchsdaten.*
 
+### 👤 Codex-Konten zentral verwalten
+
+Nutzen Sie mehrere Codex-Konten? Sehen Sie die verbleibenden Kontingente und Zurücksetzungszeiten aller Konten und wählen Sie ein Konto für Ihre nächste Sitzung.
+
+- Mehrere Konten speichern und verbleibende Kontingente, Zurücksetzungszeiten und Abonnementstatus nebeneinander vergleichen
+- Kontingente im Hintergrund aktualisieren, ohne zwischen Anmeldungen wechseln zu müssen
+- Mit einem Klick zu einem gespeicherten Konto wechseln, ohne sich jedes Mal erneut anzumelden
+
+Starten Sie nach dem Wechsel den zugehörigen Codex-Client neu, um das neue Konto zu laden. Unterstützte Versionen und Voraussetzungen finden Sie in den [Details zum Kontowechsel](docs/codex-accounts.md).
+
+![Gespeicherte Codex-Konten mit verbleibenden Kontingenten und Abonnementstatus](docs/accounts.png)
+
+*Kontoinformationen, Abonnementdaten und Verbrauchswerte im Screenshot sind Beispieldaten.*
+
 ### 🔍 Token-Verbrauch nachvollziehen
 
 Schlüsseln Sie den Verbrauch auf nach:
