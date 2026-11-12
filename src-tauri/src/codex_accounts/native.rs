@@ -7,43 +7,6 @@ use std::{fs, path::PathBuf};
 // auth.lock (read/modify/write), then resolved auth.json.lock (commit).
 pub(crate) static AUTH_OPERATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-pub(super) fn check_switch_protocol(environment: &CodexEnvironment) -> Result<(), String> {
-    use std::{
-        process::Stdio,
-        time::{Duration, Instant},
-    };
-    let codex =
-        crate::codex_limits::resolve_codex_command(environment).ok_or("accountCliMissing")?;
-    let mut command =
-        crate::codex_limits::codex_process_command(&codex, &std::env::temp_dir(), &["--version"]);
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| "accountCliUnsupported")?;
-    let deadline = Instant::now() + Duration::from_secs(3);
-    loop {
-        if child.try_wait().ok().flatten().is_some() {
-            let output = child
-                .wait_with_output()
-                .map_err(|_| "accountCliUnsupported")?;
-            if output.status.success()
-                && String::from_utf8_lossy(&output.stdout).trim() == "codex-cli 0.167.0"
-            {
-                return Ok(());
-            }
-            return Err("accountCliUnsupported".into());
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("accountCliUnsupported".into());
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct Snapshot {
     pub environment: CodexEnvironment,

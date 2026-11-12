@@ -1040,7 +1040,6 @@
     "part_resetCredits": "重置额度",
     "part_credentials": "凭据",
     "errors": {
-      "accountCliUnsupported": "切换仅支持已核验认证协议的 Codex CLI 0.167.0。其他版本仍可用于添加账号。",
       "generic": "无法更新此账号，请重试。",
       "accountTaskFailed": "无法更新此账号，请重试。",
       "accountNetworkError": "无法更新此账号，请重试。",

@@ -1070,7 +1070,6 @@
     "part_resetCredits": "リセットクレジット",
     "part_credentials": "認証情報",
     "errors": {
-      "accountCliUnsupported": "切り替えは認証プロトコルを確認した Codex CLI 0.167.0 に対応しています。他のバージョンでもアカウントを追加できます。",
       "generic": "アカウントを更新できません。再試行してください。",
       "accountTaskFailed": "アカウントを更新できません。再試行してください。",
       "accountNetworkError": "アカウントを更新できません。再試行してください。",

@@ -1040,7 +1040,6 @@
     "part_resetCredits": "重置額度",
     "part_credentials": "憑證",
     "errors": {
-      "accountCliUnsupported": "切換僅支援已核實驗證協定的 Codex CLI 0.167.0。其他版本仍可用於新增帳號。",
       "generic": "無法更新此帳號，請重試。",
       "accountTaskFailed": "無法更新此帳號，請重試。",
       "accountNetworkError": "無法更新此帳號，請重試。",

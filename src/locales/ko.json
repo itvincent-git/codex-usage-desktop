@@ -1034,7 +1034,6 @@
     "part_resetCredits": "초기화 크레딧",
     "part_credentials": "인증 정보",
     "errors": {
-      "accountCliUnsupported": "전환은 인증 프로토콜을 확인한 Codex CLI 0.167.0을 지원합니다. 다른 버전으로도 계정을 추가할 수 있습니다.",
       "generic": "계정을 업데이트할 수 없습니다. 다시 시도하세요.",
       "accountTaskFailed": "계정을 업데이트할 수 없습니다. 다시 시도하세요.",
       "accountNetworkError": "계정을 업데이트할 수 없습니다. 다시 시도하세요.",

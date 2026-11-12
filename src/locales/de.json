@@ -1077,7 +1077,6 @@
     "part_resetCredits": "Reset-Guthaben",
     "part_credentials": "Zugangsdaten",
     "errors": {
-      "accountCliUnsupported": "Das Wechseln wird mit dem geprüften Authentifizierungsprotokoll von Codex CLI 0.167.0 unterstützt. Andere Versionen können weiterhin Konten hinzufügen.",
       "generic": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
       "accountTaskFailed": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
       "accountNetworkError": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",

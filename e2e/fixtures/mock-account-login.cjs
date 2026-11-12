@@ -3,15 +3,8 @@ const { spawn } = require("node:child_process");
 const { readFileSync, writeFileSync, existsSync, realpathSync } = require("node:fs");
 const { join } = require("node:path");
 if (process.argv.includes("--version")) {
-  const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-pending`;
-  if (existsSync(pending)) {
-    writeFileSync(`${pending}.started`, "");
-    const timer = setInterval(() => {
-      if (existsSync(pending)) return;
-      clearInterval(timer);
-      console.log("codex-cli 0.167.0");
-    }, 20);
-  } else console.log("codex-cli 0.167.0");
+  writeFileSync(`${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-called`, "");
+  console.log("codex-cli 0.167.1");
   return;
 }
 const home = process.env.CODEX_HOME;

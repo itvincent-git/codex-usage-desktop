@@ -268,18 +268,7 @@ impl AccountService {
 
     // Serial per account; global store/native commit locks never span HTTP.
     fn valid_account(&self, id: &str, force_refresh: bool) -> Result<Account, String> {
-        self.valid_account_with(id, force_refresh, |credentials| {
-            let environment = selected_codex_environment();
-            if native::snapshot(&environment)
-                .ok()
-                .and_then(|s| s.content)
-                .and_then(|s| credential_identity(&s).ok())
-                == credential_identity(&credentials.to_string()).ok()
-            {
-                native::check_switch_protocol(&environment)?;
-            }
-            refresh_credentials(credentials)
-        })
+        self.valid_account_with(id, force_refresh, refresh_credentials)
     }
 
     fn valid_account_with(
@@ -484,10 +473,6 @@ impl AccountService {
     }
     pub fn switch(&self, id: &str, expected_context: &str) -> Result<SwitchResult, String> {
         let environment = selected_codex_environment();
-        // Unit tests exercise the file protocol using isolated fixtures; the
-        // application always verifies the CLI for this captured environment.
-        #[cfg(not(test))]
-        native::check_switch_protocol(&environment)?;
         let original = native::snapshot(&environment)?;
         if original.context() != expected_context {
             return Err("accountAuthConflict".into());
@@ -806,15 +791,9 @@ pub(crate) async fn list_codex_accounts(
     service: tauri::State<'_, Arc<AccountService>>,
 ) -> Result<AccountList, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut list = service.list()?;
-        if list.switch_error.is_none() {
-            list.switch_error = native::check_switch_protocol(&selected_codex_environment()).err();
-        }
-        Ok(list)
-    })
-    .await
-    .map_err(|_| "accountTaskFailed")?
+    tauri::async_runtime::spawn_blocking(move || service.list())
+        .await
+        .map_err(|_| "accountTaskFailed")?
 }
 #[tauri::command]
 pub(crate) async fn import_current_codex_account(

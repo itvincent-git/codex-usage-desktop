@@ -15,28 +15,81 @@ async function invoke<T>(command: string, args: Record<string, unknown> = {}): P
 const control = async (values: Record<string, unknown> = {}) => (await fetch(`${process.env.CODEX_USAGE_ACCOUNTS_TEST_URL}/control`, { method: "POST", body: JSON.stringify(values) })).json() as Promise<Record<string, number>>;
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
+type AccountListWindow = {
+  __TAURI_INTERNALS__: { callbacks: Map<number, (data: unknown) => unknown> };
+  __heldAccountList?: { started: boolean; release: () => void };
+};
+async function holdAccountList() {
+  await browser.execute(() => {
+    const runtime = window as unknown as AccountListWindow;
+    const callbacks = runtime.__TAURI_INTERNALS__.callbacks;
+    const set = callbacks.set;
+    const gate = { started: false, release: () => {} };
+    const released = new Promise<void>((resolve) => {
+      gate.release = () => { callbacks.set = set; resolve(); delete runtime.__heldAccountList; };
+    });
+    runtime.__heldAccountList = gate;
+    // invoke is read-only; delay only account-list callbacks from the real native command.
+    callbacks.set = function (id, callback) {
+      return set.call(this, id, (data) => {
+        if (Array.isArray((data as AccountList | null)?.accounts)) {
+          gate.started = true;
+          void released.then(() => callback(data));
+        } else callback(data);
+      });
+    };
+  });
+}
+async function releaseAccountList() {
+  await browser.execute(() => (window as unknown as AccountListWindow).__heldAccountList?.release());
+}
+
 describe("native saved Codex accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
+  run("switches complete credentials without probing the CLI version", async () => {
+    const versionCalled = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-called`;
+    if (existsSync(versionCalled)) unlinkSync(versionCalled);
+    await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const list = await invoke<AccountList>("list_codex_accounts");
+    expect(list.switchError).toBeNull();
+    const authPath = join(process.env.CODEX_HOME!, "auth.json");
+    const configPath = join(process.env.CODEX_HOME!, "config.toml");
+    const original = JSON.parse(readFileSync(authPath, "utf8"));
+    const config = readFileSync(configPath, "utf8");
+    await expect($('[data-account-id="alice"]')).toHaveAttribute("aria-current", "true");
+    for (const id of ["bob", "alice"]) {
+      const card = $(`[data-account-id="${id}"]`);
+      await card.$("button=Switch Codex sign-in").click();
+      await expect(card).toHaveAttribute("aria-current", "true");
+      expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(accountCredentials(id));
+      await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
+    }
+    expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(original);
+    expect(readFileSync(configPath, "utf8")).toBe(config);
+    expect(existsSync(versionCalled)).toBe(false);
+  });
+
   run("shows loading while the first native account list is pending", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
-    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-pending`;
     const loading = $('.accounts-page [role="status"][aria-label="加载中"]');
     try {
-      writeFileSync(pending, "");
+      await holdAccountList();
       await $('[data-testid="accounts-nav-tab"]').click();
-      await browser.waitUntil(() => existsSync(`${pending}.started`));
+      await browser.waitUntil(() => browser.execute(() => !!(window as unknown as AccountListWindow).__heldAccountList?.started));
       await expect(loading).toBeDisplayed();
       await expect(loading).toHaveText("加载中");
       await expect($$(".account-card")).toBeElementsArrayOfSize(0);
       await browser.saveScreenshot("/tmp/codex-accounts-loading.png");
-      unlinkSync(pending);
+      await releaseAccountList();
       await expect($$(".account-card")).toBeElementsArrayOfSize(4);
       await expect(loading).not.toExist();
     } finally {
-      if (existsSync(pending)) unlinkSync(pending);
-      if (existsSync(`${pending}.started`)) unlinkSync(`${pending}.started`);
+      await releaseAccountList();
     }
   });
 
@@ -52,26 +105,23 @@ describe("native saved Codex accounts", () => {
       for (const account of accounts) await expect($(`[data-account-id="${account.id}"] h2`)).toHaveText(account.email!);
     };
     await assertCards();
-    const pending = `${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-pending`;
     try {
       for (const [leave, back] of [
         ['[data-testid="dashboard-nav-tab"]', '[data-testid="accounts-nav-tab"]'],
         ['button[aria-label="Settings"]', 'button=Back'],
         ['[data-testid="dashboard-nav-tab"]', '[data-testid="accounts-nav-tab"]'],
       ]) {
-        writeFileSync(pending, "");
+        await holdAccountList();
         await $(leave).click();
         await expect($(".accounts-page")).not.toExist();
         await $(back).click();
-        await browser.waitUntil(() => existsSync(`${pending}.started`));
+        await browser.waitUntil(() => browser.execute(() => !!(window as unknown as AccountListWindow).__heldAccountList?.started));
         expect(await browser.execute(() => document.querySelectorAll(".account-card").length)).toBe(accounts.length);
-        unlinkSync(pending);
-        unlinkSync(`${pending}.started`);
+        await releaseAccountList();
         await assertCards();
       }
     } finally {
-      if (existsSync(pending)) unlinkSync(pending);
-      if (existsSync(`${pending}.started`)) unlinkSync(`${pending}.started`);
+      await releaseAccountList();
     }
   });
 

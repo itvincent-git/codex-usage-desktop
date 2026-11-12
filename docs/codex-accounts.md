@@ -18,7 +18,7 @@ Historical tokens and costs remain statistics for the selected Codex directory a
 
 ## Manual switching
 
-Native writes are enabled only for the verified **`codex-cli 0.167.0`** authentication protocol. The lock implementation was checked against the upstream `rust-v0.167.0` release (`auth.lock`, followed by the resolved `auth.json.lock`). Other CLI versions can still be used to add accounts; extending write support requires checking their authentication backend, locking, and commit behavior first.
+Switching and credential refresh do not probe the CLI version or require a version allowlist. Compatibility is checked through the selected authentication configuration, complete ChatGPT credentials, and unchanged authentication context. Native writes retain the file protocol locks (`auth.lock`, followed by the resolved `auth.json.lock`), atomic replacement, and identity verification. Adding accounts still requires the official Codex CLI. Incompatible changes to Codex's authentication format, storage backend, or locking protocol may require updates.
 
 Only an absent `cli_auth_credentials_store` setting or the explicit `file` backend is accepted. `auto`, `keyring`, `ephemeral`, API-key authentication, ambiguous profile settings, managed configuration, and incompatible login/workspace restrictions prevent switching. macOS forced Codex preferences and Windows policy configuration also prevent native writes. The application never changes `config.toml`, model settings, reasoning effort, or MCP configuration.
 

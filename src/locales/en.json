@@ -1034,7 +1034,6 @@
     "part_resetCredits": "Reset credits",
     "part_credentials": "Credentials",
     "errors": {
-      "accountCliUnsupported": "Switching is supported with the verified Codex CLI 0.167.0 authentication protocol. Other CLI versions can still be used to add accounts.",
       "generic": "Could not update this account. Try again.",
       "accountTaskFailed": "Could not update this account. Try again.",
       "accountNetworkError": "Could not update this account. Try again.",
