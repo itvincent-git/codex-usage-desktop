@@ -1,4 +1,8 @@
 {
+  "6.2.1": {
+    "zh": "- chore(homebrew): update cask to 6.2.0\n- fix: remove Codex CLI version allowlist for account switching",
+    "en": "- chore(homebrew): update cask to 6.2.0\n- fix: remove Codex CLI version allowlist for account switching"
+  },
   "6.2.0": {
     "zh": "- chore(homebrew): update cask to 6.1.3\n- chore(homebrew): update cask to 6.1.4\n- fix(limits): log underlying account request failures\n- docs: explain Codex account switching in readmes\n- docs: introduce account switching benefits for new users\n- docs: add illustrative accounts screenshot to readmes\n- docs: add accounts section to remaining translations\n- fix: retain sidebar quotas when refresh fails",
     "en": "- chore(homebrew): update cask to 6.1.3\n- chore(homebrew): update cask to 6.1.4\n- fix(limits): log underlying account request failures\n- docs: explain Codex account switching in readmes\n- docs: introduce account switching benefits for new users\n- docs: add illustrative accounts screenshot to readmes\n- docs: add accounts section to remaining translations\n- fix: retain sidebar quotas when refresh fails"
