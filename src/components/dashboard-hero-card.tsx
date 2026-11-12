@@ -1,5 +1,6 @@
 import { Download, FileSpreadsheet, FileText, Info, RefreshCcw, Cpu, FolderGit2, CalendarDays, User, Sparkles, Building2, Wallet } from "lucide-react";
 import { RangeSwitcher } from "@/components/range-switcher";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -77,19 +78,22 @@ export function DashboardHeroCard({
       <div className="p-4 lg:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{t("hero.overview_label", { defaultValue: "Overview" })}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{t("hero.overview_label", { defaultValue: "Overview" })}</p>
             <div className="flex items-center gap-2">
               <h1 className="font-display text-2.5xl font-bold tracking-display text-foreground sm:text-3xl">
                 {t("hero.title")}
               </h1>
-              <div className="group relative flex items-center">
-                <Info className="h-4 w-4 text-muted-foreground/50 transition-colors hover:text-muted-foreground cursor-help" />
-                <div className="pointer-events-none absolute top-full right-0 z-50 mt-2.5 w-64 rounded-md border border-border bg-surface p-3 text-xs text-foreground opacity-0 shadow-card transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
-                  <p className="font-semibold text-foreground">{t("hero.title")}</p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" aria-label={t("hero.total_cost_label")} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted">
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent aria-label={t("hero.total_cost_label")} className="text-sm">
+                  <p className="font-semibold">{t("hero.total_cost_label")} (USD)</p>
                   <p className="mt-1 leading-relaxed text-muted-foreground">{t("hero.subtitle")}</p>
-                  <div className="absolute right-1 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border-t border-l border-border bg-surface sm:left-1/2 sm:right-auto" />
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -120,12 +124,12 @@ export function DashboardHeroCard({
           <div className="flex flex-col justify-between gap-3.5">
             <div className="space-y-3.5">
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t("hero.total_cost_label", { defaultValue: "Total cost" })} ({getRangeLabel(range, t)})</p>
+                <p className="text-xs font-semibold text-muted-foreground">{t("hero.total_cost_label")} (USD) · {getRangeLabel(range, t)}</p>
                 <div className="flex flex-wrap items-end gap-2.5">
                   <p className="font-display text-4xl font-bold tracking-display text-foreground sm:text-5xl">
                     {formatCurrencyShort(overview.totals.costUSD)}
                   </p>
-                  <p className="pb-1 text-sm font-medium text-success">
+                  <p className="pb-1 text-sm font-medium text-success-foreground">
                     {formatCompactNumber(overview.totals.totalTokens)} tokens
                   </p>
                 </div>
@@ -149,7 +153,7 @@ export function DashboardHeroCard({
                   {membershipLevel && (
                     <div className="flex items-center gap-1.5">
                       <span className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1 border",
+                        "rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider flex items-center gap-1 border",
                         membershipLevel === "plus" || membershipLevel === "pro" || membershipLevel === "prolite"
                           ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
                           : membershipLevel === "team" || membershipLevel === "business" || membershipLevel === "enterprise"
@@ -176,7 +180,7 @@ export function DashboardHeroCard({
                     <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                     <span className="min-w-0">{t("limits.credits_balance")}: <span className="break-all font-mono text-foreground">{creditsBalance}</span></span>
                     {codexLimits.creditsIsMock ? (
-                      <span className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">{t("limits.credits_mock")}</span>
+                      <span className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs text-warning-foreground">{t("limits.credits_mock")}</span>
                     ) : null}
                   </div>
                 </div>
@@ -185,21 +189,22 @@ export function DashboardHeroCard({
 
             {/* Cost Drivers tabbed view */}
             <div className="rounded-lg border border-border/60 bg-surface/55 p-2.5 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <Cpu className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground">{t("hero.cost_drivers", { defaultValue: "Cost Drivers" })}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">{t("hero.cost_drivers", { defaultValue: "Cost Drivers" })}</span>
                 </div>
                 
                 {/* Tabs */}
-                <div className="flex p-0.5 bg-muted/40 rounded-md border border-border/40 text-[10px] font-medium">
+                <div className="flex p-0.5 bg-muted/40 rounded-md border border-border/40 text-xs font-medium">
                   {(["projects", "models", "dates"] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
+                      aria-pressed={activeTab === tab}
                       onClick={() => setActiveTab(tab)}
                       className={cn(
-                        "px-2 py-0.5 rounded-sm capitalize transition-all",
+                        "min-h-8 px-2 py-1 rounded-sm capitalize transition-colors",
                         activeTab === tab 
                           ? "bg-background text-foreground shadow-sm font-semibold" 
                           : "text-muted-foreground hover:text-foreground"
@@ -216,7 +221,7 @@ export function DashboardHeroCard({
                 {activeTabDrivers.length > 0 ? (
                   activeTabDrivers.map((item, index) => (
                     <div key={`${item.label}-${index}`} className="flex items-center gap-2">
-                      <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-muted/50 border border-border/40 text-[9px] font-bold text-muted-foreground">
+                      <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-muted/50 border border-border/40 text-xs font-bold text-muted-foreground">
                         {index + 1}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -232,7 +237,7 @@ export function DashboardHeroCard({
                           <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/60">
                             <div className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all duration-500" style={{ width: `${Math.min(Math.max(item.share, 0), 1) * 100}%` }} />
                           </div>
-                          <span className="w-8 shrink-0 text-right text-[10px] font-semibold text-muted-foreground">
+                          <span className="w-8 shrink-0 text-right text-xs font-semibold text-muted-foreground">
                             {formatPercent(item.share)}
                           </span>
                         </div>

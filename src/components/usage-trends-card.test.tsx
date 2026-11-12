@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { UsageTrendsCard, UsageTrendTooltip } from "./usage-trends-card";
@@ -60,6 +60,7 @@ describe("UsageTrendTooltip", () => {
     await user.click(screen.getByRole("button", { name: "Expand chart to full screen" }));
 
     expect(screen.getByRole("dialog", { name: "Usage Trends" })).toContainElement(screen.getByTestId("usage-trends-card"));
+    expect(screen.getByRole("button", { name: "Exit full screen" })).toHaveFocus();
     expect(document.body.style.overflow).toBe("hidden");
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
 
@@ -73,6 +74,7 @@ describe("UsageTrendTooltip", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.body.style.overflow).toBe("");
     expect(screen.getByRole("button", { name: "Expand chart to full screen" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Expand chart to full screen" })).toHaveFocus());
   });
 
   it("toggles chart series from the legend", async () => {

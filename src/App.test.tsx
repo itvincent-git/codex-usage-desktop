@@ -355,7 +355,7 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Dashboard" })).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Select time range" })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Select time range" })).toHaveFocus());
   });
 
   it("restores the sidebar width and collapse state when the app remounts", async () => {
@@ -1305,7 +1305,7 @@ describe("App", () => {
     await user.tab({ shift: true });
     expect(screen.getByRole("button", { name: "Check limits" })).toHaveFocus();
     await user.tab({ shift: true });
-    expect(screen.getByRole("tab", { name: "Accounts" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Project" })).toHaveFocus();
     loadMoreButton.focus();
     await user.tab({ shift: true });
     expect(collapse).toHaveFocus();
@@ -1921,7 +1921,7 @@ describe("App", () => {
     expect(batchSuccess.parentElement).not.toHaveTextContent("Wall time:");
     expect(batchFailure.parentElement).not.toHaveTextContent("Exit code:");
     expect(batchFailure.parentElement).not.toHaveTextContent("Wall time:");
-    expect(batchFailure.querySelector(".text-error")).toBeInTheDocument();
+    expect(batchFailure.querySelector(".text-error-foreground")).toBeInTheDocument();
     const runningActivity = screen.getByRole("button", { name: /Running pnpm test src\/App.test.tsx && pnpm typecheck/ });
     expect(runningActivity).toHaveAttribute("aria-expanded", "false");
     expect(runningActivity.parentElement).toHaveTextContent("running test output");
@@ -1929,7 +1929,7 @@ describe("App", () => {
     expect(runningActivity.parentElement).toHaveTextContent("› Sent: y");
     const failedActivity = screen.getByRole("button", { name: /Ran pnpm test src\/App.test.tsx/ });
     expect(failedActivity).toHaveAttribute("aria-expanded", "false");
-    expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error");
+    expect(failedActivity.querySelector('[title="Process exited with an error"]')).toHaveClass("text-error-foreground");
     expect(failedActivity.parentElement).toHaveTextContent("└ 2 tests failed");
     const stoppedActivity = screen.getByRole("button", { name: /Stopped \(SIGTERM\) pnpm tauri dev/ });
     expect(stoppedActivity.parentElement).toHaveTextContent("└ shutting down");

@@ -5,19 +5,42 @@ export function useModalFocus(
   closeButtonRef: RefObject<HTMLButtonElement | null>,
   onClose: () => void,
   isActive = true,
+  options: { isolateBackground?: boolean; restoreFocusRef?: RefObject<HTMLButtonElement | null> } = {},
 ) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const { isolateBackground = false, restoreFocusRef } = options;
+  const manageFocus = !isolateBackground || isActive;
 
   useEffect(() => {
+    if (!manageFocus) return;
     // Preserve the opener when StrictMode replays effects while the background is inert.
     if (previousFocusRef.current === null && document.activeElement instanceof HTMLElement) {
       previousFocusRef.current = document.activeElement;
     }
+    const background = isolateBackground
+      ? document.querySelector<HTMLElement>("[data-app-content] > .overflow-y-auto")
+      : null;
+    const wasInert = background?.inert ?? false;
+    const previousHidden = background?.getAttribute("aria-hidden");
+    if (background) {
+      background.inert = true;
+      background.setAttribute("aria-hidden", "true");
+    }
     closeButtonRef.current?.focus({ preventScroll: true });
     return () => {
-      previousFocusRef.current?.focus({ preventScroll: true });
+      if (background) {
+        background.inert = wasInert;
+        if (previousHidden == null) background.removeAttribute("aria-hidden");
+        else background.setAttribute("aria-hidden", previousHidden);
+      }
+      if (restoreFocusRef) {
+        // Portals replace the chart trigger; restore after refs and focus guards settle.
+        requestAnimationFrame(() => restoreFocusRef.current?.focus({ preventScroll: true }));
+      } else {
+        previousFocusRef.current?.focus({ preventScroll: true });
+      }
     };
-  }, [closeButtonRef]);
+  }, [closeButtonRef, manageFocus, isolateBackground, restoreFocusRef]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -26,7 +49,7 @@ export function useModalFocus(
       document.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       ),
-    ).filter((element) => (dialogRef.current?.contains(element) || element.closest("[data-app-sidebar]")) && !element.closest('[hidden], [inert], [aria-hidden="true"]'));
+    ).filter((element) => element.tabIndex >= 0 && (dialogRef.current?.contains(element) || element.closest("[data-app-sidebar]")) && !element.closest('[hidden], [inert], [aria-hidden="true"]'));
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing) return;

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import type { CodexLimitsResponse, OverviewResponse } from "../lib/api";
@@ -23,6 +24,18 @@ function hero(codexLimits: CodexLimitsResponse | null) {
 describe("Dashboard credits balance", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
+  });
+
+  it("labels the estimate and exposes its explanation to keyboard users", async () => {
+    const user = userEvent.setup();
+    render(hero(null));
+    expect(screen.getByText(/Estimated cost \(USD\)/)).toBeInTheDocument();
+    const info = screen.getByRole("button", { name: "Estimated cost" });
+    info.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog", { name: "Estimated cost" })).toHaveTextContent("cost estimator");
+    await user.keyboard("{Escape}");
+    expect(info).toHaveFocus();
   });
 
   it.each([

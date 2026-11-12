@@ -57,7 +57,7 @@ export function UsageRecoveryCard({ scanning, pending, error, diagnostics, diagn
     <Card data-testid="usage-recovery" className="mb-5 overflow-hidden border-warning/30">
       <CardContent className="space-y-5 p-5 sm:p-6">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-warning/10 p-2.5 text-warning">
+          <div className="rounded-xl bg-warning/10 p-2.5 text-warning-foreground">
             {pending ? <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" /> : <AlertTriangle className="h-5 w-5" aria-hidden="true" />}
           </div>
           <div className="min-w-0 space-y-1.5" role="status" aria-live="polite">
@@ -86,9 +86,9 @@ export function UsageRecoveryCard({ scanning, pending, error, diagnostics, diagn
           {status === "emptyRange" ? <Button size="sm" variant="secondary" disabled={busy} onClick={onExpandRange}>{t("recovery.expand_range")}</Button> : null}
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => void copyDiagnostics()}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{t(copied ? "recovery.copied" : "recovery.copy")}</Button>
         </div>
-        {copyError ? <p role="alert" className="text-xs text-warning">{t("recovery.copy_failed")}</p> : null}
+        {copyError ? <p role="alert" className="text-xs text-warning-foreground">{t("recovery.copy_failed")}</p> : null}
         {rebuildPath ? <p role="status" className="text-sm">{t("recovery.rebuild_scheduled")}<span className="mt-1 block break-all font-mono text-xs">{rebuildPath}</span></p> : null}
-        {rebuildError ? <p role="alert" className="break-all text-xs text-warning">{rebuildError}</p> : null}
+        {rebuildError ? <p role="alert" className="break-all text-xs text-warning-foreground">{rebuildError}</p> : null}
         <p className="text-xs leading-5 text-muted-foreground">{t("recovery.local_only")}</p>
       </CardContent>
     </Card>

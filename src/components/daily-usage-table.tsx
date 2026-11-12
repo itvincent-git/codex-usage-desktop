@@ -193,7 +193,7 @@ export function DailyUsageTable({ range, daily, onRowClick }: DailyUsageTablePro
           <p className="px-6 py-10 text-center text-sm text-muted-foreground">{t("daily.no_data")}</p>
         ) : (
           <div className="overflow-x-auto px-4 sm:px-6">
-            <table className="min-w-[800px] w-full border-separate border-spacing-0 text-sm">
+            <table className="usage-data-table border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   <th className="w-40 border-b border-border py-3 font-medium">{t("daily.cols.date")}</th>

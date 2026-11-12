@@ -243,6 +243,7 @@ export default function App() {
               windowActivationError={windowActivationError}
               onRefreshLimits={() => void handleLimitsRefresh()}
               onActivateWindow={() => void handleActivateCodexWindow()}
+              onManageAccounts={() => navigate("accounts")}
             />
           }
         />
@@ -286,7 +287,7 @@ export default function App() {
           lastRescanDurationMs={lastRescanDurationMs}
         /> : null}
 
-        <main className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
+        <main id={`page-${view}`} role={view === "settings" ? undefined : "tabpanel"} aria-labelledby={view === "settings" ? undefined : `${view}-nav-tab`} className={view === "dashboard" ? "flex-1 py-3" : "flex-1 py-6"}>
           {updateInfo?.hasUpdate && !isUpdateDismissed ? (
             <div className="mb-6 overflow-hidden rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-indigo-50/20 p-5 text-card-foreground shadow-sm backdrop-blur-md transition-all duration-300 hover:border-indigo-200 hover:shadow-md dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-indigo-950/35 dark:via-purple-950/20 dark:to-indigo-950/10 dark:hover:border-indigo-500/30">
               <div className="flex items-start justify-between gap-4">

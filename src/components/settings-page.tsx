@@ -192,13 +192,13 @@ export function SettingsPage({
             </div>
 
             {updateCheckError ? (
-              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error-foreground dark:text-red-400">
                 {updateCheckError}
               </div>
             ) : null}
 
             {updateInstallError ? (
-              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error dark:text-red-400">
+              <div className="rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 p-4 text-sm text-error-foreground dark:text-red-400">
                 {updateInstallError}
               </div>
             ) : null}
@@ -387,7 +387,7 @@ export function SettingsPage({
           <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               {launchAtLoginError ? (
-                <p className="max-w-lg text-sm leading-6 text-error dark:text-red-400">
+                <p className="max-w-lg text-sm leading-6 text-error-foreground dark:text-red-400">
                   {launchAtLoginError}
                 </p>
               ) : null}

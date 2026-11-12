@@ -13,7 +13,7 @@
     --sidebar: 245 244 249;
     --window-controls-height: 0px;
     --window-drag-height: 0px;
-    --primary: 99 102 241;
+    --primary: 79 70 229;
     --primary-foreground: 255 255 255;
     --secondary: 32 151 11;
     --secondary-foreground: 255 255 255;
@@ -22,8 +22,11 @@
     --border: 232 232 236;
     --ring: 99 102 241;
     --success: 16 185 129;
+    --success-foreground: 4 120 87;
     --warning: 245 158 11;
+    --warning-foreground: 146 64 14;
     --error: 239 68 68;
+    --error-foreground: 185 28 28;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -35,6 +38,12 @@
       --muted: 30 30 34;
       --muted-foreground: 161 161 170;
       --border: 48 48 54;
+      --primary: 165 180 252;
+      --primary-foreground: 14 14 17;
+      --ring: 165 180 252;
+      --success-foreground: 110 231 183;
+      --warning-foreground: 252 211 77;
+      --error-foreground: 252 165 165;
     }
   }
 
@@ -94,9 +103,38 @@
   button {
     @apply outline-none;
   }
+
+  button:focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
+  .usage-data-table {
+    width: 100%;
+    table-layout: fixed;
+    overflow-wrap: anywhere;
+  }
+
+  .usage-data-table th:nth-child(1) { width: 18%; }
+  .usage-data-table th:nth-child(2) { width: 42%; }
+  .usage-data-table th:nth-child(3) { width: 17%; }
+  .usage-data-table th:nth-child(4) { width: 23%; }
+
+  @container app-content (max-width: 900px) {
+    .usage-data-table th,
+    .usage-data-table td { padding-inline: 8px; }
+  }
+
   .usage-trends-content {
     container: usage-trends / inline-size;
   }

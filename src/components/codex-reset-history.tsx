@@ -159,10 +159,10 @@ export function LatestResetButton({
             {isRecentReset ? <span data-testid="recent-reset-indicator" className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" /> : null}
             <span data-testid="latest-reset-status" className={`truncate rounded px-1.5 py-1 ${isRecentReset ? "bg-success/10 text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`}>{isRecentReset ? t("limits.latest_reset_recent") : t("limits.latest_reset")}</span>
           </span>
-          <span className="mt-1.5 block truncate text-[9px] font-normal tabular-nums text-muted-foreground">
+          <span className="mt-1.5 block text-xs font-normal tabular-nums text-muted-foreground">
             <span data-testid="latest-reset-relative-time" className={isRecentReset ? "font-semibold text-emerald-700 dark:text-emerald-400" : "font-medium text-foreground/75"}>{relativeResetTime}</span>
             <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
-            <time dateTime={reset.announcedAt} className="text-primary/80">{dayjs(reset.announcedAt).format("MM-DD HH:mm")}</time>
+            <time dateTime={reset.announcedAt} className="text-primary">{dayjs(reset.announcedAt).format("MM-DD HH:mm")}</time>
             <span aria-hidden="true" className="text-muted-foreground/50"> · </span>
             <span data-testid="latest-reset-type" className={`font-medium ${reset.resetType === "banked" ? "text-sky-700 dark:text-sky-300" : "text-orange-700 dark:text-orange-400"}`}>{t(`limits.reset_type_${reset.resetType}`)}</span>
           </span>
@@ -430,7 +430,7 @@ export function CodexResetHistoryModal({ onClose }: { onClose: () => void }) {
           {isLoading ? (
             <p className="py-12 text-center text-sm text-muted-foreground">{t("limits.reset_history_loading")}</p>
           ) : error ? (
-            <p className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{t("limits.reset_history_error")}</p>
+            <p className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error-foreground">{t("limits.reset_history_error")}</p>
           ) : resets.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{t("limits.reset_history_empty")}</p>
           ) : (

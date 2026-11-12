@@ -36,9 +36,9 @@ export default {
           DEFAULT: "rgb(var(--surface) / <alpha-value>)",
           foreground: "rgb(var(--foreground) / <alpha-value>)",
         },
-        success: "rgb(var(--success) / <alpha-value>)",
-        warning: "rgb(var(--warning) / <alpha-value>)",
-        error: "rgb(var(--error) / <alpha-value>)",
+        success: { DEFAULT: "rgb(var(--success) / <alpha-value>)", foreground: "rgb(var(--success-foreground) / <alpha-value>)" },
+        warning: { DEFAULT: "rgb(var(--warning) / <alpha-value>)", foreground: "rgb(var(--warning-foreground) / <alpha-value>)" },
+        error: { DEFAULT: "rgb(var(--error) / <alpha-value>)", foreground: "rgb(var(--error-foreground) / <alpha-value>)" },
       },
       fontFamily: {
         display: ["'General Sans'", "sans-serif"],

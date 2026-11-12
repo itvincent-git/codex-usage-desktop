@@ -30,6 +30,7 @@ type CodexSidebarLimitsProps = {
   windowActivationError?: string | null;
   onRefreshLimits?: () => void;
   onActivateWindow?: () => void;
+  onManageAccounts?: () => void;
 };
 
 export const RECENT_RESET_OVERVIEW_DAYS = 30;
@@ -91,7 +92,7 @@ export function CodexLimitsCard({ limits, isLimitsLoading = false, limitsError =
   );
 }
 
-export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow }: CodexSidebarLimitsProps) {
+export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onManageAccounts }: CodexSidebarLimitsProps) {
   const { t } = useTranslation();
   const [, refreshCountdown] = useState(0);
   const now = Date.now();
@@ -102,7 +103,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
 
   return (
     <section className="sidebar-limits space-y-3" aria-label={t("limits.sidebar_title")}>
-      {!compact ? <div className="flex min-w-0 items-center justify-between gap-1 text-[10px]">
+      {!compact ? <div className="flex min-w-0 items-center justify-between gap-1 text-xs">
         <h2 className="font-semibold">{t("limits.sidebar_title")}</h2>
         <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={limits ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm") }) : undefined}>
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", error ? "bg-warning" : limits ? "bg-success" : "bg-muted-foreground")} />
@@ -122,24 +123,23 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         />
       ) : null}
       {error && !limits ? (
-        compact ? <p className="break-words text-center text-[9px] text-warning" title={error}>{t("limits.unavailable")}</p> : isOAuthLoginError(error) ? (
-          <div className="rounded-xl border border-warning/20 bg-warning/5 p-4 text-sm flex flex-col justify-between h-full">
+        compact ? <p className="break-words text-center text-xs text-warning-foreground" title={error}>{t("limits.unavailable")}</p> : isOAuthLoginError(error) ? (
+          <div className="rounded-xl border border-warning/20 bg-warning/5 p-3 text-sm">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-warning font-semibold">
+              <div className="flex items-center gap-2 text-warning-foreground font-semibold">
                 <LogIn className="h-4.5 w-4.5" />
                 <span>{t("limits.not_logged_in")}</span>
               </div>
               <p className="text-xs text-muted-foreground leading-normal">
-                {t("limits.login_instruction")}
+                {t("accounts.empty_login_hint")}
               </p>
-              <div className="bg-muted/60 hover:bg-muted p-2 rounded-lg font-mono text-[10px] select-all border border-border flex flex-wrap items-center justify-between gap-1 group transition-colors">
-                <span className="break-all text-foreground select-all">codex auth login</span>
-                <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">{t("limits.click_to_select")}</span>
-              </div>
+              {onManageAccounts ? <Button variant="secondary" size="sm" className="w-full whitespace-normal" onClick={onManageAccounts}>{t("limits.manage_accounts")}</Button> : null}
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{t("limits.cli_login")}</summary>
+                <p className="mt-2 leading-relaxed">{t("limits.login_instruction")}</p>
+                <code className="mt-2 block break-all rounded border border-border bg-muted p-2 text-foreground select-all">codex auth login</code>
+              </details>
             </div>
-            <p className="text-[10px] text-muted-foreground/80 leading-normal mt-2 pt-2 border-t border-border/40">
-              {t("limits.login_hint")}
-            </p>
           </div>
         ) : (
           <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
@@ -148,7 +148,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         )
 
       ) : !limits && isLimitsRefreshing ? (
-        <p role="status" className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground"><LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />{t("common.loading")}</p>
+        <p role="status" className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />{t("common.loading")}</p>
       ) : (
         <div className="space-y-3">
           {hasSubscription(limits) ? (
@@ -162,8 +162,8 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         </div>
       )}
       {error && limits ? (
-        <div role="status" className={cn("break-words text-muted-foreground", compact ? "text-center text-[9px]" : "space-y-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-2 text-[10px]")}>
-          {compact ? <p className="text-warning">{t("limits.refresh_failed")}</p> : <>
+        <div role="status" className={cn("break-words text-muted-foreground", compact ? "text-center text-xs" : "space-y-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-2 text-xs")}>
+          {compact ? <p className="text-warning-foreground">{t("limits.refresh_failed")}</p> : <>
             <p>{t("limits.cached_data")}</p>
             <p>{t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
             {isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
@@ -207,18 +207,18 @@ function LimitActions({
   return (
     <div className="space-y-2">
       <div className="flex gap-1.5">
-        <Button type="button" size="sm" variant="secondary" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-[10px]" aria-label={t("limits.query_action")} title={t("limits.query_desc")} disabled={busy} onClick={onRefresh}>
+        <Button type="button" size="sm" variant="secondary" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-xs" aria-label={t("limits.query_action")} title={t("limits.query_desc")} disabled={busy} onClick={onRefresh}>
           {isRefreshing ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <RefreshCw className="h-3 w-3 shrink-0" />}
           <span className="truncate">{t("limits.query_action")}</span>
         </Button>
         {showActivation ? (
-          <Button type="button" size="sm" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-[10px]" aria-label={t(isActivating ? "limits.activating_action" : "limits.activate_action")} title={statusText} disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
+          <Button type="button" size="sm" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-xs" aria-label={t(isActivating ? "limits.activating_action" : "limits.activate_action")} title={statusText} disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
             {isActivating ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <Play className="h-3 w-3 shrink-0" />}
             <span className="truncate">{t(isActivating ? "limits.activating_action" : "limits.sidebar_activate")}</span>
           </Button>
         ) : null}
       </div>
-      {activationStatus || activationError ? <p role="status" className={cn("text-[10px] leading-normal", activationError ? "text-error" : "text-muted-foreground")}>{statusText}</p> : null}
+      {activationStatus || activationError ? <p role="status" className={cn("text-xs leading-normal", activationError ? "text-error-foreground" : "text-muted-foreground")}>{statusText}</p> : null}
     </div>
   );
 }
@@ -294,7 +294,7 @@ function ResetArea({
         </div>
       ) : (
         <div data-testid="reset-credits-skeleton" role="status" aria-label={t("limits.reset_credits")} className="space-y-3 border-t border-border/60 pt-2.5 content-md:border-l content-md:border-t-0 content-md:pl-3 content-md:pt-0">
-          <p className="text-[10px] font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>
+          <p className="text-xs font-semibold text-muted-foreground">{t("limits.reset_credits")}</p>
           <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
             <div className="h-4 w-16 rounded-full bg-muted" />
             <div className="h-3 w-full rounded bg-muted" />
@@ -348,18 +348,18 @@ function LimitRow({ label, window, now, compact }: LimitRowProps & { now: number
         <rect ref={outlineTrackRef} x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }} className="stroke-border" strokeWidth="1.5" />
         {window ? <rect data-quota-outline x="1" y="1" rx="11" style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)", strokeDashoffset: "var(--quota-start-offset)" }} pathLength="100" strokeDasharray={`${remaining} ${100 - remaining}`} className={cn("transition-[stroke-dasharray] duration-300", expired ? "stroke-muted-foreground" : outlineClass)} strokeWidth="1.5" /> : null}
       </svg>
-      <span data-quota-label className={cn("text-[9px] font-medium text-primary", compact ? "relative block leading-tight" : "absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 leading-none")}>{friendlyLabel}</span>
+      <span data-quota-label className={cn("text-xs font-medium text-primary", compact ? "relative block leading-tight" : "absolute -top-1 right-2 rounded-md border border-primary/20 bg-surface px-1.5 py-0.5 leading-none")}>{friendlyLabel}</span>
       <div className={cn("flex items-baseline gap-1.5", compact && "mt-1 justify-center")}>
         {!compact ? <span className="text-xs">{t("limits.remaining")}</span> : null}
         <span className={cn("text-xl font-bold tabular-nums tracking-tight", expired ? "text-muted-foreground" : "text-primary")}>{window ? `${Math.round(remaining)}%` : "—"}</span>
       </div>
-      {!compact ? <div className="quota-reset-row mt-1 flex items-center justify-between gap-1 whitespace-nowrap text-[11px] tabular-nums">
+      {!compact ? <div className="quota-reset-row mt-1 flex items-center justify-between gap-1 whitespace-nowrap text-xs tabular-nums">
         <span className="min-w-0 text-muted-foreground" title={reset ? t("limits.sidebar_reset_at", { time: dayjs(window!.resetsAt).format("YYYY-MM-DD HH:mm") }) : t("limits.no_window_returned")}>
           {reset ? <>{reset}<span className="quota-reset-word"> {t("limits.sidebar_reset")}</span></> : t("limits.reset_unavailable")}
         </span>
         {countdown !== null && !expired ? <span className="flex shrink-0 items-center gap-1 font-medium text-primary" title={t("limits.sidebar_countdown")}><Clock3 className="h-3 w-3" aria-hidden="true" /><span data-quota-countdown>{countdown}</span></span> : null}
       </div> : null}
-      {expired ? <p className="mt-1 break-words text-[9px] text-muted-foreground">{t("limits.window_expired")}</p> : null}
+      {expired ? <p className="mt-1 break-words text-xs text-muted-foreground">{t("limits.window_expired")}</p> : null}
     </div>
   );
 }
@@ -396,12 +396,12 @@ function ResetCreditsPanel({
         >
           <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover:text-foreground">
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="text-[10px] font-semibold">{t("limits.reset_credits")}</span>
+            <span className="text-xs font-semibold">{t("limits.reset_credits")}</span>
             <ExternalLink className="h-3 w-3 opacity-55 transition-opacity group-hover:opacity-90" aria-hidden="true" />
           </span>
           <span
             data-testid="reset-credit-count"
-            className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground transition-colors group-hover:text-foreground"
+            className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground transition-colors group-hover:text-foreground"
           >
             {t("limits.reset_credits_available", { count })}
           </span>
@@ -411,7 +411,7 @@ function ResetCreditsPanel({
         role="region"
         aria-label={t("limits.reset_credits")}
         tabIndex={0}
-        className="mt-2 max-h-40 overflow-y-auto overscroll-contain border-t border-border/40 text-[10px] leading-normal text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-2 max-h-40 overflow-y-auto overscroll-contain border-t border-border/40 text-xs leading-normal text-foreground/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {count === 0 ? (
           <p className="pt-2 text-muted-foreground">{t("limits.reset_credits_none")}</p>

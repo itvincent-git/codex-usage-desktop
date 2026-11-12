@@ -72,9 +72,19 @@ export function AppSidebar({ view, onViewChange, collapsed, onToggleCollapsed, w
         </button>
       </div>
       <nav id="app-navigation" aria-label={t("header.navigation")} className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        <div role="tablist" aria-orientation="vertical" aria-label={t("header.navigation")} className="space-y-1">
+        <div role="tablist" aria-orientation="vertical" aria-label={t("header.navigation")} className="space-y-1" onKeyDown={(event) => {
+          const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+          const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+          const nextIndex = event.key === "ArrowDown" ? (index + 1) % tabs.length
+            : event.key === "ArrowUp" ? (index - 1 + tabs.length) % tabs.length
+              : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+          if (nextIndex === null) return;
+          event.preventDefault();
+          tabs[nextIndex].focus();
+          tabs[nextIndex].click();
+        }}>
           {pages.filter((page) => page.view !== "logs" || showLogsTab).map(({ view: page, label, icon: Icon }, index) => (
-            <button key={page} type="button" role="tab" aria-selected={view === page} aria-label={t(`common.${label}`)} title={index < 6 ? `${t(`common.${label}`)} (${shortcutLabel(String(index + 1))})` : t(`common.${label}`)} aria-keyshortcuts={index < 6 ? shortcutAria(String(index + 1)) : undefined} data-testid={`${page}-nav-tab`} onClick={() => onViewChange(page)} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"} ${view === page ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+            <button key={page} id={`${page}-nav-tab`} type="button" role="tab" tabIndex={view === page ? 0 : -1} aria-controls={`page-${page}`} aria-selected={view === page} aria-label={t(`common.${label}`)} title={index < 6 ? `${t(`common.${label}`)} (${shortcutLabel(String(index + 1))})` : t(`common.${label}`)} aria-keyshortcuts={index < 6 ? shortcutAria(String(index + 1)) : undefined} data-testid={`${page}-nav-tab`} onClick={() => onViewChange(page)} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring ${collapsed ? "justify-center" : "text-left"} ${view === page ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {!collapsed ? <span className="truncate">{t(`common.${label}`)}</span> : null}
             </button>

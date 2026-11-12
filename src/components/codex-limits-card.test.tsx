@@ -651,7 +651,7 @@ describe("CodexLimitsCard component", () => {
     expect(screen.getByTestId("latest-reset-status")).toHaveClass("bg-success/10", "text-emerald-700");
     expect(screen.getByTestId("recent-reset-indicator")).toHaveClass("bg-success");
     expect(screen.getByTestId("latest-reset-relative-time")).toHaveClass("font-semibold", "text-emerald-700");
-    expect(screen.getByTestId("latest-reset-relative-time").parentElement?.querySelector("time")).toHaveClass("text-primary/80");
+    expect(screen.getByTestId("latest-reset-relative-time").parentElement?.querySelector("time")).toHaveClass("text-primary");
     expect(screen.getByTestId("latest-reset-type")).toHaveClass(resetType === "banked" ? "text-sky-700" : "text-orange-700");
 
     vi.useRealTimers();

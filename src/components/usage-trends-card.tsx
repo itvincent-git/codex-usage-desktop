@@ -1,6 +1,7 @@
 import { Bar, CartesianGrid, ComposedChart, Line, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Maximize2, Minimize2 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { OverviewResponse } from "@/lib/api";
@@ -53,7 +54,7 @@ export const UsageTrendTooltip = ({ active, payload, label, t, compact = false, 
 
     return (
       <div className={cn("select-none rounded-lg border border-border/70 bg-surface shadow-xl", compact ? "min-w-36 p-2" : "min-w-[220px] p-3.5")}>
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           {compact ? label : day?.date ?? label}
         </p>
         <div className="space-y-1.5 text-xs">
@@ -101,7 +102,7 @@ export const UsageTrendTooltip = ({ active, payload, label, t, compact = false, 
                 </div>
               );
             })}
-            <p className="max-w-64 text-[10px] leading-relaxed text-muted-foreground">{t("trends.quota_note")}</p>
+            <p className="max-w-64 text-xs leading-relaxed text-muted-foreground">{t("trends.quota_note")}</p>
           </div> : <div className="mt-1.5 flex items-center justify-between gap-4 border-t border-border/60 pt-1.5 font-semibold text-primary">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-primary" />
@@ -121,6 +122,13 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   const { t } = useTranslation();
   const gradientId = useId().replace(/:/g, "");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const expandButtonRef = useRef<HTMLButtonElement>(null);
+  const exitButtonRef = useRef<HTMLButtonElement>(null);
+  useModalFocus(dialogRef, exitButtonRef, () => setIsFullscreen(false), isFullscreen, {
+    isolateBackground: true,
+    restoreFocusRef: expandButtonRef,
+  });
   const [view, setView] = useState<TrendView>("cost");
   const isQuotaView = !compact && view === "quota";
   const [hiddenSeries, setHiddenSeries] = useState<Set<ChartSeriesKey>>(() => new Set());
@@ -157,16 +165,10 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
     if (!isFullscreen) return;
 
     const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsFullscreen(false);
-    };
-
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isFullscreen]);
 
@@ -179,7 +181,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
         isFullscreen && "w-full border-border bg-surface hover:translate-y-0 hover:shadow-none",
       )}
     >
-      {compact ? <div className="flex items-center gap-3 px-1 text-[10px] text-muted-foreground"><span className="sr-only">{title}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-success/80" />{t("trends.total_tokens")}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-primary" />{t("common.cost")}</span></div> : <CardHeader className="flex shrink-0 flex-row items-center justify-end border-b border-border/80 p-2 sm:px-3 sm:py-1.5">
+      {compact ? <div className="flex items-center gap-3 px-1 text-xs text-muted-foreground"><span className="sr-only">{title}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-success/80" />{t("trends.total_tokens")}</span><span className="inline-flex items-center gap-1"><i className="h-1.5 w-1.5 rounded-full bg-primary" />{t("common.cost")}</span></div> : <CardHeader className="flex shrink-0 flex-row flex-wrap items-center justify-end gap-y-2 space-y-0 border-b border-border/80 p-2 sm:px-3 sm:py-1.5">
         {title ? <span className="mr-auto text-xs font-semibold text-foreground">{title}</span> : null}
         <span className="sr-only">{t("trends.total_token_trend", { defaultValue: "Total Token Trend" })}</span>
         <div role="group" aria-label={t("trends.view_label")} className="mr-3 inline-flex shrink-0 rounded-md border border-border/70 p-0.5">
@@ -189,7 +191,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
               type="button"
               aria-pressed={view === mode}
               className={cn(
-                "rounded-sm px-2 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                "min-h-8 rounded-sm px-2 py-1 text-xs font-semibold transition-colors",
                 view === mode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setView(mode)}
@@ -199,14 +201,14 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
           ))}
         </div>
         <span className="sr-only">{t(isQuotaView ? "trends.quota_trend" : "trends.cost_trend")}</span>
-        <div role="group" aria-label={t("trends.legend_label")} className="flex flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div role="group" aria-label={t("trends.legend_label")} className="flex flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs font-semibold text-muted-foreground">
           {chartLegend.filter((item) => !isQuotaView || item.dataKey !== "costUSD").map((item) => (
             <button
               key={item.dataKey}
               type="button"
               aria-pressed={!hiddenSeries.has(item.dataKey)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-sm transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                "inline-flex min-h-8 items-center gap-1.5 rounded-sm px-1 transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
                 hiddenSeries.has(item.dataKey) && "opacity-35",
               )}
               onClick={() => toggleSeries(item.dataKey)}
@@ -221,7 +223,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
               type="button"
               aria-pressed={!hiddenSeries.has(item.dataKey)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-sm transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
+                "inline-flex min-h-8 items-center gap-1.5 rounded-sm px-1 transition-opacity focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15",
                 hiddenSeries.has(item.dataKey) && "opacity-35",
               )}
               onClick={() => toggleSeries(item.dataKey)}
@@ -232,6 +234,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
           )) : null}
         </div>
         <button
+          ref={isFullscreen ? exitButtonRef : expandButtonRef}
           type="button"
           className="ml-2 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
           aria-label={t(isFullscreen ? "trends.exit_fullscreen" : "trends.enter_fullscreen")}
@@ -266,7 +269,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 minTickGap={12}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--muted-foreground) / 0.72)", fontSize: compact ? 9 : 11 }}
+                tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
               />
               <YAxis
                 yAxisId="tokens"
@@ -274,7 +277,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 width={tokenAxisWidth}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "rgb(var(--muted-foreground) / 0.7)", fontSize: 11 }}
+                tick={{ fill: "rgb(var(--muted-foreground))", fontSize: 12 }}
                 tickFormatter={(value) => formatCompactNumber(Number(value))}
               />
               <YAxis
@@ -286,7 +289,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
                 allowDecimals={!isQuotaView}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: isQuotaView ? "rgb(var(--muted-foreground) / 0.7)" : "rgb(var(--primary) / 0.78)", fontSize: 11 }}
+                tick={{ fill: isQuotaView ? "rgb(var(--muted-foreground))" : "rgb(var(--primary))", fontSize: 12 }}
                 tickFormatter={(value) => isQuotaView ? `${formatNumber(Number(value))}%` : formatCurrencyShort(Number(value))}
               />
               <Tooltip
@@ -392,6 +395,7 @@ export function UsageTrendsCard({ daily, metrics, cacheHitRate, chartHeight = 30
   return isFullscreen
     ? createPortal(
         <div
+          ref={dialogRef}
           className="absolute inset-0 z-[100] flex bg-background p-3 sm:p-5"
           role="dialog"
           aria-label={title ?? t("trends.title")}
@@ -421,7 +425,7 @@ function SummaryCell({
         <div className="space-y-0.5 flex-1 min-w-[5rem]">
           <div className="flex items-center gap-2">
             <span className={cn("h-2 w-2 shrink-0 rounded-full", style.dot)} />
-            <p className="min-w-0 break-words text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground leading-none">
+            <p className="min-w-0 break-words text-xs uppercase font-bold text-muted-foreground leading-none">
               {metric.label}
             </p>
           </div>
@@ -429,7 +433,7 @@ function SummaryCell({
             <p className="break-words text-base sm:text-lg font-extrabold tracking-tight text-foreground leading-tight" title={metric.value}>
               {metric.value}
             </p>
-            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{metric.detail}</p>
+            <p className="mt-0.5 text-xs leading-tight text-muted-foreground">{metric.detail}</p>
           </div>
         </div>
         {metric.kind === "cache" ? <CacheRing value={cacheHitRate} /> : null}

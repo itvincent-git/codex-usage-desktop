@@ -59,7 +59,7 @@ const ITEM_TITLE_TONES = {
   reasoning: "text-amber-700 dark:text-amber-300",
   tool: "text-cyan-700 dark:text-cyan-300",
   patch: "text-green-700 dark:text-green-300",
-  error: "text-error",
+  error: "text-error-foreground",
   notice: "text-sky-700 dark:text-sky-300",
 } as const;
 
@@ -605,11 +605,11 @@ function ExecResultItem({ output, index }: { output: ExecOutput; index: number }
   const failed = output.rejected || (output.exitCode !== null && output.exitCode !== 0);
   return <div className={`rounded-md border p-2 ${failed ? ITEM_TONES.error : "border-border/50"}`}>
     <button type="button" className={`flex w-full items-center justify-between text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-      <span className={failed ? "font-semibold text-error" : "font-semibold"}>{t("sessions.detail.output")} #{index + 1}</span>
+      <span className={failed ? "font-semibold text-error-foreground" : "font-semibold"}>{t("sessions.detail.output")} #{index + 1}</span>
       {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
     </button>
-    {output.stdout ? <ActivityOutput text={cleanExecOutput(output.stdout)} expanded={expanded} tone={failed ? "text-error" : "text-muted-foreground"} /> : null}
-    {output.stderr ? <ActivityOutput field="stderr" text={output.stderr} expanded={expanded} tone="text-error" /> : null}
+    {output.stdout ? <ActivityOutput text={cleanExecOutput(output.stdout)} expanded={expanded} tone={failed ? "text-error-foreground" : "text-muted-foreground"} /> : null}
+    {output.stderr ? <ActivityOutput field="stderr" text={output.stderr} expanded={expanded} tone="text-error-foreground" /> : null}
   </div>;
 }
 
@@ -661,11 +661,11 @@ function NestedActivityItem({ activity }: { activity: NestedActivity }) {
   return <div className="py-1.5">
     <SearchSourceField field="working_directory" text={activity.workdir} />
     <button type="button" className={`flex w-full min-w-0 items-start justify-between gap-3 text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-      <span className="flex min-w-0 gap-1.5"><span className={failed ? "shrink-0 text-error" : "shrink-0 text-muted-foreground"}>•</span><span className="min-w-0 whitespace-pre-wrap break-words"><span className="font-semibold">{t(activity.status === "running" ? "sessions.detail.activity_running" : "sessions.detail.activity_ran")}</span> {expanded ? <SessionSearchText text={activity.command} field="command" /> : buildCollapsedPreview(activity.command, 1)}</span></span>
+      <span className="flex min-w-0 gap-1.5"><span className={failed ? "shrink-0 text-error-foreground" : "shrink-0 text-muted-foreground"}>•</span><span className="min-w-0 whitespace-pre-wrap break-words"><span className="font-semibold">{t(activity.status === "running" ? "sessions.detail.activity_running" : "sessions.detail.activity_ran")}</span> {expanded ? <SessionSearchText text={activity.command} field="command" /> : buildCollapsedPreview(activity.command, 1)}</span></span>
       <span className="flex shrink-0 items-center gap-2 text-muted-foreground">{expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
     </button>
-    {stdout ? <ActivityOutput text={stdout} expanded={expanded} tone={failed ? "text-error" : "text-muted-foreground"} /> : null}
-    {activity.output?.stderr ? <ActivityOutput field="stderr" text={activity.output.stderr} expanded={expanded} tone="text-error" /> : null}
+    {stdout ? <ActivityOutput text={stdout} expanded={expanded} tone={failed ? "text-error-foreground" : "text-muted-foreground"} /> : null}
+    {activity.output?.stderr ? <ActivityOutput field="stderr" text={activity.output.stderr} expanded={expanded} tone="text-error-foreground" /> : null}
   </div>;
 }
 
@@ -822,7 +822,7 @@ function BackgroundTerminalItem({ input, output, result, tokenUsage, rawJsonl }:
   const waitedOnly = input.length === 0;
   const failed = result?.rejected || (result?.exitCode != null && result.exitCode !== 0);
   const running = !failed && result?.exitCode == null && result?.sessionId != null;
-  const statusTone = failed ? "text-error" : result?.exitCode === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground";
+  const statusTone = failed ? "text-error-foreground" : result?.exitCode === 0 ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground";
 
   return (
     <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${failed ? ITEM_TONES.error : ITEM_TONES.tool}`}>
@@ -846,7 +846,7 @@ function BackgroundTerminalItem({ input, output, result, tokenUsage, rawJsonl }:
         </span>
       </button>
       {!waitedOnly ? <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border/60 pl-4 text-muted-foreground">└ <SessionSearchText text={input} field="command" /></pre> : null}
-      {isExpanded && output ? <ActivityOutput text={output} expanded tone={failed ? "text-error" : "text-muted-foreground"} /> : null}
+      {isExpanded && output ? <ActivityOutput text={output} expanded tone={failed ? "text-error-foreground" : "text-muted-foreground"} /> : null}
       <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>
   );
@@ -948,7 +948,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
         {unparsedOutputText ? <ActivityOutput text={unparsedOutputText} expanded={isExpanded} tone="text-muted-foreground" /> : null}
-        {stderrText ? <ActivityOutput field="stderr" text={stderrText} expanded={isExpanded} tone="text-error" /> : null}
+        {stderrText ? <ActivityOutput field="stderr" text={stderrText} expanded={isExpanded} tone="text-error-foreground" /> : null}
       </div> : null}
       <RawJsonlDisclosure rawJsonl={rawJsonl} />
     </div>;
@@ -965,13 +965,13 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
           : "success";
     const signal = processSignal(item.output);
     const statusTone = activityStatus === "failed"
-      ? "text-error"
+      ? "text-error-foreground"
       : activityStatus === "success"
         ? "text-emerald-700 dark:text-emerald-300"
         : activityStatus === "stopped"
           ? "text-amber-700 dark:text-amber-300"
           : "text-foreground";
-    const outputTone = activityStatus === "failed" ? "text-error" : "text-muted-foreground";
+    const outputTone = activityStatus === "failed" ? "text-error-foreground" : "text-muted-foreground";
     return (
       <div className={`rounded-lg border p-3 font-mono text-xs leading-relaxed ${activityStatus === "failed" ? ITEM_TONES.error : ITEM_TONES.tool}`}>
         <button
@@ -1003,7 +1003,7 @@ function ToolCallItem({ item, activity, tokenUsage, rawJsonl }: { activity: Tool
         <SearchSourceField field="working_directory" text={execArguments.workdir} />
         {commandOutput ? <ActivityOutput text={commandOutput} expanded={isExpanded} tone={outputTone} /> : null}
         {stderrText ? (
-          <ActivityOutput field="stderr" text={stderrText} expanded={isExpanded} tone="text-error" />
+          <ActivityOutput field="stderr" text={stderrText} expanded={isExpanded} tone="text-error-foreground" />
         ) : null}
         <RawJsonlDisclosure rawJsonl={rawJsonl} />
       </div>
@@ -1620,9 +1620,9 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
           }}
         >
           <div className="px-4 py-5">
-          {refreshError ? <p role="alert" className="mb-3 rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error">{t("sessions.detail.refresh_error")}: {refreshError}</p> : null}
+          {refreshError ? <p role="alert" className="mb-3 rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error-foreground">{t("sessions.detail.refresh_error")}: {refreshError}</p> : null}
           {error ? (
-            <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
+            <div className="flex items-start gap-3 rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error-foreground">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>

@@ -346,7 +346,7 @@ it("renders structured parallel responses under their commands with stable ident
   expect(first.parentElement?.textContent).not.toContain("second response");
   expect(second.parentElement?.textContent).toContain("second response");
   expect(second.parentElement?.textContent).toContain("second error");
-  expect(second.querySelector(".text-error")).toBeInTheDocument();
+  expect(second.querySelector(".text-error-foreground")).toBeInTheDocument();
   expect(third.parentElement?.textContent).toContain("third command finished");
   expect(screen.queryByRole("button", { name: /^Output #/ })).not.toBeInTheDocument();
   await userEvent.click(first);

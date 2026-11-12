@@ -71,8 +71,8 @@ export function LogPanel({ isActive }: LogPanelProps) {
 
   function getLevelColor(level: LogLevel) {
     switch (level) {
-      case LogLevel.Error: return "text-error";
-      case LogLevel.Warn: return "text-warning";
+      case LogLevel.Error: return "text-error-foreground";
+      case LogLevel.Warn: return "text-warning-foreground";
       case LogLevel.Info: return "text-primary";
       case LogLevel.Debug: return "text-muted-foreground";
       case LogLevel.Trace: return "text-muted-foreground opacity-50";

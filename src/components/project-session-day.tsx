@@ -59,7 +59,7 @@ export function ProjectSessionDayView({ day, project, range, query, initiallyExp
       </span>
     </button>
     <div id={`project-day-${day.date}`} hidden={!expanded}>
-      {error ? <div role="alert" className="p-4 text-sm text-error">{error}<Button variant="secondary" size="sm" className="ml-3" onClick={() => {
+      {error ? <div role="alert" className="p-4 text-sm text-error-foreground">{error}<Button variant="secondary" size="sm" className="ml-3" onClick={() => {
         request.current = null;
         setError(null);
         setRetry((value) => value + 1);

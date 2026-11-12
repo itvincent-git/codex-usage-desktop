@@ -11,7 +11,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { RangeKey } from "@/lib/api";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { createPortal } from "react-dom";
 import { getRangeLabel } from "@/lib/usage-dashboard";
 import dayjs from "dayjs";
@@ -45,20 +46,11 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!isModalOpen) return;
-    closeButtonRef.current?.focus();
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
-      event.preventDefault();
-      setIsModalOpen(false);
-    }
-    window.addEventListener("keydown", handleEscape);
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-      triggerRef.current?.focus();
-    };
-  }, [isModalOpen]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus(dialogRef, closeButtonRef, () => setIsModalOpen(false), isModalOpen, {
+    isolateBackground: true,
+    restoreFocusRef: triggerRef,
+  });
   const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
     if (value.startsWith("custom:")) {
       const [start, end] = value.slice("custom:".length).split("_");
@@ -152,8 +144,8 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
             onClick={() => setIsModalOpen(false)}
           >
             <div
+              ref={dialogRef}
               role="dialog"
-              aria-modal="true"
               aria-label={t("range_switcher.modal_title")}
               className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
@@ -203,7 +195,7 @@ export function RangeSwitcher({ value, onChange }: RangeSwitcherProps) {
               </div>
 
               {error && (
-                <p className="text-xs text-error font-medium text-center">{error}</p>
+                <p role="alert" className="text-xs text-error-foreground font-medium text-center">{error}</p>
               )}
 
               <div className="flex gap-2 pt-2">

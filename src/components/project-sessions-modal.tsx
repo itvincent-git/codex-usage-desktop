@@ -229,9 +229,9 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
       </> : null}
     </header>
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]" data-testid="project-modal-scroll">
-      {refreshError ? <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error">{t("project_modal.refresh_error")}: {refreshError}</p> : null}
+      {refreshError ? <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error-foreground">{t("project_modal.refresh_error")}: {refreshError}</p> : null}
       {analyticsLoading ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">{t("project_modal.analytics_loading")}</div>
-        : analyticsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{t("project_modal.analytics_error")}: {analyticsError}</div>
+        : analyticsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error-foreground">{t("project_modal.analytics_error")}: {analyticsError}</div>
           : analytics ? (
           <Card className="overflow-hidden" data-testid="project-daily-trend">
             <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border/80">
@@ -273,12 +273,12 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
           </div>
         </div>
         {sessionsLoading ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">{t("loading.loading_sessions")}</div>
-          : sessionsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error">{sessionsError}</div>
+          : sessionsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error-foreground">{sessionsError}</div>
             : !sessionDays?.days.length ? <div className="rounded-xl border border-dashed border-border p-8 text-center"><Terminal className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 text-sm font-medium">{searchQuery ? t("project_modal.no_matching_sessions") : t("project_modal.no_sessions")}</p></div>
               : <div key={JSON.stringify([project.project, range, query])} className="space-y-3">
                 {sessionDays.days.map((day, index) => <ProjectSessionDayView key={day.date} day={day} project={project.project} range={sessionRange} query={query} initiallyExpanded={index === 0} showSessionCredits={showSessionCredits} creditsActive={isActive} revision={dayRevision} onSessionClick={onSessionClick} />)}
               </div>}
-        {moreError ? <p role="alert" className="text-sm text-error">{moreError}</p> : null}
+        {moreError ? <p role="alert" className="text-sm text-error-foreground">{moreError}</p> : null}
         {sessionDays ? <div className="flex justify-center py-3"><Button variant="secondary" onClick={() => void loadMoreDays()} disabled={loadingMore || analyticsLoading || refreshing}>{loadingMore ? t("common.loading") : t("project_modal.load_more_days")}</Button></div> : null}
       </section>
     </div>

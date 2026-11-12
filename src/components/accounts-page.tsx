@@ -190,10 +190,10 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         <Button size="sm" disabled={!!busy} onClick={openAddAccount}><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.add")}</Button>
       </div> : null}
     </div>
-    {list?.switchError ? <p role="status" className="text-sm text-warning">{message(list.switchError)}</p> : null}
-    {list?.recoveryConflict ? <p role="status" className="text-sm text-warning">{t("accounts.recovery_conflict")}</p> : null}
-    {!showAddAccount && error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
-    {!showAddAccount && notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
+    {list?.switchError ? <p role="status" className="text-sm text-warning-foreground">{message(list.switchError)}</p> : null}
+    {list?.recoveryConflict ? <p role="status" className="text-sm text-warning-foreground">{t("accounts.recovery_conflict")}</p> : null}
+    {!showAddAccount && error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
+    {!showAddAccount && notice ? <p role="status" className="text-sm text-success-foreground">{notice}</p> : null}
     {!showAddAccount && loginRunning ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
       <span>{t("accounts.login_running")}</span><Button ref={continueLoginButton} size="sm" variant="secondary" onClick={() => setShowAddAccount(true)}>{t("accounts.continue_login")}</Button>
     </div> : null}
@@ -206,8 +206,8 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         </div>
       </div> : null}
       {busy === "login" ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t("accounts.login_starting")}</p> : null}
-      {error ? <p role="alert" className="text-sm text-error">{message(error)}</p> : null}
-      {notice ? <p role="status" className="text-sm text-success">{notice}</p> : null}
+      {error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
+      {notice ? <p role="status" className="text-sm text-success-foreground">{notice}</p> : null}
       {task ? <div aria-live="polite">
         <div className="accounts-login">
           <div className="accounts-login-body">
@@ -224,9 +224,9 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
                   {t(codeCopyState === "copied" ? "accounts.device_code_copied" : "accounts.copy_device_code")}
                 </Button>
               </div>
-              {codeCopyState === "failed" ? <p role="alert" className="mt-2 text-xs text-error">{t("accounts.device_code_copy_failed")}</p> : null}
+              {codeCopyState === "failed" ? <p role="alert" className="mt-2 text-xs text-error-foreground">{t("accounts.device_code_copy_failed")}</p> : null}
             </> : null}
-            {task.error ? <p role="alert" className="mt-2 text-sm text-error">{message(task.error)}</p> : null}
+            {task.error ? <p role="alert" className="mt-2 text-sm text-error-foreground">{message(task.error)}</p> : null}
           </div>
           {loginRunning ? <div className="accounts-login-actions">
             {task.authorizationUrl ? <>
@@ -237,7 +237,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
               </Button>
             </> : null}
             <Button size="sm" variant="ghost" className="accounts-login-cancel" disabled={!!busy} onClick={() => void run("cancel", async () => { await cancelCodexAccountLogin(task.id); setTask(await getCodexAccountLogin(task.id)); })}>{t("accounts.cancel")}</Button>
-            {urlCopyState === "failed" ? <p role="alert" className="w-full text-xs text-error">{t("accounts.authorization_url_copy_failed")}</p> : null}
+            {urlCopyState === "failed" ? <p role="alert" className="w-full text-xs text-error-foreground">{t("accounts.authorization_url_copy_failed")}</p> : null}
           </div> : null}
         </div>
         {loginRunning ? <>
@@ -346,7 +346,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
                 {data ? <p>{t("accounts.data_source")} · {data.source}</p> : null}
                 {data?.subscriptionExpiresAt ? <p>{t("accounts.expires")} · {new Date(data.subscriptionExpiresAt).toLocaleString(locale)}</p> : null}
                 {sharedUpdateTime ? <p>{t("accounts.data_updated")} · {sharedUpdateTime}</p> : partUpdates.map(({ part, time }) => <p key={part}>{t(`accounts.updated_${part}`)} · {time}</p>)}
-                {Object.entries(status?.errors ?? {}).map(([part, code]) => <p key={part} className="text-error">{t(`accounts.part_${part}`)}: {message(code)}</p>)}
+                {Object.entries(status?.errors ?? {}).map(([part, code]) => <p key={part} className="text-error-foreground">{t(`accounts.part_${part}`)}: {message(code)}</p>)}
               </div>
             </details>
             <div className="account-actions">
@@ -356,7 +356,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
                 <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.more")} title={t("accounts.more")}><Ellipsis className="h-3.5 w-3.5" aria-hidden="true" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {status?.needsLogin ? <DropdownMenuItem disabled={switchDisabled} onSelect={switchAccount}>{t("accounts.switch")}</DropdownMenuItem> : <DropdownMenuItem disabled={!!busy || loginRunning} onSelect={() => void login(false, account.id)}>{t("accounts.relogin")}</DropdownMenuItem>}
-                  <DropdownMenuItem className="text-error" disabled={!!busy} onSelect={() => setPendingRemoval(account)}>{t("accounts.remove")}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-error-foreground" disabled={!!busy} onSelect={() => setPendingRemoval(account)}>{t("accounts.remove")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

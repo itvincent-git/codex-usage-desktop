@@ -1,4 +1,4 @@
-import { $, browser, expect } from "@wdio/globals";
+import { $, $$, browser, expect } from "@wdio/globals";
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -95,6 +95,12 @@ describe("page layouts beside the sidebar", () => {
           await $('button[aria-label="Close project details"]').click();
         }
         if (page === "logs") {
+          await browser.tauri.execute(({ core }) => core.invoke("plugin:log|log", {
+            level: 3,
+            message: "Sidebar layout log fixture",
+            location: "e2e/sidebar-layout.spec.ts",
+          }));
+          await browser.waitUntil(async () => await $$("[data-app-content] .font-mono > div > span:first-child").length > 0);
           const times = await browser.execute(() => Array.from(document.querySelectorAll("[data-app-content] .font-mono > div > span:first-child"))
             .map((element) => element.textContent));
           expect(times.length).toBeGreaterThan(0);
@@ -104,9 +110,14 @@ describe("page layouts beside the sidebar", () => {
           const element = document.querySelector("[data-app-content] table")?.parentElement;
           if (!element) return null;
           element.scrollLeft = element.scrollWidth;
-          return element.scrollLeft;
+          const lastCell = element.querySelector("thead th:last-child")!;
+          return {
+            left: element.scrollLeft,
+            lastColumnVisible: lastCell.getBoundingClientRect().right <= element.getBoundingClientRect().right + 1,
+          };
         });
-        if (["models", "daily", "monthly", "projects"].includes(page)) expect(tableScroll).toBeGreaterThan(0);
+        if (tableScroll) expect(tableScroll.lastColumnVisible).toBe(true);
+        if (["daily", "monthly"].includes(page)) expect(tableScroll?.left).toBe(0);
         await browser.execute(() => { document.querySelector("[data-app-content]")!.firstElementChild!.scrollTop = 0; });
         await browser.saveScreenshot(`/tmp/codex-layout-${page}.png`);
         if (page === "dashboard") {
@@ -167,6 +178,16 @@ describe("page layouts beside the sidebar", () => {
               .filter((card) => Array.from(card.children).some((element) => element.getBoundingClientRect().right > card.getBoundingClientRect().right));
             return { overflow: scroller.scrollWidth > scroller.clientWidth, clippedCards: clippedCards.length };
           });
+          if (layout.overflow) {
+            await browser.saveScreenshot("/tmp/codex-layout-overflow.png");
+            const overflowing = await browser.execute(() => {
+              const content = document.querySelector("[data-app-content]")!;
+              return Array.from(content.querySelectorAll("*"))
+                .filter(element => element.getBoundingClientRect().right > content.getBoundingClientRect().right + 1)
+                .slice(0, 8).map(element => ({ tag: element.tagName, className: element.getAttribute("class"), text: element.textContent?.slice(0, 80) }));
+            });
+            throw new Error(JSON.stringify({ scenario, page, overflowing }));
+          }
           expect({ scenario, page, ...layout }).toEqual({ scenario, page, overflow: false, clippedCards: 0 });
           await browser.saveScreenshot(`/tmp/codex-layout-${scenario.language}-${scenario.width}-${scenario.collapsed ? "collapsed" : "expanded"}-${page}.png`);
         }

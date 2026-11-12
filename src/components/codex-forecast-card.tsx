@@ -77,7 +77,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
             {t(error && !data ? "forecast.retry" : "forecast.refresh")}
           </Button>
         </div>
-        {error ? <p role="alert" className="text-xs text-warning">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
+        {error ? <p role="alert" className="text-xs text-warning-foreground">{t(data ? "forecast.refresh_failed" : "forecast.load_failed")}</p> : null}
         {!data && isRefreshing ? (
           <div data-testid="forecast-skeleton" role="status" aria-label={t("forecast.loading")}>
             <div aria-hidden="true" className="grid min-w-0 gap-4 motion-safe:animate-pulse lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
@@ -104,7 +104,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
             <div data-testid="forecast-announcement" className={cn("min-w-0 space-y-3 rounded-xl border p-4 text-xs leading-relaxed", stale ? "border-border bg-muted/20" : pending && watch ? "border-success/30 bg-success/5" : promised ? "border-primary/25 bg-primary/5" : "border-warning/30 bg-warning/5")}>
               <p className="text-muted-foreground">{t("forecast.status_label")}</p>
-              <p data-testid="forecast-status" role="status" className={cn("flex items-start gap-2 text-base font-semibold", stale ? "text-muted-foreground" : pending && watch ? "text-success" : promised ? "text-primary" : "text-amber-700 dark:text-amber-400")}>
+              <p data-testid="forecast-status" role="status" className={cn("flex items-start gap-2 text-base font-semibold", stale ? "text-muted-foreground" : pending && watch ? "text-success-foreground" : promised ? "text-primary" : "text-amber-700 dark:text-amber-400")}>
                 <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", stale ? "bg-muted-foreground" : pending && watch ? "bg-success" : promised ? "bg-primary" : "bg-warning")} aria-hidden="true" />
                 {t(`forecast.status_${status}`)}
               </p>
@@ -123,7 +123,7 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
               {data.recentPosts == null ? <p className="text-muted-foreground">{t("forecast.feed_unavailable")}</p>
                 : data.recentPosts.length === 0 ? <p className="text-muted-foreground">{t("forecast.feed_empty")}</p>
                 : <>
-                  {evidenceStale || error ? <p role="status" className="text-warning">{t("forecast.feed_stale")}</p> : null}
+                  {evidenceStale || error ? <p role="status" className="text-warning-foreground">{t("forecast.feed_stale")}</p> : null}
                   <ul className="divide-y divide-border/60">
                     {data.recentPosts.map((post) => <li key={post.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-2 py-2.5 leading-5 first:rounded-md first:bg-primary/5">
                       <time dateTime={post.at} title={formatDate(post.at)} className="whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">{formatDate(post.at, feedDate ? { hour: "2-digit", minute: "2-digit", hour12: false } : compactDate)}</time>
@@ -142,8 +142,8 @@ export function CodexForecastCard({ data, error, isRefreshing, onRefresh, resets
               <div><dt className="text-muted-foreground">{t("forecast.source")}</dt><dd className="mt-1"><ExternalLink href={alert!.url!}>@thsottiaux ↗</ExternalLink></dd></div>
             </dl>
             {!pending && alert?.window ? <p className="text-muted-foreground">{t("forecast.original_window", { label: alert.window.label ?? t("forecast.unknown"), zone: alert.window.timeZone ?? t("forecast.unknown") })}</p> : null}
-            {evidenceStale ? <p role="status" className="text-warning">{t("forecast.evidence_stale")}</p> : null}
-            {contextMissing ? <p className="text-warning">{t(posts == null ? "forecast.evidence_unavailable" : "forecast.context_missing")}</p> : null}
+            {evidenceStale ? <p role="status" className="text-warning-foreground">{t("forecast.evidence_stale")}</p> : null}
+            {contextMissing ? <p className="text-warning-foreground">{t(posts == null ? "forecast.evidence_unavailable" : "forecast.context_missing")}</p> : null}
             {original ? <ul className="space-y-2">
               {posts!.map((post) => <li key={post.id} className="space-y-1.5 rounded-md border border-border/60 p-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">

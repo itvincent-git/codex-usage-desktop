@@ -75,33 +75,32 @@ export function DashboardHeader({
               type="button"
               onClick={onUpgrade}
               disabled={isInstallingUpdate}
-              className="relative z-20 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/30 transition-all duration-200 animate-pulse hover:animate-none active:scale-95 cursor-pointer mb-2"
+              className="relative z-20 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-0.5 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/30 transition-all duration-200 hover:animate-none active:scale-95 cursor-pointer mb-2"
               title={t("header.upgrade_title")}
             >
-              <Sparkles className="h-3 w-3 animate-pulse" />
+              <Sparkles className="h-3 w-3" />
               {headerUpgradeLabel}
             </button>
           )}
         </div>
 
-        <div className="pb-2 shrink-0 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3 pb-2">
           {overview && (
-            <div className="hidden sm:flex flex-col items-end text-right leading-tight select-none">
-              <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+            <div className="hidden min-w-0 flex-col items-end text-right leading-tight select-none sm:flex">
+              <div className="flex w-full min-w-0 items-center justify-end gap-1.5 text-xs font-medium text-foreground">
                 <span className="relative flex h-1.5 w-1.5 shrink-0">
-                  <span className={`absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75 ${isSynced ? "" : "hidden"}`}></span>
                   <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isSynced ? "bg-success" : "bg-warning"}`}></span>
                 </span>
                 <span className="truncate max-w-[280px]">{isSynced ? t("hero.cache_synced", { defaultValue: "Cache Synced" }) : t("hero.out_of_sync", { defaultValue: "Out of Sync" })}</span>
                 <span className="text-muted-foreground/30">·</span>
                 <span className="text-muted-foreground font-normal truncate max-w-[280px]">{scanMessage}</span>
               </div>
-              <div className="text-[10px] text-muted-foreground/75 mt-0.5">
+              <div className="mt-0.5 max-w-full text-xs text-muted-foreground">
                 {updatedLabel}
               </div>
             </div>
           )}
-          <Button variant="primary" size="sm" className="relative z-20" title={`${t("hero.rescan")} (${shortcutLabel("R")})`} aria-keyshortcuts={shortcutAria("R")} onClick={onRefresh} disabled={isBusy}>
+          <Button variant="primary" size="sm" className="relative z-20 shrink-0" title={`${t("hero.rescan")} (${shortcutLabel("R")})`} aria-keyshortcuts={shortcutAria("R")} onClick={onRefresh} disabled={isBusy}>
             <RefreshCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
             {t("hero.rescan", { defaultValue: "Rescan local logs" })}
           </Button>
