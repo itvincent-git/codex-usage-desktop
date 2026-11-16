@@ -953,6 +953,8 @@
     "quota_not_applicable": "These credentials use an API key rather than a ChatGPT subscription. ChatGPT quota is unavailable for this authentication mode. Local token and cost statistics are still available."
   },
   "accounts": {
+    "chatgpt_account": "ChatGPT account",
+    "api_intro": "Use an API Key from OpenAI or an OpenAI-compatible provider.",
     "api_add": "Add API Key",
     "api_name": "Name",
     "api_save": "Save API Key",
@@ -966,7 +968,7 @@
     "continue_login": "Continue sign-in",
     "login_close_hint": "Closing this dialog keeps sign-in running. Return with “Continue sign-in”, or choose “Cancel login” to stop it.",
     "login_starting": "Starting sign-in…",
-    "login_intro": "Sign in with your browser to save an account and view its quotas.",
+    "login_intro": "Sign in with your browser or a device code to view your plan quotas.",
     "importing": "Adding account…",
     "empty_first": "Add your first Codex account",
     "personal_workspace": "Personal workspace",

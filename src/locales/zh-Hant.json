@@ -959,6 +959,8 @@
     "quota_not_applicable": "目前憑證使用 API Key，此驗證方式無法查詢 ChatGPT 訂閱額度。本機 Token 及費用統計仍可使用。"
   },
   "accounts": {
+    "chatgpt_account": "ChatGPT 帳號",
+    "api_intro": "使用 OpenAI 或第三方相容介面的 API Key。",
     "api_add": "新增 API Key",
     "api_name": "名稱",
     "api_save": "儲存 API Key",
@@ -972,7 +974,7 @@
     "continue_login": "繼續登入",
     "login_close_hint": "關閉彈窗後，登入仍會繼續。可點擊「繼續登入」返回，或選擇「取消登入」終止。",
     "login_starting": "正在啟動登入…",
-    "login_intro": "在瀏覽器中登入，即可儲存帳號並查看額度。",
+    "login_intro": "透過瀏覽器或裝置碼登入，查看方案額度。",
     "importing": "正在新增帳號…",
     "empty_first": "新增第一個 Codex 帳號",
     "personal_workspace": "個人工作區",

@@ -989,6 +989,8 @@
     "quota_not_applicable": "現在の認証情報は API キーを使用しています。この方式では ChatGPT の利用枠を取得できません。ローカルのトークンと費用の統計は利用できます。"
   },
   "accounts": {
+    "chatgpt_account": "ChatGPT アカウント",
+    "api_intro": "OpenAI または OpenAI 互換プロバイダーの API Key を使用します。",
     "api_add": "API Key を追加",
     "api_name": "名前",
     "api_save": "API Key を保存",
@@ -1002,7 +1004,7 @@
     "continue_login": "ログインを続行",
     "login_close_hint": "閉じてもログインは続行されます。「ログインを続行」で戻るか、「ログインをキャンセル」で中止できます。",
     "login_starting": "ログインを開始中…",
-    "login_intro": "ブラウザでログインしてアカウントを保存し、利用枠を確認できます。",
+    "login_intro": "ブラウザまたはデバイスコードでログインして、プランの利用枠を確認できます。",
     "importing": "アカウントを追加中…",
     "empty_first": "最初の Codex アカウントを追加",
     "personal_workspace": "個人用ワークスペース",

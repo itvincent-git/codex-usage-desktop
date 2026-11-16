@@ -63,10 +63,10 @@ describe("saved Codex accounts", () => {
     list.accounts = []; list.currentIdentity = null;
     render(<AccountsPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Add API Key" }));
-    await userEvent.type(screen.getByLabelText("API Key"), "private-key");
+    await userEvent.type(within(screen.getByRole("dialog")).getByLabelText("API Key"), "private-key");
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     await userEvent.click(screen.getByRole("button", { name: "Add API Key" }));
-    expect(screen.getByLabelText("API Key")).toHaveValue("");
+    expect(within(screen.getByRole("dialog")).getByLabelText("API Key")).toHaveValue("");
   });
 
   it.each([false, true])("shows loading until the first account list resolves (empty: %s)", async (empty) => {
@@ -98,6 +98,27 @@ describe("saved Codex accounts", () => {
     expect(screen.getByRole("heading", { name: "a@example.test" })).toBeVisible();
     expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
     await act(async () => { resolveList(list); });
+  });
+
+  it.each(["en", "zh"])("groups ChatGPT login methods separately from API Key setup in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    render(<AccountsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("accounts.add") }));
+    const dialog = within(screen.getByRole("dialog"));
+    const chatgpt = within(dialog.getByRole("region", { name: i18n.t("accounts.chatgpt_account") }));
+    expect(chatgpt.getByRole("button", { name: i18n.t("accounts.browser_login") })).toBeVisible();
+    const device = chatgpt.getByRole("button", { name: i18n.t("accounts.device_login") });
+    expect(device).toBeVisible();
+    expect(device.querySelector("svg")).toHaveClass("lucide-monitor-smartphone");
+    expect(chatgpt.queryByRole("button", { name: i18n.t("accounts.api_add") })).not.toBeInTheDocument();
+    const apiKey = within(dialog.getByRole("region", { name: "API Key" }));
+    expect(apiKey.getByText(i18n.t("accounts.api_intro"))).toBeVisible();
+    const addKey = apiKey.getByRole("button", { name: i18n.t("accounts.api_add") });
+    expect(addKey.querySelector("svg")).toHaveClass("lucide-key-round");
+    expect(apiKey.queryByRole("button", { name: i18n.t("accounts.device_login") })).not.toBeInTheDocument();
+    await userEvent.click(addKey);
+    expect(screen.getByRole("dialog", { name: i18n.t("accounts.api_add") })).toBeVisible();
+    expect(api.startCodexAccountLogin).not.toHaveBeenCalled();
   });
 
   it("separates current-account import from the dismissible login dialog", async () => {

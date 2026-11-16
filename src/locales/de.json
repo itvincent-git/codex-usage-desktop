@@ -996,6 +996,8 @@
     "quota_not_applicable": "Diese Anmeldedaten verwenden einen API-Schlüssel. ChatGPT-Kontingente sind dafür nicht verfügbar. Lokale Token- und Kostenstatistiken bleiben verfügbar."
   },
   "accounts": {
+    "chatgpt_account": "ChatGPT-Konto",
+    "api_intro": "Einen API Key von OpenAI oder einem OpenAI-kompatiblen Anbieter verwenden.",
     "api_add": "API Key hinzufügen",
     "api_name": "Name",
     "api_save": "API Key speichern",
@@ -1009,7 +1011,7 @@
     "continue_login": "Anmeldung fortsetzen",
     "login_close_hint": "Beim Schließen läuft die Anmeldung weiter. Kehren Sie mit „Anmeldung fortsetzen“ zurück oder wählen Sie „Anmeldung abbrechen“.",
     "login_starting": "Anmeldung wird gestartet…",
-    "login_intro": "Melden Sie sich im Browser an, um ein Konto zu speichern und Kontingente zu prüfen.",
+    "login_intro": "Im Browser oder mit einem Gerätecode anmelden, um die Kontingente Ihres Tarifs einzusehen.",
     "importing": "Konto wird hinzugefügt…",
     "empty_first": "Erstes Codex-Konto hinzufügen",
     "personal_workspace": "Persönlicher Arbeitsbereich",

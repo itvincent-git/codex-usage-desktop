@@ -27,7 +27,12 @@ describe("API Key accounts in the native app", () => {
       ["Gateway API", "fixture-gateway-api-key", "http://localhost:12345/v1"],
     ]) {
       await $("button=Add account").click();
-      await $('[role="dialog"]').$("button=Add API Key").click();
+      const methods = $('[role="dialog"]');
+      const chatgpt = methods.$('section[aria-labelledby="account-chatgpt-methods"]');
+      await expect(chatgpt.$("button=Sign in with browser")).toBeDisplayed();
+      await expect(chatgpt.$("button=Use device code")).toBeDisplayed();
+      await expect(chatgpt.$("button=Add API Key")).not.toExist();
+      await methods.$('section[aria-labelledby="account-api-method"]').$("button=Add API Key").click();
       const dialog = $('[role="dialog"]');
       const fields = dialog.$$("input");
       await expect(dialog.$("button=Save API Key")).toBeDisabled();
@@ -60,4 +65,24 @@ describe("API Key accounts in the native app", () => {
       expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
     }
   });
+
+  it("distinguishes ChatGPT sign-in and API Key setup in Chinese", async () => {
+    await browser.execute(() => { localStorage.setItem("language", "zh"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    await $("button=添加账号").click();
+    const dialog = $('[role="dialog"]');
+    const chatgpt = dialog.$('section[aria-labelledby="account-chatgpt-methods"]');
+    const apiKey = dialog.$('section[aria-labelledby="account-api-method"]');
+    await expect(chatgpt.$("h3=ChatGPT 账号")).toBeDisplayed();
+    await expect(chatgpt.$("button=在浏览器中登录")).toBeDisplayed();
+    await expect(chatgpt.$("button=使用设备码登录").$("svg")).toHaveAttribute("class", expect.stringContaining("lucide-monitor-smartphone"));
+    await expect(apiKey.$("h3=API Key")).toBeDisplayed();
+    await expect(apiKey.$("button=添加 API Key").$("svg")).toHaveAttribute("class", expect.stringContaining("lucide-key-round"));
+    await browser.saveScreenshot("/tmp/codex-add-account-methods-zh.png");
+    await dialog.$('button[aria-label="关闭"]').click();
+    await expect(dialog).not.toExist();
+  });
+
 });

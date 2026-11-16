@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "rea
 import { createPortal } from "react-dom";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Download, Ellipsis, ExternalLink, Globe, Info, KeyRound, LoaderCircle, Plus, RefreshCw, TriangleAlert, X } from "lucide-react";
+import { Check, Copy, Download, Ellipsis, ExternalLink, Globe, Info, KeyRound, LoaderCircle, MonitorSmartphone, Plus, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
@@ -224,12 +224,23 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     </AddAccountDialog> : null}
     {showAddAccount ? <AddAccountDialog title={t(loginAccountId ? "accounts.relogin" : list && !list.accounts.length && !list.currentIdentity ? "accounts.empty_first" : "accounts.login_other")} onClose={() => setShowAddAccount(false)}>
       {!loginRunning && busy !== "login" && task?.state !== "completed" ? <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">{t("accounts.login_intro")}</p>
-        <div className="flex flex-col items-start gap-2">
-          <Button size="sm" disabled={!!busy} onClick={() => void login(false, loginAccountId)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
-          {!loginAccountId ? <Button size="sm" variant="secondary" disabled={!!busy} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button> : null}
-          <Button size="sm" variant="ghost" className="!px-0 text-muted-foreground underline underline-offset-4" disabled={!!busy} onClick={() => void login(true, loginAccountId)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
-        </div>
+        <section aria-labelledby="account-chatgpt-methods" className="space-y-3 rounded-lg border border-border p-4">
+          <div className="space-y-1">
+            <h3 id="account-chatgpt-methods" className="text-sm font-semibold">{t("accounts.chatgpt_account")}</h3>
+            <p className="text-xs leading-relaxed text-muted-foreground">{t("accounts.login_intro")}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" disabled={!!busy} onClick={() => void login(false, loginAccountId)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+            <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => void login(true, loginAccountId)}><MonitorSmartphone className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
+          </div>
+        </section>
+        {!loginAccountId ? <section aria-labelledby="account-api-method" className="space-y-3 rounded-lg border border-border p-4">
+          <div className="space-y-1">
+            <h3 id="account-api-method" className="text-sm font-semibold">API Key</h3>
+            <p className="text-xs leading-relaxed text-muted-foreground">{t("accounts.api_intro")}</p>
+          </div>
+          <Button size="sm" variant="secondary" disabled={!!busy} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button>
+        </section> : null}
       </div> : null}
       {busy === "login" ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t("accounts.login_starting")}</p> : null}
       {error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
@@ -285,8 +296,11 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         {recommendImport ? <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t(busy === "import" ? "accounts.importing" : "accounts.import")}</Button> : null}
         <Button size="sm" variant={recommendImport ? "secondary" : "primary"} disabled={!!busy || loginRunning} onClick={recommendImport ? openAddAccount : () => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t(recommendImport ? "accounts.login_other" : "accounts.browser_login")}</Button>
       </div>
-      <Button size="sm" variant="secondary" className="mt-2" disabled={!!busy || loginRunning} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button>
-      {!recommendImport ? <Button size="sm" variant="ghost" className="mt-2 text-muted-foreground underline underline-offset-4" disabled={!!busy || loginRunning} onClick={() => void login(true)}>{t("accounts.device_login")}</Button> : null}
+      {!recommendImport ? <Button size="sm" variant="ghost" className="mt-2 text-muted-foreground underline underline-offset-4" disabled={!!busy || loginRunning} onClick={() => void login(true)}><MonitorSmartphone className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button> : null}
+      <section aria-label="API Key" className="mx-auto mt-5 max-w-lg space-y-3 border-t border-border pt-4">
+        <p className="text-xs leading-relaxed text-muted-foreground">{t("accounts.api_intro")}</p>
+        <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button>
+      </section>
       <p className="mt-4 text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
     </section> : null}
     <div className="accounts-grid">

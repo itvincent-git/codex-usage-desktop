@@ -953,6 +953,8 @@
     "quota_not_applicable": "현재 인증 정보는 API 키를 사용합니다. 이 방식에서는 ChatGPT 구독 한도를 조회할 수 없습니다. 로컬 토큰 및 비용 통계는 계속 사용할 수 있습니다."
   },
   "accounts": {
+    "chatgpt_account": "ChatGPT 계정",
+    "api_intro": "OpenAI 또는 OpenAI 호환 제공업체의 API Key를 사용합니다.",
     "api_add": "API Key 추가",
     "api_name": "이름",
     "api_save": "API Key 저장",
@@ -966,7 +968,7 @@
     "continue_login": "로그인 계속",
     "login_close_hint": "창을 닫아도 로그인은 계속됩니다. “로그인 계속”으로 돌아오거나 “로그인 취소”로 중지할 수 있습니다.",
     "login_starting": "로그인 시작 중…",
-    "login_intro": "브라우저에서 로그인해 계정을 저장하고 사용량을 확인하세요.",
+    "login_intro": "브라우저 또는 기기 코드로 로그인해 요금제 할당량을 확인하세요.",
     "importing": "계정 추가 중…",
     "empty_first": "첫 Codex 계정 추가",
     "personal_workspace": "개인 워크스페이스",
