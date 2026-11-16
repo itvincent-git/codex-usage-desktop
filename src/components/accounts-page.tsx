@@ -8,7 +8,7 @@ import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
 import { useModalFocus } from "@/hooks/use-modal-focus";
 import { openUrl } from "@/lib/api";
-import { cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin, importCurrentCodexAccount, listCodexAccounts, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type AccountList, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
+import { addCodexApiKey, cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin, importCurrentCodexAccount, listCodexAccounts, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type AccountList, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
 
 const restartReminderKey = "accounts_hide_restart_reminder:v1";
 
@@ -36,6 +36,22 @@ function AddAccountDialog({ children, title, onClose }: { children: ReactNode; t
   </div>, content ?? document.body);
 }
 
+function ApiKeyForm({ busy, onSave }: { busy: boolean; onSave: (name: string, key: string, url: string) => void }) {
+  const { t } = useTranslation();
+  const [name, setName] = useState("");
+  const [key, setKey] = useState("");
+  const [url, setUrl] = useState("");
+  const inputClass = "mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  return <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); onSave(name.trim(), key.trim(), url.trim()); }}>
+    <label className="block text-sm">{t("accounts.api_name")}<input className={inputClass} required autoFocus autoComplete="off" value={name} disabled={busy} onChange={(event) => setName(event.target.value)} /></label>
+    <label className="block text-sm">API Key<input className={inputClass} type="password" required autoComplete="off" spellCheck={false} value={key} disabled={busy} onChange={(event) => setKey(event.target.value)} /></label>
+    <label className="block text-sm">Base URL<input className={inputClass} type="url" placeholder="https://api.openai.com/v1" autoComplete="off" spellCheck={false} aria-describedby="api-url-hint" value={url} disabled={busy} onChange={(event) => setUrl(event.target.value)} /></label>
+    <p id="api-url-hint" className="text-xs leading-relaxed text-muted-foreground">{t("accounts.api_url_hint")}</p>
+    <p className="text-xs leading-relaxed text-muted-foreground">{t("accounts.api_storage_hint")}</p>
+    <Button type="submit" disabled={busy || !name.trim() || !key.trim()}>{t(busy ? "accounts.importing" : "accounts.api_save")}</Button>
+  </form>;
+}
+
 export function AccountsPage({ initialList = null, onListChange }: { initialList?: AccountList | null; onListChange?: (list: AccountList | null) => void } = {}) {
   const { t, i18n } = useTranslation();
   const [list, setList] = useState<AccountList | null>(initialList);
@@ -45,6 +61,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [loginAccountId, setLoginAccountId] = useState<string | null>(null);
   const continueLoginButton = useRef<HTMLButtonElement>(null);
   const [pendingRemoval, setPendingRemoval] = useState<CodexAccount | null>(null);
@@ -107,12 +124,12 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   };
   const refreshAll = async () => {
     // Three workers also bound command submissions, independently of backend limits.
-    const queue = [...(list?.accounts ?? [])];
+    const queue = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey");
     await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) await refresh(queue.shift()!); }));
     await reload().catch((e: unknown) => setError(String(e)));
   };
-  const missingAccounts = (list?.accounts ?? []).filter((account) => !account.status).map((account) => account.id).join("|");
-  const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (!account.status) void refresh(account); });
+  const missingAccounts = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey" && !account.status).map((account) => account.id).join("|");
+  const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (account.authMode !== "apikey" && !account.status) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
   const login = (device: boolean, id: string | null = null) => {
     if (busy || task?.state === "running") return;
@@ -124,6 +141,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     if (task?.state !== "running") { setTask(null); setLoginAccountId(null); setError(null); setNotice(null); }
     setShowAddAccount(true);
   };
+  const openApiKey = () => { setShowAddAccount(false); setError(null); setNotice(null); setShowApiKey(true); };
   const importAccount = () => run("import", async () => { await importCurrentCodexAccount(); setNotice(t("accounts.added")); });
   const copyAuthorizationUrl = async () => {
     if (!task?.authorizationUrl) return;
@@ -192,16 +210,24 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     </div>
     {list?.switchError ? <p role="status" className="text-sm text-warning-foreground">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning-foreground">{t("accounts.recovery_conflict")}</p> : null}
-    {!showAddAccount && error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
-    {!showAddAccount && notice ? <p role="status" className="text-sm text-success-foreground">{notice}</p> : null}
+    {!showAddAccount && !showApiKey && error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
+    {!showAddAccount && !showApiKey && notice ? <p role="status" className="text-sm text-success-foreground">{notice}</p> : null}
     {!showAddAccount && loginRunning ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
       <span>{t("accounts.login_running")}</span><Button ref={continueLoginButton} size="sm" variant="secondary" onClick={() => setShowAddAccount(true)}>{t("accounts.continue_login")}</Button>
     </div> : null}
+    {showApiKey ? <AddAccountDialog title={t("accounts.api_add")} onClose={() => { if (busy !== "api-key") { setShowApiKey(false); setError(null); } }}>
+      {error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
+      <ApiKeyForm busy={busy === "api-key"} onSave={(name, key, url) => void run("api-key", async () => {
+        await addCodexApiKey(name, key, url);
+        setShowApiKey(false); setNotice(t("accounts.added"));
+      })} />
+    </AddAccountDialog> : null}
     {showAddAccount ? <AddAccountDialog title={t(loginAccountId ? "accounts.relogin" : list && !list.accounts.length && !list.currentIdentity ? "accounts.empty_first" : "accounts.login_other")} onClose={() => setShowAddAccount(false)}>
       {!loginRunning && busy !== "login" && task?.state !== "completed" ? <div className="space-y-3">
         <p className="text-sm text-muted-foreground">{t("accounts.login_intro")}</p>
         <div className="flex flex-col items-start gap-2">
           <Button size="sm" disabled={!!busy} onClick={() => void login(false, loginAccountId)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.browser_login")}</Button>
+          {!loginAccountId ? <Button size="sm" variant="secondary" disabled={!!busy} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button> : null}
           <Button size="sm" variant="ghost" className="!px-0 text-muted-foreground underline underline-offset-4" disabled={!!busy} onClick={() => void login(true, loginAccountId)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.device_login")}</Button>
         </div>
       </div> : null}
@@ -259,6 +285,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         {recommendImport ? <Button size="sm" disabled={!!busy || loginRunning} onClick={() => void importAccount()}><Download className="h-3.5 w-3.5" aria-hidden="true" />{t(busy === "import" ? "accounts.importing" : "accounts.import")}</Button> : null}
         <Button size="sm" variant={recommendImport ? "secondary" : "primary"} disabled={!!busy || loginRunning} onClick={recommendImport ? openAddAccount : () => void login(false)}><Globe className="h-3.5 w-3.5" aria-hidden="true" />{t(recommendImport ? "accounts.login_other" : "accounts.browser_login")}</Button>
       </div>
+      <Button size="sm" variant="secondary" className="mt-2" disabled={!!busy || loginRunning} onClick={openApiKey}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />{t("accounts.api_add")}</Button>
       {!recommendImport ? <Button size="sm" variant="ghost" className="mt-2 text-muted-foreground underline underline-offset-4" disabled={!!busy || loginRunning} onClick={() => void login(true)}>{t("accounts.device_login")}</Button> : null}
       <p className="mt-4 text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
     </section> : null}
@@ -295,6 +322,24 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
           }
         });
         const switchDisabled = !!busy || !!list.switchError || !list.authContext || account.current;
+        if (account.authMode === "apikey") return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
+          <header>
+            <div className="account-identity"><h2>{account.email ?? "API Key"}</h2>{account.current ? <span className="account-current" title={t("accounts.current_hint")}><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>
+            <p className="account-workspace break-all">{account.baseUrl}</p>
+          </header>
+          <div className="account-membership"><span className="account-plan">API Key</span></div>
+          <p className="py-4 text-sm leading-relaxed text-muted-foreground">{t("accounts.api_quota_hint")}</p>
+          <footer className="account-footer">
+            <span className="text-xs text-muted-foreground">{t("accounts.api_saved")}</span>
+            <div className="account-actions">
+              <Button size="sm" variant={account.current ? "secondary" : "primary"} disabled={switchDisabled} onClick={switchAccount}>{t(account.current ? "accounts.current_account" : "accounts.switch")}</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.more")}><Ellipsis className="h-3.5 w-3.5" aria-hidden="true" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end"><DropdownMenuItem className="text-error-foreground" disabled={!!busy} onSelect={() => setPendingRemoval(account)}>{t("accounts.remove")}</DropdownMenuItem></DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </footer>
+        </article>;
         return <article key={account.id} data-account-id={account.id} aria-current={account.current ? "true" : undefined} className="account-card">
           <header>
             <div className="account-identity"><h2>{account.email ?? account.identity.userId}</h2>{account.current ? <span className="account-current" title={t("accounts.current_hint")}><Check aria-hidden="true" />{t("accounts.current")}</span> : null}</div>

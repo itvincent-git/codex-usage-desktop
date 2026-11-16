@@ -12,6 +12,8 @@ pub(crate) struct Snapshot {
     pub environment: CodexEnvironment,
     pub content: Option<String>,
     pub config: String,
+    pub user_config: String,
+    pub config_path: PathBuf,
     pub path: PathBuf,
 }
 
@@ -23,6 +25,8 @@ impl Snapshot {
                 format!("{:?}", self.environment.runtime),
                 self.path,
                 self.config,
+                self.config_path,
+                self.user_config,
                 self.content
             ])
             .to_string()
@@ -133,7 +137,7 @@ pub(super) fn validate_config(text: &str) -> Result<(), String> {
         };
         table.iter().all(|(key, value)| match key.as_str() {
             "cli_auth_credentials_store" => root && value.as_str() == Some("file"),
-            "forced_login_method" => root && value.as_str() == Some("chatgpt"),
+            "forced_login_method" => root && matches!(value.as_str(), Some("chatgpt" | "api")),
             // Workspace allowlists are checked against the target separately.
             "forced_chatgpt_workspace_id" => {
                 root && (value.is_str()
@@ -151,8 +155,7 @@ pub(super) fn validate_config(text: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn check_workspace(snapshot: &Snapshot, account: &str) -> Result<(), String> {
-    // Inspect the original documents instead of parsing the fingerprint envelope.
+pub(super) fn config_documents(snapshot: &Snapshot) -> Result<Vec<String>, String> {
     let documents: Vec<String> = if matches!(snapshot.environment.runtime, CodexRuntime::Wsl { .. })
     {
         serde_json::from_str(&snapshot.config).map_err(|_| "accountBackendUnsupported")?
@@ -166,7 +169,27 @@ pub(super) fn check_workspace(snapshot: &Snapshot, account: &str) -> Result<(), 
             .map(|p| fs::read_to_string(p).unwrap_or_default())
             .collect()
     };
-    for document in documents {
+    Ok(documents)
+}
+
+pub(super) fn check_login(snapshot: &Snapshot, api_key: bool) -> Result<(), String> {
+    for document in config_documents(snapshot)? {
+        let config: toml::Value =
+            toml::from_str(&document).map_err(|_| "accountBackendUnsupported")?;
+        if config
+            .get("forced_login_method")
+            .and_then(toml::Value::as_str)
+            .is_some_and(|method| method != if api_key { "api" } else { "chatgpt" })
+            || api_key && config.get("forced_chatgpt_workspace_id").is_some()
+        {
+            return Err("accountBackendUnsupported".into());
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn check_workspace(snapshot: &Snapshot, account: &str) -> Result<(), String> {
+    for document in config_documents(snapshot)? {
         let config: toml::Value =
             toml::from_str(&document).map_err(|_| "accountBackendUnsupported")?;
         if let Some(allowed) = config.get("forced_chatgpt_workspace_id") {
@@ -201,6 +224,15 @@ pub(crate) fn snapshot(environment: &CodexEnvironment) -> Result<Snapshot, Strin
         return Ok(Snapshot {
             environment: environment.clone(),
             content: response["content"].as_str().map(str::to_owned),
+            user_config: response["userConfig"]
+                .as_str()
+                .ok_or("accountBackendUnsupported")?
+                .to_owned(),
+            config_path: PathBuf::from(
+                response["configPath"]
+                    .as_str()
+                    .ok_or("accountBackendUnsupported")?,
+            ),
             config,
             path: PathBuf::from(
                 response["path"]
@@ -216,7 +248,20 @@ pub(crate) fn snapshot(environment: &CodexEnvironment) -> Result<Snapshot, Strin
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(_) => return Err("codexAuthUnreadable".into()),
     };
+    let config_path = environment.home.join("config.toml");
+    let config_path = if fs::symlink_metadata(&config_path).is_ok() {
+        fs::canonicalize(&config_path).map_err(|_| "accountAuthConflict")?
+    } else {
+        config_path
+    };
+    let user_config = match fs::read_to_string(&config_path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(_) => return Err("accountBackendUnsupported".into()),
+    };
     Ok(Snapshot {
+        user_config,
+        config_path,
         environment: environment.clone(),
         content,
         config,
@@ -225,11 +270,19 @@ pub(crate) fn snapshot(environment: &CodexEnvironment) -> Result<Snapshot, Strin
 }
 
 pub(super) fn commit(expected: &Snapshot, target: &str) -> Result<(), String> {
+    commit_with_config(expected, target, None)
+}
+
+pub(super) fn commit_with_config(
+    expected: &Snapshot,
+    target: &str,
+    config: Option<&str>,
+) -> Result<(), String> {
     if let CodexRuntime::Wsl { distribution } = &expected.environment.runtime {
         wsl_request(
             &expected.environment,
             distribution,
-            serde_json::json!({"operation":"commit", "expected":expected.content, "config":expected.config, "path":expected.path, "target":target}),
+            serde_json::json!({"operation":"commit", "expected":expected.content, "config":expected.config, "path":expected.path, "target":target, "targetConfig":config, "configPath":expected.config_path}),
         )?;
         return Ok(());
     }
@@ -238,11 +291,24 @@ pub(super) fn commit(expected: &Snapshot, target: &str) -> Result<(), String> {
     }
     let _outer = storage::lock(&expected.environment.home.join("auth.lock"))?;
     let _inner = storage::lock(&expected.path.with_extension("json.lock"))?;
+    let _config_lock = if config.is_some() {
+        Some(storage::lock(
+            &expected.config_path.with_extension("toml.lock"),
+        )?)
+    } else {
+        None
+    };
     if snapshot(&expected.environment)?.context() != expected.context() {
         return Err("accountAuthConflict".into());
     }
     storage::atomic_write(&expected.path, target.as_bytes())?;
-    if fs::read_to_string(&expected.path).ok().as_deref() != Some(target) {
+    if let Some(config) = config {
+        storage::atomic_write(&expected.config_path, config.as_bytes())?;
+    }
+    if config.is_some_and(|config| {
+        fs::read_to_string(&expected.config_path).ok().as_deref() != Some(config)
+    }) || fs::read_to_string(&expected.path).ok().as_deref() != Some(target)
+    {
         return Err("accountAuthConflict".into());
     }
     Ok(())

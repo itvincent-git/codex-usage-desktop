@@ -959,6 +959,13 @@
     "quota_not_applicable": "目前憑證使用 API Key，此驗證方式無法查詢 ChatGPT 訂閱額度。本機 Token 及費用統計仍可使用。"
   },
   "accounts": {
+    "api_add": "新增 API Key",
+    "api_name": "名稱",
+    "api_save": "儲存 API Key",
+    "api_url_hint": "留空使用 OpenAI 官方介面。相容服務請填寫完整的 API 根位址（如 https://gateway.example.com/v1），介面須支援 Responses API。",
+    "api_storage_hint": "金鑰以明文儲存在本機，使用與已儲存帳號相同的檔案權限。儲存不會切換 Codex。",
+    "api_quota_hint": "API Key 帳號不提供 ChatGPT 方案額度和訂閱資訊，請至 API 服務商查看帳單。本機工作階段統計仍可使用。",
+    "api_saved": "已儲存在本機",
     "view_accounts": "查看帳號額度",
     "switch_notice": "登入設定已切換。請重新啟動相關 Codex 用戶端以載入新帳號。",
     "current_hint": "此帳號已寫入 Codex 登入設定。已執行的用戶端可能需要重新啟動後才能載入。",
@@ -1042,6 +1049,9 @@
     "part_resetCredits": "重置額度",
     "part_credentials": "憑證",
     "errors": {
+      "accountApiKeyInvalid": "請輸入名稱和非空白的 API Key，金鑰不能包含空格。",
+      "accountBaseUrlInvalid": "請輸入 HTTP(S) Base URL，不能包含使用者名稱、密碼、查詢參數或片段。",
+      "accountApiKeyQuotaUnsupported": "API Key 帳號不支援查詢 ChatGPT 方案額度。",
       "generic": "無法更新此帳號，請重試。",
       "accountTaskFailed": "無法更新此帳號，請重試。",
       "accountNetworkError": "無法更新此帳號，請重試。",

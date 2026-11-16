@@ -9,6 +9,7 @@ export type AccountStatus = {
 };
 export type CodexAccount = {
   id: string; identity: AccountIdentity; email: string | null; credentialVersion: number;
+  authMode?: "chatgpt" | "apikey"; baseUrl?: string | null;
   current: boolean; lastRefresh: string | null; status: AccountStatus | null;
 };
 export type AccountList = {
@@ -29,3 +30,5 @@ export const startCodexAccountLogin = (deviceAuth: boolean, accountId: string | 
 export const getCodexAccountLogin = (taskId: string) => invoke<LoginTask>("get_codex_account_login", { taskId });
 export const cancelCodexAccountLogin = (taskId: string) => invoke<void>("cancel_codex_account_login", { taskId });
 export const currentCodexAuthContext = () => invoke<string>("current_codex_auth_context");
+
+export const addCodexApiKey = (name: string, apiKey: string, baseUrl: string) => invoke<string>("add_codex_api_key", { name, apiKey, baseUrl });

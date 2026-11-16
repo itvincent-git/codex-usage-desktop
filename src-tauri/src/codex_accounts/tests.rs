@@ -147,7 +147,7 @@ fn unsupported_backends_and_restrictions_fail_closed() {
         "cli_auth_credentials_store='auto'",
         "cli_auth_credentials_store='keyring'",
         "cli_auth_credentials_store='ephemeral'",
-        "forced_login_method='api'",
+        "forced_login_method='invalid'",
         "[profiles.work]\ncli_auth_credentials_store='file'",
         "profile='work'",
         "this is not toml",
@@ -165,7 +165,12 @@ fn unsupported_backends_and_restrictions_fail_closed() {
     let snapshot = native::snapshot(&f.environment).unwrap();
     native::check_workspace(&snapshot, "allowed").unwrap();
     assert!(native::check_workspace(&snapshot, "other").is_err());
-    assert!(credential_identity(r#"{"OPENAI_API_KEY":"private-key"}"#).is_err());
+    assert_eq!(
+        credential_identity(r#"{"OPENAI_API_KEY":"private-key"}"#)
+            .unwrap()
+            .workspace_id,
+        api_key::DEFAULT_URL
+    );
 }
 
 #[test]
@@ -262,7 +267,7 @@ fn distribution_helper_preserves_external_writes_and_matches_native_lock_files()
     let (ok, snapshot) = invoke(json!({"operation":"read", "home":f.environment.home}));
     assert!(ok);
     let target = credentials("b", "b", 1).to_string();
-    let request = json!({"operation":"commit","home":f.environment.home,"expected":snapshot["content"],"path":snapshot["path"],"config":snapshot["config"],"target":target});
+    let request = json!({"operation":"commit","home":f.environment.home,"expected":snapshot["content"],"path":snapshot["path"],"config":snapshot["config"],"configPath":snapshot["configPath"],"target":target});
     let external = credentials("external", "external", 2).to_string();
     fs::write(f.environment.home.join("auth.json"), &external).unwrap();
     let (ok, error) = invoke(request);
@@ -273,14 +278,21 @@ fn distribution_helper_preserves_external_writes_and_matches_native_lock_files()
         external
     );
     let (_, snapshot) = invoke(json!({"operation":"read", "home":f.environment.home}));
+    let target_config =
+        "model_provider='openai'\nopenai_base_url='https://gateway.example.test/v1'\n";
     let (ok, _) = invoke(
-        json!({"operation":"commit","home":f.environment.home,"expected":snapshot["content"],"path":snapshot["path"],"config":snapshot["config"],"target":target}),
+        json!({"operation":"commit","home":f.environment.home,"expected":snapshot["content"],"path":snapshot["path"],"config":snapshot["config"],"configPath":snapshot["configPath"],"target":target,"targetConfig":target_config}),
     );
     assert!(ok);
     assert_eq!(
         fs::read_to_string(f.environment.home.join("auth.json")).unwrap(),
         target
     );
+    assert_eq!(
+        fs::read_to_string(f.environment.home.join("config.toml")).unwrap(),
+        target_config
+    );
+    assert!(f.environment.home.join("config.toml.lock").exists());
     assert!(f.environment.home.join("auth.lock").exists());
     assert!(f.environment.home.join("auth.json.lock").exists());
 }
@@ -606,4 +618,258 @@ fn follows_auth_symlinks_and_uses_private_files() {
         fs::metadata(target).unwrap().permissions().mode() & 0o777,
         0o600
     );
+}
+
+#[test]
+fn api_keys_validate_normalize_and_never_expose_secrets_in_summaries() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    for (name, key, url, error) in [
+        ("", "secret", "", "accountApiKeyInvalid"),
+        ("Name", "  ", "", "accountApiKeyInvalid"),
+        ("Name", "has spaces", "", "accountApiKeyInvalid"),
+        ("Name", "secret", "file:///tmp/key", "accountBaseUrlInvalid"),
+        (
+            "Name",
+            "secret",
+            "https://user:password@example.test/v1",
+            "accountBaseUrlInvalid",
+        ),
+        (
+            "Name",
+            "secret",
+            "https://example.test/v1?key=secret",
+            "accountBaseUrlInvalid",
+        ),
+    ] {
+        assert_eq!(f.service.add_api_key(name, key, url).unwrap_err(), error);
+    }
+    let id = f
+        .service
+        .add_api_key("Official", " private-api-key ", "")
+        .unwrap();
+    let other = f
+        .service
+        .add_api_key(
+            "Gateway",
+            "private-api-key",
+            "https://gateway.example.test/v1/",
+        )
+        .unwrap();
+    assert_ne!(id, other);
+    assert_eq!(
+        f.service
+            .add_api_key(
+                "Renamed",
+                "private-api-key",
+                "https://gateway.example.test/v1"
+            )
+            .unwrap(),
+        other
+    );
+    assert_eq!(f.service.account(&other).unwrap().credential_version, 2);
+    assert!(f
+        .service
+        .fetch_status(&id)
+        .err()
+        .is_some_and(|e| e == "accountApiKeyQuotaUnsupported"));
+    let list = serde_json::to_string(&f.service.list().unwrap()).unwrap();
+    assert!(!list.contains("private-api-key"));
+    assert!(list.contains("apikey"));
+    assert!(list.contains("Renamed"));
+    crate::codex_environment::select_codex_home(Some(previous.home));
+}
+
+#[test]
+fn switches_chatgpt_and_api_endpoints_preserving_unrelated_configuration() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    let original_auth = credentials("a", "shared", 1);
+    f.live(&original_auth);
+    let config_path = f.environment.home.join("config.toml");
+    let original_config = "# keep comment\nmodel='unchanged'\nmodel_reasoning_effort='xhigh'\n[mcp_servers.keep]\ncommand='keep'\n";
+    fs::write(&config_path, original_config).unwrap();
+    let chatgpt = f.service.import_current().unwrap();
+    let official = f
+        .service
+        .add_api_key("Official", "private-official-key", "")
+        .unwrap();
+    let gateway = f
+        .service
+        .add_api_key("Gateway", "private-gateway-key", "http://localhost:1234/v1")
+        .unwrap();
+    for (id, url) in [
+        (&gateway, "http://localhost:1234/v1"),
+        (&official, api_key::DEFAULT_URL),
+    ] {
+        let context = native::snapshot(&f.environment).unwrap().context();
+        f.service.switch(id, &context).unwrap();
+        let config: toml::Value =
+            toml::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(config["openai_base_url"].as_str(), Some(url));
+        assert_eq!(config["model_provider"].as_str(), Some("openai"));
+        let list = f.service.list().unwrap();
+        assert_eq!(list.accounts.iter().find(|a| a.current).unwrap().id, *id);
+        assert_eq!(list.switch_error, None);
+    }
+    let context = native::snapshot(&f.environment).unwrap().context();
+    f.service.switch(&chatgpt, &context).unwrap();
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), original_config);
+    let restored: Value =
+        serde_json::from_str(&fs::read_to_string(f.environment.home.join("auth.json")).unwrap())
+            .unwrap();
+    assert_eq!(restored, original_auth);
+    // External endpoint edits must not be overwritten when restoring a backup.
+    let context = native::snapshot(&f.environment).unwrap().context();
+    f.service.switch(&gateway, &context).unwrap();
+    let changed = fs::read_to_string(&config_path).unwrap().replace(
+        "http://localhost:1234/v1",
+        "https://external.example.test/v1",
+    );
+    fs::write(&config_path, &changed).unwrap();
+    let context = native::snapshot(&f.environment).unwrap().context();
+    assert_eq!(
+        f.service.switch(&chatgpt, &context).err().as_deref(),
+        Some("accountAuthConflict")
+    );
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), changed);
+    crate::codex_environment::select_codex_home(Some(previous.home));
+}
+
+#[test]
+fn api_switch_respects_forced_login_and_workspace_restrictions() {
+    let f = Fixture::new();
+    let path = f.environment.home.join("config.toml");
+    for config in [
+        "forced_login_method='chatgpt'",
+        "forced_chatgpt_workspace_id='workspace'",
+    ] {
+        fs::write(&path, config).unwrap();
+        let snapshot = native::snapshot(&f.environment).unwrap();
+        assert!(native::check_login(&snapshot, true).is_err());
+        assert!(native::check_login(&snapshot, false).is_ok());
+    }
+    fs::write(&path, "forced_login_method='api'").unwrap();
+    let snapshot = native::snapshot(&f.environment).unwrap();
+    assert!(native::check_login(&snapshot, true).is_ok());
+    assert!(native::check_login(&snapshot, false).is_err());
+}
+
+#[test]
+fn api_config_restores_provider_fields_and_keeps_intervening_edits() {
+    let f = Fixture::new();
+    let path = f.environment.home.join("config.toml");
+    let original = "# original\nmodel_provider = 'openai' # provider\nopenai_base_url = 'https://old.example.test/v1' # url\nmodel = 'before'\n[mcp_servers.keep]\ncommand = 'keep'\n";
+    fs::write(&path, original).unwrap();
+    let snapshot = native::snapshot(&f.environment).unwrap();
+    let key =
+        api_key::credentials("Gateway", "private-key", "https://gateway.example.test/v1").unwrap();
+    let (applied, backup) = api_key::switch_config(&snapshot, &key, None).unwrap();
+    fs::write(
+        &path,
+        applied.replace("model = 'before'", "model = 'after'"),
+    )
+    .unwrap();
+    let snapshot = native::snapshot(&f.environment).unwrap();
+    let (restored, backup) =
+        api_key::switch_config(&snapshot, &credentials("a", "a", 1), backup.as_ref()).unwrap();
+    assert!(backup.is_none());
+    assert_eq!(
+        restored,
+        original.replace("model = 'before'", "model = 'after'")
+    );
+}
+
+#[test]
+fn api_import_reads_native_endpoint_without_metadata() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    f.live(&json!({"auth_mode":"apikey","OPENAI_API_KEY":"private-imported-key"}));
+    fs::write(
+        f.environment.home.join("config.toml"),
+        "openai_base_url='https://gateway.example.test/v1/'",
+    )
+    .unwrap();
+    let id = f.service.import_current().unwrap();
+    let list = f.service.list().unwrap();
+    let account = list.accounts.iter().find(|a| a.id == id).unwrap();
+    assert!(account.current);
+    assert_eq!(
+        account.base_url.as_deref(),
+        Some("https://gateway.example.test/v1")
+    );
+    assert_eq!(account.auth_mode, "apikey");
+    assert!(!serde_json::to_string(&list)
+        .unwrap()
+        .contains("private-imported-key"));
+    crate::codex_environment::select_codex_home(Some(previous.home));
+}
+
+#[test]
+fn api_recovery_checks_both_files_and_restores_backup_after_completed_commit() {
+    for outcome in ["before", "auth_only", "both"] {
+        let f = Fixture::new();
+        f.live(&credentials("a", "a", 1));
+        let snapshot = native::snapshot(&f.environment).unwrap();
+        let target =
+            api_key::credentials("Gateway", "private-key", "https://gateway.example.test/v1")
+                .unwrap();
+        let (config, backup) = api_key::switch_config(&snapshot, &target, None).unwrap();
+        let mut journal = pending(&snapshot, &target.to_string());
+        let key = api_key::config_key(&snapshot);
+        journal.config_key = Some(key.clone());
+        journal.original_config = Some(storage::fingerprint(snapshot.user_config.as_bytes()));
+        journal.target_config = Some(storage::fingerprint(config.as_bytes()));
+        journal.next_backup = backup;
+        {
+            let (_lock, mut store) = f.service.store().unwrap();
+            store.pending = Some(journal);
+            f.service.save(&store).unwrap();
+        }
+        if outcome != "before" {
+            f.live(&target);
+        }
+        if outcome == "both" {
+            fs::write(&snapshot.config_path, &config).unwrap();
+        }
+        let auth_before = fs::read(&snapshot.path).unwrap();
+        f.service.recover().unwrap();
+        let (_, store) = f.service.store().unwrap();
+        assert_eq!(store.recovery_conflict, outcome == "auth_only");
+        assert_eq!(store.config_backups.contains_key(&key), outcome == "both");
+        assert_eq!(fs::read(&snapshot.path).unwrap(), auth_before);
+    }
+}
+
+#[test]
+fn api_endpoint_uses_user_configuration_before_system_configuration() {
+    let f = Fixture::new();
+    let mut snapshot = native::snapshot(&f.environment).unwrap();
+    // The WSL snapshot carries the same ordered user/system config documents.
+    snapshot.environment.runtime = CodexRuntime::Wsl {
+        distribution: "fixture".into(),
+    };
+    snapshot.content =
+        Some(json!({"auth_mode":"apikey","OPENAI_API_KEY":"private-key"}).to_string());
+    let system = "openai_base_url='https://system.example.test/v1'";
+    for (user, expected) in [
+        ("", "https://system.example.test/v1"),
+        (
+            "openai_base_url='https://user.example.test/v1'",
+            "https://user.example.test/v1",
+        ),
+    ] {
+        snapshot.config = json!([user, system]).to_string();
+        let content = api_key::snapshot_content(&snapshot).unwrap().unwrap();
+        assert_eq!(
+            credential_identity(&content).unwrap().workspace_id,
+            expected
+        );
+    }
 }

@@ -1,3 +1,4 @@
+mod api_key;
 pub(crate) mod login;
 pub(crate) mod native;
 mod storage;
@@ -63,6 +64,8 @@ pub(crate) struct AccountSummary {
     credential_version: u64,
     current: bool,
     last_refresh: Option<String>,
+    auth_mode: &'static str,
+    base_url: Option<String>,
     status: Option<AccountStatus>,
 }
 
@@ -97,6 +100,8 @@ struct Store {
     removed_identities: Vec<String>,
     #[serde(default)]
     removal_revision: u64,
+    #[serde(default)]
+    config_backups: HashMap<String, api_key::ConfigBackup>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -105,6 +110,14 @@ struct Pending {
     distribution: Option<String>,
     original: String,
     target: String,
+    #[serde(default)]
+    original_config: Option<String>,
+    #[serde(default)]
+    target_config: Option<String>,
+    #[serde(default)]
+    config_key: Option<String>,
+    #[serde(default)]
+    next_backup: Option<api_key::ConfigBackup>,
 }
 
 pub(crate) struct AccountService {
@@ -164,21 +177,31 @@ impl AccountService {
             Ok(s) => (Some(s), None),
             Err(e) => (None, Some(e)),
         };
-        if let Some(content) = snapshot.as_ref().and_then(|s| s.content.as_deref()) {
+        let content = match snapshot.as_ref().map(api_key::snapshot_content).transpose() {
+            Ok(content) => content.flatten(),
+            Err(e) => {
+                error = Some(e);
+                None
+            }
+        };
+        if let Some(content) = content.as_deref() {
             if let Err(e) = credential_identity(content) {
                 error = Some(e);
             }
         }
-        let current = snapshot
-            .as_ref()
-            .and_then(|s| s.content.as_deref())
-            .and_then(|s| credential_identity(s).ok());
+        let current = content.as_deref().and_then(|s| credential_identity(s).ok());
         let (_, store) = self.store()?;
         Ok(AccountList {
             accounts: store
                 .accounts
                 .into_iter()
                 .map(|a| AccountSummary {
+                    auth_mode: if api_key::is_api_key(&a.credentials) {
+                        "apikey"
+                    } else {
+                        "chatgpt"
+                    },
+                    base_url: api_key::base_url(&a.credentials).map(str::to_owned),
                     current: current.as_ref() == Some(&a.identity),
                     last_refresh: a.credentials["last_refresh"].as_str().map(str::to_owned),
                     id: a.id,
@@ -199,8 +222,14 @@ impl AccountService {
     pub fn import_current(&self) -> Result<String, String> {
         let _operation = native::AUTH_OPERATION.lock().unwrap();
         let snapshot = native::snapshot(&selected_codex_environment())?;
-        let content = snapshot.content.ok_or("chatgptLoginRequired")?;
+        let content = api_key::snapshot_content(&snapshot)?.ok_or("chatgptLoginRequired")?;
         self.upsert(&content, None)
+    }
+    pub fn add_api_key(&self, name: &str, key: &str, base_url: &str) -> Result<String, String> {
+        self.upsert(
+            &api_key::credentials(name, key, base_url)?.to_string(),
+            None,
+        )
     }
     fn upsert(&self, content: &str, expected: Option<(&str, u64)>) -> Result<String, String> {
         self.upsert_with_revision(content, expected, None)
@@ -278,6 +307,9 @@ impl AccountService {
         refresh: impl FnOnce(&Value) -> Result<Value, String>,
     ) -> Result<Account, String> {
         let mut account = self.account(id)?;
+        if api_key::is_api_key(&account.credentials) {
+            return Ok(account);
+        }
         let environment = selected_codex_environment();
         let snapshot = native::snapshot(&environment).ok();
         let live = snapshot.as_ref().and_then(|s| s.content.as_deref());
@@ -385,6 +417,9 @@ impl AccountService {
     }
     fn fetch_status_inner(&self, id: &str) -> Result<AccountStatus, String> {
         let original = self.account(id)?;
+        if api_key::is_api_key(&original.credentials) {
+            return Err("accountApiKeyQuotaUnsupported".into());
+        }
         let mut account = match self.valid_account(id, false) {
             Ok(a) => a,
             Err(error) => return self.save_status_error(&original, error),
@@ -477,7 +512,8 @@ impl AccountService {
         if original.context() != expected_context {
             return Err("accountAuthConflict".into());
         }
-        if let Some(content) = original.content.as_deref() {
+        let original_content = api_key::snapshot_content(&original)?;
+        if let Some(content) = original_content.as_deref() {
             credential_identity(content)?;
         }
         let lock = self.account_lock(id);
@@ -485,7 +521,10 @@ impl AccountService {
             let _guard = lock.lock().unwrap();
             self.valid_account(id, false)?
         };
-        native::check_workspace(&original, &target.identity.workspace_id)?;
+        native::check_login(&original, api_key::is_api_key(&target.credentials))?;
+        if !api_key::is_api_key(&target.credentials) {
+            native::check_workspace(&original, &target.identity.workspace_id)?;
+        }
         let _operation = native::AUTH_OPERATION.lock().unwrap();
         if selected_codex_environment() != environment {
             return Err("accountAuthConflict".into());
@@ -495,7 +534,7 @@ impl AccountService {
         if native::snapshot(&environment)?.context() != original.context() {
             return Err("accountAuthConflict".into());
         }
-        if let Some(content) = &original.content {
+        if let Some(content) = &original_content {
             let identity = credential_identity(content)?;
             let credentials: Value =
                 serde_json::from_str(content).map_err(|_| "codexAuthInvalid")?;
@@ -523,19 +562,41 @@ impl AccountService {
         }
         let content =
             serde_json::to_string_pretty(&target.credentials).map_err(|_| "codexAuthInvalid")?;
-        store.pending = Some(pending(&original, &content));
+        let config_key = api_key::config_key(&original);
+        let (config, next_backup) = api_key::switch_config(
+            &original,
+            &target.credentials,
+            store.config_backups.get(&config_key),
+        )?;
+        let config_changed = config != original.user_config;
+        let mut journal = pending(&original, &content);
+        if config_changed || store.config_backups.contains_key(&config_key) {
+            journal.original_config = Some(storage::fingerprint(original.user_config.as_bytes()));
+            journal.target_config = Some(storage::fingerprint(config.as_bytes()));
+            journal.config_key = Some(config_key.clone());
+            journal.next_backup = next_backup.clone();
+        }
+        store.pending = Some(journal);
         self.save(&store)?;
         crate::session_credits::invalidate_scopes();
-        native::commit(&original, &content)?;
+        native::commit_with_config(
+            &original,
+            &content,
+            config_changed.then_some(config.as_str()),
+        )?;
         let verified = native::snapshot(&environment)?;
-        if verified
-            .content
+        if api_key::snapshot_content(&verified)?
             .as_deref()
             .and_then(|s| credential_identity(s).ok())
             .as_ref()
             != Some(&target.identity)
         {
             return Err("accountAuthConflict".into());
+        }
+        if let Some(backup) = next_backup {
+            store.config_backups.insert(config_key, backup);
+        } else {
+            store.config_backups.remove(&config_key);
         }
         store.pending = None;
         self.save(&store)?;
@@ -560,10 +621,36 @@ impl AccountService {
                 .unwrap_or(CodexRuntime::Native),
         };
         let snapshot = native::snapshot(&environment);
-        let hash = snapshot.map(|s| s.credential_hash()).unwrap_or_default();
+        let hash = snapshot
+            .as_ref()
+            .map(|s| s.credential_hash())
+            .unwrap_or_default();
+        let config_hash = snapshot
+            .as_ref()
+            .map(|s| storage::fingerprint(s.user_config.as_bytes()))
+            .unwrap_or_default();
         // Recovery never replays a credential write. Both interrupted-before and
         // interrupted-after are safe terminal states; external writes win.
-        store.recovery_conflict = hash != record.original && hash != record.target;
+        let original_matches = hash == record.original
+            && record
+                .original_config
+                .as_ref()
+                .is_none_or(|h| *h == config_hash);
+        let target_matches = hash == record.target
+            && record
+                .target_config
+                .as_ref()
+                .is_none_or(|h| *h == config_hash);
+        store.recovery_conflict = !original_matches && !target_matches;
+        if target_matches {
+            if let Some(key) = &record.config_key {
+                if let Some(backup) = &record.next_backup {
+                    store.config_backups.insert(key.clone(), backup.clone());
+                } else {
+                    store.config_backups.remove(key);
+                }
+            }
+        }
         store.pending = None;
         self.save(&store)
     }
@@ -572,7 +659,12 @@ impl AccountService {
             return;
         };
         let ids: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(
-            store.accounts.into_iter().map(|a| a.id).collect(),
+            store
+                .accounts
+                .into_iter()
+                .filter(|a| !api_key::is_api_key(&a.credentials))
+                .map(|a| a.id)
+                .collect(),
         ));
         std::thread::scope(|scope| {
             for _ in 0..3 {
@@ -612,6 +704,10 @@ fn pending(snapshot: &native::Snapshot, target: &str) -> Pending {
         },
         original: snapshot.credential_hash(),
         target: storage::fingerprint(target.as_bytes()),
+        original_config: None,
+        target_config: None,
+        config_key: None,
+        next_backup: None,
     }
 }
 fn can_adopt(live: &Value, saved: &Value) -> bool {
@@ -619,6 +715,9 @@ fn can_adopt(live: &Value, saved: &Value) -> bool {
         ["access_token", "refresh_token", "id_token"]
             .map(|k| v["tokens"][k].as_str().unwrap_or("").to_owned())
     };
+    if api_key::is_api_key(live) || api_key::is_api_key(saved) {
+        return api_key::identity(live) == api_key::identity(saved);
+    }
     bundle(live) == bundle(saved)
         || refresh_time(live)
             .is_some_and(|time| refresh_time(saved).is_none_or(|previous| time > previous))
@@ -637,6 +736,14 @@ fn jwt_claims(token: &str) -> Option<Value> {
 }
 fn credential_email(content: &str) -> Option<String> {
     let credentials: Value = serde_json::from_str(content).ok()?;
+    if api_key::is_api_key(&credentials) {
+        return Some(
+            credentials["_codex_usage"]["name"]
+                .as_str()
+                .unwrap_or("API Key")
+                .to_owned(),
+        );
+    }
     let claims = jwt_claims(credentials["tokens"]["id_token"].as_str()?)?;
     claims["email"]
         .as_str()
@@ -646,6 +753,9 @@ fn credential_email(content: &str) -> Option<String> {
 fn credential_identity(content: &str) -> Result<Identity, String> {
     let auth = parse_codex_auth(content)?;
     let value: Value = serde_json::from_str(content).map_err(|_| "codexAuthInvalid")?;
+    if let Some(identity) = api_key::identity(&value) {
+        return Ok(identity);
+    }
     if !auth.is_chatgpt
         || value["tokens"]["refresh_token"]
             .as_str()
@@ -806,6 +916,23 @@ pub(crate) async fn import_current_codex_account(
         .map_err(|_| "accountTaskFailed")??;
     changed(&app);
     Ok(result)
+}
+#[tauri::command]
+pub(crate) async fn add_codex_api_key(
+    app: tauri::AppHandle,
+    service: tauri::State<'_, Arc<AccountService>>,
+    name: String,
+    api_key: String,
+    base_url: String,
+) -> Result<String, String> {
+    let service = service.inner().clone();
+    let id = tauri::async_runtime::spawn_blocking(move || {
+        service.add_api_key(&name, &api_key, &base_url)
+    })
+    .await
+    .map_err(|_| "accountTaskFailed")??;
+    changed(&app);
+    Ok(id)
 }
 #[tauri::command]
 pub(crate) async fn fetch_codex_account_status(

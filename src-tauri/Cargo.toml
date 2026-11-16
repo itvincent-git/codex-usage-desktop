@@ -42,6 +42,7 @@ tauri-plugin-wdio-webdriver = { version = "1.5.1", optional = true }
 walkdir = "2"
 uuid = { version = "1.29.0", features = ["v4"] }
 zstd = { version = "0.14.3", default-features = false }
+toml_edit = "0.25"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"

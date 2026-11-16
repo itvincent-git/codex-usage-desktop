@@ -21,7 +21,7 @@ def snapshot(home):
         for key, item in value.items():
             if key == "cli_auth_credentials_store" and (not root or item != "file"):
                 raise ValueError("accountBackendUnsupported")
-            if key == "forced_login_method" and (not root or item != "chatgpt"):
+            if key == "forced_login_method" and (not root or item not in ("chatgpt", "api")):
                 raise ValueError("accountBackendUnsupported")
             if key in ("profile", "auth_mode", "chatgpt_base_url"):
                 raise ValueError("accountBackendUnsupported")
@@ -31,7 +31,8 @@ def snapshot(home):
         validate(tomllib.loads(doc))
     original = home / "auth.json"
     path = original.resolve(strict=original.is_symlink() or original.exists())
-    return {"config": json.dumps(config, separators=(",", ":")), "path": str(path),
+    config_path = (home / "config.toml").resolve(strict=(home / "config.toml").is_symlink())
+    return {"userConfig": config[0], "configPath": str(config_path), "config": json.dumps(config, separators=(",", ":")), "path": str(path),
             "content": path.read_text() if path.exists() else None}
 
 
@@ -49,6 +50,24 @@ def lock(path):
             time.sleep(.01)
 
 
+def atomic_write(path, text):
+    fd, name = tempfile.mkstemp(prefix=".credentials-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as output:
+            output.write(text)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(name, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
 try:
     request = json.load(sys.stdin)
     home = pathlib.Path(request["home"])
@@ -57,26 +76,16 @@ try:
         home.mkdir(mode=0o700, parents=True, exist_ok=True)
         outer = lock(home / "auth.lock")
         inner = lock(current["path"] + ".lock")
+        config_lock = lock(current["configPath"] + ".lock") if request.get("targetConfig") is not None else None
         current = snapshot(home)
-        if any(current[key] != request[key] for key in ("config", "path")) or current["content"] != request["expected"]:
+        if any(current[key] != request[key] for key in ("config", "path", "configPath")) or current["content"] != request["expected"]:
             raise ValueError("accountAuthConflict")
         path = pathlib.Path(current["path"])
-        fd, name = tempfile.mkstemp(prefix=".credentials-", dir=path.parent)
-        try:
-            with os.fdopen(fd, "w") as output:
-                output.write(request["target"])
-                output.flush()
-                os.fsync(output.fileno())
-            os.replace(name, path)
-            directory = os.open(path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        finally:
-            if os.path.exists(name):
-                os.unlink(name)
-        if path.read_text() != request["target"]:
+        atomic_write(path, request["target"])
+        if request.get("targetConfig") is not None:
+            atomic_write(pathlib.Path(current["configPath"]), request["targetConfig"])
+        if (path.read_text() != request["target"] or
+                request.get("targetConfig") is not None and pathlib.Path(current["configPath"]).read_text() != request["targetConfig"]):
             raise ValueError("accountAuthConflict")
         current = {"ok": True}
     print(json.dumps(current))

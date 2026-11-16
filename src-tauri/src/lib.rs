@@ -1331,6 +1331,7 @@ pub fn run() {
             codex_accounts::current_codex_auth_context,
             codex_accounts::list_codex_accounts,
             codex_accounts::import_current_codex_account,
+            codex_accounts::add_codex_api_key,
             codex_accounts::fetch_codex_account_status,
             codex_accounts::switch_codex_account,
             codex_accounts::remove_codex_account,

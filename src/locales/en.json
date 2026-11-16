@@ -953,6 +953,13 @@
     "quota_not_applicable": "These credentials use an API key rather than a ChatGPT subscription. ChatGPT quota is unavailable for this authentication mode. Local token and cost statistics are still available."
   },
   "accounts": {
+    "api_add": "Add API Key",
+    "api_name": "Name",
+    "api_save": "Save API Key",
+    "api_url_hint": "Leave blank for OpenAI. For compatible providers, enter the full API base URL (for example, https://gateway.example.com/v1). The endpoint must support the Responses API.",
+    "api_storage_hint": "Keys are saved locally as plaintext with the same file permissions as saved accounts. Saving does not switch Codex.",
+    "api_quota_hint": "API Key accounts do not provide ChatGPT quotas or subscription details. Check billing with your API provider. Local session statistics remain available.",
+    "api_saved": "Saved locally",
     "view_accounts": "View account quotas",
     "switch_notice": "Sign-in configuration updated. Restart related Codex clients to load the new account.",
     "current_hint": "This is the account in the Codex sign-in configuration. Running clients may need to be restarted to load it.",
@@ -1036,6 +1043,9 @@
     "part_resetCredits": "Reset credits",
     "part_credentials": "Credentials",
     "errors": {
+      "accountApiKeyInvalid": "Enter a name and a non-empty API Key without spaces.",
+      "accountBaseUrlInvalid": "Enter an HTTP(S) Base URL without credentials, query parameters, or a fragment.",
+      "accountApiKeyQuotaUnsupported": "API Key accounts do not support ChatGPT quota queries.",
       "generic": "Could not update this account. Try again.",
       "accountTaskFailed": "Could not update this account. Try again.",
       "accountNetworkError": "Could not update this account. Try again.",

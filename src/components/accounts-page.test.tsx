@@ -32,6 +32,43 @@ beforeEach(async () => {
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
 
 describe("saved Codex accounts", () => {
+  it("saves an API Key without switching or fetching ChatGPT quotas", async () => {
+    vi.mocked(api.addCodexApiKey).mockImplementation(async (name, _key, baseUrl) => {
+      list.accounts.push({ id: "api", email: name, identity: { userId: "opaque-key", workspaceId: baseUrl }, authMode: "apikey", baseUrl, current: false, credentialVersion: 1, lastRefresh: null, status: null });
+      return "api";
+    });
+    render(<AccountsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add account" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add API Key" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Add API Key" }));
+    expect(dialog.getByRole("button", { name: "Save API Key" })).toBeDisabled();
+    await userEvent.type(dialog.getByLabelText("Name"), "Gateway");
+    await userEvent.type(dialog.getByLabelText("API Key"), "private-key");
+    expect(dialog.getByLabelText("API Key")).toHaveAttribute("type", "password");
+    await userEvent.type(dialog.getByLabelText("Base URL"), "https://gateway.example.test/v1");
+    await userEvent.click(dialog.getByRole("button", { name: "Save API Key" }));
+    const saved = within((await screen.findByRole("heading", { name: "Gateway" })).closest("article")!);
+    expect(api.addCodexApiKey).toHaveBeenCalledExactlyOnceWith("Gateway", "private-key", "https://gateway.example.test/v1");
+    expect(api.switchCodexAccount).not.toHaveBeenCalled();
+    expect(api.fetchCodexAccountStatus).not.toHaveBeenCalled();
+    expect(saved.queryByRole("meter")).not.toBeInTheDocument();
+    expect(saved.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+    expect(saved.getByText(i18n.t("accounts.api_quota_hint"))).toBeVisible();
+    vi.mocked(api.fetchCodexAccountStatus).mockImplementation(async (id) => list.accounts.find((account) => account.id === id)!.status!);
+    await userEvent.click(screen.getByRole("button", { name: "Refresh all" }));
+    expect(api.fetchCodexAccountStatus).not.toHaveBeenCalledWith("api");
+  });
+
+  it("offers API Key entry for the first account and clears secrets on close", async () => {
+    list.accounts = []; list.currentIdentity = null;
+    render(<AccountsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Add API Key" }));
+    await userEvent.type(screen.getByLabelText("API Key"), "private-key");
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add API Key" }));
+    expect(screen.getByLabelText("API Key")).toHaveValue("");
+  });
+
   it.each([false, true])("shows loading until the first account list resolves (empty: %s)", async (empty) => {
     let resolveList!: (value: api.AccountList) => void;
     vi.mocked(api.listCodexAccounts).mockReturnValue(new Promise((resolve) => { resolveList = resolve; }));

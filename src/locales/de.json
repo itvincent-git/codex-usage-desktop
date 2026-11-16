@@ -996,6 +996,13 @@
     "quota_not_applicable": "Diese Anmeldedaten verwenden einen API-Schlüssel. ChatGPT-Kontingente sind dafür nicht verfügbar. Lokale Token- und Kostenstatistiken bleiben verfügbar."
   },
   "accounts": {
+    "api_add": "API Key hinzufügen",
+    "api_name": "Name",
+    "api_save": "API Key speichern",
+    "api_url_hint": "Leer lassen für OpenAI. Bei kompatiblen Anbietern die vollständige API-Basis-URL eingeben (z. B. https://gateway.example.com/v1). Der Endpunkt muss die Responses API unterstützen.",
+    "api_storage_hint": "Schlüssel werden lokal im Klartext mit denselben Dateiberechtigungen wie gespeicherte Konten abgelegt. Speichern wechselt Codex nicht.",
+    "api_quota_hint": "API-Key-Konten liefern keine ChatGPT-Kontingente oder Abonnementdetails. Rechnungen sind beim API-Anbieter einsehbar. Lokale Sitzungsstatistiken bleiben verfügbar.",
+    "api_saved": "Lokal gespeichert",
     "view_accounts": "Kontingente anzeigen",
     "switch_notice": "Anmeldekonfiguration geändert. Starten Sie die zugehörigen Codex-Clients neu, um das neue Konto zu laden.",
     "current_hint": "Dieses Konto ist in der Codex-Anmeldekonfiguration gespeichert. Laufende Clients müssen eventuell neu gestartet werden.",
@@ -1079,6 +1086,9 @@
     "part_resetCredits": "Reset-Guthaben",
     "part_credentials": "Zugangsdaten",
     "errors": {
+      "accountApiKeyInvalid": "Einen Namen und einen nicht leeren API Key ohne Leerzeichen eingeben.",
+      "accountBaseUrlInvalid": "Eine HTTP(S)-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment eingeben.",
+      "accountApiKeyQuotaUnsupported": "API-Key-Konten unterstützen keine ChatGPT-Kontingentabfragen.",
       "generic": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
       "accountTaskFailed": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
       "accountNetworkError": "Das Konto konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
