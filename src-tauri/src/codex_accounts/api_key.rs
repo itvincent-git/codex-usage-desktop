@@ -131,20 +131,12 @@ pub(super) fn switch_config(
                 applied,
             }),
         ))
-    } else if let Some(backup) = backup {
-        let original = backup
-            .original
-            .parse::<DocumentMut>()
-            .map_err(|_| "accountStorageInvalid")?;
+    } else {
+        // ChatGPT must use its native provider and endpoint, including when
+        // an imported API login has no backup or the backup contains API fields.
         for key in fields {
-            if let Some(item) = original.get(key) {
-                document[key] = item.clone();
-            } else {
-                document.remove(key);
-            }
+            document.remove(key);
         }
         Ok((document.to_string(), None))
-    } else {
-        Ok((snapshot.user_config.clone(), None))
     }
 }

@@ -760,10 +760,10 @@ fn api_switch_respects_forced_login_and_workspace_restrictions() {
 }
 
 #[test]
-fn api_config_restores_provider_fields_and_keeps_intervening_edits() {
+fn api_config_clears_provider_fields_and_keeps_intervening_edits() {
     let f = Fixture::new();
     let path = f.environment.home.join("config.toml");
-    let original = "# original\nmodel_provider = 'openai' # provider\nopenai_base_url = 'https://old.example.test/v1' # url\nmodel = 'before'\n[mcp_servers.keep]\ncommand = 'keep'\n";
+    let original = "model_provider = 'openai' # provider\nopenai_base_url = 'https://old.example.test/v1' # url\n# original\nmodel = 'before'\n[mcp_servers.keep]\ncommand = 'keep'\n";
     fs::write(&path, original).unwrap();
     let snapshot = native::snapshot(&f.environment).unwrap();
     let key =
@@ -780,8 +780,36 @@ fn api_config_restores_provider_fields_and_keeps_intervening_edits() {
     assert!(backup.is_none());
     assert_eq!(
         restored,
-        original.replace("model = 'before'", "model = 'after'")
+        "# original\nmodel = 'after'\n[mcp_servers.keep]\ncommand = 'keep'\n"
     );
+}
+
+#[test]
+fn chatgpt_switch_clears_api_configuration_without_backup() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    let chatgpt_auth = credentials("a", "shared", 1);
+    let chatgpt = f.service.upsert(&chatgpt_auth.to_string(), None).unwrap();
+    let path = f.environment.home.join("config.toml");
+    // Cover both an imported API login and an already-switched ChatGPT login
+    // whose configuration still contains the old API endpoint.
+    for auth in [
+        json!({"auth_mode":"apikey", "OPENAI_API_KEY":"private-imported-key"}),
+        chatgpt_auth.clone(),
+    ] {
+        f.live(&auth);
+        fs::write(&path, "model_provider='openai'\nopenai_base_url='https://gateway.example.test/v1'\n# keep\nmodel='keep'\n").unwrap();
+        let context = native::snapshot(&f.environment).unwrap().context();
+        f.service.switch(&chatgpt, &context).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "# keep\nmodel='keep'\n");
+        let restored: Value = serde_json::from_str(
+            &fs::read_to_string(f.environment.home.join("auth.json")).unwrap(),
+        ).unwrap();
+        assert_eq!(restored, chatgpt_auth);
+    }
+    crate::codex_environment::select_codex_home(Some(previous.home));
 }
 
 #[test]

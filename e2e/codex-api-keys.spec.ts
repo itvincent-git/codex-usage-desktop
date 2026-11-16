@@ -1,5 +1,5 @@
 import { $, browser, expect } from "@wdio/globals";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AccountList } from "../src/lib/codex-accounts";
 
@@ -64,6 +64,26 @@ describe("API Key accounts in the native app", () => {
       expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(originalAuth);
       expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
     }
+  });
+
+  it("clears an imported API endpoint without a configuration backup", async () => {
+    const home = process.env.CODEX_HOME!;
+    const authPath = join(home, "auth.json");
+    const configPath = join(home, "config.toml");
+    const originalAuth = JSON.parse(readFileSync(authPath, "utf8"));
+    const originalConfig = readFileSync(configPath, "utf8");
+    writeFileSync(authPath, JSON.stringify({ auth_mode: "apikey", OPENAI_API_KEY: "fixture-imported-key" }));
+    writeFileSync(configPath, `model_provider='openai'\nopenai_base_url='https://gateway.example.test/v1'\n${originalConfig}`);
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const alice = $('[data-account-id="alice"]');
+    await expect(alice).not.toHaveAttribute("aria-current", "true");
+    await alice.$("button=Switch Codex sign-in").click();
+    await expect(alice).toHaveAttribute("aria-current", "true");
+    expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(originalAuth);
+    expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
+    await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
   });
 
   it("distinguishes ChatGPT sign-in and API Key setup in Chinese", async () => {
