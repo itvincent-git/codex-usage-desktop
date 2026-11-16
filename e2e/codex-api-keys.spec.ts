@@ -58,6 +58,14 @@ describe("API Key accounts in the native app", () => {
       expect(JSON.parse(readFileSync(authPath, "utf8")).OPENAI_API_KEY).toBe(key);
       expect(readFileSync(configPath, "utf8")).toContain(url || "https://api.openai.com/v1");
       await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
+      // Exercise configuration edits made after API setup, then reload the auth context.
+      const applied = readFileSync(configPath, "utf8");
+      writeFileSync(configPath, url ? originalConfig : applied
+        .replace('model_provider = "openai"', "model_provider='openai' # reformatted"));
+      await browser.refresh();
+      await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+      await $('[data-testid="accounts-nav-tab"]').click();
+      await expect($('[data-account-id="alice"]')).not.toHaveAttribute("aria-current", "true");
       await $('[data-account-id="alice"]').$("button=Switch Codex sign-in").click();
       await expect($('[data-account-id="alice"]')).toHaveAttribute("aria-current", "true");
       await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();

@@ -113,7 +113,13 @@ pub(super) fn switch_config(
             .parse::<DocumentMut>()
             .map_err(|_| "accountStorageInvalid")?;
         if fields.iter().any(|key| {
-            document.get(key).map(ToString::to_string) != applied.get(key).map(ToString::to_string)
+            let current = document.get(key);
+            // Missing API fields already match the configuration ChatGPT needs.
+            if !is_api_key(credentials) && current.is_none() {
+                return false;
+            }
+            current.and_then(|item| item.as_str())
+                != applied.get(key).and_then(|item| item.as_str())
         }) {
             return Err("accountAuthConflict".into());
         }
