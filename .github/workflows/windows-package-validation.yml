@@ -11,7 +11,8 @@ jobs:
     name: Build Windows x64 installer
     runs-on: windows-latest
     env:
-      SCCACHE_GHA_ENABLED: "true"
+      # Override .cargo/config.toml to avoid sccache's Windows command-line limit.
+      RUSTC_WRAPPER: ""
 
     steps:
       - name: Checkout
@@ -38,9 +39,6 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-targets: false
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

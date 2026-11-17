@@ -23,6 +23,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       SCCACHE_GHA_ENABLED: "true"
+      # sccache can exceed Windows command-line limits when spawning rustc.
+      RUSTC_WRAPPER: ${{ matrix.os != 'windows-latest' && 'sccache' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -88,6 +90,7 @@ jobs:
           cache-targets: false
 
       - name: Setup sccache
+        if: runner.os != 'Windows'
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Install dependencies
