@@ -72,7 +72,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [urlCopyState, setUrlCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const generation = useRef(0);
-  const inFlight = useRef(new Set<string>());
+  const inFlight = useRef(new Map<string, string>());
   const mounted = useRef(true);
   const message = (code: string) => t(`accounts.errors.${code.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") });
 
@@ -112,15 +112,16 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     finally { if (mounted.current) setBusy(null); }
   };
   const refresh = async (account: CodexAccount) => {
-    if (inFlight.current.has(account.id)) return;
-    inFlight.current.add(account.id);
-    setRefreshing(new Set(inFlight.current));
+    const request = `${account.id}:${account.credentialVersion}`;
+    if (inFlight.current.has(request)) return;
+    inFlight.current.set(request, account.id);
+    setRefreshing(new Set(inFlight.current.values()));
     try {
       const status = await fetchCodexAccountStatus(account.id);
       if (!mounted.current) return;
       setList((previous) => previous ? { ...previous, accounts: previous.accounts.map((a) => a.id === status.accountId && a.identity.userId === status.identity.userId && a.identity.workspaceId === status.identity.workspaceId && status.credentialVersion >= a.credentialVersion ? { ...a, status, credentialVersion: status.credentialVersion } : a) } : previous);
     } catch (e) { if (mounted.current) setError(String(e)); }
-    finally { inFlight.current.delete(account.id); if (mounted.current) setRefreshing(new Set(inFlight.current)); }
+    finally { inFlight.current.delete(request); if (mounted.current) setRefreshing(new Set(inFlight.current.values())); }
   };
   const refreshAll = async () => {
     // Three workers also bound command submissions, independently of backend limits.
@@ -128,8 +129,9 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) await refresh(queue.shift()!); }));
     await reload().catch((e: unknown) => setError(String(e)));
   };
-  const missingAccounts = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey" && !account.status).map((account) => account.id).join("|");
-  const refreshMissing = useEffectEvent(() => { for (const account of list?.accounts ?? []) if (account.authMode !== "apikey" && !account.status) void refresh(account); });
+  const pendingStatusAccounts = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey" && (!account.status || account.status.credentialVersion < account.credentialVersion));
+  const missingAccounts = pendingStatusAccounts.map((account) => `${account.id}:${account.credentialVersion}`).join("|");
+  const refreshMissing = useEffectEvent(() => { for (const account of pendingStatusAccounts) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
   const login = (device: boolean, id: string | null = null) => {
     if (busy || task?.state === "running") return;
@@ -317,7 +319,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
         const windows = free
           ? [{ kind: "monthly", name: "accounts.window_monthly", window: data?.weekly ?? data?.session }]
           : [{ kind: "5h", name: "accounts.window_5hour", window: data?.session }, { kind: "weekly", name: "accounts.window_weekly", window: data?.weekly }];
-        const partStale = (part: string) => !!status && (status.needsLogin || !!status.errors[part] || !!status.updatedAt[part] && Date.now() - Date.parse(status.updatedAt[part]) > 10 * 60_000);
+        const partStale = (part: string) => !!status && (status.credentialVersion < account.credentialVersion || status.needsLogin || !!status.errors[part] || !!status.updatedAt[part] && Date.now() - Date.parse(status.updatedAt[part]) > 10 * 60_000);
         const limitsStale = partStale("limits");
         const subscriptionStale = partStale("subscription");
         const resetStale = partStale("resetCredits");

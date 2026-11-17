@@ -261,9 +261,33 @@ impl AccountService {
             }
         }
         let id = if let Some(account) = store.accounts.iter_mut().find(|a| a.identity == identity) {
+            // Imports have no completed-login revision or expected account version.
+            // Apply the same generation checks used when adopting native rotations.
+            if expected.is_none() && removal_revision.is_none() {
+                if account.credentials == credentials {
+                    return Ok(account.id.clone());
+                }
+                if !can_adopt(&credentials, &account.credentials) {
+                    if refresh_time(&credentials).is_some()
+                        && can_adopt(&account.credentials, &credentials)
+                    {
+                        return Ok(account.id.clone());
+                    }
+                    return Err("accountAuthConflict".into());
+                }
+            }
             account.credentials = credentials;
             account.email = credential_email(content);
             account.credential_version += 1;
+            if let Some(status) = &mut account.status {
+                status.needs_login = false;
+                status.errors.retain(|part, error| {
+                    part != "credentials"
+                        && error != "accountUnauthorized"
+                        && error != "accountLoginRequired"
+                });
+                // Keep cached values on their original generation until queried again.
+            }
             account.id.clone()
         } else {
             if expected.is_some() {
@@ -599,6 +623,7 @@ impl AccountService {
             store.config_backups.remove(&config_key);
         }
         store.pending = None;
+        store.recovery_conflict = false;
         self.save(&store)?;
         Ok(SwitchResult {
             verified: true,

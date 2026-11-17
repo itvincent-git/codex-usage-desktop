@@ -49,12 +49,18 @@ describe("API Key accounts in the native app", () => {
       expect(saved.current).toBe(false);
       expect(JSON.stringify(await accounts())).not.toContain(key);
       expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(originalAuth);
+      const storePath = join(process.env.CODEX_USAGE_TEST_DATA_DIR!, "codex-accounts/accounts.json");
+      const store = JSON.parse(readFileSync(storePath, "utf8"));
+      store.recovery_conflict = true;
+      writeFileSync(storePath, JSON.stringify(store));
+      expect((await accounts()).recoveryConflict).toBe(true);
       const card = $(`[data-account-id="${saved.id}"]`);
       await expect(card.$('[role="meter"]')).not.toExist();
       await expect(card.$('button[aria-label="Refresh"]')).not.toExist();
       await expect(card.$("button=Switch Codex sign-in")).toHaveStyle({ color: "rgb(255,255,255)" });
       await card.$("button=Switch Codex sign-in").click();
       await expect(card).toHaveAttribute("aria-current", "true");
+      expect((await accounts()).recoveryConflict).toBe(false);
       expect(JSON.parse(readFileSync(authPath, "utf8")).OPENAI_API_KEY).toBe(key);
       expect(readFileSync(configPath, "utf8")).toContain(url || "https://api.openai.com/v1");
       await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();

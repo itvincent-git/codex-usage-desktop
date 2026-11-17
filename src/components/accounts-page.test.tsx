@@ -431,6 +431,33 @@ describe("saved Codex accounts", () => {
     await act(async () => resolve(previous));
     expect(screen.getByText("new-plan")).toBeInTheDocument();
   });
+
+  it.each([false, true])("refreshes cached status after re-login while an old query is pending: %s", async (pending) => {
+    let resolveOld!: (status: api.AccountStatus) => void;
+    let resolveNew!: (status: api.AccountStatus) => void;
+    const fetch = vi.mocked(api.fetchCodexAccountStatus);
+    if (pending) fetch.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+    fetch.mockReturnValueOnce(new Promise((resolve) => { resolveNew = resolve; }));
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "b@example.test" });
+    const previous = structuredClone(list.accounts[1].status!);
+    if (pending) fireEvent.click(within(card("b@example.test")).getByRole("button", { name: "Refresh" }));
+    list.accounts[1] = { ...list.accounts[1], credentialVersion: 2 };
+    await act(async () => events.get("codex-accounts-changed")!());
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(pending ? 2 : 1));
+    const b = within(card("b@example.test"));
+    expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "25");
+    expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).toHaveClass("account-quota-stale");
+    if (pending) {
+      await act(async () => resolveOld({ ...previous, needsLogin: true, errors: { credentials: "accountLoginRequired" } }));
+      expect(b.queryByRole("button", { name: "Sign in again" })).not.toBeInTheDocument();
+      expect(b.getByRole("button", { name: "Refresh" })).toBeDisabled();
+    }
+    await act(async () => resolveNew({ ...previous, credentialVersion: 2, data: data("new-plan", 70) }));
+    expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "70");
+    expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).not.toHaveClass("account-quota-stale");
+    expect(b.getByRole("button", { name: "Refresh" })).toBeEnabled();
+  });
 });
 
 describe("account card presentation", () => {

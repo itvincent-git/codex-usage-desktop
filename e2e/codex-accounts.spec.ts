@@ -446,10 +446,10 @@ describe("native saved Codex accounts", () => {
     await expect($('//*[@role="menuitem" and normalize-space(.)="Sign in again"]')).toBeDisplayed();
     await expect($('//*[@role="menuitem" and normalize-space(.)="Remove"]')).toBeDisplayed();
     await browser.keys("Escape");
-    await page.$("button=More").execute((element) => element.focus());
-    await browser.keys("Enter");
-    await expect($('//*[@role="menuitem" and normalize-space(.)="Use device code"]')).toBeDisplayed();
-    await browser.keys("Escape");
+    await page.$("button=Add account").click();
+    const methods = $('[role="dialog"][aria-labelledby="account-add-title"]');
+    await expect(methods.$("button=Use device code")).toBeDisplayed();
+    await methods.$('button[aria-label="Close"]').click();
     const layout = () => browser.execute(() => {
       const grid = document.querySelector(".accounts-grid")!;
       return {
@@ -667,6 +667,49 @@ describe("native saved Codex accounts", () => {
     expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual(newer);
   });
 
+  run("refreshes a re-logged-in account and preserves its newer credentials on import", async () => {
+    const storePath = join(process.env.CODEX_USAGE_TEST_DATA_DIR!, "codex-accounts/accounts.json");
+    const authPath = join(process.env.CODEX_HOME!, "auth.json");
+    const store = JSON.parse(readFileSync(storePath, "utf8"));
+    const account = store.accounts.find((a: { email: string }) => a.email === "charlie@example.test");
+    account.status.needsLogin = true;
+    account.status.errors = { credentials: "accountLoginRequired" };
+    writeFileSync(storePath, JSON.stringify(store));
+    const login = accountCredentials("charlie");
+    login.tokens.refresh_token = "fixture-relogin-charlie";
+    login.last_refresh = new Date().toISOString();
+    writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH!, JSON.stringify(login));
+    const nativeBefore = readFileSync(authPath, "utf8");
+    await browser.execute(() => { localStorage.setItem("language", "en"); });
+    await browser.refresh();
+    await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
+    await $('[data-testid="accounts-nav-tab"]').click();
+    const card = $(`[data-account-id="${account.id}"]`);
+    await expect(card.$("button=Sign in again")).toBeDisplayed();
+    await expect(card.$('[role="meter"][aria-label="5-hour quota"]')).toHaveAttribute("aria-valuenow", "25");
+    await card.$("button=Sign in again").click();
+    const dialog = $('[role="dialog"][aria-labelledby="account-add-title"]');
+    await expect(dialog.$(".accounts-login-status h3")).toHaveText("Login completed");
+    await dialog.$("button=View account quotas").click();
+    await browser.waitUntil(async () => {
+      const saved = (await invoke<AccountList>("list_codex_accounts")).accounts.find(a => a.id === account.id)!;
+      return saved.credentialVersion > account.credentialVersion && saved.status?.credentialVersion === saved.credentialVersion;
+    });
+    await expect(card.$("button=Sign in again")).not.toExist();
+    await expect(card).not.toHaveText(expect.stringContaining("Stale data"));
+    expect(readFileSync(authPath, "utf8")).toBe(nativeBefore);
+    try {
+      writeFileSync(authPath, JSON.stringify(accountCredentials("charlie")));
+      await $("button=Add current Codex account").click();
+      await expect($('.accounts-page')).toHaveText(expect.stringContaining("Account saved"));
+      const saved = JSON.parse(readFileSync(storePath, "utf8")).accounts.find((a: { id: string }) => a.id === account.id);
+      expect(saved.credentials).toEqual(login);
+      expect(saved.status.needsLogin).toBe(false);
+    } finally {
+      writeFileSync(authPath, nativeBefore);
+    }
+  });
+
   run("requires confirmation before removing saved accounts", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
@@ -825,7 +868,7 @@ describe("native saved Codex accounts", () => {
       expect((await invoke<AccountList>("list_codex_accounts")).loginTask!.id).toBe(task.id);
       await browser.saveScreenshot("/tmp/codex-accounts-nng-waiting.png");
       await dialog().$("button=取消登录").click();
-      await expect(dialog().$("h3")).toHaveText("登录已取消");
+      await expect(dialog().$(".accounts-login-status h3")).toHaveText("登录已取消");
       await dialog().$('button[aria-label="关闭"]').click();
       await expect(page().$("button=继续登录")).not.toExist();
       await expect(empty().$("button=使用设备码登录")).toBeEnabled();
@@ -834,7 +877,7 @@ describe("native saved Codex accounts", () => {
       await expect(dialog().$(".accounts-login-description")).toHaveText("打开授权页面，输入下方设备码以完成登录。");
       await browser.saveScreenshot("/tmp/codex-accounts-nng-device.png");
       await dialog().$("button=取消登录").click();
-      await expect(dialog().$("h3")).toHaveText("登录已取消");
+      await expect(dialog().$(".accounts-login-status h3")).toHaveText("登录已取消");
       await dialog().$('button[aria-label="关闭"]').click();
     } finally {
       unlinkSync(pending);

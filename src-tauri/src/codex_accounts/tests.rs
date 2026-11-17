@@ -341,6 +341,118 @@ fn equal_or_missing_refresh_times_cannot_authorize_overwriting_a_rotated_bundle(
 }
 
 #[test]
+fn import_preserves_newer_credentials_and_rejects_ambiguous_generations() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    let saved = credentials("a", "a", 2);
+    let id = f.service.upsert(&saved.to_string(), None).unwrap();
+    let old = credentials("a", "a", 1);
+    f.live(&old);
+    let imported = f.service.import_current();
+    let after_old = f.service.account(&id).unwrap();
+    let mut ambiguous_results = Vec::new();
+    for timestamp in [Some("2026-11-06T00:00:02Z"), None] {
+        let mut ambiguous = old.clone();
+        ambiguous["last_refresh"] = timestamp.into();
+        f.live(&ambiguous);
+        ambiguous_results.push(f.service.import_current());
+    }
+    let after_ambiguous = f.service.account(&id).unwrap();
+    let newer = credentials("a", "a", 3);
+    f.live(&newer);
+    let updated = f.service.import_current();
+    crate::codex_environment::select_codex_home(Some(previous.home));
+    assert_eq!(imported.unwrap(), id);
+    assert_eq!(after_old.credentials, saved);
+    assert_eq!(after_old.credential_version, 1);
+    for result in ambiguous_results {
+        assert_eq!(result.err().as_deref(), Some("accountAuthConflict"));
+    }
+    assert_eq!(after_ambiguous.credentials, saved);
+    assert_eq!(after_ambiguous.credential_version, 1);
+    assert_eq!(updated.unwrap(), id);
+    assert_eq!(f.service.account(&id).unwrap().credentials, newer);
+}
+
+#[test]
+fn relogin_clears_authentication_errors_and_keeps_cached_data_for_refresh() {
+    let f = Fixture::new();
+    let id = f
+        .service
+        .upsert(&credentials("a", "a", 1).to_string(), None)
+        .unwrap();
+    let account = f.service.account(&id).unwrap();
+    let mut status = f
+        .service
+        .save_status_error(&account, "accountLoginRequired".into())
+        .unwrap();
+    status
+        .errors
+        .insert("limits".into(), "accountUnauthorized".into());
+    status
+        .errors
+        .insert("subscription".into(), "accountNetworkError".into());
+    status.data = Some(
+        serde_json::from_value(json!({
+            "updatedAt":"2026-11-06T00:00:00Z", "source":"oauth", "membershipLevel":"plus"
+        }))
+        .unwrap(),
+    );
+    status
+        .updated_at
+        .insert("limits".into(), "2026-11-06T00:00:00Z".into());
+    f.service.commit_status(&account, status.clone()).unwrap();
+    // A completed login is authoritative even without an ordered refresh timestamp.
+    let mut login = credentials("a", "a", 2);
+    login["last_refresh"] = Value::Null;
+    f.service
+        .upsert(&login.to_string(), Some((&id, 1)))
+        .unwrap();
+    let updated = f.service.account(&id).unwrap();
+    let cached = updated.status.unwrap();
+    assert_eq!(updated.credentials, login);
+    assert_eq!(updated.credential_version, 2);
+    assert_eq!(cached.credential_version, 1);
+    assert!(!cached.needs_login);
+    assert_eq!(
+        cached.errors,
+        HashMap::from([("subscription".into(), "accountNetworkError".into())])
+    );
+    assert_eq!(cached.data, status.data);
+    assert_eq!(cached.updated_at, status.updated_at);
+}
+
+#[test]
+fn verified_switch_clears_recovery_conflict_but_failed_switch_keeps_it() {
+    let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
+    let previous = selected_codex_environment();
+    let f = Fixture::new();
+    crate::codex_environment::select_codex_home(Some(f.environment.home.clone()));
+    f.live(&credentials("a", "a", 1));
+    let id = f.service.add_api_key("API", "private-key", "").unwrap();
+    {
+        let (_lock, mut store) = f.service.store().unwrap();
+        store.recovery_conflict = true;
+        f.service.save(&store).unwrap();
+    }
+    let failed = f.service.switch(&id, "stale-context");
+    let after_failed = f.service.list().unwrap().recovery_conflict;
+    let context = native::snapshot(&f.environment).unwrap().context();
+    let switched = f.service.switch(&id, &context);
+    let after_switch = f.service.list().unwrap().recovery_conflict;
+    f.service.recover().unwrap();
+    let after_restart = f.service.list().unwrap().recovery_conflict;
+    crate::codex_environment::select_codex_home(Some(previous.home));
+    assert_eq!(failed.err().as_deref(), Some("accountAuthConflict"));
+    assert!(after_failed);
+    assert!(switched.unwrap().verified);
+    assert!(!after_switch);
+    assert!(!after_restart);
+}
+
+#[test]
 fn readded_current_account_keeps_newer_saved_credentials() {
     let _environment_guard = ENVIRONMENT_TEST.lock().unwrap();
     let previous = selected_codex_environment();
