@@ -1,9 +1,9 @@
 cask "codex-usage-desktop" do
   arch arm: "arm64", intel: "x64"
 
-  version "6.3.1"
-  sha256 arm:   "72a7b50a33a07d6e313d54e9469fcd841df25e0eb702a7e2b00e8e5c3c8d4b5d",
-         intel: "7962647d153f733a2245c15a2faba32de7a7befb582c7fde8838cf2721d326dd"
+  version "6.4.0"
+  sha256 arm:   "8b726ced96bc4de09faea2bdbda899bb319103027cfded55b0a21d6fcc5dcd68",
+         intel: "5566365e23090744f18b5d423dd69a16b482c25a67190b07be0a2e25e79dc3be"
 
   url "https://github.com/itvincent-git/codex-usage-desktop/releases/download/app-v#{version}/codex-usage-desktop-macos-#{arch}.dmg"
   name "Codex Usage Desktop"
