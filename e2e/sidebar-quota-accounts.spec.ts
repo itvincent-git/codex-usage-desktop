@@ -68,9 +68,23 @@ describe("sidebar quota accounts", () => {
     const fiveHour = sidebar.$('[data-testid="limit-row-5-hour"]');
     const weekly = sidebar.$('[data-testid="limit-row-weekly"]');
     const monthly = sidebar.$('[data-testid="limit-row-monthly"]');
-    const assertPage = async (user: string, page: string) => {
-      await expect(identity).toHaveText(expect.stringContaining(`${user}@example.test`));
-      await expect(sidebar.$(".tabular-nums[aria-hidden=true]")).toHaveText(page);
+    const assertAccount = async (user: string) => {
+      await expect(identity.$(`span[title="${user}@example.test"]`)).toBeDisplayed();
+    };
+    const assertSwitchRow = async (user: string, current = false) => {
+      const name = `${user}@example.test`;
+      const row = await browser.execute((element, name) => {
+        const header = element.parentElement!;
+        const controls = header.querySelectorAll(`span[title="${name}"], button`);
+        const centers = Array.from(controls, (control) => {
+          const rect = control.getBoundingClientRect();
+          return rect.top + rect.height / 2;
+        });
+        return { text: header.textContent, controls: centers.length, offset: Math.max(...centers) - Math.min(...centers) };
+      }, await identity, name);
+      expect(row.controls).toBe(3);
+      expect(row.offset).toBeLessThan(1);
+      expect(row.text).toBe(current ? `${name}Current` : name);
     };
     const authPath = join(process.env.CODEX_HOME!, "auth.json");
     const configPath = join(process.env.CODEX_HOME!, "config.toml");
@@ -79,19 +93,20 @@ describe("sidebar quota accounts", () => {
 
     try {
       await next.waitForDisplayed({ timeout: 90_000 });
-      await assertPage("alice", "1/4");
+      await assertAccount("alice");
+      await assertSwitchRow("alice", true);
       await expect(identity).toHaveText(expect.stringContaining("Current"));
       await expect(fiveHour).toHaveText(expect.stringContaining("80%"));
       await expect(activate).toBeDisplayed();
       await expect($(".accounts-page")).not.toExist();
 
       await previous.click();
-      await assertPage("archive", "4/4");
+      await assertAccount("archive");
       await expect(fiveHour).toHaveText(expect.stringContaining("62%"));
       await next.click();
-      await assertPage("alice", "1/4");
+      await assertAccount("alice");
       await next.click();
-      await assertPage("bob", "2/4");
+      await assertAccount("bob");
       await expect(fiveHour).toHaveText(expect.stringContaining("25%"));
       await expect(weekly).toHaveText(expect.stringContaining("60%"));
       await expect(activate).not.toExist();
@@ -99,11 +114,12 @@ describe("sidebar quota accounts", () => {
       await $('button[aria-label="Collapse sidebar"]').click();
       await next.execute((button) => button.focus());
       await browser.keys("ArrowRight");
-      await assertPage("free", "3/4");
+      await assertAccount("free");
+      await assertSwitchRow("free");
       await expect(monthly).toHaveText(expect.stringContaining("85%"));
       expect(await sidebar.execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       await previous.click();
-      await assertPage("bob", "2/4");
+      await assertAccount("bob");
       await $('button[aria-label="Expand sidebar"]').click();
 
       const before = await control();
@@ -141,15 +157,15 @@ describe("sidebar quota accounts", () => {
 
       writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH!, JSON.stringify(accountCredentials("charlie")));
       await login(null);
-      await assertPage("bob", "2/5");
+      await assertAccount("bob");
       expect((await control())["charlie:/backend-api/wham/usage"]).toBeUndefined();
       await next.click();
-      await assertPage("free", "3/5");
+      await assertAccount("free");
       await next.click();
-      await assertPage("archive", "4/5");
+      await assertAccount("archive");
       await holdNextStatus();
       await next.click();
-      await assertPage("charlie", "5/5");
+      await assertAccount("charlie");
       await waitForHeldStatus();
       await expect(sidebar).toHaveText(expect.stringContaining("Loading"));
       await releaseStatus();
@@ -157,7 +173,7 @@ describe("sidebar quota accounts", () => {
 
       const charlie = (await invoke<AccountList>("list_codex_accounts")).accounts.find((account) => account.email === "charlie@example.test")!;
       await invoke("remove_codex_account", { accountId: charlie.id });
-      await assertPage("alice", "1/4");
+      await assertAccount("alice");
       for (const id of ["alice", "bob", "free", "archive"]) await invoke("remove_codex_account", { accountId: id });
       await expect(previous).not.toExist();
       await expect(next).not.toExist();

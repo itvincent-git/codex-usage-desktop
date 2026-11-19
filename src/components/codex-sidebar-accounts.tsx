@@ -46,8 +46,7 @@ export function CodexSidebarAccounts({ accounts, selectedId, onSelect, ...live }
   const account = page && {
     name: page.name,
     current: page.current,
-    index,
-    count: pages.length,
+    canSwitch: pages.length > 1,
     onPageChange: (step: number) => onSelect(pages[(index + step + pages.length) % pages.length].id),
   };
   if (!saved) {

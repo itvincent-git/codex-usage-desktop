@@ -127,7 +127,6 @@
     "current_account": "現在",
     "previous_account": "前のアカウントの上限",
     "next_account": "次のアカウントの上限",
-    "account_page": "{{total}} アカウント中 {{page}} 番目",
     "sidebar_updated": "更新済み",
     "refresh_failed": "更新に失敗",
     "cached_data": "最後に取得できたデータを表示しています。",

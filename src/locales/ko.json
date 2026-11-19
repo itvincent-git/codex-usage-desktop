@@ -127,7 +127,6 @@
     "current_account": "현재",
     "previous_account": "이전 계정 한도",
     "next_account": "다음 계정 한도",
-    "account_page": "계정 {{page}} / {{total}}",
     "sidebar_updated": "업데이트됨",
     "refresh_failed": "업데이트 실패",
     "cached_data": "마지막으로 가져온 데이터를 표시합니다.",

@@ -22,7 +22,7 @@ type CodexLimitsCardProps = {
 
 export type CodexSidebarLimitsProps = {
   compact?: boolean;
-  account?: { name: string; current: boolean; index: number; count: number; onPageChange: (step: number) => void };
+  account?: { name: string; current: boolean; canSwitch: boolean; onPageChange: (step: number) => void };
   limits: CodexLimitsResponse | null;
   error: string | null;
   isLimitsRefreshing?: boolean;
@@ -114,20 +114,18 @@ export function CodexSidebarLimits({ compact = false, account, limits, error, is
           <span className="truncate">{t(isLimitsRefreshing ? "common.loading" : error ? (limits ? "limits.refresh_failed" : "limits.unavailable") : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
         </span>
       </div> : null}
-      {account ? <div className="space-y-1">
-        <div aria-live="polite" aria-atomic="true" className={cn("flex min-w-0 gap-x-1 text-xs", compact ? "flex-col items-stretch text-center" : "items-center justify-between")}>
-          <span className="min-w-0 truncate font-medium" title={account.name}>{account.name}</span>
-          {account.current ? <span className="shrink-0 truncate rounded bg-primary/10 px-1 text-primary" title={t("limits.current_account")}>{t("limits.current_account")}</span> : null}
-          {account.count > 1 ? <span className="sr-only">{t("limits.account_page", { page: account.index + 1, total: account.count })}</span> : null}
+      {account ? <div className={cn("relative flex min-w-0", compact ? "items-start gap-0.5" : "items-center gap-1", compact && account.current && "pb-4")}>
+        <div aria-live="polite" aria-atomic="true" className={cn("min-w-0 flex-1 text-xs", compact ? "text-center" : "flex items-center gap-1")}>
+          <span className={cn("block min-w-0 truncate font-medium", compact && "text-[10px] leading-6")} title={account.name}>{account.name}</span>
+          {account.current ? <span className={cn("shrink-0 rounded bg-primary/10 px-1 text-primary", compact && "absolute inset-x-0 bottom-0 mx-auto w-fit")} title={t("limits.current_account")}>{t("limits.current_account")}</span> : null}
         </div>
-        {account.count > 1 ? <div className={cn("grid items-center gap-x-1", compact ? "grid-cols-2" : "grid-cols-[auto_1fr_auto]")} onKeyDown={(event) => {
+        {account.canSwitch ? <div className={cn("flex shrink-0", compact ? "gap-0.5" : "gap-1")} onKeyDown={(event) => {
           if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
           event.preventDefault();
           account.onPageChange(event.key === "ArrowLeft" ? -1 : 1);
         }}>
-          <Button type="button" size="icon" variant="secondary" className={cn("h-6 w-7 hover:translate-y-0", compact && "row-start-2 justify-self-center")} aria-label={t("limits.previous_account")} title={t("limits.previous_account")} onClick={() => account.onPageChange(-1)}><ChevronLeft className="h-4 w-4" aria-hidden="true" /></Button>
-          <span aria-hidden="true" className={cn("text-center text-xs tabular-nums text-muted-foreground", compact && "col-span-2 col-start-1 row-start-1")}>{account.index + 1}/{account.count}</span>
-          <Button type="button" size="icon" variant="secondary" className={cn("h-6 w-7 hover:translate-y-0", compact && "col-start-2 row-start-2 justify-self-center")} aria-label={t("limits.next_account")} title={t("limits.next_account")} onClick={() => account.onPageChange(1)}><ChevronRight className="h-4 w-4" aria-hidden="true" /></Button>
+          <Button type="button" size="icon" variant="secondary" className={cn("h-6 hover:translate-y-0", compact ? "w-4" : "w-6")} aria-label={t("limits.previous_account")} title={t("limits.previous_account")} onClick={() => account.onPageChange(-1)}><ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+          <Button type="button" size="icon" variant="secondary" className={cn("h-6 hover:translate-y-0", compact ? "w-4" : "w-6")} aria-label={t("limits.next_account")} title={t("limits.next_account")} onClick={() => account.onPageChange(1)}><ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></Button>
         </div> : null}
       </div> : null}
       {!compact && onRefreshLimits ? (

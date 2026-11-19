@@ -127,7 +127,6 @@
     "current_account": "Aktiv",
     "previous_account": "Kontingent des vorherigen Kontos",
     "next_account": "Kontingent des nächsten Kontos",
-    "account_page": "Konto {{page}} von {{total}}",
     "sidebar_updated": "Aktualisiert",
     "refresh_failed": "Aktualisierung fehlgeschlagen",
     "cached_data": "Die zuletzt erfolgreich abgerufenen Daten werden angezeigt.",

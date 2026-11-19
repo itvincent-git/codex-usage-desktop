@@ -127,7 +127,6 @@
     "current_account": "目前",
     "previous_account": "上一個額度帳號",
     "next_account": "下一個額度帳號",
-    "account_page": "第 {{page}} 個帳號，共 {{total}} 個",
     "sidebar_updated": "已更新",
     "refresh_failed": "更新失敗",
     "cached_data": "目前顯示上次成功取得的資料。",
