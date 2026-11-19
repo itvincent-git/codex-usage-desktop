@@ -45,7 +45,9 @@ zstd = { version = "0.14.3", default-features = false }
 toml_edit = "0.25"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
 objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["block2", "NSApplication", "NSEvent", "NSGraphicsContext", "NSResponder", "NSStatusBarButton", "NSView", "NSWindow"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.7.0"

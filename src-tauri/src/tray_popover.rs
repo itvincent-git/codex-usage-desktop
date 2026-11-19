@@ -2,6 +2,19 @@ use serde_json::Value;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 
+#[cfg(target_os = "macos")]
+use {
+    block2::RcBlock,
+    objc2::{rc::Retained, runtime::AnyObject},
+    objc2_app_kit::{NSEvent, NSEventMask, NSWindow},
+    std::{cell::Cell, ptr::NonNull},
+};
+
+#[cfg(target_os = "macos")]
+thread_local! {
+    static MOUSE_MONITORS: Cell<[Option<Retained<AnyObject>>; 2]> = const { Cell::new([None, None]) };
+}
+
 #[derive(Default)]
 pub struct TrayPopoverState(pub Mutex<Option<Value>>);
 
@@ -20,6 +33,7 @@ pub fn get_tray_popover(state: tauri::State<'_, TrayPopoverState>) -> Option<Val
 #[serde(rename_all = "camelCase")]
 pub enum TrayPopoverAction {
     Toggle,
+    Dismiss,
     #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
     LeftClick,
     #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
@@ -30,6 +44,10 @@ pub enum TrayPopoverAction {
     },
     #[cfg(all(target_os = "macos", feature = "e2e"))]
     AssertTemplate,
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    SendMouseDown {
+        inside: bool,
+    },
     #[cfg(all(target_os = "macos", feature = "e2e"))]
     ToggleAt {
         position: tauri::PhysicalPosition<i32>,
@@ -53,6 +71,7 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             toggle(&app, None).map_err(|error| error.to_string())?;
         }
+        TrayPopoverAction::Dismiss => dismiss(&app).map_err(|error| error.to_string())?,
         #[cfg(all(any(target_os = "macos", target_os = "windows"), feature = "e2e"))]
         TrayPopoverAction::LeftClick => {
             crate::handle_tray_click(&app, tauri::tray::MouseButton::Left, None);
@@ -94,6 +113,32 @@ pub fn tray_popover_action(app: tauri::AppHandle, action: TrayPopoverAction) -> 
             if !is_template {
                 return Err("Expected a native template tray image".to_string());
             }
+        }
+        #[cfg(all(target_os = "macos", feature = "e2e"))]
+        TrayPopoverAction::SendMouseDown { inside } => {
+            use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSEventType};
+
+            let label = if inside { "tray" } else { "main" };
+            let window = app
+                .get_webview_window(label)
+                .ok_or("Test window is missing")?;
+            let mtm = objc2::MainThreadMarker::new().ok_or("Expected the AppKit main thread")?;
+            // Tauri owns the NSWindow and the window handle stays live during dispatch.
+            let native = window.ns_window().map_err(|error| error.to_string())?;
+            let native = unsafe { &*native.cast::<NSWindow>() };
+            let event = NSEvent::mouseEventWithType_location_modifierFlags_timestamp_windowNumber_context_eventNumber_clickCount_pressure(
+                NSEventType::OtherMouseDown,
+                Default::default(),
+                NSEventModifierFlags::empty(),
+                0.0,
+                native.windowNumber(),
+                None,
+                0,
+                1,
+                1.0,
+            )
+            .ok_or("Could not create a native mouse event")?;
+            NSApplication::sharedApplication(mtm).sendEvent(&event);
         }
         #[cfg(all(target_os = "macos", feature = "e2e"))]
         TrayPopoverAction::ToggleAt {
@@ -138,19 +183,64 @@ pub fn dismiss(app: &tauri::AppHandle) -> tauri::Result<()> {
         window.hide()?;
     }
     #[cfg(target_os = "macos")]
-    set_highlighted(app, false)?;
+    update_status_item(app, None)?;
     Ok(())
 }
 
 #[cfg(target_os = "macos")]
-fn set_highlighted(app: &tauri::AppHandle, highlighted: bool) -> tauri::Result<()> {
+fn update_status_item(
+    app: &tauri::AppHandle,
+    popover: Option<&tauri::WebviewWindow>,
+) -> tauri::Result<()> {
     if let Some(tray) = app.tray_by_id("main") {
+        let app = app.clone();
+        let popover = popover.cloned();
         tray.with_inner_tray_icon(move |tray| {
             let mtm = objc2::MainThreadMarker::new().expect("Tauri runs this on main thread");
-            if let Some(button) = tray.ns_status_item().and_then(|item| item.button(mtm)) {
-                button.highlight(highlighted);
+            let button = tray.ns_status_item().and_then(|item| item.button(mtm));
+            if let Some(button) = &button {
+                button.highlight(popover.is_some());
             }
-        })?;
+            for monitor in MOUSE_MONITORS.with(Cell::take).into_iter().flatten() {
+                // These tokens came from AppKit's event monitor registration methods.
+                unsafe { NSEvent::removeMonitor(&monitor) };
+            }
+            let Some(popover) = popover else {
+                return Ok::<_, tauri::Error>(());
+            };
+
+            // The Tauri handle keeps this NSWindow alive on the main thread.
+            let native = popover.ns_window()?.cast::<NSWindow>();
+            let popover_number = unsafe { &*native }.windowNumber();
+            let dismiss_outside = move || {
+                if let Err(error) = dismiss(&app) {
+                    log::warn!("Failed to dismiss tray popover: {error}");
+                }
+            };
+            let dismiss_local = dismiss_outside.clone();
+            let local = RcBlock::new(move |event: NonNull<NSEvent>| {
+                // AppKit supplies a valid event for the duration of the callback.
+                let number = unsafe { event.as_ref() }.windowNumber();
+                let on_status_item = button
+                    .as_ref()
+                    .and_then(|button| button.window())
+                    .is_some_and(|window| window.windowNumber() == number);
+                if number != popover_number && !on_status_item {
+                    dismiss_local();
+                }
+                event.as_ptr()
+            });
+            let global = RcBlock::new(move |_| dismiss_outside());
+            let mask = NSEventMask::LeftMouseDown
+                | NSEventMask::RightMouseDown
+                | NSEventMask::OtherMouseDown;
+            // The local callback passes the original event through unchanged.
+            let local =
+                unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &local) };
+            let global = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &global);
+            MOUSE_MONITORS.with(|monitors| monitors.set([local, global]));
+            Ok(())
+        })??;
     }
     Ok(())
 }
@@ -218,7 +308,7 @@ fn dismiss_on_focus_loss_at(
 ) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("tray") {
         if !window.is_visible()? {
-            return set_highlighted(app, false);
+            return update_status_item(app, None);
         }
     }
     if let (Some(rect), Some(monitor)) = (rect, app.monitor_from_point(cursor.x, cursor.y)?) {
@@ -291,7 +381,7 @@ fn toggle_at(
         }
     }
     window.show()?;
-    set_highlighted(app, true)?;
+    update_status_item(app, Some(&window))?;
     window.set_focus()
 }
 

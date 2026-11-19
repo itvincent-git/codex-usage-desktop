@@ -28,7 +28,7 @@ export function TrayPopover() {
       if (active) setData(snapshot);
     })().catch((err) => { if (active) setError(String(err)); });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") void getCurrentWindow().hide();
+      if (event.key === "Escape") void invoke("tray_popover_action", { action: "dismiss" });
       if (isMac && event.metaKey && event.key.toLowerCase() === "q") {
         event.preventDefault();
         void invoke("tray_popover_action", { action: "quit" });

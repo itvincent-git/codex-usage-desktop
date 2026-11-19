@@ -1,6 +1,38 @@
 import { $, browser, expect } from "@wdio/globals";
 
 describe("menu bar popover dismissal", () => {
+  it("dismisses on a native outside mouse-down without a focus change", async function () {
+    if (process.platform !== "darwin") this.skip();
+    const action = (action: "showMain" | "rightClick" | { sendMouseDown: { inside: boolean } }) =>
+      browser.tauri.execute(({ core }, action) => core.invoke("tray_popover_action", { action }), action);
+    const visible = async () => await browser.tauri.execute(({ core }) =>
+      core.invoke("plugin:window|is_visible", { label: "tray" })) as boolean;
+    const setFocusable = (value: boolean) => browser.tauri.execute(({ core }, value) =>
+      core.invoke("plugin:window|set_focusable", { label: "tray", value }), value);
+
+    try {
+      await action("showMain");
+      // Reproduce a visible popover that cannot emit a focus-loss event.
+      await setFocusable(false);
+      await action("rightClick");
+      await browser.switchToWindow("tray");
+      await $(".tray-popover").waitForDisplayed();
+      expect(await browser.tauri.execute(({ core }) =>
+        core.invoke("plugin:window|is_focused", { label: "tray" }))).toBe(false);
+
+      await action({ sendMouseDown: { inside: true } });
+      expect(await visible()).toBe(true);
+      await action({ sendMouseDown: { inside: false } });
+      await browser.waitUntil(async () => !(await visible()), {
+        timeoutMsg: "A mouse-down outside the tray popover left it open",
+      });
+    } finally {
+      await action("showMain");
+      await setFocusable(true);
+      await browser.switchToWindow("main");
+    }
+  });
+
   it("closes with either mouse button without opening the main window after focus is lost", async function () {
     if (process.platform !== "darwin") this.skip();
     const monitor = await browser.tauri.execute(({ core }) =>
