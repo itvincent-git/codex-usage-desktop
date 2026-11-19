@@ -4,8 +4,9 @@ import react from "@vitejs/plugin-react";
 
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   clearScreen: false,
+  logLevel: command === "build" ? "warn" : "info",
   plugins: [react()],
   resolve: {
     alias: {
@@ -33,4 +34,4 @@ export default defineConfig({
     minify: !process.env.TAURI_ENV_DEBUG ? "oxc" : false,
     sourcemap: Boolean(process.env.TAURI_ENV_DEBUG),
   },
-});
+}));

@@ -98,7 +98,7 @@ export const config: WebdriverIO.Config = {
     ],
   ],
   framework: "mocha",
-  reporters: ["spec"],
+  reporters: [["spec", { onlyFailures: true, showPreface: false }]],
   logLevel: "error",
   waitforTimeout: 10_000,
   connectionRetryTimeout: 15_000,

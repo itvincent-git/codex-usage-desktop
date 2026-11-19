@@ -66,6 +66,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Recommended workflow in this repo:
 - Run only the WDIO cases relevant to the changes. Add or update a focused spec under `e2e/`, then run that spec with `pnpm exec wdio run ./wdio.conf.ts --spec ./e2e/<name>.spec.ts`. The WDIO configuration builds the native application with the e2e feature and launches it through `@wdio/tauri-service`.
+- WDIO prints a run summary and includes the spec report when a spec fails. Vite builds print warnings and errors. Use `pnpm build:web --logLevel info` when you need the full asset list.
 - Do not run the full suite (`pnpm test:e2e`) unless the scope of the changes requires it or the user explicitly requests it.
 - Use WDIO browser, element, and assertion APIs to inspect rendered state, exercise interactions, and wait for asynchronous updates.
 - If the issue looks like loading, sync, or missing data, inspect the Tauri command path and Rust logs before blaming React.
