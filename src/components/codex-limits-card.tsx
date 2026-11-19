@@ -1,4 +1,4 @@
-import { Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LatestResetButton } from "@/components/codex-reset-history";
@@ -20,8 +20,9 @@ type CodexLimitsCardProps = {
   onOpenResetCredits: () => void;
 };
 
-type CodexSidebarLimitsProps = {
+export type CodexSidebarLimitsProps = {
   compact?: boolean;
+  account?: { name: string; current: boolean; index: number; count: number; onPageChange: (step: number) => void };
   limits: CodexLimitsResponse | null;
   error: string | null;
   isLimitsRefreshing?: boolean;
@@ -92,8 +93,11 @@ export function CodexLimitsCard({ limits, isLimitsLoading = false, limitsError =
   );
 }
 
-export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onManageAccounts }: CodexSidebarLimitsProps) {
+export function CodexSidebarLimits({ compact = false, account, limits, error, isLimitsRefreshing = false, isWindowActivating = false, windowActivationStatus, windowActivationError, onRefreshLimits, onActivateWindow, onManageAccounts }: CodexSidebarLimitsProps) {
   const { t } = useTranslation();
+  const savedAccount = account?.current === false;
+  const hasShortWindows = hasSubscription(limits) || (savedAccount && (limits?.session?.windowMinutes === 300 || limits?.weekly?.windowMinutes === 10080));
+  const errorLabel = error && savedAccount ? t(`accounts.errors.${error.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") }) : null;
   const [, refreshCountdown] = useState(0);
   const now = Date.now();
   useEffect(() => {
@@ -110,7 +114,23 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           <span className="truncate">{t(isLimitsRefreshing ? "common.loading" : error ? (limits ? "limits.refresh_failed" : "limits.unavailable") : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
         </span>
       </div> : null}
-      {!compact && onRefreshLimits && onActivateWindow ? (
+      {account ? <div className="space-y-1">
+        <div aria-live="polite" aria-atomic="true" className={cn("flex min-w-0 gap-x-1 text-xs", compact ? "flex-col items-stretch text-center" : "items-center justify-between")}>
+          <span className="min-w-0 truncate font-medium" title={account.name}>{account.name}</span>
+          {account.current ? <span className="shrink-0 truncate rounded bg-primary/10 px-1 text-primary" title={t("limits.current_account")}>{t("limits.current_account")}</span> : null}
+          {account.count > 1 ? <span className="sr-only">{t("limits.account_page", { page: account.index + 1, total: account.count })}</span> : null}
+        </div>
+        {account.count > 1 ? <div className={cn("grid items-center gap-x-1", compact ? "grid-cols-2" : "grid-cols-[auto_1fr_auto]")} onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          account.onPageChange(event.key === "ArrowLeft" ? -1 : 1);
+        }}>
+          <Button type="button" size="icon" variant="secondary" className={cn("h-6 w-7 hover:translate-y-0", compact && "row-start-2 justify-self-center")} aria-label={t("limits.previous_account")} title={t("limits.previous_account")} onClick={() => account.onPageChange(-1)}><ChevronLeft className="h-4 w-4" aria-hidden="true" /></Button>
+          <span aria-hidden="true" className={cn("text-center text-xs tabular-nums text-muted-foreground", compact && "col-span-2 col-start-1 row-start-1")}>{account.index + 1}/{account.count}</span>
+          <Button type="button" size="icon" variant="secondary" className={cn("h-6 w-7 hover:translate-y-0", compact && "col-start-2 row-start-2 justify-self-center")} aria-label={t("limits.next_account")} title={t("limits.next_account")} onClick={() => account.onPageChange(1)}><ChevronRight className="h-4 w-4" aria-hidden="true" /></Button>
+        </div> : null}
+      </div> : null}
+      {!compact && onRefreshLimits ? (
         <LimitActions
           window={limits?.session ?? null}
           showActivation={hasSubscription(limits)}
@@ -123,7 +143,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         />
       ) : null}
       {error && !limits ? (
-        compact ? <p className="break-words text-center text-xs text-warning-foreground" title={error}>{t("limits.unavailable")}</p> : isOAuthLoginError(error) ? (
+        compact ? <p className="break-words text-center text-xs text-warning-foreground" title={errorLabel ?? error}>{t("limits.unavailable")}</p> : !savedAccount && isOAuthLoginError(error) ? (
           <div className="rounded-xl border border-warning/20 bg-warning/5 p-3 text-sm">
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-warning-foreground font-semibold">
@@ -143,7 +163,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
           </div>
         ) : (
           <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">
-            {t(quotaErrorKey(error))}
+            {errorLabel ?? t(quotaErrorKey(error))}
           </div>
         )
 
@@ -151,7 +171,7 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         <p role="status" className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><LoaderCircle className="h-3 w-3 animate-spin" aria-hidden="true" />{t("common.loading")}</p>
       ) : (
         <div className="space-y-3">
-          {hasSubscription(limits) ? (
+          {hasShortWindows ? (
             <>
               <LimitRow label="5 hour" window={limits?.session ?? null} now={now} compact={compact} />
               <LimitRow label="Weekly" window={limits?.weekly ?? null} now={now} compact={compact} />
@@ -165,8 +185,8 @@ export function CodexSidebarLimits({ compact = false, limits, error, isLimitsRef
         <div role="status" className={cn("break-words text-muted-foreground", compact ? "text-center text-xs" : "space-y-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-2 text-xs")}>
           {compact ? <p className="text-warning-foreground">{t("limits.refresh_failed")}</p> : <>
             <p>{t("limits.cached_data")}</p>
-            <p>{t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
-            {isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
+            <p>{errorLabel ?? t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
+            {!savedAccount && isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
           </>}
           <p title={t("limits.updated", { time: dayjs(limits.updatedAt).format("YYYY-MM-DD HH:mm") })}>{t("limits.last_success", { time: dayjs(limits.updatedAt).format("MM/DD HH:mm") })}</p>
         </div>
@@ -192,7 +212,7 @@ function LimitActions({
   activationStatus?: CodexWindowActivationStatus | null;
   activationError?: string | null;
   onRefresh: () => void;
-  onActivate: () => void;
+  onActivate?: () => void;
 }) {
   const { t } = useTranslation();
   const canActivate = window !== null && window.usedPercent <= 0;
@@ -211,7 +231,7 @@ function LimitActions({
           {isRefreshing ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <RefreshCw className="h-3 w-3 shrink-0" />}
           <span className="truncate">{t("limits.query_action")}</span>
         </Button>
-        {showActivation ? (
+        {showActivation && onActivate ? (
           <Button type="button" size="sm" className="h-8 min-w-0 flex-1 gap-1 px-1.5 text-xs" aria-label={t(isActivating ? "limits.activating_action" : "limits.activate_action")} title={statusText} disabled={busy || !canActivate || activationAlreadyRequested} onClick={onActivate}>
             {isActivating ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : <Play className="h-3 w-3 shrink-0" />}
             <span className="truncate">{t(isActivating ? "limits.activating_action" : "limits.sidebar_activate")}</span>

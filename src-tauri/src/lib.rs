@@ -73,6 +73,7 @@ async fn schedule_cache_rebuild(state: tauri::State<'_, AppState>) -> Result<Str
 
 #[tauri::command]
 async fn configure_codex_home(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     home: Option<String>,
 ) -> Result<(), String> {
@@ -82,7 +83,9 @@ async fn configure_codex_home(
         usage_diagnostics::configure(&settings_path, home.map(PathBuf::from))
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    codex_accounts::changed(&app);
+    Ok(())
 }
 
 struct BackgroundRefreshSchedule {

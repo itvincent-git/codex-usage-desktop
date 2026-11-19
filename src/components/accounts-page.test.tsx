@@ -2,7 +2,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AccountsPage } from "./accounts-page";
+import { AccountsPage as AccountCards } from "./accounts-page";
+import { useCodexAccounts } from "@/hooks/use-codex-accounts";
 import * as api from "@/lib/codex-accounts";
 import type { CodexLimitsResponse } from "@/lib/api";
 import i18n from "@/i18n";
@@ -21,12 +22,22 @@ function account(id: string, plan: string, remaining: number): api.CodexAccount 
     status: { accountId: id, identity, credentialVersion: 1, data: data(plan, remaining), errors: {}, updatedAt: { limits: new Date().toISOString() }, needsLogin: false } };
 }
 let list: api.AccountList;
+function AccountsPage() {
+  return <AccountCards {...useCodexAccounts()} />;
+}
+
+function commitStatus(status: api.AccountStatus) {
+  const owner = list.accounts.find((account) => account.id === status.accountId);
+  if (owner?.credentialVersion === status.credentialVersion) owner.status = status;
+  return status;
+}
+
 beforeEach(async () => {
   vi.resetAllMocks(); events.clear(); await i18n.changeLanguage("en");
   localStorage.clear();
   // jsdom does not implement the native dialog API.
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-  list = { accounts: [account("a", "plus", 80), account("b", "pro", 25)], environment: "/isolated/codex", authContext: "context-a", currentIdentity: { userId: "user-a", workspaceId: "shared-workspace" }, switchError: null, recoveryConflict: false };
+  list = { accounts: [account("a", "plus", 80), account("b", "pro", 25)], environment: "/isolated/codex", authContext: "context-a", currentIdentity: { userId: "user-a", workspaceId: "shared-workspace" }, currentChatgpt: { email: "a@example.test" }, switchError: null, recoveryConflict: false };
   vi.mocked(api.listCodexAccounts).mockImplementation(async () => structuredClone(list));
 });
 const card = (email: string) => screen.getByRole("heading", { name: email }).closest("article")!;
@@ -92,9 +103,11 @@ describe("saved Codex accounts", () => {
   });
 
   it("keeps cached accounts visible while reloading", async () => {
+    render(<AccountsPage />);
+    await screen.findByRole("heading", { name: "a@example.test" });
     let resolveList!: (value: api.AccountList) => void;
     vi.mocked(api.listCodexAccounts).mockReturnValue(new Promise((resolve) => { resolveList = resolve; }));
-    render(<AccountsPage initialList={list} />);
+    act(() => { events.get("codex-accounts-changed")!(); });
     expect(screen.getByRole("heading", { name: "a@example.test" })).toBeVisible();
     expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
     await act(async () => { resolveList(list); });
@@ -329,7 +342,7 @@ describe("saved Codex accounts", () => {
     expect(within(card("b@example.test")).getByText(/Refreshing…/)).toBeInTheDocument();
     expect(within(card("a@example.test")).getByRole("button", { name: "Refresh" })).toBeEnabled();
     expect(api.switchCodexAccount).not.toHaveBeenCalled();
-    await act(async () => resolve({ ...list.accounts[1].status!, data: data("pro", 60) }));
+    await act(async () => resolve(commitStatus({ ...list.accounts[1].status!, data: data("pro", 60) })));
     expect(within(card("b@example.test")).getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "60");
     expect(within(card("a@example.test")).getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "80");
   });
@@ -453,7 +466,7 @@ describe("saved Codex accounts", () => {
       expect(b.queryByRole("button", { name: "Sign in again" })).not.toBeInTheDocument();
       expect(b.getByRole("button", { name: "Refresh" })).toBeDisabled();
     }
-    await act(async () => resolveNew({ ...previous, credentialVersion: 2, data: data("new-plan", 70) }));
+    await act(async () => resolveNew(commitStatus({ ...previous, credentialVersion: 2, data: data("new-plan", 70) })));
     expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "70");
     expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).not.toHaveClass("account-quota-stale");
     expect(b.getByRole("button", { name: "Refresh" })).toBeEnabled();

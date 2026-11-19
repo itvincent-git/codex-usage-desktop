@@ -72,20 +72,16 @@ describe("native saved Codex accounts", () => {
     expect(existsSync(versionCalled)).toBe(false);
   });
 
-  run("shows loading while the first native account list is pending", async () => {
+  run("shares the account list loaded before navigating to the account page", async () => {
     await browser.execute(() => { localStorage.clear(); localStorage.setItem("language", "zh"); });
     await browser.refresh();
     await $('[data-testid="accounts-nav-tab"]').waitForDisplayed({ timeout: 90_000 });
     const loading = $('.accounts-page [role="status"][aria-label="加载中"]');
+    await expect($('[aria-label="下一个额度账号"]')).toBeDisplayed();
     try {
       await holdAccountList();
       await $('[data-testid="accounts-nav-tab"]').click();
       await browser.waitUntil(() => browser.execute(() => !!(window as unknown as AccountListWindow).__heldAccountList?.started));
-      await expect(loading).toBeDisplayed();
-      await expect(loading).toHaveText("加载中");
-      await expect($$(".account-card")).toBeElementsArrayOfSize(0);
-      await browser.saveScreenshot("/tmp/codex-accounts-loading.png");
-      await releaseAccountList();
       await expect($$(".account-card")).toBeElementsArrayOfSize(4);
       await expect(loading).not.toExist();
     } finally {

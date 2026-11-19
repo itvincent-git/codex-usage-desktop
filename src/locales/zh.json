@@ -124,6 +124,10 @@
   },
   "limits": {
     "sidebar_title": "额度概览",
+    "current_account": "当前",
+    "previous_account": "上一个额度账号",
+    "next_account": "下一个额度账号",
+    "account_page": "第 {{page}} 个账号，共 {{total}} 个",
     "sidebar_updated": "已更新",
     "refresh_failed": "更新失败",
     "cached_data": "当前显示上次成功获取的数据。",

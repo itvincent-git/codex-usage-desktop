@@ -124,6 +124,10 @@
   },
   "limits": {
     "sidebar_title": "Quota overview",
+    "current_account": "Current",
+    "previous_account": "Previous quota account",
+    "next_account": "Next quota account",
+    "account_page": "Account {{page}} of {{total}}",
     "sidebar_updated": "Updated",
     "refresh_failed": "Update failed",
     "cached_data": "Showing the last successful data.",

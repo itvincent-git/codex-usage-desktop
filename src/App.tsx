@@ -2,7 +2,8 @@ import { AccountsPage } from "@/components/accounts-page";
 import { UsageRecoveryCard } from "@/components/usage-recovery-card";
 import { ScanWaitNotice } from "@/components/scan-wait-notice";
 import { CodexForecastCard } from "@/components/codex-forecast-card";
-import { CodexLimitsCard, CodexSidebarLimits } from "@/components/codex-limits-card";
+import { CodexLimitsCard } from "@/components/codex-limits-card";
+import { CodexSidebarAccounts } from "@/components/codex-sidebar-accounts";
 import { CodexResetHistoryModal } from "@/components/codex-reset-history";
 import { DailyUsageTable } from "@/components/daily-usage-table";
 import { DashboardHeroCard } from "@/components/dashboard-hero-card";
@@ -24,7 +25,7 @@ import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { getReleaseNotes } from "@/lib/release-notes";
 import type { SessionDetailRow } from "@/lib/api";
-import type { AccountList } from "@/lib/codex-accounts";
+import { useCodexAccounts } from "@/hooks/use-codex-accounts";
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,8 @@ import { useTranslation } from "react-i18next";
 export default function App() {
   const { t, i18n } = useTranslation();
   const [showNotes, setShowNotes] = useState(false);
-  const [accounts, setAccounts] = useState<AccountList | null>(null);
+  const accounts = useCodexAccounts();
+  const [selectedQuotaAccountId, setSelectedQuotaAccountId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("sidebar_collapsed") === "true";
@@ -137,6 +139,11 @@ export default function App() {
     handleTrayCountdownUnitChange,
   } = useUsageDashboard();
 
+  const syncAccountsWithLiveLimits = useEffectEvent(() => {
+    if (codexLimits?.authContext && codexLimits.authContext !== accounts.list?.authContext) void accounts.reload();
+  });
+  useEffect(() => { syncAccountsWithLiveLimits(); }, [codexLimits?.authContext]);
+
   useEffect(() => {
     try {
       localStorage.setItem("sidebar_collapsed", String(sidebarCollapsed));
@@ -233,7 +240,10 @@ export default function App() {
           onWidthChange={setSidebarWidth}
           showLogsTab={showLogsTab}
           limits={
-            <CodexSidebarLimits
+            <CodexSidebarAccounts
+              accounts={accounts}
+              selectedId={selectedQuotaAccountId}
+              onSelect={setSelectedQuotaAccountId}
               compact={sidebarCollapsed}
               limits={codexLimits}
               error={codexLimitsError}
@@ -418,7 +428,7 @@ export default function App() {
 
           {isLoading && view !== "accounts" ? <LoadingState title={loadingTitle} description={loadingDescription} /> : null}
 
-          {view === "accounts" ? <AccountsPage initialList={accounts} onListChange={setAccounts} /> : null}
+          {view === "accounts" ? <AccountsPage {...accounts} /> : null}
 
           {view === "monthly" && isMonthlyLoading ? (
             <LoadingState title={t("loading.loading_monthly")} description={t("loading.natural_month_desc")} />

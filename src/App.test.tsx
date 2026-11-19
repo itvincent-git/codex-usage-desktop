@@ -2120,15 +2120,18 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getAllByText("3,400").length).toBeGreaterThan(0));
 
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledTimes(6));
     expect(latestResetInvokeMock).toHaveBeenCalledTimes(1);
     expect(resetHistoryInvokeMock).toHaveBeenCalledWith({ days: 30 });
     expect(resetHistoryInvokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenNthCalledWith(1, "fetch_codex_limits");
     expect(invokeMock).toHaveBeenNthCalledWith(2, "fetch_overview", { range: "30d" });
-    expect(invokeMock).toHaveBeenNthCalledWith(3, "scan_usage");
-    expect(invokeMock).toHaveBeenNthCalledWith(4, "check_for_updates");
-    expect(invokeMock).toHaveBeenNthCalledWith(5, "fetch_overview", { range: "30d" });
+    expect(invokeMock.mock.calls.filter(([command]) => command === "list_codex_accounts")).toHaveLength(1);
+    expect(invokeMock.mock.calls.filter(([command]) => command !== "list_codex_accounts").slice(2)).toEqual([
+      ["scan_usage"],
+      ["check_for_updates"],
+      ["fetch_overview", { range: "30d" }],
+    ]);
   });
 
   it("keeps the cached overview visible when the background scan fails", async () => {
@@ -3243,7 +3246,7 @@ describe("App", () => {
     const identity = { userId: "alice", workspaceId: "personal" };
     const saved: AccountList = { accounts: [{ id: "alice", identity, email: "alice@example.test", credentialVersion: 1, current: true, lastRefresh: null,
       status: { accountId: "alice", identity, credentialVersion: 1, data: limits(80), errors: {}, updatedAt: {}, needsLogin: false } }],
-      environment: "/codex", authContext: "context-a", currentIdentity: identity, switchError: null, recoveryConflict: false };
+      environment: "/codex", authContext: "context-a", currentIdentity: identity, currentChatgpt: { email: "alice@example.test" }, switchError: null, recoveryConflict: false };
     let complete!: (value: AccountList) => void;
     let reads = 0;
     let reloading = false;
@@ -3280,8 +3283,8 @@ describe("App", () => {
       return fallback(command, ...args);
     });
     render(<App />);
-    await waitFor(() => expect(eventListeners.get("codex-accounts-changed")?.length).toBe(1));
-    await act(async () => { eventListeners.get("codex-accounts-changed")![0]({ payload: null }); });
+    await waitFor(() => expect(eventListeners.get("codex-accounts-changed")?.length).toBe(2));
+    await act(async () => { eventListeners.get("codex-accounts-changed")!.forEach((listener) => listener({ payload: null })); });
     await waitFor(() => expect(screen.getByTestId("limit-row-monthly")).toHaveTextContent("25%"));
     await act(async () => completeA({ ...limits(90), authContext: "context-a" }));
     expect(screen.getByTestId("limit-row-monthly")).toHaveTextContent("25%");

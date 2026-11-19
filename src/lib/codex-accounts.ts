@@ -14,6 +14,7 @@ export type CodexAccount = {
 };
 export type AccountList = {
   accounts: CodexAccount[]; environment: string; authContext: string | null;
+  currentChatgpt: { email: string | null } | null;
   loginTask?: LoginTask | null; currentIdentity: AccountIdentity | null; switchError: string | null; recoveryConflict: boolean;
 };
 export type LoginTask = {

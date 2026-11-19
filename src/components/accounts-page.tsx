@@ -1,14 +1,14 @@
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Download, Ellipsis, ExternalLink, Globe, Info, KeyRound, LoaderCircle, MonitorSmartphone, Plus, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./accounts-page.css";
 import { Button } from "@/components/ui/button";
+import { accountVersionKey, type CodexAccounts } from "@/hooks/use-codex-accounts";
 import { useModalFocus } from "@/hooks/use-modal-focus";
 import { openUrl } from "@/lib/api";
-import { addCodexApiKey, cancelCodexAccountLogin, fetchCodexAccountStatus, getCodexAccountLogin, importCurrentCodexAccount, listCodexAccounts, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type AccountList, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
+import { addCodexApiKey, cancelCodexAccountLogin, getCodexAccountLogin, importCurrentCodexAccount, removeCodexAccount, startCodexAccountLogin, switchCodexAccount, type CodexAccount, type LoginTask } from "@/lib/codex-accounts";
 
 const restartReminderKey = "accounts_hide_restart_reminder:v1";
 
@@ -52,13 +52,11 @@ function ApiKeyForm({ busy, onSave }: { busy: boolean; onSave: (name: string, ke
   </form>;
 }
 
-export function AccountsPage({ initialList = null, onListChange }: { initialList?: AccountList | null; onListChange?: (list: AccountList | null) => void } = {}) {
+export function AccountsPage({ list, listError, reload, refresh, refreshing, refreshError }: CodexAccounts) {
   const { t, i18n } = useTranslation();
-  const [list, setList] = useState<AccountList | null>(initialList);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
   const [task, setTask] = useState<LoginTask | null>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -71,12 +69,14 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
   const restartDialog = useRef<HTMLDialogElement>(null);
   const [codeCopyState, setCodeCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [urlCopyState, setUrlCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const generation = useRef(0);
-  const inFlight = useRef(new Map<string, string>());
-  const mounted = useRef(true);
   const message = (code: string) => t(`accounts.errors.${code.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") });
+  const pageError = error ?? listError ?? list?.accounts.map(refreshError).find(Boolean);
 
-  useEffect(() => { onListChange?.(list); }, [list, onListChange]);
+  useEffect(() => { void reload(); }, [reload]);
+  const activeLogin = list?.loginTask;
+  useEffect(() => {
+    if (activeLogin) setTask((previous) => previous?.id === activeLogin.id && previous.state !== "running" ? previous : activeLogin);
+  }, [activeLogin]);
   useEffect(() => { if (pendingRemoval) removalDialog.current?.showModal(); }, [pendingRemoval]);
   useEffect(() => {
     if (showRestartReminder) {
@@ -93,44 +93,19 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     setDontRemindAgain(false);
   };
 
-  const reload = useEffectEvent(async () => {
-    const request = ++generation.current;
-    const result = await listCodexAccounts();
-    if (mounted.current && request === generation.current) { setList(result); if (result.loginTask) setTask(result.loginTask); }
-  });
-  useEffect(() => {
-    mounted.current = true;
-    void reload().catch((e: unknown) => setError(String(e)));
-    const stops = ["codex-accounts-changed", "codex-account-statuses-updated"].map((event) => listen(event, () => { void reload().catch((e: unknown) => setError(String(e))); }));
-    return () => { mounted.current = false; generation.current++; for (const stop of stops) void stop.then((unlisten) => unlisten()); };
-  }, []);
-
   const run = async (key: string, action: () => Promise<unknown>) => {
     if (busy) return;
     setBusy(key); setError(null); setNotice(null);
-    try { await action(); await reload(); } catch (e) { setError(String(e)); await reload().catch(() => {}); }
-    finally { if (mounted.current) setBusy(null); }
-  };
-  const refresh = async (account: CodexAccount) => {
-    const request = `${account.id}:${account.credentialVersion}`;
-    if (inFlight.current.has(request)) return;
-    inFlight.current.set(request, account.id);
-    setRefreshing(new Set(inFlight.current.values()));
-    try {
-      const status = await fetchCodexAccountStatus(account.id);
-      if (!mounted.current) return;
-      setList((previous) => previous ? { ...previous, accounts: previous.accounts.map((a) => a.id === status.accountId && a.identity.userId === status.identity.userId && a.identity.workspaceId === status.identity.workspaceId && status.credentialVersion >= a.credentialVersion ? { ...a, status, credentialVersion: status.credentialVersion } : a) } : previous);
-    } catch (e) { if (mounted.current) setError(String(e)); }
-    finally { inFlight.current.delete(request); if (mounted.current) setRefreshing(new Set(inFlight.current.values())); }
+    try { await action(); } catch (e) { setError(String(e)); }
+    finally { await reload(); setBusy(null); }
   };
   const refreshAll = async () => {
     // Three workers also bound command submissions, independently of backend limits.
     const queue = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey");
     await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) await refresh(queue.shift()!); }));
-    await reload().catch((e: unknown) => setError(String(e)));
   };
   const pendingStatusAccounts = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey" && (!account.status || account.status.credentialVersion < account.credentialVersion));
-  const missingAccounts = pendingStatusAccounts.map((account) => `${account.id}:${account.credentialVersion}`).join("|");
+  const missingAccounts = JSON.stringify(pendingStatusAccounts.map(accountVersionKey));
   const refreshMissing = useEffectEvent(() => { for (const account of pendingStatusAccounts) void refresh(account); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
   const login = (device: boolean, id: string | null = null) => {
@@ -212,7 +187,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     </div>
     {list?.switchError ? <p role="status" className="text-sm text-warning-foreground">{message(list.switchError)}</p> : null}
     {list?.recoveryConflict ? <p role="status" className="text-sm text-warning-foreground">{t("accounts.recovery_conflict")}</p> : null}
-    {!showAddAccount && !showApiKey && error ? <p role="alert" className="text-sm text-error-foreground">{message(error)}</p> : null}
+    {!showAddAccount && !showApiKey && pageError ? <p role="alert" className="text-sm text-error-foreground">{message(pageError)}</p> : null}
     {!showAddAccount && !showApiKey && notice ? <p role="status" className="text-sm text-success-foreground">{notice}</p> : null}
     {!showAddAccount && loginRunning ? <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4 text-sm">
       <span>{t("accounts.login_running")}</span><Button ref={continueLoginButton} size="sm" variant="secondary" onClick={() => setShowAddAccount(true)}>{t("accounts.continue_login")}</Button>
@@ -287,7 +262,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
       <p className="text-xs text-muted-foreground">{t("accounts.add_hint")}</p>
       {task?.state === "completed" ? <Button size="sm" onClick={() => setShowAddAccount(false)}>{t("accounts.view_accounts")}</Button> : null}
     </AddAccountDialog> : null}
-    {!list && !error ? <div role="status" aria-live="polite" aria-label={t("common.loading")} className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+    {!list && !pageError ? <div role="status" aria-live="polite" aria-label={t("common.loading")} className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
       <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
       <span>{t("common.loading")}</span>
     </div> : null}
@@ -307,6 +282,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
     </section> : null}
     <div className="accounts-grid">
       {list?.accounts.map((account) => {
+        const isRefreshing = refreshing.has(accountVersionKey(account));
         const status = account.status;
         const data = status?.data;
         const plan = data?.membershipLevel?.toLowerCase();
@@ -402,7 +378,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
           {status?.needsLogin || stale ? <p role="status" className="account-warning"><TriangleAlert aria-hidden="true" />{t(status?.needsLogin ? "accounts.needs_login" : "accounts.stale")}{Object.keys(status?.errors ?? {}).length ? ` · ${Object.keys(status!.errors).map((part) => t(`accounts.part_${part}`)).join(" / ")}` : ""}</p> : null}
           <footer className="account-footer">
             <details className="account-details">
-              <summary>{refreshing.has(account.id) ? t("accounts.refreshing") : relativeUpdate(updatedAt)} · {t("accounts.data_details")}</summary>
+              <summary>{isRefreshing ? t("accounts.refreshing") : relativeUpdate(updatedAt)} · {t("accounts.data_details")}</summary>
               <div className="account-detail-body">
                 {data ? <p>{t("accounts.data_source")} · {data.source}</p> : null}
                 {data?.subscriptionExpiresAt ? <p>{t("accounts.expires")} · {new Date(data.subscriptionExpiresAt).toLocaleString(locale)}</p> : null}
@@ -411,7 +387,7 @@ export function AccountsPage({ initialList = null, onListChange }: { initialList
               </div>
             </details>
             <div className="account-actions">
-              <Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.refresh")} title={t("accounts.refresh")} aria-busy={refreshing.has(account.id)} disabled={refreshing.has(account.id)} onClick={() => void refresh(account)}><RefreshCw className={`h-3.5 w-3.5${refreshing.has(account.id) ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" /></Button>
+              <Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.refresh")} title={t("accounts.refresh")} aria-busy={isRefreshing} disabled={isRefreshing} onClick={() => void refresh(account)}><RefreshCw className={`h-3.5 w-3.5${isRefreshing ? " animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" /></Button>
               {status?.needsLogin ? <Button size="sm" variant="secondary" disabled={!!busy || loginRunning} onClick={() => void login(false, account.id)}>{t("accounts.relogin")}</Button> : <Button size="sm" variant={account.current ? "secondary" : "primary"} disabled={switchDisabled} onClick={switchAccount}>{t(account.current ? "accounts.current_account" : "accounts.switch")}</Button>}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="account-icon-button" aria-label={t("accounts.more")} title={t("accounts.more")}><Ellipsis className="h-3.5 w-3.5" aria-hidden="true" /></Button></DropdownMenuTrigger>

@@ -76,9 +76,15 @@ pub(crate) struct AccountList {
     environment: String,
     auth_context: Option<String>,
     current_identity: Option<Identity>,
+    current_chatgpt: Option<CurrentChatgpt>,
     switch_error: Option<String>,
     recovery_conflict: bool,
     login_task: Option<login::LoginTask>,
+}
+
+#[derive(Serialize)]
+struct CurrentChatgpt {
+    email: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -190,6 +196,11 @@ impl AccountService {
             }
         }
         let current = content.as_deref().and_then(|s| credential_identity(s).ok());
+        let current_chatgpt = content.as_deref().and_then(|content| {
+            parse_codex_auth(content).ok()?.is_chatgpt.then(|| CurrentChatgpt {
+                email: credential_email(content),
+            })
+        });
         let (_, store) = self.store()?;
         Ok(AccountList {
             accounts: store
@@ -214,6 +225,7 @@ impl AccountService {
             environment: format!("{} ({:?})", environment.home.display(), environment.runtime),
             auth_context: snapshot.map(|s| s.context()),
             current_identity: current,
+            current_chatgpt,
             switch_error: error,
             recovery_conflict: store.recovery_conflict,
             login_task: self.active_login(),
@@ -717,7 +729,11 @@ fn current_version<'a>(
     store
         .accounts
         .iter_mut()
-        .find(|a| a.id == expected.id && a.credential_version == expected.credential_version)
+        .find(|a| {
+            a.id == expected.id
+                && a.identity == expected.identity
+                && a.credential_version == expected.credential_version
+        })
         .ok_or_else(|| "accountAuthConflict".into())
 }
 fn pending(snapshot: &native::Snapshot, target: &str) -> Pending {

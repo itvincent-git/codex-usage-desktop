@@ -31,7 +31,7 @@ export const config: WebdriverIO.Config = {
       writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.db-wal"), "startup wal fixture");
       writeFileSync(join(process.env.CODEX_USAGE_TEST_DATA_DIR, "codex-usage-desktop.rebuild-on-start"), "");
       buildArgs.push("--config", JSON.stringify({ identifier: "com.codexusage.desktop.e2e.recovery" }));
-    } else if (process.argv.some((arg) => arg.includes("codex-accounts.spec.ts") || arg.includes("codex-api-keys.spec.ts"))) {
+    } else if (process.argv.some((arg) => arg.includes("codex-accounts.spec.ts") || arg.includes("codex-api-keys.spec.ts") || arg.includes("sidebar-quota-accounts.spec.ts"))) {
       archivedSessionsHome = mkdtempSync(join(tmpdir(), "codex-accounts-e2e-"));
       accountsFixture = await startAccountsFixture(archivedSessionsHome);
       process.env.CODEX_HOME = accountsFixture.codexHome;

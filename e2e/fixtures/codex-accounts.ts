@@ -34,12 +34,14 @@ export async function startAccountsFixture(root: string) {
   const requests: Record<string, number> = {};
   let failSubscription = false;
   let limitRateLimited = false;
+  let bobUsedPercent = 75;
   const server = createServer(async (req, res) => {
     if (req.url === "/control") {
       let body = ""; for await (const chunk of req) body += chunk;
       const control = JSON.parse(body || "{}");
       if ("failSubscription" in control) failSubscription = control.failSubscription;
       if ("limitRateLimited" in control) limitRateLimited = control.limitRateLimited;
+      if ("bobUsedPercent" in control) bobUsedPercent = control.bobUsedPercent;
       res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(requests)); return;
     }
     if (req.url === "/oauth/token") {
@@ -70,7 +72,7 @@ export async function startAccountsFixture(root: string) {
     } else if (endpoint.endsWith("/usage")) {
       if (claims.force401) { res.writeHead(401).end('{"error":"fixture"}'); return; }
       if (limitRateLimited && identity.chatgpt_user_id === "bob") { res.writeHead(429, { "Retry-After": "60" }).end('{"error":"fixture"}'); return; }
-      res.end(JSON.stringify({ plan_type: identity.chatgpt_user_id === "bob" ? "self_serve_business_prolite" : identity.chatgpt_user_id === "free" ? "free" : identity.chatgpt_user_id === "alice" ? "plus" : "pro", rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "free" ? 15 : identity.chatgpt_user_id === "alice" ? 20 : 75, reset_at: Math.floor(Date.now() / 1000) + (identity.chatgpt_user_id === "free" ? 23 * 86400 : 4 * 3600 + 32 * 60), limit_window_seconds: identity.chatgpt_user_id === "free" ? 30 * 86400 : 18_000 }, secondary_window: identity.chatgpt_user_id === "free" ? null : { used_percent: 40, reset_at: Math.floor(Date.now() / 1000) + 3 * 86400 + 6 * 3600, limit_window_seconds: 604_800 } }, credits: { has_credits: identity.chatgpt_user_id !== "free", unlimited: false, balance: identity.chatgpt_user_id === "free" ? "0" : identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
+      res.end(JSON.stringify({ plan_type: identity.chatgpt_user_id === "bob" ? "self_serve_business_prolite" : identity.chatgpt_user_id === "free" ? "free" : identity.chatgpt_user_id === "alice" ? "plus" : "pro", rate_limit: { primary_window: { used_percent: identity.chatgpt_user_id === "free" ? 15 : identity.chatgpt_user_id === "alice" ? 20 : identity.chatgpt_user_id === "bob" ? bobUsedPercent : 75, reset_at: Math.floor(Date.now() / 1000) + (identity.chatgpt_user_id === "free" ? 23 * 86400 : 4 * 3600 + 32 * 60), limit_window_seconds: identity.chatgpt_user_id === "free" ? 30 * 86400 : 18_000 }, secondary_window: identity.chatgpt_user_id === "free" ? null : { used_percent: 40, reset_at: Math.floor(Date.now() / 1000) + 3 * 86400 + 6 * 3600, limit_window_seconds: 604_800 } }, credits: { has_credits: identity.chatgpt_user_id !== "free", unlimited: false, balance: identity.chatgpt_user_id === "free" ? "0" : identity.chatgpt_user_id === "alice" ? "20" : "200" } }));
     } else { res.writeHead(404).end("{}"); }
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
