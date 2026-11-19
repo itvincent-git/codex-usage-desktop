@@ -1,4 +1,8 @@
 {
+  "6.4.0": {
+    "zh": "- chore(homebrew): update cask to 6.3.1\n- fix(tray): dismiss macOS popover on outside clicks\n- fix(tray): make the usage popover more compact\n- feat(sidebar): browse Codex quotas by account\n- fix(sidebar): align quota account controls inline\n- fix(accounts): share current quota refreshes",
+    "en": "- chore(homebrew): update cask to 6.3.1\n- fix(tray): dismiss macOS popover on outside clicks\n- fix(tray): make the usage popover more compact\n- feat(sidebar): browse Codex quotas by account\n- fix(sidebar): align quota account controls inline\n- fix(accounts): share current quota refreshes"
+  },
   "6.3.1": {
     "zh": "- chore(homebrew): update cask to 6.2.1\n- fix(ui): improve accessibility and compact dashboard layouts\n- feat(accounts): support API keys and compatible base URLs\n- fix(accounts): distinguish ChatGPT login from API key setup\n- fix(accounts): clear API provider settings when switching to ChatGPT\n- fix(accounts): accept cleared API settings when switching to ChatGPT\n- fix(accounts): preserve credentials and refresh login state\n- fix(ci): disable sccache for Windows packaging",
     "en": "- chore(homebrew): update cask to 6.2.1\n- fix(ui): improve accessibility and compact dashboard layouts\n- feat(accounts): support API keys and compatible base URLs\n- fix(accounts): distinguish ChatGPT login from API key setup\n- fix(accounts): clear API provider settings when switching to ChatGPT\n- fix(accounts): accept cleared API settings when switching to ChatGPT\n- fix(accounts): preserve credentials and refresh login state\n- fix(ci): disable sccache for Windows packaging"
