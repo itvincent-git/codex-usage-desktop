@@ -32,15 +32,15 @@ export function CodexSidebarAccounts({ accounts, selectedId, onSelect, ...live }
   }, [selectedId, selectedIndex, onSelect]);
   const index = Math.max(0, selectedIndex);
   const page = pages[index];
-  const saved = page?.current ? null : page?.saved;
+  const saved = page?.saved && (!page.current || page.saved.credentialVersion === list?.currentCredentialVersion) ? page.saved : null;
   const cachedStatus = saved?.status;
   const status = cachedStatus && saved && cachedStatus.accountId === saved.id
     && cachedStatus.identity.userId === saved.identity.userId && cachedStatus.identity.workspaceId === saved.identity.workspaceId
     && cachedStatus.credentialVersion <= saved.credentialVersion ? cachedStatus : null;
   const failure = saved && refreshError(saved);
-  const needsQuota = !!saved && !failure && (!status || status.credentialVersion < saved.credentialVersion);
+  const needsQuota = !!saved && !page?.current && !failure && (!status || status.credentialVersion < saved.credentialVersion);
   const versionKey = saved && accountVersionKey(saved);
-  const fetchMissing = useEffectEvent(() => { if (saved && needsQuota) void refresh(saved); });
+  const fetchMissing = useEffectEvent(() => { if (saved && needsQuota) void refresh(saved, true); });
   useEffect(() => { fetchMissing(); }, [needsQuota, versionKey]);
 
   const account = page && {
@@ -49,15 +49,24 @@ export function CodexSidebarAccounts({ accounts, selectedId, onSelect, ...live }
     canSwitch: pages.length > 1,
     onPageChange: (step: number) => onSelect(pages[(index + step + pages.length) % pages.length].id),
   };
-  if (!saved) {
-    const matches = !list || !live.limits?.authContext || live.limits.authContext === list.authContext;
-    return <CodexSidebarLimits {...live} account={account} limits={matches ? live.limits : null} />;
-  }
-
   const error = failure || status?.errors.credentials || status?.errors.limits || (needsQuota ? listError : null);
   const updatedAt = status?.updatedAt.limits;
   const cached = status?.data;
   const limits = cached && (updatedAt || cached.session || cached.weekly) ? { ...cached, updatedAt: updatedAt ?? cached.updatedAt } : null;
+  if (!saved || page?.current) {
+    const matches = !list || !live.limits?.authContext || live.limits.authContext === list.authContext;
+    const liveLimits = matches ? live.limits : null;
+    const newerLive = !!liveLimits && (!limits || Date.parse(liveLimits.updatedAt) > Date.parse(limits.updatedAt));
+    const showLive = newerLive || !!liveLimits && liveLimits.updatedAt === limits?.updatedAt;
+    return <CodexSidebarLimits
+      {...live}
+      account={account}
+      limits={showLive ? liveLimits : limits}
+      error={newerLive ? live.error : error || (showLive || !status ? live.error : null)}
+      isLimitsRefreshing={live.isLimitsRefreshing || !!versionKey && refreshing.has(versionKey)}
+    />;
+  }
+
   return <CodexSidebarLimits
     compact={live.compact}
     account={account}

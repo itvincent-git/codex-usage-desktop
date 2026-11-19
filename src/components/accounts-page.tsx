@@ -106,7 +106,7 @@ export function AccountsPage({ list, listError, reload, refresh, refreshing, ref
   };
   const pendingStatusAccounts = (list?.accounts ?? []).filter((account) => account.authMode !== "apikey" && (!account.status || account.status.credentialVersion < account.credentialVersion));
   const missingAccounts = JSON.stringify(pendingStatusAccounts.map(accountVersionKey));
-  const refreshMissing = useEffectEvent(() => { for (const account of pendingStatusAccounts) void refresh(account); });
+  const refreshMissing = useEffectEvent(() => { for (const account of pendingStatusAccounts) void refresh(account, true); });
   useEffect(() => { refreshMissing(); }, [missingAccounts]);
   const login = (device: boolean, id: string | null = null) => {
     if (busy || task?.state === "running") return;

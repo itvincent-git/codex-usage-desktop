@@ -46,6 +46,7 @@ function isOAuthLoginError(err: string | null): boolean {
   const lowercaseErr = err.toLowerCase();
   return (
     lowercaseErr.includes("chatgptloginrequired") ||
+    lowercaseErr.includes("accountloginrequired") ||
     lowercaseErr.includes("no such file or directory") ||
     lowercaseErr.includes("failed to read codex auth") ||
     lowercaseErr.includes("contains no tokens") ||
@@ -60,7 +61,7 @@ function quotaErrorKey(error: string): string {
   if (error.includes("codexAuthInvalid")) return "recovery.auth_invalid";
   if (error.includes("chatgptQuotaNotApplicable")) return "recovery.quota_not_applicable";
   if (/\b403\b/.test(error)) return "recovery.quota_forbidden";
-  if (/\b429\b/.test(error)) return "recovery.quota_rate_limited";
+  if (error.includes("accountRateLimited") || /\b429\b/.test(error)) return "recovery.quota_rate_limited";
   if (/\b5\d\d\b/.test(error)) return "recovery.quota_service_error";
   if (/timed?\s*out|timeout/i.test(error)) return "recovery.quota_timeout";
   return "limits.unavailable_reason";
@@ -69,7 +70,7 @@ function quotaErrorKey(error: string): string {
 export function hasSubscription(limits: CodexLimitsResponse | null | undefined): boolean {
   if (!limits || !limits.membershipLevel) return false;
   const level = limits.membershipLevel.toLowerCase();
-  return ["plus", "pro", "prolite", "team", "business", "enterprise"].includes(level);
+  return ["plus", "pro", "prolite", "promax", "team", "business", "enterprise", "self_serve_business_prolite", "self_serve_business_usage_based"].includes(level);
 }
 
 export function CodexLimitsCard({ limits, isLimitsLoading = false, limitsError = null, isResetLoading = false, resetError = null, latestReset, recentResets, onOpenResetHistory, onOpenResetCredits }: CodexLimitsCardProps) {

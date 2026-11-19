@@ -167,7 +167,14 @@ struct SubscriptionInfo {
     has_active_subscription: Option<bool>,
 }
 
-pub fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
+pub fn fetch_codex_limits(
+    reuse_since: Option<chrono::DateTime<Utc>>,
+) -> Result<CodexLimitsResponse, String> {
+    let environment = selected_codex_environment();
+    let snapshot = crate::codex_accounts::native::snapshot(&environment)?;
+    if let Some(limits) = crate::codex_accounts::fetch_managed_current_limits(&snapshot, reuse_since)? {
+        return Ok(apply_limits_debug(limits));
+    }
     crate::codex_accounts::refresh_managed_current()?;
     let snapshot = crate::codex_accounts::native::snapshot(&selected_codex_environment())?;
     let result = fetch_limits_for_snapshot(snapshot.clone());
@@ -187,27 +194,26 @@ fn fetch_limits_for_snapshot(snapshot: crate::codex_accounts::native::Snapshot) 
     let context = snapshot.context();
     fetch_codex_limits_single_flight_key(context.clone(), || {
         log::info!("Starting fetch_codex_limits...");
-        let limits = fetch_codex_limits_with(|| fetch_oauth_limits(&auth), || fetch_account_snapshot(&auth))?;
-        #[cfg(debug_assertions)]
-        let limits = if window_activation_debug_enabled() {
-            let mut debug_limits = limits;
-            set_debug_session_window(&mut debug_limits, 0.0, Utc::now().timestamp());
-            debug_limits
-        } else {
-            limits
-        };
-        #[cfg(debug_assertions)]
-        let limits = {
-            let mut limits = limits;
-            if let Ok(value) = env::var(CREDITS_DEBUG_ENV) {
-                apply_debug_credits(&mut limits, &value);
-            }
-            limits
-        };
-        let mut limits = limits;
+        let mut limits = fetch_codex_limits_with(|| fetch_oauth_limits(&auth), || fetch_account_snapshot(&auth))?;
         limits.auth_context = Some(context);
-        Ok(limits)
+        Ok(apply_limits_debug(limits))
     })
+}
+
+fn apply_limits_debug(limits: CodexLimitsResponse) -> CodexLimitsResponse {
+    #[cfg(debug_assertions)]
+    {
+        let mut limits = limits;
+        if window_activation_debug_enabled() {
+            set_debug_session_window(&mut limits, 0.0, Utc::now().timestamp());
+        }
+        if let Ok(value) = env::var(CREDITS_DEBUG_ENV) {
+            apply_debug_credits(&mut limits, &value);
+        }
+        limits
+    }
+    #[cfg(not(debug_assertions))]
+    limits
 }
 
 #[cfg(debug_assertions)]
@@ -291,7 +297,7 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
     #[cfg(debug_assertions)]
     if window_activation_debug_enabled() {
         log::info!("Codex window activation completed in debug mode without starting the CLI.");
-        let mut limits = fetch_codex_limits()?;
+        let mut limits = fetch_codex_limits(None)?;
         set_debug_session_window(&mut limits, 1.0, Utc::now().timestamp());
         return Ok(CodexWindowActivationResponse {
             status: CodexWindowActivationStatus::Started,

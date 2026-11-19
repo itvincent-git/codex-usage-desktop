@@ -293,8 +293,10 @@ export async function fetchMonthlyUsage(): Promise<MonthlyUsageResponse> {
   return invoke<MonthlyUsageResponse>("fetch_monthly_usage");
 }
 
-export async function fetchCodexLimits(): Promise<CodexLimitsResponse> {
-  return invoke<CodexLimitsResponse>("fetch_codex_limits");
+export async function fetchCodexLimits(force = false): Promise<CodexLimitsResponse> {
+  return force
+    ? invoke<CodexLimitsResponse>("fetch_codex_limits", { force })
+    : invoke<CodexLimitsResponse>("fetch_codex_limits");
 }
 
 export async function activateCodexWindow(): Promise<CodexWindowActivationResponse> {

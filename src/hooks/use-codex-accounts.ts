@@ -39,13 +39,13 @@ export function useCodexAccounts() {
     };
   }, [reload]);
 
-  const refresh = useCallback((account: CodexAccount) => {
+  const refresh = useCallback((account: CodexAccount, reuseRecent = false) => {
     const key = accountVersionKey(account);
     const pending = inFlight.current.get(key);
     if (pending) return pending;
     const request = (async () => {
       try {
-        await fetchCodexAccountStatus(account.id);
+        await fetchCodexAccountStatus(account.id, reuseRecent);
         setRefreshErrors((errors) => {
           if (!errors[key]) return errors;
           const next = { ...errors };

@@ -356,6 +356,9 @@ describe("native saved Codex accounts", () => {
     await bob.$("button=Switch Codex sign-in").click();
     await expect(bob).toHaveAttribute("aria-current", "true");
     await expect(alice).not.toHaveAttribute("aria-current");
+    const sidebar = $(".sidebar-limits");
+    await expect(sidebar.$('[title="bob@example.test"]')).toBeDisplayed();
+    await expect(sidebar.$('[data-testid="limit-row-5-hour"]')).toHaveText(expect.stringContaining("25%"));
     expect(await appearance("bob")).toEqual(current);
     expect(await appearance("alice")).toEqual(inactive);
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();
@@ -363,6 +366,8 @@ describe("native saved Codex accounts", () => {
     await alice.$("button=Switch Codex sign-in").click();
     await expect(alice).toHaveAttribute("aria-current", "true");
     await expect(bob).not.toHaveAttribute("aria-current");
+    await expect(sidebar.$('[title="alice@example.test"]')).toBeDisplayed();
+    await expect(sidebar.$('[data-testid="limit-row-5-hour"]')).toHaveText(expect.stringContaining("80%"));
     expect(await appearance("alice")).toEqual(current);
     expect(await appearance("bob")).toEqual(inactive);
     await $('dialog[aria-labelledby="account-restart-title"]').$("button=Got it").click();

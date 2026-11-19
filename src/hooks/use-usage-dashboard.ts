@@ -340,11 +340,10 @@ export function useUsageDashboard() {
     setError(null);
   });
 
-  const loadCodexLimits = useEffectEvent(async (options?: { force?: boolean }) => {
+  const loadCodexLimits = useEffectEvent(async ({ force = false, bypassThrottle = force }: { force?: boolean; bypassThrottle?: boolean } = {}) => {
     if (limitsFetchInFlightRef.current) return;
     const now = Date.now();
-    const isManual = options?.force === true;
-    if (!isManual && now - lastLimitsFetchTimeRef.current < 5000) {
+    if (!bypassThrottle && now - lastLimitsFetchTimeRef.current < 5000) {
       return;
     }
 
@@ -354,7 +353,7 @@ export function useUsageDashboard() {
     const generation = ++limitsGeneration.current;
 
     try {
-      const data = await fetchCodexLimits();
+      const data = await fetchCodexLimits(force);
       if (generation !== limitsGeneration.current) return;
       if (data.authContext && data.authContext !== await currentCodexAuthContext()) return;
       if (generation !== limitsGeneration.current) return;
@@ -382,7 +381,7 @@ export function useUsageDashboard() {
       setWindowActivationStatus(null);
       setWindowActivationError(null);
       window.dispatchEvent(new Event("session-credits-identity-changed"));
-      void loadCodexLimits({ force: true });
+      void loadCodexLimits({ bypassThrottle: true });
     });
     void listener.then((stop) => { if (cancelled) stop(); });
     return () => { cancelled = true; void listener.then((stop) => stop()); };
@@ -441,7 +440,7 @@ export function useUsageDashboard() {
         if (view === "monthly") await loadMonthlyUsage();
         if (view === "sessions") await loadSessions();
         setLastRescanDurationMs(performance.now() - startedAt);
-        if (!options?.force && filesParsed > 0) void loadCodexLimits({ force: true });
+        if (!options?.force && filesParsed > 0) void loadCodexLimits({ bypassThrottle: true });
       } catch (error) {
         setScanError(errorMessage(error, "Local scan failed."));
         await loadDiagnostics();
@@ -641,9 +640,9 @@ export function useUsageDashboard() {
       setCodexLimitsError(null);
       lastLimitsFetchTimeRef.current = Date.now();
     } else if (refresh.limitsError) {
-      await loadCodexLimits({ force: true });
+      await loadCodexLimits({ bypassThrottle: true });
     } else if (refresh.limitsSkipped && (codexLimitsError !== null || hasExpiredCodexLimitWindow(codexLimits))) {
-      await loadCodexLimits({ force: true });
+      await loadCodexLimits({ bypassThrottle: true });
     }
 
     setScanError(null);

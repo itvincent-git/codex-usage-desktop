@@ -197,11 +197,12 @@ fn refresh_usage_data_blocking(
     database_path: &Path,
     pricing_cache_path: &Path,
     force_limits: bool,
+    reuse_limits_since: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Result<UsageRefreshResponse, String> {
     refresh_usage_data_with(
         force_limits,
         || scan_usage_blocking(database_path, pricing_cache_path),
-        codex_limits::fetch_codex_limits,
+        || codex_limits::fetch_codex_limits(reuse_limits_since),
     )
 }
 
@@ -258,7 +259,7 @@ async fn refresh_usage_data(
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits)
+        refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits, None)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -359,10 +360,16 @@ async fn fetch_monthly_usage(
 }
 
 #[tauri::command]
-async fn fetch_codex_limits() -> Result<CodexLimitsResponse, String> {
-    tauri::async_runtime::spawn_blocking(codex_limits::fetch_codex_limits)
+async fn fetch_codex_limits(
+    app: tauri::AppHandle,
+    force: Option<bool>,
+) -> Result<CodexLimitsResponse, String> {
+    let reuse_since = (!force.unwrap_or(false)).then(codex_accounts::recent_status_cutoff);
+    let result = tauri::async_runtime::spawn_blocking(move || codex_limits::fetch_codex_limits(reuse_since))
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit("codex-account-statuses-updated", ());
+    result
 }
 
 #[tauri::command]
@@ -1300,7 +1307,7 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             tauri::async_runtime::spawn_blocking(move || {
-                accounts.refresh_all();
+                accounts.refresh_all(codex_accounts::recent_status_cutoff());
                 let _ = app_handle.emit("codex-account-statuses-updated", ());
                 loop {
                     let interval = background_refresh_schedule.interval.lock().unwrap();
@@ -1314,9 +1321,15 @@ pub fn run() {
                     }
                     drop(interval);
 
-                    accounts.refresh_all();
+                    let reuse_since = codex_accounts::recent_status_cutoff();
+                    accounts.refresh_all(reuse_since);
                     let _ = app_handle.emit("codex-account-statuses-updated", ());
-                    match refresh_usage_data_blocking(&database_path, &pricing_cache_path, false) {
+                    match refresh_usage_data_blocking(
+                        &database_path,
+                        &pricing_cache_path,
+                        false,
+                        Some(reuse_since),
+                    ) {
                         Ok(refresh_response) => {
                             let _ = app_handle.emit("background-refresh-completed", refresh_response);
                         }

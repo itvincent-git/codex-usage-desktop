@@ -67,7 +67,7 @@ describe("saved Codex accounts", () => {
     expect(saved.getByText(i18n.t("accounts.api_quota_hint"))).toBeVisible();
     vi.mocked(api.fetchCodexAccountStatus).mockImplementation(async (id) => list.accounts.find((account) => account.id === id)!.status!);
     await userEvent.click(screen.getByRole("button", { name: "Refresh all" }));
-    expect(api.fetchCodexAccountStatus).not.toHaveBeenCalledWith("api");
+    expect(vi.mocked(api.fetchCodexAccountStatus).mock.calls.map(([id]) => id)).not.toContain("api");
   });
 
   it("offers API Key entry for the first account and clears secrets on close", async () => {
@@ -458,6 +458,7 @@ describe("saved Codex accounts", () => {
     list.accounts[1] = { ...list.accounts[1], credentialVersion: 2 };
     await act(async () => events.get("codex-accounts-changed")!());
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(pending ? 2 : 1));
+    expect(fetch).toHaveBeenLastCalledWith("b", true);
     const b = within(card("b@example.test"));
     expect(b.getByRole("meter", { name: "5-hour quota" })).toHaveAttribute("aria-valuenow", "25");
     expect(b.getByRole("meter", { name: "5-hour quota" }).closest("section")).toHaveClass("account-quota-stale");

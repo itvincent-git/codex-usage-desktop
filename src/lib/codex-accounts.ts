@@ -14,6 +14,7 @@ export type CodexAccount = {
 };
 export type AccountList = {
   accounts: CodexAccount[]; environment: string; authContext: string | null;
+  currentCredentialVersion?: number | null;
   currentChatgpt: { email: string | null } | null;
   loginTask?: LoginTask | null; currentIdentity: AccountIdentity | null; switchError: string | null; recoveryConflict: boolean;
 };
@@ -24,7 +25,8 @@ export type LoginTask = {
 
 export const listCodexAccounts = () => invoke<AccountList>("list_codex_accounts");
 export const importCurrentCodexAccount = () => invoke<string>("import_current_codex_account");
-export const fetchCodexAccountStatus = (accountId: string) => invoke<AccountStatus>("fetch_codex_account_status", { accountId });
+export const fetchCodexAccountStatus = (accountId: string, reuseRecent: boolean) =>
+  invoke<AccountStatus>("fetch_codex_account_status", reuseRecent ? { accountId, reuseRecent } : { accountId });
 export const switchCodexAccount = (accountId: string, expectedAuthContext: string) => invoke<{ verified: boolean; restartRequired: boolean; authContext: string }>("switch_codex_account", { accountId, expectedAuthContext });
 export const removeCodexAccount = (accountId: string) => invoke<void>("remove_codex_account", { accountId });
 export const startCodexAccountLogin = (deviceAuth: boolean, accountId: string | null = null) => invoke<LoginTask>("start_codex_account_login", { deviceAuth, accountId });

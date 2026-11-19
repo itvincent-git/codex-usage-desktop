@@ -2626,7 +2626,7 @@ describe("App", () => {
     const calls = invokeMock.mock.calls.map(([command, args]) => [command, args]);
     const resetCallIndex = calls.findIndex(([command]) => command === "reset_usage_state");
     expect(resetCallIndex).toBeGreaterThan(-1);
-    expect(calls[resetCallIndex + 1]).toEqual(["fetch_codex_limits", undefined]);
+    expect(calls[resetCallIndex + 1]).toEqual(["fetch_codex_limits", { force: true }]);
     expect(calls[resetCallIndex + 2]).toEqual(["scan_usage", undefined]);
     expect(calls[resetCallIndex + 3]).toEqual(["fetch_overview", { range: "30d" }]);
   });

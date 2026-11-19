@@ -53,6 +53,13 @@ describe("sidebar quota accounts", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
 
   run("pages through account quotas without switching Codex sign-in", async () => {
+    const aliceUsage = "alice:/backend-api/wham/usage";
+    await browser.waitUntil(async () => {
+      const { accounts } = await invoke<AccountList>("list_codex_accounts");
+      return !!accounts.find(({ id }) => id === "alice")?.status?.updatedAt.limits;
+    });
+    expect((await control())[aliceUsage]).toBe(1);
+
     await browser.execute(() => {
       localStorage.setItem("language", "en");
       localStorage.setItem("sidebar_width", "160");
@@ -99,6 +106,32 @@ describe("sidebar quota accounts", () => {
       await expect(fiveHour).toHaveText(expect.stringContaining("80%"));
       await expect(activate).toBeDisplayed();
       await expect($(".accounts-page")).not.toExist();
+
+      await refresh.waitForEnabled();
+      const initialAliceRequests = (await control())[aliceUsage];
+      await $('[data-testid="accounts-nav-tab"]').click();
+      const alice = $('[data-account-id="alice"]');
+      const aliceMeter = alice.$('[role="meter"][aria-label="5-hour quota"]');
+      const aliceRefresh = alice.$('button[aria-label="Refresh"]');
+      await expect(aliceMeter).toHaveAttribute("aria-valuenow", "80");
+      expect((await control())[aliceUsage]).toBe(initialAliceRequests);
+
+      await control({ aliceUsedPercent: 35, holdAliceUsage: true });
+      await refresh.click();
+      await browser.waitUntil(async () => (await control())[aliceUsage] === initialAliceRequests + 1);
+      await aliceRefresh.click();
+      await expect(aliceRefresh).toBeDisabled();
+      await control({ holdAliceUsage: false });
+      await expect(fiveHour).toHaveText(expect.stringContaining("65%"));
+      await expect(aliceMeter).toHaveAttribute("aria-valuenow", "65");
+      expect((await control())[aliceUsage]).toBe(initialAliceRequests + 1);
+
+      await control({ aliceUsedPercent: 20 });
+      await aliceRefresh.click();
+      await expect(aliceMeter).toHaveAttribute("aria-valuenow", "80");
+      await expect(fiveHour).toHaveText(expect.stringContaining("80%"));
+      expect((await control())[aliceUsage]).toBe(initialAliceRequests + 2);
+      await $('[data-testid="dashboard-nav-tab"]').click();
 
       await previous.click();
       await assertAccount("archive");
@@ -183,6 +216,7 @@ describe("sidebar quota accounts", () => {
       expect(readFileSync(authPath, "utf8")).toBe(auth);
       expect(readFileSync(configPath, "utf8")).toBe(config);
     } finally {
+      await control({ holdAliceUsage: false });
       await releaseStatus();
     }
   }).timeout(120_000);

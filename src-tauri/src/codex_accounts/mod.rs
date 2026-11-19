@@ -12,7 +12,7 @@ use crate::{
     types::CodexLimitsResponse,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -24,6 +24,10 @@ use std::{
 use tauri::Emitter;
 
 static SERVICE: OnceLock<Arc<AccountService>> = OnceLock::new();
+
+pub(crate) fn recent_status_cutoff() -> DateTime<Utc> {
+    Utc::now() - chrono::TimeDelta::seconds(5)
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +57,8 @@ pub(crate) struct AccountStatus {
     pub errors: HashMap<String, String>,
     pub updated_at: HashMap<String, String>,
     pub needs_login: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -75,6 +81,7 @@ pub(crate) struct AccountList {
     accounts: Vec<AccountSummary>,
     environment: String,
     auth_context: Option<String>,
+    current_credential_version: Option<u64>,
     current_identity: Option<Identity>,
     current_chatgpt: Option<CurrentChatgpt>,
     switch_error: Option<String>,
@@ -202,6 +209,15 @@ impl AccountService {
             })
         });
         let (_, store) = self.store()?;
+        let current_credentials = content
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok());
+        let current_credential_version = store.accounts.iter()
+            .find(|account| {
+                current.as_ref() == Some(&account.identity)
+                    && current_credentials.as_ref() == Some(&account.credentials)
+            })
+            .map(|account| account.credential_version);
         Ok(AccountList {
             accounts: store
                 .accounts
@@ -224,6 +240,7 @@ impl AccountService {
                 .collect(),
             environment: format!("{} ({:?})", environment.home.display(), environment.runtime),
             auth_context: snapshot.map(|s| s.context()),
+            current_credential_version,
             current_identity: current,
             current_chatgpt,
             switch_error: error,
@@ -411,16 +428,33 @@ impl AccountService {
     }
 
     pub fn fetch_status(&self, id: &str) -> Result<AccountStatus, String> {
-        let account = self.account(id)?;
-        let key = format!("{}:{}", id, account.credential_version);
-        let (flight, fetch) = {
+        self.fetch_status_since(id, None)
+    }
+
+    fn fetch_status_since(
+        &self,
+        id: &str,
+        reuse_since: Option<DateTime<Utc>>,
+    ) -> Result<AccountStatus, String> {
+        let (key, flight, fetch) = {
             let mut flights = self.flights.lock().unwrap();
+            let account = self.account(id)?;
+            let key = format!("{}:{}", id, account.credential_version);
             if let Some(flight) = flights.get(&key) {
-                (flight.clone(), false)
+                (key, flight.clone(), false)
             } else {
+                if let Some(status) = account.status.filter(|status| {
+                    status.account_id == account.id
+                        && status.identity == account.identity
+                        && status.credential_version == account.credential_version
+                        && reuse_since
+                            .is_some_and(|since| status.checked_at.is_some_and(|time| time >= since))
+                }) {
+                    return Ok(status);
+                }
                 let flight = Arc::new(StatusFlight::default());
                 flights.insert(key.clone(), flight.clone());
-                (flight, true)
+                (key, flight, true)
             }
         };
         if !fetch {
@@ -514,6 +548,7 @@ impl AccountService {
             errors,
             updated_at,
             needs_login,
+            checked_at: None,
         };
         self.commit_status(&account, status)
     }
@@ -526,6 +561,7 @@ impl AccountService {
             errors: HashMap::new(),
             updated_at: HashMap::new(),
             needs_login: false,
+            checked_at: None,
         });
         status.credential_version = account.credential_version;
         status.needs_login = error == "accountLoginRequired";
@@ -535,9 +571,10 @@ impl AccountService {
     fn commit_status(
         &self,
         account: &Account,
-        status: AccountStatus,
+        mut status: AccountStatus,
     ) -> Result<AccountStatus, String> {
         let (_lock, mut store) = self.store()?;
+        status.checked_at = Some(Utc::now());
         current_version(&mut store, account)?.status = Some(status.clone());
         self.save(&store)?;
         Ok(status)
@@ -691,7 +728,7 @@ impl AccountService {
         store.pending = None;
         self.save(&store)
     }
-    pub fn refresh_all(self: &Arc<Self>) {
+    pub fn refresh_all(self: &Arc<Self>, reuse_since: DateTime<Utc>) {
         let Ok((_, store)) = self.store() else {
             return;
         };
@@ -711,7 +748,7 @@ impl AccountService {
                     let Some(id) = id else {
                         break;
                     };
-                    let _ = self.fetch_status(&id);
+                    let _ = self.fetch_status_since(&id, Some(reuse_since));
                 });
             }
         });
@@ -873,6 +910,54 @@ pub(crate) fn initialize(root: PathBuf) -> Result<Arc<AccountService>, String> {
     let _ = SERVICE.set(service.clone());
     Ok(service)
 }
+
+pub(crate) fn fetch_managed_current_limits(
+    snapshot: &native::Snapshot,
+    reuse_since: Option<DateTime<Utc>>,
+) -> Result<Option<CodexLimitsResponse>, String> {
+    let (Some(service), Some(content)) = (SERVICE.get(), snapshot.content.as_deref()) else {
+        return Ok(None);
+    };
+    let (Ok(identity), Ok(credentials)) = (credential_identity(content), serde_json::from_str::<Value>(content)) else {
+        return Ok(None);
+    };
+    let Ok((_, store)) = service.store() else {
+        return Ok(None);
+    };
+    let Some(account) = store.accounts.into_iter().find(|account| {
+        account.identity == identity
+            && !api_key::is_api_key(&account.credentials)
+            && (account.credentials == credentials || can_adopt(&credentials, &account.credentials))
+    }) else {
+        return Ok(None);
+    };
+
+    let reuse_since = reuse_since.filter(|_| account.credentials == credentials);
+    let status = service.fetch_status_since(&account.id, reuse_since)?;
+    if selected_codex_environment() != snapshot.environment {
+        return Err("accountAuthConflict".into());
+    }
+    let current = native::snapshot(&snapshot.environment)?;
+    let current_credentials = current.content.as_deref().and_then(|s| serde_json::from_str::<Value>(s).ok());
+    let saved = service.account(&account.id)?;
+    if status.account_id != saved.id
+        || status.credential_version != saved.credential_version
+        || status.identity != saved.identity
+        || current_credentials.as_ref() != Some(&saved.credentials)
+    {
+        return Err("accountAuthConflict".into());
+    }
+    if let Some(error) = status.errors.get("credentials").or_else(|| status.errors.get("limits")) {
+        return Err(error.clone());
+    }
+    let mut limits = status.data.ok_or("accountResponseUnavailable")?;
+    if let Some(updated_at) = status.updated_at.get("limits") {
+        limits.updated_at.clone_from(updated_at);
+    }
+    limits.auth_context = Some(current.context());
+    Ok(Some(limits))
+}
+
 pub(crate) fn refresh_managed_current() -> Result<(), String> {
     let Some(service) = SERVICE.get() else {
         return Ok(());
@@ -979,11 +1064,18 @@ pub(crate) async fn add_codex_api_key(
 pub(crate) async fn fetch_codex_account_status(
     service: tauri::State<'_, Arc<AccountService>>,
     account_id: String,
+    reuse_recent: Option<bool>,
 ) -> Result<AccountStatus, String> {
     let service = service.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || service.fetch_status(&account_id))
-        .await
-        .map_err(|_| "accountTaskFailed")?
+    tauri::async_runtime::spawn_blocking(move || {
+        if reuse_recent.unwrap_or(false) {
+            service.fetch_status_since(&account_id, Some(recent_status_cutoff()))
+        } else {
+            service.fetch_status(&account_id)
+        }
+    })
+    .await
+    .map_err(|_| "accountTaskFailed")?
 }
 #[tauri::command]
 pub(crate) async fn switch_codex_account(
