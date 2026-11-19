@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ChevronRight, PanelsTopLeft, Power } from "lucide-react";
+import { PanelsTopLeft, Power } from "lucide-react";
 import appIcon from "../../src-tauri/icons/icon.png";
 import type { TrayPopoverData } from "@/lib/tray-popover";
 import "./tray-popover.css";
@@ -45,7 +45,7 @@ export function TrayPopover() {
   useEffect(() => {
     const element = panel.current!;
     const observer = new ResizeObserver(() => {
-      void getCurrentWindow().setSize(new LogicalSize(390, Math.ceil(element.getBoundingClientRect().height)))
+      void getCurrentWindow().setSize(new LogicalSize(304, Math.ceil(element.getBoundingClientRect().height)))
         .catch((err) => setError(String(err)));
     });
     observer.observe(element);
@@ -61,7 +61,7 @@ export function TrayPopover() {
   return (
     <main ref={panel} className={`tray-popover${isMac ? "" : " tray-popover-windows"}`} aria-label="Codex Usage">
       <header className="tray-header">
-        <img className="tray-app-icon" src={appIcon} alt="" width="44" height="44" />
+        <img className="tray-app-icon" src={appIcon} alt="" width="32" height="32" />
         <div className="tray-identity">
           <h1>Codex Usage</h1>
           {data?.account ? <p title={data.account}>{data.account}</p> : null}
@@ -87,13 +87,17 @@ export function TrayPopover() {
       {data && (data.tokens || data.cost !== null) ? <section className="tray-today" aria-label={data.labels.today}>
         <h2>{data.labels.today}</h2>
         <div className="tray-metrics">
-          {data.tokens ? <div className="tray-metric"><span>Tokens</span><strong>{data.tokens.value}</strong><small>{data.tokens.exact}</small></div> : null}
+          {data.tokens ? <div className="tray-metric">
+            <span>Tokens</span>
+            <strong>{data.tokens.value}</strong>
+            {data.tokens.exact !== data.tokens.value ? <small>{data.tokens.exact}</small> : null}
+          </div> : null}
           {data.cost !== null ? <div className="tray-metric"><span>{data.labels.cost}</span><strong>{data.cost}</strong></div> : null}
         </div>
       </section> : null}
       {error ? <p className="tray-error" role="alert">{error}</p> : null}
       <footer className="tray-actions">
-        <button type="button" onClick={() => void showMain()}><PanelsTopLeft aria-hidden="true" /><span>{data?.labels.showMain ?? "Show Main Window"}</span><ChevronRight className="tray-action-hint" aria-hidden="true" /></button>
+        <button type="button" onClick={() => void showMain()}><PanelsTopLeft aria-hidden="true" /><span>{data?.labels.showMain ?? "Show Main Window"}</span></button>
         <button type="button" onClick={() => void invoke("tray_popover_action", { action: "quit" }).catch((err) => setError(String(err)))}><Power aria-hidden="true" /><span>{data?.labels.quit ?? "Quit"}</span>{isMac ? <kbd>⌘Q</kbd> : null}</button>
       </footer>
     </main>

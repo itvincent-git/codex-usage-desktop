@@ -51,7 +51,7 @@ describe("menu bar popover across monitors", () => {
             && x + geometry.size.width / scale <= left + width + 1
             && y + geometry.size.height / scale <= top + height + 1;
         }, { timeoutMsg: `Popover did not move onto ${monitor.name ?? index}` });
-        expect(await browser.execute(() => innerWidth)).toBe(390);
+        expect(await browser.execute(() => innerWidth)).toBe(304);
         if (index % 2 === 0) await browser.keys("Escape");
         else await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_focus", { label: "main" }));
         await browser.waitUntil(async () => !(await visible()));

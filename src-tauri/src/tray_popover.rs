@@ -255,7 +255,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         tauri::WebviewUrl::App("index.html#tray".into()),
     )
     .title("Codex Usage")
-    .inner_size(390.0, 490.0)
+    .inner_size(304.0, 350.0)
     .visible(false)
     .focused(false)
     .decorations(false)
@@ -271,7 +271,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         EffectsBuilder::new()
             .effect(Effect::Popover)
             .state(EffectState::Active)
-            .radius(18.0)
+            .radius(14.0)
             .build(),
     );
     builder.build()?;

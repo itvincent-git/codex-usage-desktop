@@ -79,16 +79,38 @@ describe("menu bar usage popover", () => {
         const image = document.querySelector<HTMLImageElement>(".tray-app-icon")!;
         return image.complete && image.naturalWidth === 512;
       })).toBe(true);
-      expect(await browser.execute(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight)).toBe(true);
-      await browser.saveScreenshot(join(tmpdir(), "codex-tray-popover.png"));
+      for (const theme of ["light", "dark"]) {
+        await browser.tauri.execute(({ core }, value) => core.invoke("plugin:window|set_theme", { label: "tray", value }), theme);
+        await browser.waitUntil(() => browser.execute((theme) => {
+          const panel = document.querySelector(".tray-popover")!;
+          return matchMedia("(prefers-color-scheme: dark)").matches === (theme === "dark")
+            && innerWidth === 304 && innerHeight <= 370
+            && Math.ceil(panel.getBoundingClientRect().height) === innerHeight
+            && document.documentElement.scrollWidth <= innerWidth
+            && document.documentElement.scrollHeight <= innerHeight;
+        }, theme), { timeoutMsg: `The compact popover did not fit its contents in ${theme} mode` });
+        await browser.saveScreenshot(join(tmpdir(), `codex-tray-popover-${theme}.png`));
+      }
+      const fullHeight = await browser.execute(() => innerHeight);
 
       // Updates use the Rust snapshot/event path while the panel stays open.
       const data = await browser.tauri.execute(({ core }) => core.invoke("get_tray_popover")) as TrayPopoverData;
-      const update = { ...data, quotas: [{ ...data.quotas[0], remainingPercent: 0, usedText: "已用 100%" }], cost: null };
+      expect(await $(".tray-metric:first-child small").isExisting()).toBe(data.tokens?.value !== data.tokens?.exact);
+      const update = {
+        ...data,
+        quotas: [{ ...data.quotas[0], remainingPercent: 0, usedText: "已用 100%" }],
+        tokens: { value: "123.46K", exact: "123,456" },
+        cost: null,
+      };
       await browser.tauri.execute(({ core }, popover) => core.invoke("update_tray", { payload: { title: "Codex Usage", items: [], popover } }), update);
       await expect($('[data-quota="5h"] strong')).toHaveText("0%");
       await expect($$(".tray-quota")).toBeElementsArrayOfSize(1);
       await expect($$(".tray-metric")).toBeElementsArrayOfSize(1);
+      await expect($(".tray-metric small")).toHaveText("123,456");
+      await browser.waitUntil(() => browser.execute((fullHeight) => {
+        const panel = document.querySelector(".tray-popover")!;
+        return innerHeight < fullHeight && Math.ceil(panel.getBoundingClientRect().height) === innerHeight;
+      }, fullHeight), { timeoutMsg: "The popover did not shrink with its contents" });
       await browser.keys("Escape");
       await browser.waitUntil(async () => !(await isVisible()));
 
@@ -119,6 +141,7 @@ describe("menu bar usage popover", () => {
       await browser.waitUntil(async () => !(await isVisible()));
     } finally {
       await browser.switchToWindow("main");
+      await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_theme", { label: "tray", value: null }));
       await browser.execute((preferences) => {
         for (const [key, value] of Object.entries(preferences)) {
           if (value === null) localStorage.removeItem(key);
