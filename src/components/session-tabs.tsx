@@ -82,7 +82,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
                   aria-keyshortcuts="Delete"
                   tabIndex={tabbable ? 0 : -1}
                   title={title}
-                  className="min-w-0 truncate rounded px-2 py-1 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="min-w-0 select-none truncate rounded px-2 py-1 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   onClick={() => onSelect(id)}
                   onKeyDown={(event) => handleKey(event, index)}
                 >
