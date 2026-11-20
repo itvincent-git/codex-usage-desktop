@@ -57,7 +57,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
           {t("sessions.tabs.back")}
         </Button>
       ) : null}
-      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="pointer-events-auto flex min-w-0 items-center gap-1 overflow-x-auto px-1 py-px [&::-webkit-scrollbar]:h-1.5">
+      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="pointer-events-auto flex min-w-0 items-center gap-1 overflow-x-auto px-1 py-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map(({ id, session }, index) => {
           const title = session.threadName || session.sessionId.replace(/\.jsonl(?:\.zst)?$/, "");
           const selected = id === selectedId;

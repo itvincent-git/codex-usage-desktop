@@ -291,6 +291,11 @@ describe("session detail tabs", () => {
     });
     const lastOffset = (await tabStrip()).offset;
     expect(lastOffset).toBeGreaterThan(0);
+    expect(await tabs().execute((list) => (
+      CSS.supports("scrollbar-width", "none")
+        ? getComputedStyle(list).getPropertyValue("scrollbar-width") === "none"
+        : getComputedStyle(list, "::-webkit-scrollbar").display === "none"
+    ))).toBe(true);
     await expectTabsInTitleBar();
     await browser.keys("Home");
     await expectSelected(overflowNames[0]);
