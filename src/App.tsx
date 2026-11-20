@@ -147,6 +147,7 @@ export default function App() {
   } = useUsageDashboard(sessionTabs.tabs.length > 0);
 
   const activeSessionId = view === "settings" ? null : sessionTabs.selectedId;
+  const showSessionTabs = view !== "settings" && sessionTabs.tabs.length > 0;
   const projectActive = !!selectedProjectForModal && view !== "settings" && activeSessionId === null && !isResetHistoryOpen;
 
   useEffect(() => {
@@ -167,7 +168,10 @@ export default function App() {
     if (activeSessionId !== null || view === "settings" || !opener?.isConnected) return;
     opener.focus({ preventScroll: true });
     if (document.activeElement === opener) return;
-    const frame = requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+    // Let WebKit lay out the project list after the tab strip changes height.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+    });
     return () => cancelAnimationFrame(frame);
   }, [activeSessionId, view]);
 
@@ -307,7 +311,7 @@ export default function App() {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-background text-foreground">
-      <div data-tauri-drag-region aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[var(--window-controls-height)] select-none" />
+      <div data-tauri-drag-region data-session-tabs-open={showSessionTabs || undefined} aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-[var(--window-controls-height)] select-none" />
       {view !== "settings" ? (
         <AppSidebar
           view={view}
@@ -337,7 +341,7 @@ export default function App() {
         />
       ) : null}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-      {view !== "settings" && sessionTabs.tabs.length > 0 ? (
+      {showSessionTabs ? (
         <SessionTabs
           tabs={sessionTabs.tabs}
           selectedId={activeSessionId}

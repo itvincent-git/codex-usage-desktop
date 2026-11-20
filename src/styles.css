@@ -13,6 +13,7 @@
     --sidebar: 245 244 249;
     --window-controls-height: 0px;
     --window-drag-height: 0px;
+    --session-tab-strip-height: 42px;
     --primary: 79 70 229;
     --primary-foreground: 255 255 255;
     --secondary: 32 151 11;
@@ -54,6 +55,10 @@
   :root[data-platform="macos"] {
     --window-controls-height: 36px;
     --window-drag-height: 12px;
+  }
+
+  :root[data-platform="macos"] [data-tauri-drag-region][data-session-tabs-open] {
+    height: var(--session-tab-strip-height);
   }
 
   @media (forced-colors: none) {

@@ -106,6 +106,7 @@ describe("session detail tabs", () => {
           tabsBesideSidebar: bounds.left === sidebar.right && bounds.right === content.right,
           contentBelowTitleBar: content.top === titleBar.bottom,
           blankSpaceDraggable: document.elementFromPoint(bounds.right - 16, titleBar.height / 2) === dragRegion,
+          spaceAboveTabsDraggable: document.elementFromPoint(selected.getBoundingClientRect().left + 2, bounds.top + 3) === dragRegion,
           controlsClickable: controls.every((control) => {
             const { x, y, width, height } = control.getBoundingClientRect();
             return control.contains(document.elementFromPoint(x + width / 2, y + height / 2));
@@ -117,6 +118,7 @@ describe("session detail tabs", () => {
         tabsBesideSidebar: true,
         contentBelowTitleBar: true,
         blankSpaceDraggable: true,
+        spaceAboveTabsDraggable: true,
         controlsClickable: true,
       });
     };
@@ -394,6 +396,12 @@ describe("session detail tabs", () => {
     }
     const selected = titles.at(-1)!;
     const inactive = titles.at(-3)!;
+    const layout = await tab(selected).execute((button) => {
+      const tab = button.parentElement!.getBoundingClientRect();
+      const strip = button.closest("[data-session-tabs]")!.getBoundingClientRect();
+      return { height: strip.height, topSpace: tab.top - strip.top, bottomSpace: strip.bottom - tab.bottom };
+    });
+    expect(layout).toEqual({ height: 42, topSpace: 7, bottomSpace: 0 });
     const appearance = (title: string) => tab(title).execute((button) => {
       const item = button.parentElement!;
       const style = getComputedStyle(item);

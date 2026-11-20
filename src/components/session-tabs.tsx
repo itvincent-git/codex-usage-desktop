@@ -72,7 +72,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
   }
 
   return (
-    <div data-session-tabs className="session-tab-strip pointer-events-none relative z-10 flex h-9 min-h-[var(--window-controls-height)] min-w-0 shrink-0 items-center gap-2 bg-muted pl-3 pr-8">
+    <div data-session-tabs className="session-tab-strip pointer-events-none relative z-10 flex h-[var(--session-tab-strip-height)] min-w-0 shrink-0 items-center gap-2 bg-muted pl-3 pr-8 pt-1.5">
       {selectedId !== null ? (
         <Button variant="secondary" size="sm" className="pointer-events-auto shrink-0" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
