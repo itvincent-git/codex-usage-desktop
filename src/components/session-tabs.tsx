@@ -1,5 +1,5 @@
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,27 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
     if (item.left < viewport.left) list.scrollLeft += item.left - viewport.left;
     else if (item.right > viewport.right) list.scrollLeft += item.right - viewport.right;
   }, [selectedId, tabs.length]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      const mode = event.deltaMode;
+      if (event.deltaX !== 0 || event.deltaY === 0 || event.ctrlKey || event.shiftKey) return;
+
+      let distance = event.deltaY;
+      if (mode === WheelEvent.DOM_DELTA_LINE) distance *= 16;
+      else if (mode === WheelEvent.DOM_DELTA_PAGE) distance *= list.clientWidth;
+
+      const previous = list.scrollLeft;
+      list.scrollLeft += distance;
+      if (list.scrollLeft !== previous) event.preventDefault();
+    };
+
+    list.addEventListener("wheel", handleWheel, { passive: false });
+    return () => list.removeEventListener("wheel", handleWheel);
+  }, []);
 
   function handleKey(event: KeyboardEvent, index: number) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;

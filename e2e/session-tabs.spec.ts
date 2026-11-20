@@ -47,7 +47,8 @@ describe("session detail tabs", () => {
     await browser.setWindowSize(1200, 780);
 
     const modifier = process.platform === "darwin" ? "Meta" : "Control";
-    const tabs = () => $('[role="tablist"][aria-label="Open sessions"]');
+    const tabListSelector = '[role="tablist"][aria-label="Open sessions"]';
+    const tabs = () => $(tabListSelector);
     const tab = (name: string) => tabs().$(`[role="tab"]=Tabs fixture ${name}`);
     const menu = () => $('[role="menu"]');
     const menuItem = (label: string) => menu().$(`[role="menuitem"]=${label}`);
@@ -283,12 +284,12 @@ describe("session detail tabs", () => {
       await expectSelected(name);
       if (name !== overflowNames.at(-1)) await back.click();
     }
-    const tabStrip = () => browser.execute(() => {
-      const list = document.querySelector('[role="tablist"][aria-label="Open sessions"]')!;
+    const tabStrip = () => browser.execute((selector) => {
+      const list = document.querySelector(selector)!;
       const bounds = list.getBoundingClientRect();
       const selected = list.querySelector('[aria-selected="true"]')!.parentElement!.getBoundingClientRect();
       return { offset: list.scrollLeft, selectedVisible: selected.left >= bounds.left - 1 && selected.right <= bounds.right + 1 };
-    });
+    }, tabListSelector);
     const lastOffset = (await tabStrip()).offset;
     expect(lastOffset).toBeGreaterThan(0);
     expect(await tabs().execute((list) => (
@@ -297,6 +298,18 @@ describe("session detail tabs", () => {
         : getComputedStyle(list, "::-webkit-scrollbar").display === "none"
     ))).toBe(true);
     await expectTabsInTitleBar();
+    const wheelOrigin = await browser.execute((selector) => {
+      const { x, y, width, height } = document.querySelector(selector)!.getBoundingClientRect();
+      return { x: Math.round(x + width / 2), y: Math.round(y + height / 2) };
+    }, tabListSelector);
+    const wheelTabs = (deltaY: number) => browser.action("wheel").scroll({ ...wheelOrigin, deltaX: 0, deltaY }).perform();
+    await wheelTabs(-120);
+    const offsetAfterWheelUp = (await tabStrip()).offset;
+    expect(offsetAfterWheelUp).toBeLessThan(lastOffset);
+    await wheelTabs(120);
+    expect((await tabStrip()).offset).toBeGreaterThan(offsetAfterWheelUp);
+    await expectSelected(overflowNames.at(-1)!);
+
     await browser.keys("Home");
     await expectSelected(overflowNames[0]);
     const first = await tabStrip();
