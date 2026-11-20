@@ -10,6 +10,7 @@ mod codex_resets;
 mod date;
 mod db;
 mod exporter;
+mod floating;
 mod overview;
 mod pricing;
 mod project_sessions;
@@ -252,6 +253,7 @@ async fn rescan_project(
 
 #[tauri::command]
 async fn refresh_usage_data(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     force_limits: bool,
 ) -> Result<UsageRefreshResponse, String> {
@@ -259,7 +261,13 @@ async fn refresh_usage_data(
     let pricing_cache_path = state.pricing_cache_path.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
-        refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits, None)
+        let result = refresh_usage_data_blocking(&database_path, &pricing_cache_path, force_limits, None)?;
+        if let Some(limits) = &result.limits {
+            floating::observe_limits(&app, limits);
+        } else if result.limits_error.is_some() {
+            floating::observe_limits_failure(&app);
+        }
+        Ok::<_, String>(result)
     })
     .await
     .map_err(|error| error.to_string())?
@@ -368,6 +376,10 @@ async fn fetch_codex_limits(
     let result = tauri::async_runtime::spawn_blocking(move || codex_limits::fetch_codex_limits(reuse_since))
         .await
         .map_err(|error| error.to_string())?;
+    match &result {
+        Ok(limits) => floating::observe_limits(&app, limits),
+        Err(_) => floating::observe_limits_failure(&app),
+    }
     let _ = app.emit("codex-account-statuses-updated", ());
     result
 }
@@ -1118,6 +1130,7 @@ fn delete_pricing_cache(path: &Path) -> Result<(), String> {
 
 fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = Menu::default(app.handle())?;
+    let float_item = MenuItem::with_id(app, "floating_usage", "Desktop Usage Window", true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let reload_item = MenuItem::with_id(app, "reload_page", "Reload WebView", true, Some("CmdOrCtrl+Shift+R"))?;
     #[cfg(debug_assertions)]
@@ -1136,6 +1149,7 @@ fn setup_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
     for item in menu.items()? {
         if let MenuItemKind::Submenu(submenu) = item {
             if submenu.text()? == "View" {
+                submenu.prepend(&float_item)?;
                 #[cfg(debug_assertions)]
                 submenu.prepend(&inspect_item)?;
                 #[cfg(debug_assertions)]
@@ -1201,6 +1215,12 @@ pub fn run() {
             }
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "floating_usage" => {
+                let action = if floating::is_enabled(app) { "hide" } else { "show" };
+                if let Err(error) = floating::floating_action(app.clone(), action.into(), None) {
+                    log::warn!("Opening desktop usage window: {error}");
+                }
+            }
             "reload_page" => {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.reload();
@@ -1233,6 +1253,7 @@ pub fn run() {
             let accounts = codex_accounts::initialize(app_data_dir.join("codex-accounts"))?;
             app.manage(accounts.clone());
             let database_path = app_data_dir.join("codex-usage-desktop.db");
+            floating::setup(app, app_data_dir.join("floating-window.json"), database_path.clone())?;
             if let Err(error) = cache_recovery::apply_on_start(&database_path) {
                 log::error!("Cache recovery failed: {error}");
             }
@@ -1331,6 +1352,11 @@ pub fn run() {
                         Some(reuse_since),
                     ) {
                         Ok(refresh_response) => {
+                            if let Some(limits) = &refresh_response.limits {
+                                floating::observe_limits(&app_handle, limits);
+                            } else if refresh_response.limits_error.is_some() {
+                                floating::observe_limits_failure(&app_handle);
+                            }
                             let _ = app_handle.emit("background-refresh-completed", refresh_response);
                         }
                         Err(error) => {
@@ -1344,6 +1370,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            floating::fetch_floating_usage,
+            floating::floating_action,
+            floating::floating_preferences,
             codex_accounts::current_codex_auth_context,
             codex_accounts::list_codex_accounts,
             codex_accounts::import_current_codex_account,

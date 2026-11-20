@@ -13,7 +13,10 @@ async function renderApp() {
     await import("@wdio/tauri-plugin");
   }
 
-  const App = window.location.hash === "#tray"
+  if (window.location.hash === "#floating") document.documentElement.dataset.surface = "floating";
+  const App = window.location.hash === "#floating"
+    ? (await import("./components/floating-window")).FloatingWindow
+    : window.location.hash === "#tray"
     ? (await import("./components/tray-popover")).TrayPopover
     : (await import("./App")).default;
 

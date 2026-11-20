@@ -80,6 +80,10 @@ Restart the related Codex client after switching to load the new account. See [a
 
 *Account identities, subscription dates, and usage values in this screenshot are illustrative.*
 
+### Desktop usage window
+
+On macOS, choose **View → Desktop Usage Window** to show the optional always-on-top window. Click the quota ring to expand local token totals and this week's projects. Drag the compact ring to a screen edge to dock it, or away from the edge to detach it. The window settings include a control for the bottom-edge width.
+
 ### 🔍 Find what is using your tokens
 
 Break usage down by:
