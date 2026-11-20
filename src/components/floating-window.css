@@ -1,0 +1,112 @@
+html[data-surface="floating"],html[data-surface="floating"] body,html[data-surface="floating"] #root {margin:0;min-width:0;min-height:0;width:100%;height:100%;overflow:hidden;background:transparent!important;}
+.float-shell,.float-compact {font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;font-size:12px;line-height:1.35;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;color:#252525;user-select:none;color-scheme:light;--float-muted:#858585;--float-line:#ededed;}
+.float-shell *,.float-compact * {box-sizing:border-box;}
+.float-shell button,.float-compact button {font:inherit;cursor:pointer;color:inherit;border:0;}
+.float-shell button:focus-visible,.float-orb:focus-visible {outline:1px solid #a0a0a0;outline-offset:-2px;}
+.float-shell button:disabled {opacity:.45;cursor:default;}
+/* One 36 px circle and one 24 px meter in every compact mode. The native free/side
+   canvas is always 44 x 44; only clipping and translation change at the edge. */
+.float-compact {position:relative;width:100%;height:100%;overflow:hidden;}
+.float-orb {position:absolute;left:4px;top:4px;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#fff;box-shadow:0 1px 4px #00000012;touch-action:none;transition:transform 180ms cubic-bezier(.2,.8,.2,1),border-radius 180ms;}
+.float-orb:hover {background:#fff;}
+.float-gauge {position:relative;display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;}
+.float-ring {position:absolute;width:24px;height:24px;fill:none;stroke-width:2;}
+.float-ring .track {stroke:#e4e4e4;}
+.float-ring .progress {stroke:var(--quota-color);stroke-linecap:round;transition:stroke-dashoffset 180ms;}
+.float-orb-core {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;line-height:1;transition:opacity 140ms;}
+.float-orb strong {display:flex;align-items:center;font-size:9px;font-weight:550;letter-spacing:-.4px;line-height:1;}
+.float-orb small {font-size:6px;font-weight:400;margin-left:.5px;}
+.dock-free .float-ring {inset:2px;}
+.dock-free .float-orb strong {display:block;letter-spacing:0;transform:translateY(-.5px);}
+.dock-free .float-orb small {letter-spacing:0;}
+.dock-free .float-orb-core.is-empty strong {position:relative;color:transparent;transform:none;}
+.dock-free .float-orb-core.is-empty strong::after {content:"";position:absolute;inset:0;margin:auto;width:7px;height:1px;border-radius:1px;background:#252525;}
+.float-orb.is-stale .progress {opacity:.35;}
+.float-orb-error {position:absolute;right:-1px;top:-1px;display:grid;place-items:center;width:13px;height:13px;border:1.5px solid #fff;border-radius:50%;background:#b64c45;color:#fff;font-size:10px;font-weight:750;line-height:1;box-shadow:0 1px 2px #00000018;}
+.dock-left:not(.is-extended) .float-orb {transform:translateX(-22px);}
+.dock-right:not(.is-extended) .float-orb {left:calc(100% - 40px);transform:translateX(22px);}
+.dock-left:not(.is-extended) .float-orb-core,.dock-right:not(.is-extended) .float-orb-core {opacity:0;}
+.is-extended .float-orb {width:calc(100% - 4px);gap:2px;border-radius:18px;}
+.is-extended.dock-left .float-orb {left:0;border-radius:0 18px 18px 0;padding-left:5px;}
+.is-extended.dock-right .float-orb {left:4px;border-radius:18px 0 0 18px;padding-right:5px;}
+.is-extended.dock-left .float-gauge {order:2;margin-left:auto;}
+.is-extended.dock-right .float-gauge {margin-right:auto;}
+.float-bottom-info {min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;gap:3px;height:28px;white-space:nowrap;overflow:hidden;}
+.float-bottom-info>span {font-size:8px;color:#999;}
+.float-bottom-info>b {font-size:10px;font-weight:500;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.float-shell {display:flex;flex-direction:column;width:calc(100% - 8px);height:calc(100% - 8px);margin:4px;padding:0 12px;border:1px solid #ededed;border-radius:14px;background:#fff;box-shadow:0 1px 4px #00000012;overflow:hidden;}
+.float-shell>* {flex-shrink:0;min-width:176px;}
+.float-header {display:flex;align-items:center;justify-content:space-between;height:28px;}
+.float-drag {display:flex;align-items:center;gap:4px;flex:1;align-self:stretch;touch-action:none;cursor:grab;font-size:12px;font-weight:550;}
+.float-drag:active {cursor:grabbing;}
+.float-drag>svg {width:10px;height:10px;color:#aaa;}
+.float-header-actions {display:flex;gap:2px;}
+.float-header-actions button,.float-footer button {display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:transparent;color:#888;}
+.float-header-actions svg {width:13px;height:13px;}
+.float-header-actions button:hover,.float-footer button:hover,.float-header-actions button[aria-pressed="true"] {background:#f3f3f3;}
+.float-quota {display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:3px;}
+.float-quota>span {font-size:10px;color:#777;}
+.float-quota>span small {font-size:9px;}
+.float-quota>strong {font-size:18px;font-weight:500;letter-spacing:-.5px;}
+.float-quota-track {grid-column:1/-1;height:2px;border-radius:2px;background:#ededed;overflow:hidden;}
+.float-quota-track>i {display:block;height:100%;background:var(--quota-color);border-radius:inherit;transition:width 180ms;}
+.float-tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin-top:5px;border-bottom:1px solid var(--float-line);}
+.float-tabs button {position:relative;padding:3px 0 5px;background:transparent;color:#999;font-size:11px;white-space:nowrap;}
+.float-tabs button[aria-pressed="true"] {color:#303030;font-weight:550;}
+.float-tabs button[aria-pressed="true"]::after {content:"";position:absolute;bottom:-1px;left:0;right:0;height:1px;background:#777;}
+.float-overview {padding-top:7px;}
+.float-periods {display:flex;padding:2px;border-radius:7px;background:#f4f4f4;}
+.float-periods button {flex:1;padding:4px 0;border-radius:5px;background:transparent;color:#888;font-size:11px;}
+.float-periods button[aria-pressed="true"] {background:#fff;color:#333;box-shadow:0 1px 2px #0000000c;}
+.float-main-number {display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;margin-top:8px;}
+.float-main-number>span {width:100%;font-size:11px;color:#888;}
+.float-main-number>strong {font-size:28px;line-height:1.1;font-weight:500;letter-spacing:-1px;}
+.float-main-number>small {font-size:10px;color:#aaa;}
+.float-range {margin:3px 0 0;font-size:10px;line-height:1.3;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.float-composition {margin-top:9px;}
+.float-composition-bar {display:flex;height:3px;border-radius:3px;overflow:hidden;background:#f0f0f0;}
+.float-composition .input {background:#6989b7;}
+.float-composition .cached {background:#9a8aaf;}
+.float-composition .output {background:#baa17c;}
+.float-composition-values {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:6px;}
+.float-composition-values span {display:flex;align-items:center;gap:3px;font-size:10px;color:#888;}
+.float-composition-values i {width:4px;height:4px;flex:0 0 4px;border-radius:50%;}
+.float-composition-values strong {display:block;margin-top:3px;font-size:11px;font-weight:500;letter-spacing:-.3px;white-space:nowrap;}
+.float-projects {flex:1;min-height:0;display:flex;flex-direction:column;flex-shrink:1;}
+.float-projects {padding-top:5px;}
+.float-project-list {flex:1;min-height:0;overflow:auto;margin-top:3px;scrollbar-width:thin;scrollbar-color:#ccc transparent;}
+.float-project {padding:8px 0;}
+.float-project+.float-project {border-top:1px solid #f0f0f0;}
+.float-project>div:first-child {display:flex;align-items:baseline;justify-content:space-between;gap:7px;font-size:11px;}
+.float-project span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#777;}
+.float-project strong {font-weight:500;flex-shrink:0;font-size:11px;}
+.float-project-track {height:2px;margin-top:5px;border-radius:2px;background:#f0f0f0;overflow:hidden;}
+.float-project-track i {display:block;height:100%;border-radius:inherit;background:#aaa;}
+.float-footer {display:flex;align-items:center;justify-content:space-between;margin-top:auto;min-height:22px;font-size:9px;color:#aaa;}
+.float-footer>span {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.float-footer button {flex-shrink:0;}
+.float-placeholder {margin-top:14px;text-align:center;font-size:11px;color:#999;}
+.float-settings {flex:1;min-height:0;flex-shrink:1;display:flex;flex-direction:column;padding-top:3px;}
+.float-settings-content {flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;}
+.float-back {display:flex;align-items:center;gap:2px;padding:0;background:transparent;font-size:11px!important;color:#888!important;}
+.float-settings h1 {margin:9px 0 3px;font-size:18px;font-weight:550;letter-spacing:-.3px;}
+.float-settings label {display:block;margin-bottom:6px;font-size:12px;color:#777;}
+.float-settings .float-settings-device {font-size:10px;margin:0 0 12px;overflow-wrap:anywhere;}
+.float-settings p {margin:8px 0;font-size:11px;line-height:1.6;color:#888;}
+.float-rules {display:grid;grid-template-columns:auto 1fr;gap:6px;padding:9px 0;border-top:1px solid var(--float-line);border-bottom:1px solid var(--float-line);margin-top:9px;font-size:10px;}
+.float-rules span {color:#999;}
+.float-rules strong {font-weight:400;text-align:right;}
+.float-setting-actions {display:flex;justify-content:space-between;flex-shrink:0;min-height:28px;align-items:center;border-top:1px solid var(--float-line);}
+.float-setting-actions button {display:flex;align-items:center;gap:3px;padding:4px 0;font-size:10px;background:transparent;color:#777;}
+.float-setting-actions svg {width:12px;}
+.float-length-setting {margin-top:12px;}
+.float-length-setting label {display:flex;justify-content:space-between;align-items:center;font-size:11px;}
+.float-length-setting strong {font-weight:500;color:#444;}
+.float-length-setting input {width:100%;accent-color:#888;cursor:ew-resize;}
+.float-empty {flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+.float-empty strong {font-size:14px;font-weight:500;}
+.float-empty p {margin:0;font-size:10px;color:#999;}
+.float-empty button {padding:6px 10px;border-radius:7px;font-size:11px;background:#f4f4f4;}
+.float-spinning {animation:float-spin 1s linear infinite;}
+@keyframes float-spin {to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.float-shell *,.float-compact *{transition:none!important;animation:none!important;}}
