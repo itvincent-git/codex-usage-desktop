@@ -68,16 +68,21 @@ describe("sidebar navigation", () => {
     expect(await browser.execute(() => document.activeElement?.getAttribute("aria-label"))).toBe("Settings");
     await $('[data-testid="sessions-nav-tab"]').click();
     await detail.waitForExist({ reverse: true });
+    const sessionTab = () => $('[data-session-tabs] [role="tab"]');
+    await expect(sessionTab()).toHaveText("Sidebar navigation task");
+    await expect(sessionTab()).toHaveAttribute("aria-selected", "false");
     await project.waitForExist({ reverse: true });
     await expect($('[data-testid="sessions-nav-tab"]')).toHaveAttribute("aria-selected", "true");
 
     await $('button[aria-label="Settings"]').click();
     await expect($("h1=Settings")).toBeDisplayed();
     await expect(sidebar).not.toBeExisting();
+    await expect(sessionTab()).not.toBeExisting();
     expect(await $("[data-app-content]").getLocation("x")).toBe(0);
     await browser.saveScreenshot("/tmp/codex-usage-fullscreen-settings.png");
     await $("button=Back").click();
     await expect($('[data-testid="sessions-nav-tab"]')).toHaveAttribute("aria-selected", "true");
+    await expect(sessionTab()).toBeDisplayed();
     await expect($('button[aria-label="Expand sidebar"]')).toBeDisplayed();
     await $('button[aria-label="Expand sidebar"]').click();
     expect(await sidebar.getSize("width")).toBe(expandedWidth);

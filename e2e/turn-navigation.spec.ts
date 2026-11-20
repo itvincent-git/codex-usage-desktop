@@ -60,7 +60,7 @@ describe("session turn navigation", () => {
           const dialog = document.querySelector('[aria-labelledby="session-detail-title"]')!;
           const header = dialog.querySelector("header")!;
           const title = dialog.querySelector("#session-detail-title")!.getBoundingClientRect();
-          const close = header.querySelector('button[aria-label="Close session detail"]')!.getBoundingClientRect();
+          const close = document.querySelector('[data-session-tabs] button[aria-label^="Close tab:"]')!.getBoundingClientRect();
           const bounds = dialog.getBoundingClientRect();
           let outerScrolled = false;
           for (let ancestor = header.parentElement; ancestor; ancestor = ancestor.parentElement) {
@@ -68,7 +68,7 @@ describe("session turn navigation", () => {
           }
           return {
             titleVisible: title.height > 0 && title.top >= Math.max(0, bounds.top) && title.bottom <= Math.min(innerHeight, bounds.bottom),
-            closeVisible: close.top >= Math.max(0, bounds.top) && close.bottom <= Math.min(innerHeight, bounds.bottom),
+            closeVisible: close.height > 0 && close.top >= 0 && close.bottom <= bounds.top,
             outerScrolled,
           };
         });

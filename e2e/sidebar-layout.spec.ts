@@ -69,7 +69,7 @@ describe("page layouts beside the sidebar", () => {
           await $('[data-testid="session-card"]').click();
           await expect($('[aria-labelledby="session-detail-title"]')).toHaveText(expect.stringContaining("Sidebar layout reply"));
           await browser.saveScreenshot("/tmp/codex-layout-session-detail.png");
-          await $('button[aria-label="Close session detail"]').click();
+          await $('button[aria-label^="Close tab:"]').click();
         }
         if (page === "models") {
           await $('[data-quota-model] summary').click();

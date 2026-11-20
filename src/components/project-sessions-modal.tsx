@@ -1,6 +1,6 @@
 import { useRefreshShortcut } from "@/hooks/use-refresh-shortcut";
 import { shortcutAria, shortcutLabel } from "@/lib/keyboard-shortcuts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { ArrowRight, Coins, Database, Folder, RefreshCcw, Search, Terminal, X } from "lucide-react";
 import { Area, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -76,7 +76,13 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  useModalFocus(dialogRef, closeButtonRef, onClose, isActive);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPosition = useRef(0);
+  useModalFocus(dialogRef, closeButtonRef, onClose, isActive, { allowSessionTabs: true });
+
+  useLayoutEffect(() => {
+    if (isActive && scrollRef.current) scrollRef.current.scrollTop = scrollPosition.current;
+  }, [isActive]);
 
   useEffect(() => {
     let active = true;
@@ -199,7 +205,7 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
   const tokenAxisWidth = getYAxisWidth(maxDailyTokens, formatCompactNumber, 64);
   const costAxisWidth = getYAxisWidth(maxDailyCost, formatCurrencyShort, 72);
 
-  return <div ref={dialogRef} className="absolute inset-0 z-50 flex flex-col overflow-hidden overscroll-contain bg-background text-foreground" role="dialog" aria-labelledby="modal-project-title" aria-hidden={!isActive} inert={!isActive}>
+  return <div ref={dialogRef} className={`absolute inset-0 z-50 flex flex-col overflow-hidden overscroll-contain bg-background text-foreground ${isActive ? "" : "invisible"}`} role="dialog" aria-labelledby="modal-project-title" aria-hidden={!isActive} inert={!isActive}>
     <header className="shrink-0 border-b border-border/70 bg-surface px-4 py-1.5 shadow-sm" data-testid="project-modal-header">
       <div className="flex min-h-8 items-center gap-2">
         <Folder className="h-4 w-4 shrink-0 text-primary" />
@@ -228,7 +234,9 @@ export function ProjectSessionsModal({ project, range, onClose, onGoToSessions, 
         </div>
       </> : null}
     </header>
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]" data-testid="project-modal-scroll">
+    <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [overflow-anchor:none]" data-testid="project-modal-scroll" onScroll={(event) => {
+      if (isActive) scrollPosition.current = event.currentTarget.scrollTop;
+    }}>
       {refreshError ? <p role="alert" className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error-foreground">{t("project_modal.refresh_error")}: {refreshError}</p> : null}
       {analyticsLoading ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">{t("project_modal.analytics_loading")}</div>
         : analyticsError ? <div className="rounded-xl border border-error/20 bg-error/5 p-4 text-sm text-error-foreground">{t("project_modal.analytics_error")}: {analyticsError}</div>

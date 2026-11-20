@@ -101,7 +101,8 @@ function groupSessionsByAgentHierarchy(sessions: SessionDisplayRow[]) {
   }
 
   return Array.from(groups, ([root, members]) => ({
-    key: root.path,
+    key: root.threadId || root.path,
+    rootPath: root.path,
     sessions: members,
     inputTokens: members.reduce((sum, session) => sum + session.inputTokens, 0),
     cachedInputTokens: members.reduce((sum, session) => sum + session.cachedInputTokens, 0),
@@ -735,12 +736,12 @@ export const SessionUsageTable = memo(function SessionUsageTable({
                     const subagentLabel = [t("sessions.subagent"), session.agentNickname, session.agentRole]
                       .filter(Boolean)
                       .join(" · ");
-                    const isParentAgent = hasSubagents && session.path === agentGroup.key;
+                    const isParentAgent = hasSubagents && session.path === agentGroup.rootPath;
                     const connector = connectorMetadata.get(session.path);
 
                     return (
                       <div
-                        key={session.path}
+                        key={session.threadId || session.path}
                         className="relative [container-type:inline-size] [container-name:session-card]"
                         data-agent-depth={session.agentDepth ?? 0}
                         style={{ paddingInlineStart: hierarchyDepth ? `${hierarchyDepth * 20}px` : undefined }}

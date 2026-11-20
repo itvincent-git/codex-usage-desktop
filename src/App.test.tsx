@@ -1310,14 +1310,15 @@ describe("App", () => {
     await user.tab({ shift: true });
     expect(collapse).toHaveFocus();
     const scroll = within(projectDialog).getByTestId("project-modal-scroll");
-    scroll.scrollTop = 250;
+    fireEvent.scroll(scroll, { target: { scrollTop: 250 } });
     fireEvent.click(card);
-    const detail = await screen.findByRole("dialog", { name: "Project task" });
-    expect(within(detail).getByRole("button", { name: "Close session detail" })).toHaveFocus();
+    await screen.findByRole("dialog", { name: "Project task" });
+    const sessionTab = screen.getByRole("tab", { name: "Project task" });
+    expect(sessionTab).toHaveFocus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Close tab: Project task" })).toHaveFocus();
     await user.tab({ shift: true });
-    expect(within(detail).getByRole("button", { name: "Close session detail" })).toHaveFocus();
+    expect(sessionTab).toHaveFocus();
     expect(invokeMock).toHaveBeenCalledWith("fetch_session_detail", { path: row.path });
     expect(projectDialog).toHaveAttribute("inert");
     expect(projectDialog).toHaveAttribute("aria-hidden", "true");
@@ -1384,7 +1385,7 @@ describe("App", () => {
     await waitFor(() => expect(refresh).toHaveAttribute("aria-busy", "false"));
     expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_session_details")).toHaveLength(1);
     expect(invokeMock.mock.calls.filter(([command]) => command === "fetch_overview")).toHaveLength(overviewRequests + 1);
-    await userEvent.click(screen.getByRole("button", { name: "Close session detail" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close tab: Refreshed target" }));
     expect(screen.getByText("Refreshed target")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open session Refreshed target" })).toHaveTextContent("240");
   });
@@ -1809,7 +1810,7 @@ describe("App", () => {
     await userEvent.click(screen.getByText("Replay summary"));
 
     expect(await screen.findByRole("dialog", { name: "Updated replay summary" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Close session detail" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Replay summary" })).toHaveFocus();
     const detailHeader = screen.getByRole("dialog", { name: "Updated replay summary" }).querySelector("header")!;
     expect(detailHeader).toHaveClass("py-1.5");
     expect(screen.getByRole("button", { name: /Details/ })).toHaveAttribute("aria-expanded", "false");
@@ -2036,9 +2037,9 @@ describe("App", () => {
     await userEvent.click(showFullButton);
     expect(screen.getByText(/raw-only-marker/)).toBeInTheDocument();
 
-    screen.getByRole("button", { name: "Collapse sidebar" }).focus();
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
-    expect(screen.getByRole("button", { name: "Show in File Manager" })).toHaveFocus();
+    screen.getByRole("tab", { name: "Replay summary" }).focus();
+    await userEvent.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Back to list" })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Updated replay summary" })).not.toBeInTheDocument());

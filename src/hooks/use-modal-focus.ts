@@ -5,10 +5,10 @@ export function useModalFocus(
   closeButtonRef: RefObject<HTMLButtonElement | null>,
   onClose: () => void,
   isActive = true,
-  options: { isolateBackground?: boolean; restoreFocusRef?: RefObject<HTMLButtonElement | null> } = {},
+  options: { isolateBackground?: boolean; restoreFocusRef?: RefObject<HTMLButtonElement | null>; allowSessionTabs?: boolean } = {},
 ) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
-  const { isolateBackground = false, restoreFocusRef } = options;
+  const { isolateBackground = false, restoreFocusRef, allowSessionTabs = false } = options;
   const manageFocus = !isolateBackground || isActive;
 
   useEffect(() => {
@@ -44,12 +44,13 @@ export function useModalFocus(
 
   useEffect(() => {
     if (!isActive) return;
+    const navigation = allowSessionTabs ? "[data-app-sidebar], [data-session-tabs]" : "[data-app-sidebar]";
 
     const focusableElements = () => Array.from(
       document.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       ),
-    ).filter((element) => element.tabIndex >= 0 && (dialogRef.current?.contains(element) || element.closest("[data-app-sidebar]")) && !element.closest('[hidden], [inert], [aria-hidden="true"]'));
+    ).filter((element) => element.tabIndex >= 0 && (dialogRef.current?.contains(element) || element.closest(navigation)) && !element.closest('[hidden], [inert], [aria-hidden="true"]'));
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.isComposing) return;
@@ -74,7 +75,7 @@ export function useModalFocus(
     }
 
     function handleFocus(event: FocusEvent) {
-      if (event.target instanceof Node && !dialogRef.current?.contains(event.target) && !(event.target instanceof Element && event.target.closest("[data-app-sidebar]"))) {
+      if (event.target instanceof Node && !dialogRef.current?.contains(event.target) && !(event.target instanceof Element && event.target.closest(navigation))) {
         closeButtonRef.current?.focus({ preventScroll: true });
       }
     }
@@ -85,5 +86,5 @@ export function useModalFocus(
       window.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("focusin", handleFocus);
     };
-  }, [closeButtonRef, dialogRef, isActive, onClose]);
+  }, [closeButtonRef, dialogRef, isActive, onClose, allowSessionTabs]);
 }

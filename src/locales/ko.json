@@ -492,6 +492,11 @@
     "btn_apply": "기간 적용"
   },
   "sessions": {
+    "tabs": {
+      "label": "열린 세션",
+      "back": "목록으로 돌아가기",
+      "close": "탭 닫기: {{title}}"
+    },
     "archived": "보관됨",
     "title": "세션 상세",
     "subtitle": "명령별 실행 내역과 파일 편집 기록을 확인합니다.",

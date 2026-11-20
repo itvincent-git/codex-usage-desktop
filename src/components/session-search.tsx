@@ -4,18 +4,21 @@ import { useTranslation } from "react-i18next";
 import type { SessionReplayDetail } from "@/lib/api";
 import type { SearchScope, SessionSearchHit, SessionSearchRequest, SessionSearchResponse, SessionSearchResult } from "@/lib/session-search";
 
+type SearchDocument = Pick<SessionReplayDetail, "turns" | "rawJsonl">;
+
 export type SessionSearchState = SessionSearchResult & {
-  source: SessionReplayDetail;
+  source: SearchDocument;
   scope: SearchScope;
   active: boolean;
   pending: boolean;
   error: boolean;
 };
-export type SessionSearchHandle = { clear: () => void; focus: () => void };
+export type SessionSearchHandle = { clear: () => boolean; focus: () => void };
 const EMPTY_RESULT: SessionSearchResult = { count: 0, index: 0, hit: null, matches: [] };
 
-export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: {
-  detail: SessionReplayDetail;
+export function SessionSearchToolbar({ id, detail, scope, onChange, onClose, ref }: {
+  id?: string;
+  detail: SearchDocument;
   scope: SearchScope;
   onChange: (state: SessionSearchState) => void;
   onClose: () => void;
@@ -38,12 +41,14 @@ export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: 
   }
 
   function clear() {
+    if (!query) return false;
     requestId.current += 1;
     send({ type: "cancel" });
     setQuery("");
     setResult(EMPTY_RESULT);
     setPending(false);
     onChange({ ...EMPTY_RESULT, source: detail, scope, active: false, pending: false, error: false });
+    return true;
   }
   useImperativeHandle(ref, () => ({ clear, focus: () => { inputRef.current?.focus(); inputRef.current?.select(); } }));
 
@@ -105,7 +110,7 @@ export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: 
   }
 
   return (
-    <div id="session-detail-search" role="search" className="absolute inset-x-3 top-2 z-20 ml-auto flex max-w-xl items-center gap-2 rounded-lg border border-border/60 bg-surface px-3 py-2 shadow-lg">
+    <div id={id} role="search" className="absolute inset-x-3 top-2 z-20 ml-auto flex max-w-xl items-center gap-2 rounded-lg border border-border/60 bg-surface px-3 py-2 shadow-lg">
       <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <input
         ref={inputRef}
@@ -121,10 +126,9 @@ export function SessionSearchToolbar({ detail, scope, onChange, onClose, ref }: 
           if (event.key === "Enter") {
             event.preventDefault();
             navigate(event.shiftKey ? -1 : 1);
-          } else if (event.key === "Escape" && query) {
+          } else if (event.key === "Escape" && clear()) {
             event.preventDefault();
             event.stopPropagation();
-            clear();
           }
         }}
       />

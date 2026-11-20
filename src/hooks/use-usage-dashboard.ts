@@ -3,7 +3,7 @@ import { useCodexForecast } from "@/hooks/use-codex-forecast";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   activateCodexWindow,
@@ -122,7 +122,7 @@ function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgress
   };
 }
 
-export function useUsageDashboard() {
+export function useUsageDashboard(keepSessionsCurrent = false) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
@@ -438,7 +438,7 @@ export function useUsageDashboard() {
         if (!data || data.totals.totalTokens === 0) await loadDiagnostics();
         else setDiagnostics(null);
         if (view === "monthly") await loadMonthlyUsage();
-        if (view === "sessions") await loadSessions();
+        if (view === "sessions" || keepSessionsCurrent) await loadSessions();
         setLastRescanDurationMs(performance.now() - startedAt);
         if (!options?.force && filesParsed > 0) void loadCodexLimits({ bypassThrottle: true });
       } catch (error) {
@@ -656,7 +656,7 @@ export function useUsageDashboard() {
       if (view === "monthly") {
         await loadMonthlyUsage();
       }
-      if (view === "sessions") {
+      if (view === "sessions" || keepSessionsCurrent) {
         await loadSessions();
       }
     }
@@ -1006,7 +1006,7 @@ export function useUsageDashboard() {
     }
   }
 
-  async function handleLocalScanComplete(scan: ScanResponse, updatedSession?: SessionDetailRow, previousPath?: string) {
+  const handleLocalScanComplete = useCallback(async (scan: ScanResponse, updatedSession?: SessionDetailRow, previousPath?: string) => {
     if (updatedSession) setSessions((current) => current.map((session) => session.path === previousPath ? updatedSession : session));
     const generation = ++localReloadGeneration.current;
     const overviewRequest = ++overviewGeneration.current;
@@ -1014,7 +1014,7 @@ export function useUsageDashboard() {
     const nextRange = range;
     const [nextOverview, nextSessions, nextMonthly] = await Promise.all([
       fetchOverview(nextRange),
-      hasLoadedSessions && !updatedSession ? fetchSessionDetails() : Promise.resolve(null),
+      (hasLoadedSessions || keepSessionsCurrent) && !updatedSession ? fetchSessionDetails() : Promise.resolve(null),
       monthlyUsage ? fetchMonthlyUsage() : Promise.resolve(null),
     ]);
     if (generation !== localReloadGeneration.current) return;
@@ -1023,7 +1023,7 @@ export function useUsageDashboard() {
     if (nextMonthly) setMonthlyUsage(nextMonthly);
     setLastRescanDurationMs(scan.metrics?.totalMs ?? null);
     setError(null);
-  }
+  }, [hasLoadedSessions, keepSessionsCurrent, monthlyUsage, range]);
 
   async function handlePricingRefreshed() {
     await loadOverview(range);

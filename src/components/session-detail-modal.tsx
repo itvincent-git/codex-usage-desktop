@@ -5,9 +5,9 @@ import {
   parseToolContentBlocks, parseUserInputAnswers, processSignal, splitWebSearchResults, summarizeOutput,
   type ConversationBlock, type DisplayTokenUsageItem, type ExecOutput, type NestedActivity, type ReplayItem, type TimelineEntry, type TokenUsageItem, type ToolActivity, type UserInputQuestion, type WebSearchResult,
 } from "@/lib/session-conversation";
-import { lazy, memo, Suspense, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, memo, Suspense, useContext, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCcw, MessageSquare, Search, Terminal, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCcw, MessageSquare, Search, Terminal, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, rescanSession, revealInFileManager, type ScanResponse, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -16,7 +16,6 @@ import { projectLabel, sessionProjectReferences } from "@/lib/project-reference"
 import { SessionQuotaUsageView } from "./session-quota-usage";
 import { SessionArchivedBadge } from "./session-archived-badge";
 import { MetricBadge } from "./metric-badge";
-import { useModalFocus } from "@/hooks/use-modal-focus";
 import { useSessionCredits } from "@/hooks/use-session-credits";
 import { SessionCredits } from "./session-credits";
 import { SessionSearchContext, SessionSearchTarget, SessionSearchText, SessionSearchToolbar, useSessionSearchExpansion, type SessionSearchHandle, type SessionSearchState } from "./session-search";
@@ -24,6 +23,7 @@ import type { SessionSearchHit } from "@/lib/session-search";
 
 type SessionDetailModalProps = {
   session: SessionDetailRow;
+  isActive?: boolean;
   showSessionCredits?: boolean;
   onClose: () => void;
   onScanComplete?: (session: SessionDetailRow, previousPath: string, scan: ScanResponse) => Promise<void>;
@@ -1208,14 +1208,18 @@ export const ConversationItem = memo(function ConversationItem({ block, rawJsonl
   );
 });
 
-export function SessionDetailModal({ session, showSessionCredits = false, onClose, onScanComplete }: SessionDetailModalProps) {
+export const SessionDetailModal = memo(function SessionDetailModal({ session, isActive = true, showSessionCredits = false, onClose, onScanComplete }: SessionDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<SessionReplayDetail | null>(null);
-  const [activePath, setActivePath] = useState(session.path);
+  const [agentPath, setAgentPath] = useState<string | null>(null);
+  const activePath = agentPath ?? session.path;
+  const modifiedAtMs = agentPath === null ? session.modifiedAtMs : undefined;
+  const sizeBytes = agentPath === null ? session.sizeBytes : undefined;
   const [refreshedSession, setRefreshedSession] = useState<SessionDetailRow | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  const loadingGeneration = useRef<number | null>(null);
   const refreshInFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
@@ -1233,48 +1237,76 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
   const searchRef = useRef<SessionSearchHandle>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPosition = useRef(0);
+  useLayoutEffect(() => {
+    if (isActive && scrollRef.current) scrollRef.current.scrollTop = scrollPosition.current;
+  }, [isActive]);
   const turnRefs = useRef(new Map<string, HTMLElement>());
-  useModalFocus(dialogRef, closeButtonRef, onClose);
   const creditSession = refreshedSession?.path === activePath ? refreshedSession : activePath === session.path ? session : null;
   const activeDetail = detail?.path === activePath ? detail : null;
   const creditThreadId = creditSession?.threadId ?? activeDetail?.agents?.find((agent) => agent.path === activePath)?.sessionId;
-  const credits = useSessionCredits(showSessionCredits, creditThreadId ? [{
+  const credits = useSessionCredits(isActive && showSessionCredits, creditThreadId ? [{
     threadId: creditThreadId,
     modifiedAtMs: creditSession?.modifiedAtMs ?? activeDetail?.modifiedAtMs ?? 0,
   }] : []);
 
-  useEffect(() => {
-    function handleSearchKey(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing) return;
-      if (isPrimaryShortcut(event) && event.key.toLowerCase() === "f" && detail) {
-        event.preventDefault();
-        if (showSearch) searchRef.current?.focus();
-        else setShowSearch(true);
-      } else if (event.key === "Escape" && showSearch) {
-        if (event.target instanceof HTMLInputElement && event.target.type === "search" && event.target.value) return;
-        event.preventDefault();
-        event.stopPropagation();
-        closeSearch();
-      }
+  const handleDetailKey = useEffectEvent((event: KeyboardEvent) => {
+    if (!isActive || event.defaultPrevented || event.isComposing) return;
+    if (isPrimaryShortcut(event) && event.key.toLowerCase() === "f" && detail) {
+      event.preventDefault();
+      if (showSearch) searchRef.current?.focus();
+      else setShowSearch(true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      if (!showSearch) onClose();
+      else if (!searchRef.current?.clear()) closeSearch();
     }
-    window.addEventListener("keydown", handleSearchKey, true);
-    return () => window.removeEventListener("keydown", handleSearchKey, true);
-  }, [detail, showSearch]);
+  });
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKey = (event: KeyboardEvent) => handleDetailKey(event);
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
+  }, [isActive]);
+
+  function updateDetail(previous: SessionReplayDetail | null, next: SessionReplayDetail) {
+    const previousKeys = new Set(previous?.turns.map((turn, index) => `${turn.turnId}-${index}`));
+    const nextKeys = next.turns.map((turn, index) => `${turn.turnId}-${index}`);
+    setExpandedTurns((current) => new Set(nextKeys.filter((key) => !previousKeys.has(key) || current.has(key))));
+    setActiveTurnKey((current) => current && nextKeys.includes(current) ? current : nextKeys[0] ?? null);
+    setDetail(previous?.rawJsonl === next.rawJsonl ? { ...next, turns: previous.turns } : next);
+  }
+
+  const replayIsCurrent = useEffectEvent(() => detail?.path === activePath
+    && (modifiedAtMs === undefined || modifiedAtMs === detail.modifiedAtMs)
+    && (sizeBytes === undefined || sizeBytes === detail.sizeBytes));
+  const applyFetchedDetail = useEffectEvent((next: SessionReplayDetail) => updateDetail(detail, next));
+  useEffect(() => () => { requestGeneration.current += 1; }, [activePath, modifiedAtMs, sizeBytes]);
 
   useEffect(() => {
-    setActivePath(session.path);
-  }, [session.path]);
+    const generation = requestGeneration.current;
+    if (!isActive || loadingGeneration.current === generation) return;
+    setError(null);
+    if (replayIsCurrent()) return;
+    loadingGeneration.current = generation;
+    void fetchSessionDetail(activePath).then((data) => {
+      if (generation === requestGeneration.current) applyFetchedDetail(data);
+    }).catch((err) => {
+      if (generation === requestGeneration.current) setError(err instanceof Error ? err.message : String(err));
+    }).finally(() => {
+      if (loadingGeneration.current === generation) loadingGeneration.current = null;
+    });
+  }, [activePath, modifiedAtMs, sizeBytes, isActive]);
 
-  useEffect(() => {
-    let cancelled = false;
-    requestGeneration.current += 1;
+  function selectAgent(path: string) {
+    if (path === activePath) return;
+    setAgentPath(path === session.path ? null : path);
     setRefreshedSession(null);
     setRefreshError(null);
     setDetail(null);
-    setError(null);
     setActiveTab("timeline");
     setCopiedSessionId(false);
     setCopiedProjectPath(null);
@@ -1287,25 +1319,9 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
     setActiveTurnKey(null);
     setSearch(null);
     turnRefs.current.clear();
+    scrollPosition.current = 0;
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
-
-    void fetchSessionDetail(activePath)
-      .then((data) => {
-        if (!cancelled) {
-          setDetail(data);
-          setExpandedTurns(new Set(data.turns.map((turn, index) => `${turn.turnId}-${index}`)));
-          setActiveTurnKey(data.turns.length > 0 ? `${data.turns[0].turnId}-0` : null);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-
-    return () => {
-      cancelled = true;
-      requestGeneration.current += 1;
-    };
-  }, [activePath, session.path]);
+  }
 
   async function refreshSession() {
     if (refreshInFlight.current || !detail) return;
@@ -1318,15 +1334,12 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
       const result = await rescanSession(previousPath);
       const synchronization = onScanComplete?.(result.session, previousPath, result.scan);
       if (generation === requestGeneration.current) {
-        const previousKeys = new Set(detail.turns.map((turn, index) => `${turn.turnId}-${index}`));
-        setExpandedTurns((current) => new Set(result.detail.turns.map((turn, index) => `${turn.turnId}-${index}`)
-          .filter((key) => !previousKeys.has(key) || current.has(key))));
-        setDetail((current) => ({
-          ...result.detail,
-          turns: current?.rawJsonl === result.detail.rawJsonl ? current.turns : result.detail.turns,
-        }));
-        setRefreshedSession(result.session);
-        credits.refresh();
+        updateDetail(detail, result.detail);
+        if (agentPath !== null) {
+          setAgentPath(result.detail.path);
+          setRefreshedSession(result.session);
+        }
+        if (isActive) credits.refresh();
       }
       await synchronization;
     } catch (error) {
@@ -1339,7 +1352,7 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
 
   useRefreshShortcut(() => {
     if (!refreshing && detail) void refreshSession();
-  }, true, true);
+  }, isActive, true);
 
   const cacheRate = useMemo(() => {
     const inputTokens = detail?.summary.inputTokens ?? session.inputTokens;
@@ -1366,7 +1379,8 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
       && !text.startsWith("# AGENTS.md instructions for ")
       && !text.startsWith("<environment_context>");
   })?.text.trim().slice(0, 600) ?? "") ?? [], [detail?.turns]);
-  const searchResult = showSearch && search?.active && search.source === detail && search.scope === activeTab ? search : null;
+  const searchDocument = useMemo(() => detail ? { turns: detail.turns, rawJsonl: detail.rawJsonl } : null, [detail?.turns, detail?.rawJsonl]);
+  const searchResult = showSearch && search?.active && search.source === searchDocument && search.scope === activeTab ? search : null;
   const searchHit = searchResult?.hit;
   const searchMatches = useMemo(() => {
     const turns = new Map<number, Map<number, SessionSearchHit[]>>();
@@ -1380,8 +1394,8 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
     return turns;
   }, [searchResult?.matches]);
 
-  useLayoutEffect(() => {
-    if (!searchHit) return;
+  const revealSearchHit = useEffectEvent(() => {
+    if (!isActive || !searchHit) return;
     if (detail && searchHit.turnIndex >= 0) {
       setActiveTurnKey(`${detail.turns[searchHit.turnIndex].turnId}-${searchHit.turnIndex}`);
     }
@@ -1390,7 +1404,8 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
     if (scroll && target) {
       scroll.scrollTop += target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 64;
     }
-  }, [detail, searchHit]);
+  });
+  useLayoutEffect(() => { revealSearchHit(); }, [searchHit]);
 
   async function copySessionId() {
     await navigator.clipboard?.writeText(displayedSessionId);
@@ -1452,10 +1467,10 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
 
   return (
     <div
-      ref={dialogRef}
       className="absolute inset-0 z-50 flex overscroll-contain bg-background text-foreground"
       role="dialog"
-      aria-labelledby="session-detail-title"
+      aria-hidden={!isActive}
+      aria-labelledby={isActive ? "session-detail-title" : undefined}
     >
       <div className="flex h-full w-full flex-col overflow-hidden overscroll-contain">
         <header className={`z-10 shrink-0 border-b border-border/70 bg-surface px-4 shadow-sm transition-[padding] motion-reduce:transition-none ${isScrolled ? "py-1" : "py-1.5"}`}>
@@ -1463,7 +1478,7 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-1.5">
                 <FileJson className="h-4 w-4 text-primary" />
-                <h2 id="session-detail-title" className={`mr-1 min-w-0 truncate font-bold tracking-tight transition-[font-size] ${isScrolled ? "text-sm" : "text-base"}`}>
+                <h2 id={isActive ? "session-detail-title" : undefined} className={`mr-1 min-w-0 truncate font-bold tracking-tight transition-[font-size] ${isScrolled ? "text-sm" : "text-base"}`}>
                   {threadName || (
                     <button
                       type="button"
@@ -1487,7 +1502,7 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
               aria-keyshortcuts={shortcutAria("F")}
               aria-label={t("sessions.detail.search_placeholder")}
               aria-expanded={showSearch}
-              aria-controls="session-detail-search"
+              aria-controls={isActive ? "session-detail-search" : undefined}
               disabled={!detail}
               onClick={() => showSearch ? closeSearch() : setShowSearch(true)}
             >
@@ -1520,9 +1535,6 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
                 {t("sessions.detail.raw_jsonl")}
               </button>
             </nav>
-            <Button ref={closeButtonRef} variant="secondary" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t("sessions.detail.close_aria")}>
-              <X className="h-4 w-4" />
-            </Button>
           </div>
           <div
             className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${isScrolled ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
@@ -1591,13 +1603,15 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
         </header>
 
         <div className="relative flex min-h-0 flex-1 flex-col">
-        {detail && showSearch ? <SessionSearchToolbar key={activePath} ref={searchRef} detail={detail} scope={activeTab} onChange={setSearch} onClose={closeSearch} /> : null}
+        {searchDocument && showSearch ? <SessionSearchToolbar id={isActive ? "session-detail-search" : undefined} ref={searchRef} detail={searchDocument} scope={activeTab} onChange={setSearch} onClose={closeSearch} /> : null}
         <div
           ref={scrollRef}
           data-testid="session-detail-scroll"
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background [overflow-anchor:none]"
           onScroll={(event) => {
+            if (!isActive) return;
             const scrollTop = event.currentTarget.scrollTop;
+            scrollPosition.current = scrollTop;
             if (!isScrolled && scrollTop > 12) {
               // Preserve the scroll range while the header releases space, even for short replays.
               setCollapsedHeight((summaryRef.current?.offsetHeight ?? 0) + 4);
@@ -1677,7 +1691,7 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
                 </div>
               </nav>
               <div className="min-w-0 max-w-5xl flex-1 space-y-5">
-              <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={setActivePath} />
+              <AgentHierarchy agents={detail.agents ?? []} activePath={detail.path} onSelect={selectAgent} />
               {detail.turns.map((turn, index) => {
                 const turnKey = `${turn.turnId}-${index}`;
                 const isExpanded = expandedTurns.has(turnKey) || searchMatches.has(index);
@@ -1773,4 +1787,4 @@ export function SessionDetailModal({ session, showSessionCredits = false, onClos
       </div>
     </div>
   );
-}
+});

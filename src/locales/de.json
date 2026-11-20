@@ -535,6 +535,11 @@
     "btn_apply": "Zeitraum anwenden"
   },
   "sessions": {
+    "tabs": {
+      "label": "Geöffnete Sitzungen",
+      "back": "Zurück zur Liste",
+      "close": "Tab schließen: {{title}}"
+    },
     "archived": "Archiviert",
     "title": "Sitzungsdetails",
     "subtitle": "Detaillierter Verlauf der Befehle und Dateiänderungen.",

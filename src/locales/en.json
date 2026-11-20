@@ -492,6 +492,11 @@
     "btn_apply": "Apply Range"
   },
   "sessions": {
+    "tabs": {
+      "label": "Open sessions",
+      "back": "Back to list",
+      "close": "Close tab: {{title}}"
+    },
     "archived": "Archived",
     "title": "Session Details",
     "subtitle": "Granular command-by-command or file-edit history.",

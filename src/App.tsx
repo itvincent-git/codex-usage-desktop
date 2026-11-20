@@ -17,6 +17,7 @@ import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { SessionUsageTable } from "@/components/session-usage-table";
 import { SessionDetailModal } from "@/components/session-detail-modal";
+import { SessionTabs, type SessionTab } from "@/components/session-tabs";
 import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useRefreshShortcut } from "@/hooks/use-refresh-shortcut";
@@ -24,12 +25,16 @@ import { isPrimaryShortcut } from "@/lib/keyboard-shortcuts";
 import { useUsageDashboard } from "@/hooks/use-usage-dashboard";
 import { buildMetricCards, getRangeLabel } from "@/lib/usage-dashboard";
 import { getReleaseNotes } from "@/lib/release-notes";
-import type { SessionDetailRow } from "@/lib/api";
+import type { ScanResponse, SessionDetailRow } from "@/lib/api";
 import { useCodexAccounts } from "@/hooks/use-codex-accounts";
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, X, ChevronDown, ChevronUp, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+
+function isSameSession(first: SessionDetailRow, second: SessionDetailRow) {
+  return first.threadId && second.threadId ? first.threadId === second.threadId : first.path === second.path;
+}
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -65,7 +70,9 @@ export default function App() {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
   const clearProjectFilter = useCallback(() => setSelectedProjectFilter(null), []);
   const [projectDataRevision, setProjectDataRevision] = useState(0);
-  const [selectedSession, setSelectedSession] = useState<SessionDetailRow | null>(null);
+  const [sessionTabs, setSessionTabs] = useState<{ tabs: SessionTab[]; selectedId: number | null }>({ tabs: [], selectedId: null });
+  const nextTabId = useRef(0);
+  const sessionListFocus = useRef<HTMLElement | null>(null);
   const [isResetHistoryOpen, setIsResetHistoryOpen] = useState(false);
   const {
     view,
@@ -137,7 +144,68 @@ export default function App() {
     handleTrayMenuShowChange,
     trayCountdownUnits,
     handleTrayCountdownUnitChange,
-  } = useUsageDashboard();
+  } = useUsageDashboard(sessionTabs.tabs.length > 0);
+
+  const activeSessionId = view === "settings" ? null : sessionTabs.selectedId;
+  const projectActive = !!selectedProjectForModal && view !== "settings" && activeSessionId === null && !isResetHistoryOpen;
+
+  useEffect(() => {
+    setSessionTabs((current) => {
+      if (!current.tabs.length || !sessions.length) return current;
+      const byPath = new Map(sessions.map((session) => [session.path, session]));
+      const byThread = new Map(sessions.map((session) => [session.threadId, session]));
+      const tabs = current.tabs.map((tab) => {
+        const session = (tab.session.threadId ? byThread.get(tab.session.threadId) : undefined) ?? byPath.get(tab.session.path);
+        return session && session !== tab.session && isSameSession(tab.session, session) ? { ...tab, session } : tab;
+      });
+      return tabs.some((tab, index) => tab !== current.tabs[index]) ? { ...current, tabs } : current;
+    });
+  }, [sessions]);
+
+  useLayoutEffect(() => {
+    const opener = sessionListFocus.current;
+    if (activeSessionId !== null || view === "settings" || !opener?.isConnected) return;
+    opener.focus({ preventScroll: true });
+    if (document.activeElement === opener) return;
+    const frame = requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [activeSessionId, view]);
+
+  const openSession = useCallback((session: SessionDetailRow) => {
+    if (document.activeElement instanceof HTMLElement) sessionListFocus.current = document.activeElement;
+    const id = ++nextTabId.current;
+    setSessionTabs((current) => {
+      const existing = current.tabs.find((tab) => isSameSession(tab.session, session));
+      return existing
+        ? { ...current, selectedId: existing.id }
+        : { tabs: [...current.tabs, { id, session }], selectedId: id };
+    });
+  }, []);
+
+  const selectSessionTab = (selectedId: number | null) => {
+    setSessionTabs((current) => ({ ...current, selectedId }));
+  };
+
+  const closeSessionTab = useCallback((id?: number) => {
+    setSessionTabs((current) => {
+      const closingId = id ?? current.selectedId;
+      const index = current.tabs.findIndex((tab) => tab.id === closingId);
+      if (index < 0) return current;
+      return {
+        tabs: current.tabs.filter((tab) => tab.id !== closingId),
+        selectedId: closingId === current.selectedId ? (current.tabs[index + 1] ?? current.tabs[index - 1])?.id ?? null : current.selectedId,
+      };
+    });
+  }, []);
+
+  const handleSessionScanComplete = useCallback(async (session: SessionDetailRow, previousPath: string, scan: ScanResponse) => {
+    setSessionTabs((current) => ({
+      ...current,
+      tabs: current.tabs.map((tab) => tab.session.path === previousPath || isSameSession(tab.session, session) ? { ...tab, session } : tab),
+    }));
+    setProjectDataRevision((value) => value + 1);
+    await handleLocalScanComplete(scan, session, previousPath);
+  }, [handleLocalScanComplete]);
 
   const syncAccountsWithLiveLimits = useEffectEvent(() => {
     if (codexLimits?.authContext && codexLimits.authContext !== accounts.list?.authContext) void accounts.reload();
@@ -192,20 +260,25 @@ export default function App() {
       : t("update.upgrade_now");
 
   const navigate = (nextView: DashboardView) => {
-    if (nextView === "settings" && view !== "settings") setSettingsReturnView(view);
-    if (nextView !== "sessions" && nextView !== "settings") {
-      setSelectedSessionDate(null);
-      setSelectedProjectFilter(null);
+    if (nextView === "settings") {
+      if (view !== "settings") setSettingsReturnView(view);
+    } else if (view !== "settings" || nextView !== settingsReturnView) {
+      if (nextView !== "sessions") {
+        setSelectedSessionDate(null);
+        setSelectedProjectFilter(null);
+      }
+      sessionListFocus.current = null;
+      setSelectedProjectForModal(null);
+      selectSessionTab(null);
     }
-    setSelectedProjectForModal(null);
-    setSelectedSession(null);
     setIsResetHistoryOpen(false);
     void handleViewChange(nextView);
   };
 
-  const hasModal = !!(selectedProjectForModal || selectedSession || isResetHistoryOpen);
+  const hasModal = projectActive || activeSessionId !== null || isResetHistoryOpen;
+  const hasOpenDialog = () => document.querySelector('[role="dialog"]:not([aria-hidden="true"]), [role="menu"], [role="listbox"]');
   useRefreshShortcut(() => {
-    if (!hasModal && !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') && view !== "settings" && view !== "accounts" && !isLoading && !isScanning && !isRefreshing && !isResetting && isExporting === null) {
+    if (!hasModal && !hasOpenDialog() && view !== "settings" && view !== "accounts" && !isLoading && !isScanning && !isRefreshing && !isResetting && isExporting === null) {
       void handleRefresh();
     }
   });
@@ -217,7 +290,7 @@ export default function App() {
     const toggleSidebar = isPrimaryShortcut(event, true) && event.key.toLowerCase() === "l";
     if (!nextView && !toggleSidebar) return;
     event.preventDefault();
-    if (event.repeat || hasModal || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+    if (event.repeat || hasModal || hasOpenDialog()) return;
     if (toggleSidebar && view !== "settings") setSidebarCollapsed((collapsed) => !collapsed);
     else if (nextView) navigate(nextView);
   });
@@ -260,6 +333,15 @@ export default function App() {
       ) : null}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
       <div aria-hidden="true" className="h-[var(--window-controls-height)] shrink-0" />
+      {view !== "settings" && sessionTabs.tabs.length > 0 ? (
+        <SessionTabs
+          tabs={sessionTabs.tabs}
+          selectedId={activeSessionId}
+          onSelect={selectSessionTab}
+          onClose={closeSessionTab}
+          onBack={() => selectSessionTab(null)}
+        />
+      ) : null}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden [container-type:inline-size] [container-name:app-content]" data-app-content>
       {view === "settings" ? (
         <div className="mx-auto w-full max-w-layout shrink-0 px-6 pt-4 content-sm:px-8 content-lg:px-10">
@@ -273,8 +355,8 @@ export default function App() {
       ) : null}
       <div
         className="min-h-0 flex-1 overflow-y-auto"
-        aria-hidden={selectedProjectForModal || selectedSession || isResetHistoryOpen ? "true" : undefined}
-        inert={selectedProjectForModal || selectedSession || isResetHistoryOpen ? true : undefined}
+        aria-hidden={hasModal || undefined}
+        inert={hasModal || undefined}
       >
       <div className={`relative mx-auto flex min-h-full w-full max-w-layout flex-col px-6 pb-8 content-sm:px-8 content-lg:px-10 ${view === "settings" ? "pt-0" : "pt-4"}`}>
         <div
@@ -529,11 +611,11 @@ export default function App() {
             <SessionUsageTable
               sessions={sessions}
               showSessionCredits={showSessionCredits}
-              creditsActive={!selectedProjectForModal && !selectedSession && !isResetHistoryOpen}
+              creditsActive={!hasModal}
               initialExpandedDate={selectedSessionDate}
               selectedProject={selectedProjectFilter}
               onClearProjectFilter={clearProjectFilter}
-              onSessionClick={setSelectedSession}
+              onSessionClick={openSession}
             />
           ) : null}
 
@@ -584,8 +666,8 @@ export default function App() {
           project={selectedProjectForModal}
           showSessionCredits={showSessionCredits}
           range={range}
-          onSessionClick={setSelectedSession}
-          isActive={!selectedSession && !isResetHistoryOpen}
+          onSessionClick={openSession}
+          isActive={projectActive}
           dataRevision={projectDataRevision}
           onScanComplete={handleLocalScanComplete}
           onClose={() => setSelectedProjectForModal(null)}
@@ -597,17 +679,17 @@ export default function App() {
           }}
         />
       )}
-      {selectedSession && (
-        <SessionDetailModal
-          session={selectedSession}
-          showSessionCredits={showSessionCredits}
-          onScanComplete={async (session, previousPath, scan) => {
-            setProjectDataRevision((value) => value + 1);
-            await handleLocalScanComplete(scan, session, previousPath);
-          }}
-          onClose={() => setSelectedSession(null)}
-        />
-      )}
+      {sessionTabs.tabs.map(({ id, session }) => (
+        <div key={id} id={`session-panel-${id}`} role="tabpanel" aria-labelledby={`session-tab-${id}`} aria-hidden={id !== activeSessionId} inert={id !== activeSessionId} className={`absolute inset-0 z-50 ${id === activeSessionId ? "" : "invisible"}`}>
+          <SessionDetailModal
+            session={session}
+            isActive={id === activeSessionId}
+            showSessionCredits={showSessionCredits}
+            onScanComplete={handleSessionScanComplete}
+            onClose={closeSessionTab}
+          />
+        </div>
+      ))}
       {isResetHistoryOpen ? (
         <CodexResetHistoryModal onClose={() => setIsResetHistoryOpen(false)} />
       ) : null}

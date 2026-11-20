@@ -492,6 +492,11 @@
     "btn_apply": "应用范围"
   },
   "sessions": {
+    "tabs": {
+      "label": "已打开的会话",
+      "back": "返回列表",
+      "close": "关闭标签：{{title}}"
+    },
     "archived": "已归档",
     "title": "会话日志明细",
     "subtitle": "逐条命令或文件编辑的详细历史记录。",
