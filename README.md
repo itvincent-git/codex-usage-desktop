@@ -80,6 +80,12 @@ Restart the related Codex client after switching to load the new account. See [a
 
 *Account identities, subscription dates, and usage values in this screenshot are illustrative.*
 
+### macOS desktop widgets
+
+The optional WidgetKit extension shows local token totals and the official weekly quota. The medium widget breaks usage down by model. The large widget can switch between projects and models and expand named project conversations.
+
+For a local build, make an application bundle with `pnpm tauri build --bundles app` under Xcode, then run `bash scripts/bundle-macos-widget.sh "/path/to/Codex Usage Desktop.app"`. Open the resulting app once and add **Codex 用量** from macOS **Edit Widgets**. The extension reads a local snapshot written by the app.
+
 ### 🔍 Find what is using your tokens
 
 Break usage down by:
