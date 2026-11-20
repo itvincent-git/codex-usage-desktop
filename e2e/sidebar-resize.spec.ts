@@ -30,7 +30,7 @@ describe("sidebar resizing", () => {
     const handle = $('[role="separator"][aria-label="Resize sidebar"]');
     await handle.waitForDisplayed();
     await $("button=Rescan local logs").waitForEnabled({ timeout: 90_000 });
-    expect(await sidebar.getSize("width")).toBe(160);
+    expect(await sidebar.getSize("width")).toBe(240);
 
     const expectWindowBackgrounds = async () => {
       const layout = await browser.execute(() => {
@@ -92,7 +92,7 @@ describe("sidebar resizing", () => {
     };
 
     await dragBy(80);
-    await expectWidth(240);
+    await expectWidth(320);
     await dragBy(300);
     await expectWidth(360);
     await dragBy(-300);

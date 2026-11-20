@@ -89,6 +89,36 @@ describe("session detail tabs", () => {
       await expect(tab(name)).toBeFocused();
       await expect(detail().$("h2")).toHaveText(`Tabs fixture ${name}`);
     };
+    const expectTabsInTitleBar = async () => {
+      if (process.platform !== "darwin") return;
+      const layout = await browser.execute(() => {
+        const strip = document.querySelector("[data-session-tabs]")!;
+        const content = document.querySelector("[data-app-content]")!.getBoundingClientRect();
+        const sidebar = document.querySelector("[data-app-sidebar]")!.getBoundingClientRect();
+        const dragRegion = document.querySelector("[data-tauri-drag-region]")!;
+        const titleBar = dragRegion.getBoundingClientRect();
+        const bounds = strip.getBoundingClientRect();
+        const selected = strip.querySelector('[aria-selected="true"]')!;
+        const controls = [selected, selected.nextElementSibling!, strip.querySelector("button")!];
+        return {
+          tabsAtTop: bounds.top === titleBar.top && bounds.bottom === titleBar.bottom,
+          tabsBesideSidebar: bounds.left === sidebar.right && bounds.right === content.right,
+          contentBelowTitleBar: content.top === titleBar.bottom,
+          blankSpaceDraggable: document.elementFromPoint(bounds.right - 16, titleBar.height / 2) === dragRegion,
+          controlsClickable: controls.every((control) => {
+            const { x, y, width, height } = control.getBoundingClientRect();
+            return control.contains(document.elementFromPoint(x + width / 2, y + height / 2));
+          }),
+        };
+      });
+      expect(layout).toEqual({
+        tabsAtTop: true,
+        tabsBesideSidebar: true,
+        contentBelowTitleBar: true,
+        blankSpaceDraggable: true,
+        controlsClickable: true,
+      });
+    };
 
     const sessionsNav = $('[data-testid="sessions-nav-tab"]');
     await $("button=Rescan local logs").waitForEnabled({ timeout: 90_000 });
@@ -96,6 +126,10 @@ describe("session detail tabs", () => {
     await $(card("Alpha")).waitForDisplayed();
     await $(card("Alpha")).click();
     await expectSelected("Alpha");
+    await expectTabsInTitleBar();
+    await $('button[aria-label="Collapse sidebar"]').click();
+    await expectTabsInTitleBar();
+    await $('button[aria-label="Expand sidebar"]').click();
     const introTurn = () => detail().$('//button[@aria-expanded and .//*[normalize-space(.)="Turn intro"]]');
     await introTurn().waitForDisplayed();
     await introTurn().click();
@@ -257,6 +291,7 @@ describe("session detail tabs", () => {
     });
     const lastOffset = (await tabStrip()).offset;
     expect(lastOffset).toBeGreaterThan(0);
+    await expectTabsInTitleBar();
     await browser.keys("Home");
     await expectSelected(overflowNames[0]);
     const first = await tabStrip();

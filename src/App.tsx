@@ -337,7 +337,6 @@ export default function App() {
         />
       ) : null}
       <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-      <div aria-hidden="true" className="h-[var(--window-controls-height)] shrink-0" />
       {view !== "settings" && sessionTabs.tabs.length > 0 ? (
         <SessionTabs
           tabs={sessionTabs.tabs}
@@ -346,7 +345,9 @@ export default function App() {
           onClose={closeSessionTab}
           onBack={() => selectSessionTab(null)}
         />
-      ) : null}
+      ) : (
+        <div aria-hidden="true" className="h-[var(--window-controls-height)] shrink-0" />
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden [container-type:inline-size] [container-name:app-content]" data-app-content>
       {view === "settings" ? (
         <div className="mx-auto w-full max-w-layout shrink-0 px-6 pt-4 content-sm:px-8 content-lg:px-10">

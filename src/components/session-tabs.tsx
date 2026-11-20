@@ -50,14 +50,14 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
   }
 
   return (
-    <div data-session-tabs className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border/70 bg-surface px-3 py-1">
+    <div data-session-tabs className="pointer-events-none relative z-10 flex min-h-[var(--window-controls-height)] min-w-0 shrink-0 items-center gap-2 border-b border-border/70 bg-surface pl-3 pr-8">
       {selectedId !== null ? (
-        <Button variant="secondary" size="sm" className="shrink-0" onClick={onBack}>
+        <Button variant="secondary" size="sm" className="pointer-events-auto shrink-0" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           {t("sessions.tabs.back")}
         </Button>
       ) : null}
-      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-1">
+      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="pointer-events-auto flex min-w-0 items-center gap-1 overflow-x-auto px-1 py-px [&::-webkit-scrollbar]:h-1.5">
         {tabs.map(({ id, session }, index) => {
           const title = session.threadName || session.sessionId.replace(/\.jsonl(?:\.zst)?$/, "");
           const selected = id === selectedId;
