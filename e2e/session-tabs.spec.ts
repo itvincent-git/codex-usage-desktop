@@ -33,7 +33,7 @@ describe("session detail tabs", () => {
     writeFileSync(alpha, log("Alpha", 1));
     writeFileSync(beta, log("Beta", 2, betaThread));
     writeFileSync(join(sessions, "tabs-ignored.jsonl"), log("Ignored", 1).replace("Tabs fixture Ignored", "Unrelated project session"));
-    const overflowNames = Array.from({ length: 6 }, (_, index) => `Long session title for scrolling ${index + 1}`);
+    const overflowNames = Array.from({ length: 14 }, (_, index) => `Long session title for scrolling ${index + 1}`);
     for (const [index, name] of overflowNames.entries()) {
       writeFileSync(join(sessions, `tab-overflow-${index}.jsonl`), log(name, 1, undefined, "/tab-overflow-test"));
     }
@@ -288,7 +288,8 @@ describe("session detail tabs", () => {
       const list = document.querySelector(selector)!;
       const bounds = list.getBoundingClientRect();
       const selected = list.querySelector('[aria-selected="true"]')!.parentElement!.getBoundingClientRect();
-      return { offset: list.scrollLeft, selectedVisible: selected.left >= bounds.left - 1 && selected.right <= bounds.right + 1 };
+      const corner = parseFloat(getComputedStyle(list).paddingLeft);
+      return { offset: list.scrollLeft, selectedVisible: selected.left >= bounds.left + corner - 1 && selected.right <= bounds.right - corner + 1 };
     }, tabListSelector);
     const lastOffset = (await tabStrip()).offset;
     expect(lastOffset).toBeGreaterThan(0);
@@ -362,4 +363,76 @@ describe("session detail tabs", () => {
     await sessionsNav.waitForDisplayed();
     await expect(tabs()).not.toBeExisting();
   }).timeout(180_000);
+
+  run("shows compact tabs with a joined active tab in both themes", async () => {
+    const sessions = join(process.env.CODEX_HOME!, "sessions");
+    mkdirSync(sessions, { recursive: true });
+    const titles = Array.from({ length: 14 }, (_, i) => `${String(i + 1).padStart(2, "0")} Compact session tab`);
+    const timestamp = new Date(Date.now() - 86_400_000).toISOString();
+    for (const [index, title] of titles.entries()) {
+      const entries = [
+        { type: "session_meta", payload: { cwd: "/compact-session-tabs" } },
+        { type: "turn_context", payload: { model: "gpt-5" } },
+        { type: "event_msg", payload: { type: "user_message", message: title } },
+        { type: "event_msg", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 } } } },
+      ];
+      writeFileSync(join(sessions, `compact-tab-${index}.jsonl`), entries.map((entry) => JSON.stringify({ timestamp, ...entry })).join("\n") + "\n");
+    }
+    await browser.execute(() => localStorage.setItem("language", "en"));
+    await browser.tauri.execute(({ core }) => core.invoke("scan_usage"));
+    await browser.refresh();
+    await browser.setWindowSize(1200, 780);
+    await $('[data-testid="sessions-nav-tab"]').click();
+
+    const list = () => $('[role="tablist"][aria-label="Open sessions"]');
+    const tab = (title: string) => list().$(`[role="tab"]=${title}`);
+    const close = (title: string) => list().$(`button[aria-label="Close tab: ${title}"]`);
+    for (const title of titles) {
+      await $(`[data-testid="session-card"]:has(h3[title="${title}"])`).click();
+      await expect(tab(title)).toHaveAttribute("aria-selected", "true");
+      if (title !== titles.at(-1)) await $("button=Back to list").click();
+    }
+    const selected = titles.at(-1)!;
+    const inactive = titles.at(-3)!;
+    const appearance = (title: string) => tab(title).execute((button) => {
+      const item = button.parentElement!;
+      const style = getComputedStyle(item);
+      const header = document.querySelector('[aria-labelledby="session-detail-title"] header')!;
+      const after = getComputedStyle(item, "::after");
+      return {
+        joinsPanel: style.backgroundColor === getComputedStyle(header).backgroundColor
+          && parseFloat(style.borderTopLeftRadius) > 0
+          && style.borderBottomWidth === "0px",
+        hasDivider: after.content !== "none" && after.backgroundImage === "none",
+        closeVisible: getComputedStyle(button.nextElementSibling!).opacity === "1",
+      };
+    });
+    try {
+      for (const theme of ["light", "dark"]) {
+        await browser.tauri.execute(({ core }, value) => core.invoke("plugin:window|set_theme", { label: "main", value }), theme);
+        await browser.waitUntil(() => browser.execute(value => matchMedia("(prefers-color-scheme: dark)").matches === (value === "dark"), theme));
+        expect(await appearance(inactive)).toEqual({ joinsPanel: false, hasDivider: true, closeVisible: false });
+        expect(await appearance(selected)).toEqual({ joinsPanel: true, hasDivider: false, closeVisible: true });
+      }
+    } finally {
+      await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_theme", { label: "main", value: null }));
+    }
+
+    expect(await list().execute((element) => element.scrollLeft)).toBeGreaterThan(0);
+    await browser.keys("Home");
+    await expect(tab(titles[0])).toBeFocused();
+    expect(await list().execute((element) => element.scrollLeft)).toBe(0);
+    await browser.keys("End");
+    await expect(tab(selected)).toBeFocused();
+
+    // The embedded driver sends synthetic moves, which cannot activate CSS :hover.
+    await tab(inactive).execute((button) => button.focus({ preventScroll: true }));
+    expect(await appearance(inactive)).toMatchObject({ closeVisible: true });
+    await close(inactive).click();
+    await expect(tab(inactive)).not.toBeExisting();
+    await expect(tab(selected)).toHaveAttribute("aria-selected", "true");
+    await close(selected).click();
+    await expect(tab(selected)).not.toBeExisting();
+    await expect(tab(titles.at(-2)!)).toHaveAttribute("aria-selected", "true");
+  }).timeout(90_000);
 });

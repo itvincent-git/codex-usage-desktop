@@ -118,6 +118,53 @@
   }
 }
 
+@layer components {
+  .session-tab-strip {
+    --tab-line: rgb(var(--muted-foreground) / 0.24);
+    background-image: linear-gradient(var(--tab-line), var(--tab-line));
+    background-position: bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 1px;
+  }
+
+  .session-tab:not([data-selected], :last-child, :has(+ [data-selected]))::after {
+    @apply pointer-events-none absolute -right-px top-1/2 h-4 w-px -translate-y-1/2;
+    content: "";
+    background: var(--tab-line);
+  }
+
+  .session-tab[data-selected] {
+    @apply z-10 rounded-t-xl border-b-0 bg-surface text-foreground/75;
+    border-color: var(--tab-line);
+  }
+
+  /* The outer corners join the active tab to the line below its neighbors. */
+  .session-tab[data-selected]::before,
+  .session-tab[data-selected]::after {
+    @apply pointer-events-none absolute bottom-0 size-2.5;
+    content: "";
+    background: radial-gradient(circle at var(--tab-corner), transparent 8.5px, var(--tab-line) 9px 9.75px, rgb(var(--surface)) 10.25px);
+  }
+
+  .session-tab[data-selected]::before {
+    right: 100%;
+    --tab-corner: top left;
+  }
+
+  .session-tab[data-selected]::after {
+    left: 100%;
+    --tab-corner: top right;
+  }
+
+  .session-tab:is([data-selected], :hover, :focus-within) > [role="tab"] {
+    padding-right: 1.75rem;
+  }
+
+  .session-tab:not([data-selected], :hover, :focus-within) > button + button {
+    @apply pointer-events-none opacity-0;
+  }
+}
+
 @layer utilities {
   .usage-data-table {
     width: 100%;

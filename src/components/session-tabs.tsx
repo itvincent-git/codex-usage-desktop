@@ -27,8 +27,9 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
     if (!list || !tab.parentElement) return;
     const item = tab.parentElement.getBoundingClientRect();
     const viewport = list.getBoundingClientRect();
-    if (item.left < viewport.left) list.scrollLeft += item.left - viewport.left;
-    else if (item.right > viewport.right) list.scrollLeft += item.right - viewport.right;
+    const corner = parseFloat(getComputedStyle(list).paddingLeft);
+    if (item.left - corner < viewport.left) list.scrollLeft += item.left - corner - viewport.left;
+    else if (item.right + corner > viewport.right) list.scrollLeft += item.right + corner - viewport.right;
   }, [selectedId, tabs.length]);
 
   useEffect(() => {
@@ -71,14 +72,14 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
   }
 
   return (
-    <div data-session-tabs className="pointer-events-none relative z-10 flex min-h-[var(--window-controls-height)] min-w-0 shrink-0 items-center gap-2 border-b border-border/70 bg-surface pl-3 pr-8">
+    <div data-session-tabs className="session-tab-strip pointer-events-none relative z-10 flex h-9 min-h-[var(--window-controls-height)] min-w-0 shrink-0 items-center gap-2 bg-muted pl-3 pr-8">
       {selectedId !== null ? (
         <Button variant="secondary" size="sm" className="pointer-events-auto shrink-0" onClick={onBack}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           {t("sessions.tabs.back")}
         </Button>
       ) : null}
-      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="pointer-events-auto flex min-w-0 items-center gap-1 overflow-x-auto px-1 py-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div ref={listRef} role="tablist" aria-label={t("sessions.tabs.label")} className="pointer-events-auto flex h-full min-w-0 overflow-x-auto overflow-y-hidden px-2.5 pt-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map(({ id, session }, index) => {
           const title = session.threadName || session.sessionId.replace(/\.jsonl(?:\.zst)?$/, "");
           const selected = id === selectedId;
@@ -91,7 +92,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
           ] as const;
           return (
             <ContextMenu.Root key={id} modal={false}>
-              <ContextMenu.Trigger role="presentation" className={`flex min-w-0 max-w-[12rem] shrink-0 items-center rounded-md border ${selected ? "border-primary/25 bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}>
+              <ContextMenu.Trigger role="presentation" data-selected={selected ? "" : undefined} className="session-tab relative flex w-[4.5rem] shrink-0 items-center border border-transparent text-muted-foreground hover:text-foreground">
                 <button
                   ref={selected ? selectedRef : undefined}
                   type="button"
@@ -103,7 +104,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
                   aria-keyshortcuts="Delete"
                   tabIndex={tabbable ? 0 : -1}
                   title={title}
-                  className="min-w-0 select-none truncate rounded px-2 py-1 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="h-full w-full select-none truncate rounded-[inherit] px-2 text-left text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   onClick={() => onSelect(id)}
                   onKeyDown={(event) => handleKey(event, index)}
                 >
@@ -114,7 +115,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
                   tabIndex={tabbable ? 0 : -1}
                   aria-label={t("sessions.tabs.close", { title })}
                   title={t("sessions.tabs.close", { title })}
-                  className="mr-0.5 shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="absolute right-0.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onClose(id)}
                 >
                   <X className="h-3.5 w-3.5" aria-hidden="true" />
