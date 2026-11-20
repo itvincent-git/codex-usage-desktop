@@ -603,7 +603,7 @@ function ExecResultItem({ output, index }: { output: ExecOutput; index: number }
   const { t } = useTranslation();
   const [expanded, setExpanded] = useSessionSearchExpansion();
   const failed = output.rejected || (output.exitCode !== null && output.exitCode !== 0);
-  return <div className={`rounded-md border p-2 ${failed ? ITEM_TONES.error : "border-border/50"}`}>
+  return <div className={`rounded-md border p-2 text-xs leading-relaxed ${failed ? ITEM_TONES.error : "border-border/50"}`}>
     <button type="button" className={`flex w-full items-center justify-between text-left ${DISCLOSURE_BUTTON_CLASS}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
       <span className={failed ? "font-semibold text-error-foreground" : "font-semibold"}>{t("sessions.detail.output")} #{index + 1}</span>
       {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
