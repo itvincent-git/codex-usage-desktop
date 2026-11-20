@@ -17,7 +17,7 @@ import { ProjectUsageCard } from "@/components/project-usage-card";
 import { SettingsPage } from "@/components/settings-page";
 import { SessionUsageTable } from "@/components/session-usage-table";
 import { SessionDetailModal } from "@/components/session-detail-modal";
-import { SessionTabs, type SessionTab } from "@/components/session-tabs";
+import { SessionTabs, type SessionTab, type SessionTabCloseAction } from "@/components/session-tabs";
 import { ProjectSessionsModal } from "@/components/project-sessions-modal";
 import { RangeSwitcher } from "@/components/range-switcher";
 import { useRefreshShortcut } from "@/hooks/use-refresh-shortcut";
@@ -186,15 +186,20 @@ export default function App() {
     setSessionTabs((current) => ({ ...current, selectedId }));
   };
 
-  const closeSessionTab = useCallback((id?: number) => {
+  const closeSessionTab = useCallback((id?: number, action: SessionTabCloseAction = "close") => {
     setSessionTabs((current) => {
       const closingId = id ?? current.selectedId;
       const index = current.tabs.findIndex((tab) => tab.id === closingId);
       if (index < 0) return current;
-      return {
-        tabs: current.tabs.filter((tab) => tab.id !== closingId),
-        selectedId: closingId === current.selectedId ? (current.tabs[index + 1] ?? current.tabs[index - 1])?.id ?? null : current.selectedId,
-      };
+      let tabs: SessionTab[];
+      switch (action) {
+        case "close": tabs = current.tabs.filter((tab) => tab.id !== closingId); break;
+        case "others": tabs = [current.tabs[index]]; break;
+        case "after": tabs = current.tabs.slice(0, index + 1); break;
+        case "all": tabs = []; break;
+      }
+      const keepSelection = current.selectedId === null || tabs.some((tab) => tab.id === current.selectedId);
+      return { tabs, selectedId: keepSelection ? current.selectedId : (tabs[index] ?? tabs.at(-1))?.id ?? null };
     });
   }, []);
 

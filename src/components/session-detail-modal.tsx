@@ -1253,6 +1253,7 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
 
   const handleDetailKey = useEffectEvent((event: KeyboardEvent) => {
     if (!isActive || event.defaultPrevented || event.isComposing) return;
+    if (event.target instanceof Element && event.target.closest("[data-session-tab-menu]")) return;
     if (isPrimaryShortcut(event) && event.key.toLowerCase() === "f" && detail) {
       event.preventDefault();
       if (showSearch) searchRef.current?.focus();

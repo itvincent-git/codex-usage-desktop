@@ -495,7 +495,13 @@
     "tabs": {
       "label": "열린 세션",
       "back": "목록으로 돌아가기",
-      "close": "탭 닫기: {{title}}"
+      "close": "탭 닫기: {{title}}",
+      "menu": {
+        "close": "닫기",
+        "others": "다른 탭 닫기",
+        "after": "오른쪽 탭 닫기",
+        "all": "모든 탭 닫기"
+      }
     },
     "archived": "보관됨",
     "title": "세션 상세",

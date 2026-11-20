@@ -495,7 +495,13 @@
     "tabs": {
       "label": "已開啟的工作階段",
       "back": "返回清單",
-      "close": "關閉分頁：{{title}}"
+      "close": "關閉分頁：{{title}}",
+      "menu": {
+        "close": "關閉",
+        "others": "關閉其他分頁",
+        "after": "關閉右側分頁",
+        "all": "關閉所有分頁"
+      }
     },
     "archived": "已封存",
     "title": "工作階段日誌明細",

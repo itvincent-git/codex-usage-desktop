@@ -44,7 +44,7 @@ export function useModalFocus(
 
   useEffect(() => {
     if (!isActive) return;
-    const navigation = allowSessionTabs ? "[data-app-sidebar], [data-session-tabs]" : "[data-app-sidebar]";
+    const navigation = allowSessionTabs ? "[data-app-sidebar], [data-session-tabs], [data-session-tab-menu]" : "[data-app-sidebar]";
 
     const focusableElements = () => Array.from(
       document.querySelectorAll<HTMLElement>(

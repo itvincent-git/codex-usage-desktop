@@ -538,7 +538,13 @@
     "tabs": {
       "label": "Geöffnete Sitzungen",
       "back": "Zurück zur Liste",
-      "close": "Tab schließen: {{title}}"
+      "close": "Tab schließen: {{title}}",
+      "menu": {
+        "close": "Schließen",
+        "others": "Andere Tabs schließen",
+        "after": "Rechts liegende Tabs schließen",
+        "all": "Alle Tabs schließen"
+      }
     },
     "archived": "Archiviert",
     "title": "Sitzungsdetails",

@@ -5,7 +5,7 @@ import { join } from "node:path";
 describe("session detail tabs", () => {
   const run = process.env.CODEX_USAGE_REFRESH_E2E === "1" ? it : it.skip;
 
-  run("keeps two replays and returns to the same project list", async () => {
+  run("preserves open replays and supports closing tabs from the context menu", async () => {
     const home = process.env.CODEX_HOME!;
     const sessions = join(home, "sessions");
     const archived = join(home, "archived_sessions");
@@ -49,6 +49,23 @@ describe("session detail tabs", () => {
     const modifier = process.platform === "darwin" ? "Meta" : "Control";
     const tabs = () => $('[role="tablist"][aria-label="Open sessions"]');
     const tab = (name: string) => tabs().$(`[role="tab"]=Tabs fixture ${name}`);
+    const menu = () => $('[role="menu"]');
+    const menuItem = (label: string) => menu().$(`[role="menuitem"]=${label}`);
+    const rightClickTab = async (name: string) => {
+      await tab(name).execute((element) => {
+        // The embedded driver sends mouse button events without a contextmenu event.
+        element.scrollIntoView({ block: "nearest", inline: "nearest" });
+        const bounds = element.getBoundingClientRect();
+        element.dispatchEvent(new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: bounds.left + bounds.width / 2,
+          clientY: bounds.top + bounds.height / 2,
+        }));
+      });
+      await expect(menu()).toHaveAttribute("aria-label", `Tabs fixture ${name}`);
+    };
     const card = (name: string) => `[data-testid="session-card"]:has(h3[title="Tabs fixture ${name}"])`;
     const detail = () => $('[aria-labelledby="session-detail-title"]');
     const searchInput = () => detail().$('input[type="search"]');
@@ -186,6 +203,11 @@ describe("session detail tabs", () => {
     await expect(days()[1]).toHaveAttribute("aria-expanded", "true");
     await expect(betaCard().$('[data-testid="session-archived-badge"]')).toHaveText("Archived");
     expect(await projectScroll.execute((element) => element.scrollTop)).toBe(projectPosition);
+    await rightClickTab("Alpha");
+    await browser.waitUntil(async () => menu().execute((element) => element.contains(document.activeElement)));
+    await browser.keys("Escape");
+    await expect(menu()).not.toBeExisting();
+    await expect(project).toBeDisplayed();
     await betaCard().click();
     await expectSelected("Beta");
     expect(await tab("Beta").getAttribute("id")).toBe(betaId);
@@ -243,6 +265,46 @@ describe("session detail tabs", () => {
     await browser.keys("End");
     await expectSelected(overflowNames.at(-1)!);
     expect(await tabStrip()).toEqual({ offset: lastOffset, selectedVisible: true });
+
+    const lastName = overflowNames.at(-1)!;
+    await rightClickTab(lastName);
+    await expect(menuItem("Close Tabs After")).toHaveAttribute("aria-disabled", "true");
+    await browser.keys("Escape");
+    await expect(menu()).not.toBeExisting();
+    await expectSelected(lastName);
+
+    await rightClickTab(overflowNames[4]);
+    await expect(tab(lastName)).toHaveAttribute("aria-selected", "true");
+    await menuItem("Close").click();
+    await expect(tab(overflowNames[4])).not.toBeExisting();
+    await expectSelected(lastName);
+
+    await rightClickTab(overflowNames[2]);
+    await menuItem("Close Tabs After").click();
+    await expect(tabs().$$('[role="tab"]')).toBeElementsArrayOfSize(3);
+    await expect(tab(overflowNames[0])).toBeExisting();
+    await expect(tab(overflowNames[1])).toBeExisting();
+    await expectSelected(overflowNames[2]);
+
+    await rightClickTab(overflowNames[0]);
+    await menuItem("Close Others").click();
+    await expect(tabs().$$('[role="tab"]')).toBeElementsArrayOfSize(1);
+    await expectSelected(overflowNames[0]);
+    await rightClickTab(overflowNames[0]);
+    await expect(menuItem("Close Others")).toHaveAttribute("aria-disabled", "true");
+    await browser.keys("Escape");
+
+    await back.click();
+    await $(card(overflowNames[1])).click();
+    await expectSelected(overflowNames[1]);
+    await rightClickTab(overflowNames[0]);
+    await menuItem("Close All").click();
+    await expect(tabs()).not.toBeExisting();
+    await expect($$('[id^="session-panel-"]')).toBeElementsArrayOfSize(0);
+    await expect($(card(overflowNames[1]))).toBeFocused();
+
+    await $(card(overflowNames[0])).click();
+    await expectSelected(overflowNames[0]);
     await browser.refresh();
     await sessionsNav.waitForDisplayed();
     await expect(tabs()).not.toBeExisting();

@@ -495,7 +495,13 @@
     "tabs": {
       "label": "已打开的会话",
       "back": "返回列表",
-      "close": "关闭标签：{{title}}"
+      "close": "关闭标签：{{title}}",
+      "menu": {
+        "close": "关闭",
+        "others": "关闭其他标签",
+        "after": "关闭右侧标签",
+        "all": "关闭所有标签"
+      }
     },
     "archived": "已归档",
     "title": "会话日志明细",

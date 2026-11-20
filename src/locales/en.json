@@ -495,7 +495,13 @@
     "tabs": {
       "label": "Open sessions",
       "back": "Back to list",
-      "close": "Close tab: {{title}}"
+      "close": "Close tab: {{title}}",
+      "menu": {
+        "close": "Close",
+        "others": "Close Others",
+        "after": "Close Tabs After",
+        "all": "Close All"
+      }
     },
     "archived": "Archived",
     "title": "Session Details",
