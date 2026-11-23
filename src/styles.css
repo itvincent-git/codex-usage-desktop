@@ -125,7 +125,7 @@
 
 @layer components {
   .session-tab-strip {
-    --tab-line: rgb(var(--muted-foreground) / 0.24);
+    --tab-line: color-mix(in srgb, rgb(var(--muted-foreground)) 24%, rgb(var(--muted)));
     background-image: linear-gradient(var(--tab-line), var(--tab-line));
     background-position: bottom;
     background-repeat: no-repeat;
@@ -143,22 +143,27 @@
     border-color: var(--tab-line);
   }
 
-  /* The outer corners join the active tab to the line below its neighbors. */
+  /* The rounded border covers the strip line, and the shadow fills the cutout. */
   .session-tab[data-selected]::before,
   .session-tab[data-selected]::after {
     @apply pointer-events-none absolute bottom-0 size-2.5;
     content: "";
-    background: radial-gradient(circle at var(--tab-corner), transparent 8.5px, var(--tab-line) 9px 9.75px, rgb(var(--surface)) 10.25px);
+    border-bottom: 1px solid var(--tab-line);
+    background: rgb(var(--muted));
+    box-shadow: 0 0 0 10px rgb(var(--surface));
+    clip-path: inset(0);
   }
 
   .session-tab[data-selected]::before {
     right: 100%;
-    --tab-corner: top left;
+    border-right: 1px solid var(--tab-line);
+    border-bottom-right-radius: 100%;
   }
 
   .session-tab[data-selected]::after {
     left: 100%;
-    --tab-corner: top right;
+    border-left: 1px solid var(--tab-line);
+    border-bottom-left-radius: 100%;
   }
 
   .session-tab:is([data-selected], :hover, :focus-within) > [role="tab"] {

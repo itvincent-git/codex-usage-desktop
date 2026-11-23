@@ -411,7 +411,7 @@ describe("session detail tabs", () => {
         joinsPanel: style.backgroundColor === getComputedStyle(header).backgroundColor
           && parseFloat(style.borderTopLeftRadius) > 0
           && style.borderBottomWidth === "0px",
-        hasDivider: after.content !== "none" && after.backgroundImage === "none",
+        hasDivider: after.content !== "none" && after.width === "1px",
         closeVisible: getComputedStyle(button.nextElementSibling!).opacity === "1",
       };
     });
@@ -421,6 +421,35 @@ describe("session detail tabs", () => {
         await browser.waitUntil(() => browser.execute(value => matchMedia("(prefers-color-scheme: dark)").matches === (value === "dark"), theme));
         expect(await appearance(inactive)).toEqual({ joinsPanel: false, hasDivider: true, closeVisible: false });
         expect(await appearance(selected)).toEqual({ joinsPanel: true, hasDivider: false, closeVisible: true });
+        const screenshot = await browser.takeScreenshot();
+        const joins = await browser.execute(async (png: string) => {
+          const bytes = Uint8Array.from(atob(png), (byte) => byte.charCodeAt(0));
+          const image = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+          const canvas = document.createElement("canvas");
+          canvas.width = innerWidth;
+          canvas.height = innerHeight;
+          const context = canvas.getContext("2d")!;
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          image.close();
+          const { left, right, bottom } = document.querySelector(".session-tab[data-selected]")!.getBoundingClientRect();
+          const y = Math.round(bottom) - 1;
+          const readRed = (x: number, width: number) => context.getImageData(Math.round(x), y, width, 1)
+            .data.filter((_, index) => index % 4 === 0);
+          return {
+            line: readRed(right + 12, 1)[0],
+            corners: [Array.from(readRed(left - 10, 10)), Array.from(readRed(right, 10))],
+            sideEdges: [readRed(left, 1)[0], readRed(right - 1, 1)[0]],
+            panel: context.getImageData(Math.round(right + 12), y + 1, 1, 1).data[0],
+          };
+        }, screenshot);
+        // Each curve should meet the strip line at the same shade and cover the side border.
+        const strongestStroke = theme === "light" ? Math.min : Math.max;
+        for (const corner of joins.corners) {
+          expect(Math.abs(strongestStroke(...corner) - joins.line)).toBeLessThanOrEqual(3);
+        }
+        for (const edge of joins.sideEdges) {
+          expect(Math.abs(edge - joins.panel)).toBeLessThanOrEqual(3);
+        }
       }
     } finally {
       await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_theme", { label: "main", value: null }));
@@ -434,8 +463,10 @@ describe("session detail tabs", () => {
     await expect(tab(selected)).toBeFocused();
 
     // The embedded driver sends synthetic moves, which cannot activate CSS :hover.
+    await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_focus", { label: "main" }));
+    await browser.waitUntil(() => browser.execute(() => document.hasFocus()));
     await tab(inactive).execute((button) => button.focus({ preventScroll: true }));
-    expect(await appearance(inactive)).toMatchObject({ closeVisible: true });
+    await expect(close(inactive)).toHaveStyle({ opacity: "1" });
     await close(inactive).click();
     await expect(tab(inactive)).not.toBeExisting();
     await expect(tab(selected)).toHaveAttribute("aria-selected", "true");
