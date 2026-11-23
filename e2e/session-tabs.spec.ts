@@ -366,10 +366,10 @@ describe("session detail tabs", () => {
     await expect(tabs()).not.toBeExisting();
   }).timeout(180_000);
 
-  run("shows compact tabs with a joined active tab in both themes", async () => {
+  run("shrinks session tabs as they fill the strip and joins the active tab in both themes", async () => {
     const sessions = join(process.env.CODEX_HOME!, "sessions");
     mkdirSync(sessions, { recursive: true });
-    const titles = Array.from({ length: 14 }, (_, i) => `${String(i + 1).padStart(2, "0")} Compact session tab`);
+    const titles = Array.from({ length: 14 }, (_, i) => i === 0 ? "01 Tab" : `${String(i + 1).padStart(2, "0")} Compact session tab`);
     const timestamp = new Date(Date.now() - 86_400_000).toISOString();
     for (const [index, title] of titles.entries()) {
       const entries = [
@@ -389,11 +389,27 @@ describe("session detail tabs", () => {
     const list = () => $('[role="tablist"][aria-label="Open sessions"]');
     const tab = (title: string) => list().$(`[role="tab"]=${title}`);
     const close = (title: string) => list().$(`button[aria-label="Close tab: ${title}"]`);
-    for (const title of titles) {
+    const openTab = async (title: string) => {
       await $(`[data-testid="session-card"]:has(h3[title="${title}"])`).click();
       await expect(tab(title)).toHaveAttribute("aria-selected", "true");
       if (title !== titles.at(-1)) await $("button=Back to list").click();
-    }
+    };
+    const tabSize = async (title: string) => await tab(title).execute((button) => ({
+      width: button.clientWidth,
+      truncated: button.scrollWidth > button.clientWidth,
+    })) as { width: number; truncated: boolean };
+    for (const title of titles.slice(0, 2)) await openTab(title);
+    const roomyTab = await tabSize(titles[1]);
+    expect(roomyTab.truncated).toBe(false);
+    expect(roomyTab.width).toBeGreaterThan((await tabSize(titles[0])).width);
+
+    for (const title of titles.slice(2, 8)) await openTab(title);
+    const crowdedTab = await tabSize(titles[1]);
+    expect(crowdedTab.width).toBeLessThan(roomyTab.width);
+    expect(crowdedTab.truncated).toBe(true);
+    expect(await list().execute((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+
+    for (const title of titles.slice(8)) await openTab(title);
     const selected = titles.at(-1)!;
     const inactive = titles.at(-3)!;
     const layout = await tab(selected).execute((button) => {

@@ -166,10 +166,6 @@
     border-bottom-left-radius: 100%;
   }
 
-  .session-tab:is([data-selected], :hover, :focus-within) > [role="tab"] {
-    padding-right: 1.75rem;
-  }
-
   .session-tab:not([data-selected], :hover, :focus-within) > button + button {
     @apply pointer-events-none opacity-0;
   }

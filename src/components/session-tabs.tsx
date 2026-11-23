@@ -92,7 +92,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
           ] as const;
           return (
             <ContextMenu.Root key={id} modal={false}>
-              <ContextMenu.Trigger role="presentation" data-selected={selected ? "" : undefined} className="session-tab relative flex w-[4.5rem] shrink-0 items-center border border-transparent text-muted-foreground hover:text-foreground">
+              <ContextMenu.Trigger role="presentation" data-selected={selected ? "" : undefined} className="session-tab relative flex w-max min-w-[4.5rem] max-w-[16rem] items-center border border-transparent text-muted-foreground hover:text-foreground">
                 <button
                   ref={selected ? selectedRef : undefined}
                   type="button"
@@ -104,7 +104,7 @@ export function SessionTabs({ tabs, selectedId, onSelect, onClose, onBack }: {
                   aria-keyshortcuts="Delete"
                   tabIndex={tabbable ? 0 : -1}
                   title={title}
-                  className="h-full w-full select-none truncate rounded-[inherit] px-2 text-left text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="h-full min-w-0 flex-auto select-none truncate rounded-[inherit] pl-2 pr-7 text-left text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   onClick={() => onSelect(id)}
                   onKeyDown={(event) => handleKey(event, index)}
                 >
