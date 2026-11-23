@@ -36,7 +36,7 @@ const CHATGPT_ACCOUNT_CHECK_URL: &str =
 const RESET_CREDITS_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_COOLDOWN: Duration = Duration::from_secs(5 * 60);
 const WINDOW_ACTIVATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
-const WINDOW_ACTIVATION_MODEL: &str = "gpt-5.6-luna";
+const WINDOW_ACTIVATION_MODEL: &str = "gpt-6-luna";
 const WINDOW_ACTIVATION_PROMPT: &str = "Reply with exactly OK. Do not inspect files or call tools.";
 #[cfg(debug_assertions)]
 const WINDOW_ACTIVATION_DEBUG_ENV: &str = "CODEX_USAGE_DEBUG_WINDOW_ACTIVATION";
@@ -140,6 +140,41 @@ struct LimitsFetchFlight {
 struct WindowActivationMarker {
     window_key: String,
     attempted_at: i64,
+}
+
+struct WindowActivationSnapshot {
+    auth: CodexAuth,
+    auth_context: String,
+    limits: LimitsSnapshot,
+}
+
+impl WindowActivationSnapshot {
+    fn fetch() -> Result<Self, String> {
+        let snapshot = crate::codex_accounts::native::snapshot(&selected_codex_environment())?;
+        let auth = crate::codex_auth::parse_codex_auth(
+            snapshot.content.as_deref().ok_or("chatgptLoginRequired")?,
+        )?;
+        let limits = parse_oauth_limits(fetch_oauth_usage(&auth)?)?;
+        Ok(Self {
+            auth,
+            auth_context: snapshot.context(),
+            limits,
+        })
+    }
+
+    fn session_used_percent(&self) -> Option<f64> {
+        normalize_windows(self.limits.primary.clone(), self.limits.secondary.clone())
+            .0
+            .map(|window| clamp_percent(window.used_percent))
+    }
+
+    fn into_response(mut self) -> CodexLimitsResponse {
+        let client = reqwest::blocking::Client::new();
+        add_oauth_reset_credits(&mut self.limits, fetch_oauth_reset_credits(&client, &self.auth));
+        let mut response = make_response(self.limits, fetch_account_snapshot(&self.auth));
+        response.auth_context = Some(self.auth_context);
+        apply_limits_debug(response)
+    }
 }
 
 #[derive(Debug)]
@@ -313,12 +348,17 @@ pub fn activate_codex_window(marker_path: &Path) -> Result<CodexWindowActivation
     let working_directory = marker_path.parent().ok_or_else(|| {
         "The Codex window activation state has no application data directory.".to_string()
     })?;
-    activate_codex_window_with(
+    // Only quota usage is needed to decide whether to launch the CLI.
+    let (status, snapshot) = activate_codex_window_with(
         marker_path,
         Utc::now().timestamp(),
-        fetch_current_snapshot,
+        WindowActivationSnapshot::fetch,
         || run_codex_window_activation(working_directory),
-    )
+    )?;
+    Ok(CodexWindowActivationResponse {
+        status,
+        limits: snapshot.into_response(),
+    })
 }
 
 #[cfg(debug_assertions)]
@@ -342,26 +382,25 @@ fn set_debug_session_window(limits: &mut CodexLimitsResponse, used_percent: f64,
 fn activate_codex_window_with(
     marker_path: &Path,
     now: i64,
-    mut fetch_limits: impl FnMut() -> Result<CodexLimitsResponse, String>,
+    mut fetch_limits: impl FnMut() -> Result<WindowActivationSnapshot, String>,
     run_activation: impl FnOnce() -> Result<(), String>,
-) -> Result<CodexWindowActivationResponse, String> {
+) -> Result<(CodexWindowActivationStatus, WindowActivationSnapshot), String> {
     let current = fetch_limits()?;
-    let Some(window_key) = inactive_session_window_key(&current)? else {
+    let used_percent = current.session_used_percent().ok_or_else(|| {
+        "Codex did not return a 5-hour limit window, so activation was not attempted.".to_string()
+    })?;
+    if used_percent > 0.0 {
         log::info!("Codex window activation skipped because the 5-hour window is already active.");
-        return Ok(CodexWindowActivationResponse {
-            status: CodexWindowActivationStatus::AlreadyActive,
-            limits: current,
-        });
-    };
+        return Ok((CodexWindowActivationStatus::AlreadyActive, current));
+    }
 
+    let (account, _) = decode_jwt_info(&current.auth.access_token);
+    let window_key = format!("{}|zero-usage", account.as_deref().unwrap_or("unknown-account"));
     if activation_was_recently_requested(marker_path, &window_key, now) {
         log::info!(
             "Codex window activation skipped because a request was sent within the cooldown."
         );
-        return Ok(CodexWindowActivationResponse {
-            status: CodexWindowActivationStatus::RecentlyRequested,
-            limits: current,
-        });
+        return Ok((CodexWindowActivationStatus::RecentlyRequested, current));
     }
 
     write_activation_marker(marker_path, &window_key, now)?;
@@ -370,38 +409,14 @@ fn activate_codex_window_with(
         format!("The activation request finished, but the updated Codex limits could not be verified: {error}")
     })?;
 
-    if session_window_has_usage(&updated) {
-        return Ok(CodexWindowActivationResponse {
-            status: CodexWindowActivationStatus::Started,
-            limits: updated,
-        });
+    if updated
+        .session_used_percent()
+        .is_some_and(|percent| percent > 0.0)
+    {
+        return Ok((CodexWindowActivationStatus::Started, updated));
     }
 
-    activation_result.map(|()| CodexWindowActivationResponse {
-        status: CodexWindowActivationStatus::Started,
-        limits: updated,
-    })
-}
-
-fn inactive_session_window_key(limits: &CodexLimitsResponse) -> Result<Option<String>, String> {
-    let session = limits.session.as_ref().ok_or_else(|| {
-        "Codex did not return a 5-hour limit window, so activation was not attempted.".to_string()
-    })?;
-    if session.used_percent > 0.0 {
-        return Ok(None);
-    }
-
-    Ok(Some(format!(
-        "{}|zero-usage",
-        limits.account.as_deref().unwrap_or("unknown-account")
-    )))
-}
-
-fn session_window_has_usage(limits: &CodexLimitsResponse) -> bool {
-    limits
-        .session
-        .as_ref()
-        .is_some_and(|window| window.used_percent > 0.0)
+    activation_result.map(|()| (CodexWindowActivationStatus::Started, updated))
 }
 
 fn activation_was_recently_requested(marker_path: &Path, window_key: &str, now: i64) -> bool {
@@ -661,34 +676,41 @@ fn make_oauth_snapshot(
     usage: OAuthUsageResponse,
     reset_credits: Result<OAuthResetCreditsSnapshot, String>,
 ) -> Result<LimitsSnapshot, String> {
+    let mut limits = parse_oauth_limits(usage)?;
+    add_oauth_reset_credits(&mut limits, reset_credits);
+    Ok(limits)
+}
+
+fn parse_oauth_limits(usage: OAuthUsageResponse) -> Result<LimitsSnapshot, String> {
     let rate_limit = usage
         .rate_limit
         .ok_or_else(|| "Codex usage API response was missing rate_limit.".to_string())?;
-    let usage_available_count = usage
-        .rate_limit_reset_credits
-        .and_then(|credits| credits.available_count);
-    let (reset_credits_available_count, reset_credits) = match reset_credits {
-        Ok(details) => (
-            details
-                .available_count
-                .or(usage_available_count)
-                .or_else(|| Some(details.credits.len() as i64)),
-            Some(details.credits),
-        ),
-        Err(error) => {
-            log::warn!("Codex reset credit details unavailable: {error}");
-            (usage_available_count, None)
-        }
-    };
-
     Ok(LimitsSnapshot {
         primary: rate_limit.primary_window.map(RateLimitWindow::from),
         secondary: rate_limit.secondary_window.map(RateLimitWindow::from),
         credits: usage.credits,
-        reset_credits_available_count,
-        reset_credits,
+        reset_credits_available_count: usage
+            .rate_limit_reset_credits
+            .and_then(|credits| credits.available_count),
+        reset_credits: None,
         source: "oauth",
     })
+}
+
+fn add_oauth_reset_credits(
+    limits: &mut LimitsSnapshot,
+    reset_credits: Result<OAuthResetCreditsSnapshot, String>,
+) {
+    match reset_credits {
+        Ok(details) => {
+            limits.reset_credits_available_count = details
+                .available_count
+                .or(limits.reset_credits_available_count)
+                .or_else(|| Some(details.credits.len() as i64));
+            limits.reset_credits = Some(details.credits);
+        }
+        Err(error) => log::warn!("Codex reset credit details unavailable: {error}"),
+    }
 }
 
 impl ResetCreditsCache {
@@ -1755,7 +1777,7 @@ mod tests {
                 "-c",
                 r#"model_reasoning_effort="low""#,
                 "-m",
-                WINDOW_ACTIVATION_MODEL,
+                "gpt-6-luna",
                 "-s",
                 "read-only",
                 "-a",
@@ -1770,14 +1792,33 @@ mod tests {
         );
     }
 
+    fn activation_snapshot(used_percent: f64, resets_at: i64) -> WindowActivationSnapshot {
+        WindowActivationSnapshot {
+            auth: parse_codex_auth(r#"{"tokens":{"access_token":"fixture"}}"#).unwrap(),
+            auth_context: "fixture".into(),
+            limits: LimitsSnapshot {
+                primary: Some(RateLimitWindow {
+                    used_percent,
+                    window_duration_mins: Some(SESSION_WINDOW_MINUTES),
+                    resets_at: Some(resets_at),
+                }),
+                secondary: None,
+                credits: None,
+                reset_credits_available_count: None,
+                reset_credits: None,
+                source: "oauth",
+            },
+        }
+    }
+
     #[test]
     fn active_window_does_not_send_activation_request() {
         let marker = command_v_fixture("active-window-marker");
         let launches = Cell::new(0);
-        let response = activate_codex_window_with(
+        let (status, _) = activate_codex_window_with(
             &marker,
             1_789_000_000,
-            || Ok(limits_with_session(1.0, "2026-09-10T05:00:00.000Z")),
+            || Ok(activation_snapshot(1.0, 1_789_010_000)),
             || {
                 launches.set(launches.get() + 1);
                 Ok(())
@@ -1785,7 +1826,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(response.status, CodexWindowActivationStatus::AlreadyActive);
+        assert_eq!(status, CodexWindowActivationStatus::AlreadyActive);
         assert_eq!(launches.get(), 0);
         assert!(!marker.exists());
     }
@@ -1809,15 +1850,15 @@ mod tests {
         let _ = fs::remove_file(&marker);
         let fetches = Cell::new(0);
         let launches = Cell::new(0);
-        let response = activate_codex_window_with(
+        let (status, snapshot) = activate_codex_window_with(
             &marker,
             1_789_000_000,
             || {
                 fetches.set(fetches.get() + 1);
                 Ok(if fetches.get() == 1 {
-                    limits_with_session(0.0, "2026-09-10T05:00:00.000Z")
+                    activation_snapshot(0.0, 1_789_010_000)
                 } else {
-                    limits_with_session(0.0, "2026-09-10T06:00:00.000Z")
+                    activation_snapshot(0.0, 1_789_013_600)
                 })
             },
             || {
@@ -1827,7 +1868,11 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(response.status, CodexWindowActivationStatus::Started);
+        assert_eq!(status, CodexWindowActivationStatus::Started);
+        assert_eq!(
+            snapshot.limits.primary.unwrap().resets_at,
+            Some(1_789_013_600)
+        );
         assert_eq!(fetches.get(), 2);
         assert_eq!(launches.get(), 1);
         fs::remove_file(marker).unwrap();
@@ -1839,10 +1884,10 @@ mod tests {
         let _ = fs::remove_file(&marker);
         write_activation_marker(&marker, "unknown-account|zero-usage", 1_789_000_000).unwrap();
         let launches = Cell::new(0);
-        let response = activate_codex_window_with(
+        let (status, _) = activate_codex_window_with(
             &marker,
             1_789_000_001,
-            || Ok(limits_with_session(0.0, "2026-09-10T05:00:00.000Z")),
+            || Ok(activation_snapshot(0.0, 1_789_010_000)),
             || {
                 launches.set(launches.get() + 1);
                 Ok(())
@@ -1851,7 +1896,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            response.status,
+            status,
             CodexWindowActivationStatus::RecentlyRequested
         );
         assert_eq!(launches.get(), 0);

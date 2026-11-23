@@ -2,6 +2,18 @@
 const { spawn } = require("node:child_process");
 const { readFileSync, writeFileSync, existsSync, realpathSync } = require("node:fs");
 const { join } = require("node:path");
+if (process.argv.includes("exec")) {
+  fetch(`${process.env.CODEX_USAGE_ACCOUNTS_TEST_URL}/control`, {
+    method: "POST",
+    body: JSON.stringify({ aliceUsedPercent: 1 }),
+  }).then((response) => response.json()).then((requests) => {
+    writeFileSync(`${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.activation`, JSON.stringify({ args: process.argv.slice(2), requests }));
+  }).catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+  return;
+}
 if (process.argv.includes("--version")) {
   writeFileSync(`${process.env.CODEX_USAGE_ACCOUNTS_PROCESS_FILE}.version-called`, "");
   console.log("codex-cli 0.167.1");
