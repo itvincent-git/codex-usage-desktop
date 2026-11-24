@@ -32,7 +32,8 @@ describe("sidebar quota refresh recovery", () => {
     const sidebar = $('section[aria-label="额度概览"]');
     const session = $('[data-testid="limit-row-5-hour"]');
     const weekly = $('[data-testid="limit-row-weekly"]');
-    const warning = sidebar.$('[role="status"]');
+    const warning = sidebar.$('button[aria-label="更新失败"]');
+    const details = $('[role="dialog"][aria-label="更新失败"]');
     const limits: CodexLimitsResponse = {
       session: { usedPercent: 25, remainingPercent: 75, windowMinutes: 300, resetsAt: new Date(Date.now() + 4 * 3_600_000).toISOString() },
       weekly: { usedPercent: 50, remainingPercent: 50, windowMinutes: 10080, resetsAt: new Date(Date.now() + 6 * 86_400_000).toISOString() },
@@ -52,8 +53,9 @@ describe("sidebar quota refresh recovery", () => {
       await refresh.waitForEnabled();
       await expect(session).toHaveText(expect.stringContaining("75%"));
       await expect(weekly).toHaveText(expect.stringContaining("50%"));
+      const loadedHeight = await sidebar.execute((element) => element.getBoundingClientRect().height);
 
-      await reply("request timeout", true);
+      await reply("network failure", true);
       await refresh.click();
       await expect(refresh).toBeDisabled();
       await expect(sidebar).toHaveText(expect.stringContaining("加载"));
@@ -61,19 +63,33 @@ describe("sidebar quota refresh recovery", () => {
       await browser.waitUntil(() => browser.execute(() => typeof (window as unknown as Record<string, unknown>).releaseQuotaReply === "function"));
       await browser.execute(() => (window as unknown as { releaseQuotaReply: () => void }).releaseQuotaReply());
       await refresh.waitForEnabled();
-      await expect(sidebar).toHaveText(expect.stringContaining("更新失败"));
-      await expect(warning).toHaveText(expect.stringContaining("上次成功："));
+      await expect(warning).toHaveText("更新失败");
+      await expect(details).not.toExist();
+      await expect(sidebar).not.toHaveText(expect.stringContaining("上次成功："));
       await expect(session).toHaveText(expect.stringContaining("75%"));
       await expect(weekly).toHaveText(expect.stringContaining("50%"));
+      expect(await sidebar.execute((element) => element.getBoundingClientRect().height)).toBe(loadedHeight);
       expect(await sidebar.execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       await browser.saveScreenshot("/tmp/codex-quota-refresh-failed.png");
 
+      await warning.click();
+      await expect(details).toHaveText(expect.stringContaining("当前显示上次成功获取的数据。"));
+      await expect(details).toHaveText(expect.stringContaining("暂时无法获取 Codex 额度限制"));
+      await expect(details).toHaveText(expect.stringContaining("上次成功："));
+      await browser.keys("Escape");
+      await expect(details).not.toBeDisplayed();
+
       await $('button[aria-label="收起侧栏"]').click();
-      await expect(warning).toHaveText(expect.stringContaining("更新失败"));
-      await expect(warning).toHaveText(expect.stringContaining("上次成功："));
+      await expect(warning).toBeDisplayed();
+      await expect(warning).toHaveText("");
       await expect(session).toHaveText(expect.stringContaining("75%"));
       expect(await sidebar.execute((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       await browser.saveScreenshot("/tmp/codex-quota-refresh-failed-compact.png");
+      await warning.click();
+      await expect(details).toHaveText(expect.stringContaining("上次成功："));
+      await expect(details).toHaveText(expect.stringContaining("暂时无法获取 Codex 额度限制"));
+      await browser.keys("Escape");
+      await expect(details).not.toBeDisplayed();
       await $('button[aria-label="展开侧栏"]').click();
 
       await reply({ ...limits, updatedAt: new Date().toISOString(), session: { ...limits.session!, usedPercent: 40, remainingPercent: 60 } });
@@ -81,7 +97,6 @@ describe("sidebar quota refresh recovery", () => {
       await refresh.waitForEnabled();
       await expect(session).toHaveText(expect.stringContaining("60%"));
       await expect(warning).not.toExist();
-      await expect(sidebar).not.toHaveText(expect.stringContaining("更新失败"));
 
       await reply({ ...limits, session: { ...limits.session!, resetsAt: new Date(Date.now() - 60_000).toISOString() } });
       await refresh.click();
@@ -94,7 +109,8 @@ describe("sidebar quota refresh recovery", () => {
       await reply("401 Unauthorized");
       await refresh.click();
       await refresh.waitForEnabled();
-      await expect(warning).toHaveText(expect.stringContaining("codex auth login"));
+      await warning.click();
+      await expect(details).toHaveText(expect.stringContaining("codex auth login"));
       await expect(session).toHaveText(expect.stringContaining("75%"));
     } finally {
       await browser.execute((preferences) => {

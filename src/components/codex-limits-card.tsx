@@ -1,6 +1,7 @@
-import { ChevronLeft, ChevronRight, Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, LoaderCircle, LogIn, Play, RefreshCw, RotateCcw, TriangleAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { LatestResetButton } from "@/components/codex-reset-history";
 import type { CodexLimitWindow, CodexLimitsResponse, CodexResetAnnouncement, CodexResetCredit, CodexWindowActivationStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,8 @@ export function CodexSidebarLimits({ compact = false, account, limits, error, is
   const savedAccount = account?.current === false;
   const hasShortWindows = hasSubscription(limits) || (savedAccount && (limits?.session?.windowMinutes === 300 || limits?.weekly?.windowMinutes === 10080));
   const errorLabel = error && savedAccount ? t(`accounts.errors.${error.split(":")[0]}`, { defaultValue: t("accounts.errors.generic") }) : null;
+  const showRefreshFailure = !!(error && limits && !isLimitsRefreshing);
+  const refreshFailedLabel = t("limits.refresh_failed");
   const [, refreshCountdown] = useState(0);
   const now = Date.now();
   useEffect(() => {
@@ -107,13 +110,33 @@ export function CodexSidebarLimits({ compact = false, account, limits, error, is
   }, []);
 
   return (
-    <section className="sidebar-limits space-y-3" aria-label={t("limits.sidebar_title")}>
-      {!compact ? <div className="flex min-w-0 items-center justify-between gap-1 text-xs">
-        <h2 className="font-semibold">{t("limits.sidebar_title")}</h2>
-        <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={limits ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm") }) : undefined}>
-          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", error ? "bg-warning" : limits ? "bg-success" : "bg-muted-foreground")} />
-          <span className="truncate">{t(isLimitsRefreshing ? "common.loading" : error ? (limits ? "limits.refresh_failed" : "limits.unavailable") : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
-        </span>
+    <section className="sidebar-limits relative space-y-3" aria-label={t("limits.sidebar_title")}>
+      {!compact || showRefreshFailure ? <div className={cn("flex min-w-0 items-center gap-1 text-xs", compact ? "justify-center" : "justify-between")}>
+        {!compact ? <h2 className="min-w-0 truncate font-semibold" title={t("limits.sidebar_title")}>{t("limits.sidebar_title")}</h2> : null}
+        {showRefreshFailure ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label={refreshFailedLabel} title={refreshFailedLabel} className={cn("inline-flex min-w-0 items-center justify-center gap-0.5 rounded-sm text-warning-foreground hover:bg-warning/10 focus-visible:ring-2 focus-visible:ring-ring", compact && "size-6 shrink-0")}>
+                <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+                {!compact ? <>
+                  <span className="truncate">{refreshFailedLabel}</span>
+                  <ChevronDown className="size-3 shrink-0" aria-hidden="true" />
+                </> : null}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" collisionPadding={8} aria-label={refreshFailedLabel} className="max-w-[calc(100vw-1rem)] space-y-2 break-words p-3 text-xs leading-relaxed">
+              <p>{t("limits.cached_data")}</p>
+              <p className="text-muted-foreground">{t("limits.last_success", { time: dayjs(limits.updatedAt).format("YYYY-MM-DD HH:mm") })}</p>
+              <p>{errorLabel ?? t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
+              {!savedAccount && isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <span className="flex min-w-0 items-center gap-1 text-muted-foreground" title={limits ? t("limits.updated", { time: dayjs(limits.updatedAt).format("HH:mm") }) : undefined}>
+            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", error ? "bg-warning" : limits ? "bg-success" : "bg-muted-foreground")} />
+            <span className="truncate">{t(isLimitsRefreshing ? "common.loading" : error ? "limits.unavailable" : limits ? "limits.sidebar_updated" : "limits.not_fetched")}</span>
+          </span>
+        )}
       </div> : null}
       {account ? <div className={cn("relative flex min-w-0", compact ? "items-start gap-0.5" : "items-center gap-1", compact && account.current && "pb-4")}>
         <div aria-live="polite" aria-atomic="true" className={cn("min-w-0 flex-1 text-xs", compact ? "text-center" : "flex items-center gap-1")}>
@@ -180,16 +203,7 @@ export function CodexSidebarLimits({ compact = false, account, limits, error, is
           )}
         </div>
       )}
-      {error && limits ? (
-        <div role="status" className={cn("break-words text-muted-foreground", compact ? "text-center text-xs" : "space-y-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-2 text-xs")}>
-          {compact ? <p className="text-warning-foreground">{t("limits.refresh_failed")}</p> : <>
-            <p>{t("limits.cached_data")}</p>
-            <p>{errorLabel ?? t(isOAuthLoginError(error) ? "limits.login_instruction" : quotaErrorKey(error))}</p>
-            {!savedAccount && isOAuthLoginError(error) ? <code className="block select-all">codex auth login</code> : null}
-          </>}
-          <p title={t("limits.updated", { time: dayjs(limits.updatedAt).format("YYYY-MM-DD HH:mm") })}>{t("limits.last_success", { time: dayjs(limits.updatedAt).format("MM/DD HH:mm") })}</p>
-        </div>
-      ) : null}
+      <span className="sr-only left-0 top-0" aria-live="polite">{showRefreshFailure ? refreshFailedLabel : null}</span>
     </section>
   );
 }

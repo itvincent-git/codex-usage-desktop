@@ -175,19 +175,25 @@ describe("sidebar quota refresh failures", () => {
     rerender(<CodexSidebarLimits compact={compact} limits={limits} error="request timeout" />);
     expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
     expect(screen.getByTestId("limit-row-weekly")).toHaveTextContent("50%");
-    expect(screen.getByRole("status")).toHaveTextContent("Last success:");
-    expect(screen.getByRole("status")).toHaveTextContent(dayjs(limits.updatedAt).format("MM/DD HH:mm"));
-    expect(screen.getByText("Update failed")).toBeInTheDocument();
+    const warning = screen.getByRole("button", { name: "Update failed" });
+    expect(warning).toHaveTextContent(compact ? /^$/ : "Update failed");
+    expect(screen.queryByText(/Last success:/)).not.toBeInTheDocument();
+    fireEvent.click(warning);
+    const details = screen.getByRole("dialog", { name: "Update failed" });
+    expect(details).toHaveTextContent("Showing the last successful data.");
+    expect(details).toHaveTextContent(`Last success: ${dayjs(limits.updatedAt).format("YYYY-MM-DD HH:mm")}`);
+    expect(details).toHaveTextContent(/timed out/i);
 
     rerender(<CodexSidebarLimits compact={compact} limits={{ ...limits, session: { ...limits.session, remainingPercent: 60, usedPercent: 40 } }} error={null} />);
     expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("60%");
-    expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Last success:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Update failed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows login guidance with cached data and drops quotas when the data is cleared", () => {
     const { rerender } = render(<CodexSidebarLimits limits={limits} error="401 Unauthorized" />);
     expect(screen.getByTestId("limit-row-5-hour")).toHaveTextContent("75%");
+    fireEvent.click(screen.getByRole("button", { name: "Update failed" }));
     expect(screen.getByText("codex auth login")).toBeInTheDocument();
     rerender(<CodexSidebarLimits limits={null} error={null} isLimitsRefreshing />);
     expect(screen.queryByTestId("limit-row-5-hour")).not.toBeInTheDocument();

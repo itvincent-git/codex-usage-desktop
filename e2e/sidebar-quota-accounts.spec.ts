@@ -184,8 +184,11 @@ describe("sidebar quota accounts", () => {
       // A newer failed check still uses Bob's last successful limit after the old reply.
       await control({ limitRateLimited: true });
       await refresh.click();
-      await expect(sidebar).toHaveText(expect.stringContaining("Update failed"));
-      await expect(sidebar).toHaveText(expect.stringContaining("Last success:"));
+      const warning = sidebar.$('button[aria-label="Update failed"]');
+      await expect(warning).toBeDisplayed();
+      await warning.click();
+      await expect($('[role="dialog"][aria-label="Update failed"]')).toHaveText(expect.stringContaining("Last success:"));
+      await browser.keys("Escape");
       await expect(fiveHour).toHaveText(expect.stringContaining("55%"));
 
       writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH!, JSON.stringify(accountCredentials("charlie")));
