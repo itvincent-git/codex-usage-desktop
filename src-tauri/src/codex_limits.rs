@@ -1132,7 +1132,7 @@ pub(crate) enum CodexCommand {
     Wsl { distribution: String, path: String },
 }
 
-fn codex_activation_args() -> [&'static str; 16] {
+fn codex_activation_args() -> [&'static str; 20] {
     [
         "-c",
         "mcp_servers={}",
@@ -1149,6 +1149,11 @@ fn codex_activation_args() -> [&'static str; 16] {
         "--ignore-user-config",
         "--ignore-rules",
         "--skip-git-repo-check",
+        // Built-in Apps and plugins can still make network requests with an empty MCP config.
+        "--disable",
+        "apps",
+        "--disable",
+        "plugins",
         WINDOW_ACTIVATION_PROMPT,
     ]
 }
@@ -1787,6 +1792,10 @@ mod tests {
                 "--ignore-user-config",
                 "--ignore-rules",
                 "--skip-git-repo-check",
+                "--disable",
+                "apps",
+                "--disable",
+                "plugins",
                 WINDOW_ACTIVATION_PROMPT,
             ]
         );

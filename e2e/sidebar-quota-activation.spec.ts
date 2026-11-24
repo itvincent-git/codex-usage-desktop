@@ -9,7 +9,7 @@ async function quotaRequests(values = {}) {
 describe("sidebar quota activation", () => {
   const run = process.env.CODEX_USAGE_ACCOUNTS_TEST_URL ? it : it.skip;
 
-  run("launches Luna after one quota check and displays the updated window", async () => {
+  run("launches Luna without apps or plugins and displays the updated window", async () => {
     await browser.execute(() => {
       localStorage.setItem("language", "en");
       localStorage.setItem("sidebar_collapsed", "false");
@@ -41,6 +41,8 @@ describe("sidebar quota activation", () => {
     const subscription = "alice:/backend-api/accounts/check/v4-2023-04-27";
     const resetCredits = "alice:/backend-api/wham/rate-limit-reset-credits";
     expect(args[args.indexOf("-m") + 1]).toBe("gpt-6-luna");
+    const disabledFeatures = args.flatMap((arg, index) => arg === "--disable" ? [args[index + 1]] : []);
+    expect(disabledFeatures).toEqual(expect.arrayContaining(["apps", "plugins"]));
     expect(requests[usage]).toBe(before[usage] + 1);
     expect(requests[subscription]).toBe(before[subscription]);
     expect(requests[resetCredits]).toBe(before[resetCredits]);
