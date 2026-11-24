@@ -1109,7 +1109,11 @@ describe("session titles", () => {
         durationMs: null,
         systemMessages: [],
         userMessages: [{ timestamp: null, kind: "message", text: prompt }],
-        assistantMessages: [],
+        assistantMessages: turnId === "turn-2" ? [
+          { timestamp: null, kind: "message", text: "Checking the fix now" },
+          { timestamp: null, kind: "message", text: "The fix passed verification" },
+          { timestamp: null, kind: "message", text: "  " },
+        ] : [],
         reasoningSummaries: [],
         toolCalls: [],
         patchResults: [],
@@ -1124,6 +1128,9 @@ describe("session titles", () => {
     const navigation = await screen.findByRole("navigation", { name: "Quick navigation" });
     expect(within(navigation).getByRole("button", { name: /Navigate to start of turn turn-1.*Investigate the sync issue/ }).parentElement).toHaveAttribute("aria-current", "location");
     const secondTurn = within(navigation).getByRole("button", { name: /Navigate to start of turn turn-2.*Apply the verified fix/ });
+    expect(within(navigation).getByText("The fix passed verification")).toBeVisible();
+    expect(within(navigation).queryByText("Checking the fix now")).not.toBeInTheDocument();
+    expect(within(navigation).getByRole("button", { name: /Navigate to end of turn turn-1.*Investigate the sync issue/ })).toBeInTheDocument();
     const scroll = screen.getByTestId("session-detail-scroll");
     const scrollTo = vi.fn();
     scroll.scrollTo = scrollTo;
@@ -1139,7 +1146,7 @@ describe("session titles", () => {
     expect(secondTurn.parentElement).toHaveAttribute("aria-current", "location");
     await userEvent.click(turnToggle);
     expect(turnToggle).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(within(navigation).getByRole("button", { name: /Navigate to end of turn turn-2.*Apply the verified fix/ }));
+    await userEvent.click(within(navigation).getByRole("button", { name: /Navigate to end of turn turn-2.*The fix passed verification/ }));
     expect(turnToggle).toHaveAttribute("aria-expanded", "true");
     expect(scrollTo).toHaveBeenLastCalledWith({ behavior: "smooth", top: 1120 });
     expect(scrollIntoView).not.toHaveBeenCalled();

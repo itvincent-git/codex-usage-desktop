@@ -6,7 +6,7 @@ import type { SessionReplayDetail } from "../src/lib/api";
 describe("session turn navigation", () => {
   const run = process.env.CODEX_USAGE_ARCHIVE_E2E === "1" ? it : it.skip;
 
-  run("keeps navigation beside the content and jumps to each turn's start and end", async () => {
+  run("previews prompts and replies beside the content and jumps to each turn's start and end", async () => {
     const sessions = join(process.env.CODEX_HOME!, "sessions", "2026", "10", "16");
     mkdirSync(sessions, { recursive: true });
     const id = "01977e3d-d9f6-72b7-93cf-f3f2f83c3999";
@@ -102,6 +102,8 @@ describe("session turn navigation", () => {
       expect(navigationText).toContain("Check AGENTS.md");
       for (const turn of [1, 2, 3]) {
         expect(navigationText).toContain(`Navigate turn ${turn}`);
+        expect(navigationText).toContain(`Turn ${turn}, step 14.`);
+        expect(navigationText).not.toContain(`Turn ${turn}, step 1.`);
         expect(navigationText).not.toContain(`nav-${turn}`);
       }
       for (const button of await navigation.$$('button')) {
@@ -111,16 +113,23 @@ describe("session turn navigation", () => {
       }
       const firstStart = navigation.$('button[aria-label^="Navigate to start of turn nav-1"]');
       const firstEnd = navigation.$('button[aria-label^="Navigate to end of turn nav-1"]');
+      await expect(firstStart).toHaveAttribute("aria-label", /Navigate turn 1/);
+      await expect(firstEnd).toHaveAttribute("aria-label", /Turn 1, step 14\./);
       const cardLayout = await browser.execute(() => {
         const button = document.querySelector('nav[aria-label="Quick navigation"] button')!;
         const card = button.parentElement!;
         const preview = card.querySelector("span")!;
         const [start, end] = Array.from(card.querySelectorAll("button")).map((element) => element.getBoundingClientRect());
+        const reply = card.querySelector('span[title^="Turn 1, step 14."]')!;
+        const replyBounds = reply.getBoundingClientRect();
         const bounds = card.getBoundingClientRect();
         return {
           previewLines: preview.clientHeight / parseFloat(getComputedStyle(preview).lineHeight),
           clampedLines: getComputedStyle(preview).webkitLineClamp,
           preservesLineBreaks: getComputedStyle(preview).whiteSpace === "pre-wrap",
+          replyInEndHalf: preview.getBoundingClientRect().bottom <= start.bottom
+            && replyBounds.top >= end.top && replyBounds.bottom <= end.bottom && replyBounds.height > 0,
+          replyClampedLines: getComputedStyle(reply).webkitLineClamp,
           coversCard: start.left === bounds.left && start.right === bounds.right && start.top === bounds.top
             && start.bottom === end.top && end.left === bounds.left && end.right === bounds.right && end.bottom === bounds.bottom,
           fullPreview: preview.textContent,
@@ -129,6 +138,8 @@ describe("session turn navigation", () => {
       expect(cardLayout.previewLines).toBe(3);
       expect(cardLayout.clampedLines).toBe("3");
       expect(cardLayout.preservesLineBreaks).toBe(true);
+      expect(cardLayout.replyInEndHalf).toBe(true);
+      expect(cardLayout.replyClampedLines).toBe("3");
       expect(cardLayout.coversCard).toBe(true);
       expect(cardLayout.fullPreview).toContain("without the previous 140-character truncation.");
       expect(await firstStart.$("span").execute((element) => getComputedStyle(element).opacity)).toBe("0");

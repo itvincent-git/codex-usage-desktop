@@ -1374,12 +1374,19 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
   const rawJsonlLines = useMemo(() => detail?.rawJsonl.split("\n") ?? [], [detail?.rawJsonl]);
   const conversation = useMemo(() => detail ? buildSessionConversation(detail.turns) : [], [detail?.turns]);
   const turnPreviews = useMemo(() => detail?.turns.map(firstUserPreview) ?? [], [detail?.turns]);
-  const navigationPreviews = useMemo(() => detail?.turns.map((turn) => turn.userMessages.find((message) => {
-    const text = message.text.trim();
-    return text.length > 0
-      && !text.startsWith("# AGENTS.md instructions for ")
-      && !text.startsWith("<environment_context>");
-  })?.text.trim().slice(0, 600) ?? "") ?? [], [detail?.turns]);
+  const navigationPreviews = useMemo(() => detail?.turns.map((turn) => {
+    const user = turn.userMessages.find((message) => {
+      const text = message.text.trim();
+      return text.length > 0
+        && !text.startsWith("# AGENTS.md instructions for ")
+        && !text.startsWith("<environment_context>");
+    });
+    const assistant = turn.assistantMessages.findLast((message) => message.text.trim());
+    return {
+      user: user?.text.trim().slice(0, 600),
+      assistant: assistant?.text.trim().slice(0, 600),
+    };
+  }) ?? [], [detail?.turns]);
   const searchDocument = useMemo(() => detail ? { turns: detail.turns, rawJsonl: detail.rawJsonl } : null, [detail?.turns, detail?.rawJsonl]);
   const searchResult = showSearch && search?.active && search.source === searchDocument && search.scope === activeTab ? search : null;
   const searchHit = searchResult?.hit;
@@ -1660,7 +1667,7 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
                   <div className="space-y-0.5">
                     {detail.turns.map((turn, index) => {
                       const turnKey = `${turn.turnId}-${index}`;
-                      const preview = navigationPreviews[index];
+                      const { user, assistant } = navigationPreviews[index];
                       const isActive = activeTurnKey === turnKey;
                       return (
                         <div
@@ -1668,23 +1675,32 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
                           className={`relative block w-full rounded-md px-2 py-1.5 text-left transition ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                           aria-current={isActive ? "location" : undefined}
                         >
-                          <span className="line-clamp-3 min-h-12 whitespace-pre-wrap break-words text-xs font-medium" title={preview || undefined}>
-                            {preview || t("sessions.detail.turn", { id: index + 1 })}
+                          <span className="line-clamp-3 min-h-12 whitespace-pre-wrap break-words text-xs font-medium" title={user}>
+                            {user ?? t("sessions.detail.turn", { id: index + 1 })}
                           </span>
-                          {(["start", "end"] as const).map((position) => (
-                            <button
-                              key={position}
-                              type="button"
-                              className={`group absolute inset-x-0 flex h-1/2 items-center justify-end px-1 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${position === "start" ? "top-0 rounded-t-md" : "bottom-0 rounded-b-md"}`}
-                              aria-label={`${t(`sessions.detail.navigate_to_turn_${position}`, { id: turn.turnId })}${preview ? `: ${preview}` : ""}`}
-                              title={t(`sessions.detail.navigate_to_turn_${position}`, { id: index + 1 })}
-                              onClick={() => scrollToTurn(turnKey, position)}
-                            >
-                              <span className="rounded bg-surface/95 p-0.5 text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" aria-hidden="true">
-                                {position === "start" ? <ArrowUpToLine className="h-3.5 w-3.5" /> : <ArrowDownToLine className="h-3.5 w-3.5" />}
-                              </span>
-                            </button>
-                          ))}
+                          {assistant ? (
+                            <span className="flex min-h-12 items-start gap-1.5">
+                              <Bot aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span className="line-clamp-3 min-w-0 whitespace-pre-wrap break-words text-xs" title={assistant}>{assistant}</span>
+                            </span>
+                          ) : null}
+                          {(["start", "end"] as const).map((position) => {
+                            const preview = position === "end" ? assistant ?? user : user;
+                            return (
+                              <button
+                                key={position}
+                                type="button"
+                                className={`group absolute inset-x-0 flex h-1/2 items-center justify-end px-1 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${position === "start" ? "top-0 rounded-t-md" : "bottom-0 rounded-b-md"}`}
+                                aria-label={`${t(`sessions.detail.navigate_to_turn_${position}`, { id: turn.turnId })}${preview ? `: ${preview}` : ""}`}
+                                title={t(`sessions.detail.navigate_to_turn_${position}`, { id: index + 1 })}
+                                onClick={() => scrollToTurn(turnKey, position)}
+                              >
+                                <span className="rounded bg-surface/95 p-0.5 text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" aria-hidden="true">
+                                  {position === "start" ? <ArrowUpToLine className="h-3.5 w-3.5" /> : <ArrowDownToLine className="h-3.5 w-3.5" />}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       );
                     })}
