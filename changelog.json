@@ -1,4 +1,8 @@
 {
+  "7.1.0": {
+    "zh": "- chore(homebrew): update cask to 7.0.0\n- fix: speed up Codex quota window activation",
+    "en": "- chore(homebrew): update cask to 7.0.0\n- fix: speed up Codex quota window activation"
+  },
   "7.0.0": {
     "zh": "- chore(homebrew): update cask to 6.4.0\n- chore: reduce build and e2e log noise\n- fix: normalize session tool output font size\n- feat: add session detail tabs\n- feat: add session tab closing context menu\n- fix: prevent text selection on session tabs\n- feat: move session tabs into the title bar\n- fix: hide the session tab scrollbar\n- feat: scroll session tabs with the mouse wheel\n- feat: restyle session tabs\n- fix: add top spacing to session tabs\n- fix: smooth active session tab corners\n- fix: let session tabs shrink as space runs out",
     "en": "- chore(homebrew): update cask to 6.4.0\n- chore: reduce build and e2e log noise\n- fix: normalize session tool output font size\n- feat: add session detail tabs\n- feat: add session tab closing context menu\n- fix: prevent text selection on session tabs\n- feat: move session tabs into the title bar\n- fix: hide the session tab scrollbar\n- feat: scroll session tabs with the mouse wheel\n- feat: restyle session tabs\n- fix: add top spacing to session tabs\n- fix: smooth active session tab corners\n- fix: let session tabs shrink as space runs out"
