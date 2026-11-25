@@ -1239,9 +1239,11 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
   const summaryRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useRef(0);
+  const turnNavigationScroll = useRef<{ top: number; timeout: number } | null>(null);
   useLayoutEffect(() => {
     if (isActive && scrollRef.current) scrollRef.current.scrollTop = scrollPosition.current;
   }, [isActive]);
+  useLayoutEffect(() => clearTurnNavigationScroll, [activePath, activeTab, isActive]);
   const turnRefs = useRef(new Map<string, HTMLElement>());
   const creditSession = refreshedSession?.path === activePath ? refreshedSession : activePath === session.path ? session : null;
   const activeDetail = detail?.path === activePath ? detail : null;
@@ -1410,6 +1412,7 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
     const scroll = scrollRef.current;
     const target = scroll?.querySelector<HTMLElement>('[data-testid="session-search-current"]');
     if (scroll && target) {
+      clearTurnNavigationScroll();
       scroll.scrollTop += target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 64;
     }
   });
@@ -1455,6 +1458,35 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
     searchButtonRef.current?.focus({ preventScroll: true });
   }
 
+  function clearTurnNavigationScroll() {
+    if (turnNavigationScroll.current) window.clearTimeout(turnNavigationScroll.current.timeout);
+    turnNavigationScroll.current = null;
+  }
+
+  function updateActiveTurnFromScroll(scroll: HTMLDivElement) {
+    const marker = scroll.getBoundingClientRect().top + 80;
+    let currentTurnKey: string | undefined;
+    for (const [key, element] of turnRefs.current) {
+      currentTurnKey ??= key;
+      if (element.getBoundingClientRect().top > marker) break;
+      currentTurnKey = key;
+    }
+    if (currentTurnKey) setActiveTurnKey(currentTurnKey);
+  }
+
+  function watchTurnNavigationScroll(scroll: HTMLDivElement, top: number) {
+    clearTurnNavigationScroll();
+    const destination = Math.max(0, Math.min(top, scroll.scrollHeight - scroll.clientHeight));
+    if (Math.abs(scroll.scrollTop - destination) <= 1) return;
+
+    // Resume position tracking if scrolling stops short of the requested destination.
+    const timeout = window.setTimeout(() => {
+      turnNavigationScroll.current = null;
+      updateActiveTurnFromScroll(scroll);
+    }, 200);
+    turnNavigationScroll.current = { top, timeout };
+  }
+
   function scrollToTurn(key: string, position: "start" | "end") {
     if (position === "end" && !expandedTurns.has(key)) {
       flushSync(() => setExpandedTurns((current) => new Set(current).add(key)));
@@ -1469,8 +1501,10 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
     const offset = position === "start"
       ? bounds.top - viewport.top - parseFloat(style.scrollMarginTop || "0")
       : bounds.bottom - viewport.bottom + parseFloat(style.scrollMarginBottom || "0");
+    const top = scroll.scrollTop + offset;
+    watchTurnNavigationScroll(scroll, top);
     // scrollIntoView also scrolls overflow-hidden ancestors, moving the title bar offscreen.
-    scroll.scrollTo({ top: scroll.scrollTop + offset, behavior: "smooth" });
+    scroll.scrollTo({ top, behavior: "smooth" });
   }
 
   return (
@@ -1522,6 +1556,7 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
               aria-expanded={showDetails}
               onClick={() => {
                 setShowDetails((value) => isScrolled || !value);
+                clearTurnNavigationScroll();
                 if (scrollRef.current) scrollRef.current.scrollTop = 0;
                 setIsScrolled(false);
                 setCollapsedHeight(0);
@@ -1629,16 +1664,11 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
               setCollapsedHeight(0);
             }
 
-            const turnSections = Array.from(turnRefs.current.entries());
-            if (turnSections.length > 0) {
-              const marker = event.currentTarget.getBoundingClientRect().top + 80;
-              let currentTurnKey = turnSections[0][0];
-              for (const [turnKey, element] of turnSections) {
-                if (element.getBoundingClientRect().top > marker) break;
-                currentTurnKey = turnKey;
-              }
-              setActiveTurnKey((current) => current === currentTurnKey ? current : currentTurnKey);
+            if (turnNavigationScroll.current) {
+              watchTurnNavigationScroll(event.currentTarget, turnNavigationScroll.current.top);
+              return;
             }
+            updateActiveTurnFromScroll(event.currentTarget);
           }}
         >
           <div className="px-4 py-5">

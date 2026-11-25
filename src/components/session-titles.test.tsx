@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ProjectSessionsModal } from "./project-sessions-modal";
@@ -1134,6 +1134,8 @@ describe("session titles", () => {
     const scroll = screen.getByTestId("session-detail-scroll");
     const scrollTo = vi.fn();
     scroll.scrollTo = scrollTo;
+    vi.spyOn(scroll, "scrollHeight", "get").mockReturnValue(1800);
+    vi.spyOn(scroll, "clientHeight", "get").mockReturnValue(400);
     scroll.scrollTop = 200;
     vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue({ top: 100, bottom: 500 } as DOMRect);
     const turnToggle = screen.getByRole("button", { name: /Turn turn-2.*Collapse/ });
@@ -1144,6 +1146,15 @@ describe("session titles", () => {
     await userEvent.click(secondTurn);
     expect(scrollTo).toHaveBeenCalledWith({ behavior: "smooth", top: 880 });
     expect(secondTurn.parentElement).toHaveAttribute("aria-current", "location");
+    scroll.scrollTop = 300;
+    fireEvent.scroll(scroll);
+    expect(secondTurn.parentElement).toHaveAttribute("aria-current", "location");
+    scroll.scrollTop = 880;
+    fireEvent.scroll(scroll);
+    expect(secondTurn.parentElement).toHaveAttribute("aria-current", "location");
+    scroll.scrollTop = 200;
+    fireEvent.scroll(scroll);
+    expect(secondTurn.parentElement).not.toHaveAttribute("aria-current");
     await userEvent.click(turnToggle);
     expect(turnToggle).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(within(navigation).getByRole("button", { name: /Navigate to end of turn turn-2.*The fix passed verification/ }));

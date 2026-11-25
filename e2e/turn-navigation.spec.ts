@@ -159,6 +159,27 @@ describe("session turn navigation", () => {
         await browser.action("pointer").move({ x: point.x, y: point.y }).down().up().perform();
       }
 
+      // Record each highlight change so a transient return to the first turn is visible to the test.
+      await navigation.execute((element) => {
+        function recordSelection() {
+          const button = element.querySelector('[aria-current="location"] button');
+          const turn = button?.getAttribute("aria-label")?.match(/nav-\d+/)?.[0];
+          if (!turn) return;
+          const history = element.getAttribute("data-selection-history")?.split(",") ?? [];
+          if (history.at(-1) !== turn) element.setAttribute("data-selection-history", [...history, turn].join(","));
+        }
+        recordSelection();
+        new MutationObserver(recordSelection).observe(element, { subtree: true, attributeFilter: ["aria-current"] });
+      });
+      await clickTurnRow(2, "start");
+      const secondSection = dialog.$('button*=Turn nav-2').$("./parent::section");
+      await browser.waitUntil(async () => secondSection.execute((element) => {
+        const viewport = document.querySelector('[data-testid="session-detail-scroll"]')!.getBoundingClientRect();
+        const gap = element.getBoundingClientRect().top - viewport.top;
+        return gap >= 0 && gap < 80;
+      }), { timeoutMsg: "Turn 2 should reach the top of the replay viewport" });
+      await expect(navigation).toHaveAttribute("data-selection-history", "nav-1,nav-2");
+
       for (const turn of [1, 2, 3]) {
         const toggle = dialog.$(`button*=Turn nav-${turn}`);
         await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -190,6 +211,8 @@ describe("session turn navigation", () => {
         }
       }
       await browser.saveScreenshot("/tmp/codex-usage-turn-navigation.png");
+      await dialog.$('[data-testid="session-detail-scroll"]').execute((element) => { element.scrollTop = 0; });
+      await expect(firstStart.$("./parent::div")).toHaveAttribute("aria-current", "location");
       await browser.keys("Escape");
       await dialog.waitForExist({ reverse: true });
     } catch (error) {
