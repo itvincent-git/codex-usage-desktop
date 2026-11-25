@@ -87,12 +87,14 @@ describe("session turn navigation", () => {
         const viewport = document.querySelector('[data-testid="session-detail-scroll"]')!;
         return {
           sidebarWidth: document.querySelector('[data-app-sidebar]')!.getBoundingClientRect().width,
+          navigationWidth: nav.width,
           hasGap: sections.every((section) => section.getBoundingClientRect().right + 15 <= nav.left),
           fitsViewport: nav.right <= viewport.getBoundingClientRect().right,
           overflows: content.scrollWidth > content.clientWidth || element.scrollWidth > element.clientWidth,
         };
       });
       expect(layout.sidebarWidth).toBe(360);
+      expect(layout.navigationWidth).toBe(208);
       expect(layout.hasGap).toBe(true);
       expect(layout.fitsViewport).toBe(true);
       expect(layout.overflows).toBe(false);
@@ -107,65 +109,48 @@ describe("session turn navigation", () => {
         expect(navigationText).not.toContain(`nav-${turn}`);
       }
       for (const button of await navigation.$$('button')) {
-        expect(await button.getText()).toBe("");
         await expect(button).not.toHaveAttribute("aria-label", /AGENTS\.md instructions|environment_context/);
         await expect(button).toHaveAttribute("title", /Navigate to (start|end) of turn/);
       }
       const firstStart = navigation.$('button[aria-label^="Navigate to start of turn nav-1"]');
       const firstEnd = navigation.$('button[aria-label^="Navigate to end of turn nav-1"]');
-      await expect(firstStart).toHaveAttribute("aria-label", /Navigate turn 1/);
-      await expect(firstEnd).toHaveAttribute("aria-label", /Turn 1, step 14\./);
+      await expect(firstStart).toHaveText(/Navigate turn 1/);
+      await expect(firstEnd).toHaveText(/Turn 1, step 14\./);
+      await expect(firstStart).toHaveAttribute("title", /without the previous 140-character truncation\./);
+      await expect(firstStart.$("./parent::div")).toHaveAttribute("aria-current", "location");
+      await expect(firstStart.$("svg.lucide-arrow-up-to-line")).toBeDisplayed();
+      await expect(firstEnd.$("svg.lucide-arrow-down-to-line")).toBeDisplayed();
       const cardLayout = await browser.execute(() => {
-        const button = document.querySelector('nav[aria-label="Quick navigation"] button')!;
-        const card = button.parentElement!;
-        const preview = card.querySelector("span")!;
-        const [start, end] = Array.from(card.querySelectorAll("button")).map((element) => element.getBoundingClientRect());
-        const reply = card.querySelector('span[title^="Turn 1, step 14."]')!;
-        const replyBounds = reply.getBoundingClientRect();
+        const card = document.querySelector('nav[aria-label="Quick navigation"] button')!.parentElement!;
+        const [start, end] = Array.from(card.querySelectorAll("button"));
+        const startBounds = start.getBoundingClientRect();
+        const endBounds = end.getBoundingClientRect();
         const bounds = card.getBoundingClientRect();
         return {
-          previewLines: preview.clientHeight / parseFloat(getComputedStyle(preview).lineHeight),
-          clampedLines: getComputedStyle(preview).webkitLineClamp,
-          preservesLineBreaks: getComputedStyle(preview).whiteSpace === "pre-wrap",
-          replyInEndHalf: preview.getBoundingClientRect().bottom <= start.bottom
-            && replyBounds.top >= end.top && replyBounds.bottom <= end.bottom && replyBounds.height > 0,
-          replyClampedLines: getComputedStyle(reply).webkitLineClamp,
-          coversCard: start.left === bounds.left && start.right === bounds.right && start.top === bounds.top
-            && start.bottom === end.top && end.left === bounds.left && end.right === bounds.right && end.bottom === bounds.bottom,
-          fullPreview: preview.textContent,
+          bothPreviewsTruncate: [start, end].every((button) => {
+            const preview = button.querySelector("span")!;
+            const style = getComputedStyle(preview);
+            return style.whiteSpace === "nowrap" && style.textOverflow === "ellipsis" && preview.scrollWidth > preview.clientWidth;
+          }),
+          coversCard: startBounds.width === bounds.width && endBounds.width === bounds.width
+            && startBounds.top === bounds.top && startBounds.bottom === endBounds.top && endBounds.bottom === bounds.bottom,
+          cardHeight: bounds.height,
         };
       });
-      expect(cardLayout.previewLines).toBe(3);
-      expect(cardLayout.clampedLines).toBe("3");
-      expect(cardLayout.preservesLineBreaks).toBe(true);
-      expect(cardLayout.replyInEndHalf).toBe(true);
-      expect(cardLayout.replyClampedLines).toBe("3");
+      expect(cardLayout.bothPreviewsTruncate).toBe(true);
       expect(cardLayout.coversCard).toBe(true);
-      expect(cardLayout.fullPreview).toContain("without the previous 140-character truncation.");
-      expect(await firstStart.$("span").execute((element) => getComputedStyle(element).opacity)).toBe("0");
-      expect(await firstEnd.$("span").execute((element) => getComputedStyle(element).opacity)).toBe("0");
+      expect(cardLayout.cardHeight).toBe(48);
 
       await browser.tauri.execute(({ core }) => core.invoke("plugin:window|set_focus", { label: "main" }));
       await browser.waitUntil(() => browser.execute(() => document.hasFocus()));
-      for (const position of ["start", "end"] as const) {
-        const button = position === "start" ? firstStart : firstEnd;
-        const other = position === "start" ? firstEnd : firstStart;
-        // The embedded driver dispatches synthetic mouse events, which cannot activate CSS :hover.
-        // Focus exercises the same direction indicator through its keyboard interaction instead.
-        await button.execute((element) => (element as HTMLElement).focus({ preventScroll: true }));
-        await browser.waitUntil(async () => button.$("span").execute((element) => getComputedStyle(element).opacity === "1"));
-        await browser.waitUntil(async () => other.$("span").execute((element) => getComputedStyle(element).opacity === "0"));
-        await expect(button.$("svg")).toHaveElementClass(position === "start" ? "lucide-arrow-up-to-line" : "lucide-arrow-down-to-line");
-      }
-
-      async function clickTurnHalf(turn: number, position: "start" | "end") {
+      async function clickTurnRow(turn: number, position: "start" | "end") {
         const selector = `nav[aria-label="Quick navigation"] button[aria-label^="Navigate to ${position} of turn nav-${turn}"]`;
         await $(selector).waitForStable();
         const point = await browser.execute((turn, position) => {
           const button = document.querySelector(`nav[aria-label="Quick navigation"] button[aria-label^="Navigate to ${position} of turn nav-${turn}"]`)!;
           const bounds = button.getBoundingClientRect();
-          // Click the card's left edge, away from the direction icon.
-          const x = Math.round(bounds.left + 4);
+          // Click the preview, away from the direction icon.
+          const x = Math.round(bounds.left + bounds.width / 2);
           const y = Math.round(bounds.top + bounds.height / 2);
           return { x, y, hit: document.elementFromPoint(x, y)?.closest("button") === button };
         }, turn, position);
@@ -180,7 +165,7 @@ describe("session turn navigation", () => {
         const section = toggle.$("./parent::section");
         expect(await section.getSize("height")).toBeGreaterThan(await $('[data-testid="session-detail-scroll"]').getSize("height"));
         for (const position of ["end", "start"] as const) {
-          await clickTurnHalf(turn, position);
+          await clickTurnRow(turn, position);
           await browser.waitUntil(async () => section.execute((element, position) => {
             const viewport = document.querySelector('[data-testid="session-detail-scroll"]')!.getBoundingClientRect();
             const bounds = element.getBoundingClientRect();
@@ -194,7 +179,7 @@ describe("session turn navigation", () => {
           // Avoid the embedded driver's scrollIntoView changing ancestors before the navigation click.
           await toggle.execute((element) => (element as HTMLButtonElement).click());
           await expect(toggle).toHaveAttribute("aria-expanded", "false");
-          await clickTurnHalf(2, "end");
+          await clickTurnRow(2, "end");
           await expect(toggle).toHaveAttribute("aria-expanded", "true");
           await browser.waitUntil(async () => section.execute((element) => {
             const viewport = document.querySelector('[data-testid="session-detail-scroll"]')!.getBoundingClientRect();

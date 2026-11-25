@@ -1656,15 +1656,15 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
           ) : activeTab === "timeline" ? (
             <div className="mx-auto max-w-5xl min-[1280px]:flex min-[1280px]:max-w-[77rem] min-[1280px]:gap-4">
               <nav
-                className="order-last hidden w-40 shrink-0 min-[1280px]:block"
+                className="order-last hidden w-52 shrink-0 min-[1280px]:block"
                 aria-label={t("sessions.detail.quick_navigation")}
               >
                 <div className="sticky top-5 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-border/60 bg-surface/95 p-2 shadow-sm backdrop-blur">
-                  <div className="flex items-center gap-1.5 px-2 pb-2 text-xs font-semibold text-muted-foreground">
-                    <List className="h-3.5 w-3.5" />
+                  <div className="mb-1.5 flex items-center gap-1.5 border-b border-border/60 px-2 pb-2 text-xs font-semibold text-muted-foreground">
+                    <List aria-hidden="true" className="h-3.5 w-3.5" />
                     {t("sessions.detail.quick_navigation")}
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {detail.turns.map((turn, index) => {
                       const turnKey = `${turn.turnId}-${index}`;
                       const { user, assistant } = navigationPreviews[index];
@@ -1672,31 +1672,27 @@ export const SessionDetailModal = memo(function SessionDetailModal({ session, is
                       return (
                         <div
                           key={turnKey}
-                          className={`relative block w-full rounded-md px-2 py-1.5 text-left transition ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                          className={`relative rounded-md ${isActive ? "bg-primary/10 text-primary before:pointer-events-none before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-primary" : "text-muted-foreground"}`}
                           aria-current={isActive ? "location" : undefined}
                         >
-                          <span className="line-clamp-3 min-h-12 whitespace-pre-wrap break-words text-xs font-medium" title={user}>
-                            {user ?? t("sessions.detail.turn", { id: index + 1 })}
-                          </span>
-                          {assistant ? (
-                            <span className="flex min-h-12 items-start gap-1.5">
-                              <Bot aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0" />
-                              <span className="line-clamp-3 min-w-0 whitespace-pre-wrap break-words text-xs" title={assistant}>{assistant}</span>
-                            </span>
-                          ) : null}
                           {(["start", "end"] as const).map((position) => {
-                            const preview = position === "end" ? assistant ?? user : user;
+                            const isStart = position === "start";
+                            const preview = isStart ? user : assistant;
+                            const accessiblePreview = preview ?? user;
+                            const label = t(`sessions.detail.navigate_to_turn_${position}`, { id: index + 1 });
+                            const DirectionIcon = isStart ? ArrowUpToLine : ArrowDownToLine;
                             return (
                               <button
                                 key={position}
                                 type="button"
-                                className={`group absolute inset-x-0 flex h-1/2 items-center justify-end px-1 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${position === "start" ? "top-0 rounded-t-md" : "bottom-0 rounded-b-md"}`}
-                                aria-label={`${t(`sessions.detail.navigate_to_turn_${position}`, { id: turn.turnId })}${preview ? `: ${preview}` : ""}`}
-                                title={t(`sessions.detail.navigate_to_turn_${position}`, { id: index + 1 })}
+                                className={`flex min-h-6 w-full items-center gap-1.5 px-2 text-left text-xs transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none ${isStart ? "rounded-t-md font-semibold" : "rounded-b-md"}`}
+                                aria-label={`${t(`sessions.detail.navigate_to_turn_${position}`, { id: turn.turnId })}${accessiblePreview ? `: ${accessiblePreview}` : ""}`}
+                                title={preview ? `${label}: ${preview}` : label}
                                 onClick={() => scrollToTurn(turnKey, position)}
                               >
-                                <span className="rounded bg-surface/95 p-0.5 text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" aria-hidden="true">
-                                  {position === "start" ? <ArrowUpToLine className="h-3.5 w-3.5" /> : <ArrowDownToLine className="h-3.5 w-3.5" />}
+                                <DirectionIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                                <span className={`min-w-0 truncate ${isStart && !isActive ? "text-foreground" : ""}`}>
+                                  {preview ?? (isStart ? t("sessions.detail.turn", { id: index + 1 }) : label)}
                                 </span>
                               </button>
                             );
