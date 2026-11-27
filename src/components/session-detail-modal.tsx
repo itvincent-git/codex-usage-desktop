@@ -41,6 +41,7 @@ const NESTED_TOOL_NAMES: Record<NestedActivity["kind"], string> = {
   command: "exec_command", terminal: "write_stdin", patch: "apply_patch", image: "view_image", webSearch: "web__run", webOpen: "web__run",
 };
 const DISCLOSURE_BUTTON_CLASS = "rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const ITEM_ACTION_BUTTON_CLASS = `flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`;
 const MarkdownContent = lazy(() => import("./markdown-content").then((module) => ({ default: module.MarkdownContent })));
 
 const ITEM_TONES = {
@@ -166,26 +167,28 @@ function TokenMetadata({ usage }: { usage: DisplayTokenUsageItem }) {
   );
 }
 
-function RawJsonlDisclosure({ rawJsonl }: { rawJsonl: string[] }) {
+function RawJsonlDisclosure({ rawJsonl, actions }: { rawJsonl: string[]; actions?: ReactNode }) {
   const { t } = useTranslation();
   const [isRawVisible, setIsRawVisible] = useState(false);
+  const hasRawJsonl = rawJsonl.length > 0;
 
-  if (rawJsonl.length === 0) return null;
+  if (!hasRawJsonl && !actions) return null;
 
   return (
     <div className="mt-2 w-full space-y-1">
-      <div className="flex justify-end">
-        <button
+      <div className="flex items-center justify-end gap-1">
+        {actions}
+        {hasRawJsonl ? <button
           type="button"
-          className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground ${DISCLOSURE_BUTTON_CLASS}`}
+          className={ITEM_ACTION_BUTTON_CLASS}
           aria-expanded={isRawVisible}
           onClick={() => setIsRawVisible((value) => !value)}
         >
           <FileJson className="h-3 w-3" />
           {isRawVisible ? t("sessions.detail.hide_item_raw_jsonl") : t("sessions.detail.show_item_raw_jsonl")}
-        </button>
+        </button> : null}
       </div>
-      {isRawVisible ? (
+      {hasRawJsonl && isRawVisible ? (
         <pre className="max-h-80 overflow-auto rounded-lg border border-border/60 bg-surface p-3 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
           {rawJsonl.join("\n")}
         </pre>
@@ -361,22 +364,22 @@ function AgentHierarchy({
   );
 }
 
-function SessionMarkdown({ text, preview = text }: { text: string; preview?: string }) {
+function MarkdownSourceButton({ showSource, onClick }: { showSource: boolean; onClick: () => void }) {
   const { t } = useTranslation();
-  const [showSource, setShowSource] = useState(false);
+  return (
+    <button type="button" className={ITEM_ACTION_BUTTON_CLASS} onClick={onClick}>
+      {showSource ? t("sessions.detail.show_rendered_markdown") : t("sessions.detail.show_raw_markdown")}
+    </button>
+  );
+}
+
+function SessionMarkdown({ text, showSource, preview = text }: { text: string; showSource: boolean; preview?: string }) {
   const source = <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{preview}</pre>;
 
   return (
-    <>
-      <div className="mb-1 flex justify-end">
-        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowSource((value) => !value)}>
-          {showSource ? t("sessions.detail.show_rendered_markdown") : t("sessions.detail.show_raw_markdown")}
-        </Button>
-      </div>
-      <SessionSearchText text={text}>
-        {showSource ? source : <Suspense fallback={source}><MarkdownContent content={preview} /></Suspense>}
-      </SessionSearchText>
-    </>
+    <SessionSearchText text={text}>
+      {showSource ? source : <Suspense fallback={source}><MarkdownContent content={preview} /></Suspense>}
+    </SessionSearchText>
   );
 }
 
@@ -384,13 +387,13 @@ function TextBlock({
   title,
   text,
   defaultCollapsed = false,
-  markdown = false,
+  showMarkdownSource,
   titleClassName = "text-muted-foreground",
 }: {
   title: string;
   text: string;
   defaultCollapsed?: boolean;
-  markdown?: boolean;
+  showMarkdownSource?: boolean;
   titleClassName?: string;
 }) {
   const { t } = useTranslation();
@@ -401,8 +404,8 @@ function TextBlock({
   return (
     <div className="py-2">
       <div className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${titleClassName}`}>{title}</div>
-      {markdown ? (
-        <SessionMarkdown text={text} preview={isFullVisible ? text : preview} />
+      {showMarkdownSource !== undefined ? (
+        <SessionMarkdown text={text} preview={isFullVisible ? text : preview} showSource={showMarkdownSource} />
       ) : (
         <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
           <SessionSearchText text={text}>{isFullVisible ? text : preview}</SessionSearchText>
@@ -427,6 +430,7 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
   const { t } = useTranslation();
   const isConversation = item.role === "user" || item.role === "assistant";
   const [isExpanded, setIsExpanded] = useSessionSearchExpansion(isConversation);
+  const [showSource, setShowSource] = useState(false);
   const toneKey = item.role === "user" || item.role === "assistant" || item.role === "developer" ? item.role : "system";
   const title = t(`sessions.detail.${toneKey}`);
 
@@ -436,7 +440,10 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
         type="button"
         className={`mb-2 flex w-full items-center justify-between gap-3 text-left text-xs font-medium text-muted-foreground ${DISCLOSURE_BUTTON_CLASS}`}
         aria-expanded={isExpanded}
-        onClick={() => setIsExpanded((value) => !value)}
+        onClick={() => {
+          if (isExpanded) setShowSource(false);
+          setIsExpanded((value) => !value);
+        }}
       >
         <span>{title}</span>
         <span className="flex flex-wrap items-center justify-end gap-3">
@@ -447,10 +454,13 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
         </span>
       </button>
       {isExpanded ? (
-        <SessionMarkdown text={item.text} />
+        <SessionMarkdown text={item.text} showSource={showSource} />
       ) : <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{buildCollapsedPreview(item.text, 3)}</p>}
       <div className="mt-2 flex justify-end"><CopyContentButton content={item.text} /></div>
-      <RawJsonlDisclosure rawJsonl={rawJsonl} />
+      <RawJsonlDisclosure
+        rawJsonl={rawJsonl}
+        actions={isExpanded ? <MarkdownSourceButton showSource={showSource} onClick={() => setShowSource((value) => !value)} /> : null}
+      />
     </article>
   );
 }
@@ -686,6 +696,7 @@ function NestedActivityItem({ activity }: { activity: NestedActivity }) {
 
 function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "toolCall" }>; questions: UserInputQuestion[]; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
   const { t } = useTranslation();
+  const [showSource, setShowSource] = useState(false);
   const answers = parseUserInputAnswers(item.output);
 
   return (
@@ -706,7 +717,7 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
             <section key={question.id} className="py-2">
               {question.header ? <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"><SessionSearchText text={question.header} /></div> : null}
               <div className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
-                <SessionMarkdown text={question.question} />
+                <SessionMarkdown text={question.question} showSource={showSource} />
               </div>
               {question.options.length > 0 ? <ol className="mt-3 space-y-2">
                 {question.options.map((option, index) => {
@@ -742,7 +753,7 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
           );
         })}
       </div>
-      <RawJsonlDisclosure rawJsonl={rawJsonl} />
+      <RawJsonlDisclosure rawJsonl={rawJsonl} actions={<MarkdownSourceButton showSource={showSource} onClick={() => setShowSource((value) => !value)} />} />
     </div>
   );
 }
@@ -1136,6 +1147,22 @@ function PatchItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, {
   );
 }
 
+function ReasoningItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem, { kind: "reasoning" }>; tokenUsage?: TokenUsageItem; rawJsonl: string[] }) {
+  const { t } = useTranslation();
+  const [showSource, setShowSource] = useState(false);
+
+  return (
+    <div className={`rounded-lg border p-3 text-muted-foreground ${ITEM_TONES.reasoning}`}>
+      <div className="mb-1 flex justify-end gap-2">
+        {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
+        <CopyContentButton content={item.text} />
+      </div>
+      <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} showMarkdownSource={showSource} titleClassName={ITEM_TITLE_TONES.reasoning} />
+      <RawJsonlDisclosure rawJsonl={rawJsonl} actions={<MarkdownSourceButton showSource={showSource} onClick={() => setShowSource((value) => !value)} />} />
+    </div>
+  );
+}
+
 function TimelineItem({ item, activity, tokenUsage, rawJsonlLines }: TimelineEntry & { rawJsonlLines: string[] }) {
   const { t } = useTranslation();
   const rawJsonl = [...(item.rawJsonlLineNumbers ?? []), ...(tokenUsage?.rawJsonlLineNumbers ?? [])]
@@ -1145,16 +1172,7 @@ function TimelineItem({ item, activity, tokenUsage, rawJsonlLines }: TimelineEnt
   if (item.kind === "message") {
     content = <MessageItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "reasoning") {
-    content = (
-      <div className={`rounded-lg border p-3 text-muted-foreground ${ITEM_TONES.reasoning}`}>
-        <div className="mb-1 flex justify-end gap-2">
-          {tokenUsage ? <TokenMetadata usage={tokenUsage} /> : null}
-          <CopyContentButton content={item.text} />
-        </div>
-        <TextBlock title={t("sessions.detail.reasoning_summary")} text={item.text} markdown titleClassName={ITEM_TITLE_TONES.reasoning} />
-        <RawJsonlDisclosure rawJsonl={rawJsonl} />
-      </div>
-    );
+    content = <ReasoningItem item={item} tokenUsage={tokenUsage} rawJsonl={rawJsonl} />;
   } else if (item.kind === "toolCall") {
     content = <><SearchSourceField field="sleep_tool" text={activity!.displayToolName} /><ToolCallItem item={item} activity={activity!} tokenUsage={tokenUsage} rawJsonl={rawJsonl} /></>;
   } else if (item.kind === "patch") {

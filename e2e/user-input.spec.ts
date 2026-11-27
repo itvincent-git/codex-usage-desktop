@@ -16,6 +16,7 @@ describe("session user input rendering", () => {
     const callId = "call_c1b878e6c86d4fcea9d32aeab086ca8a";
     const itemId = "fc_09eb5b3daf51cd25016ac75bd87b0c81979f6281800b28894e";
     const title = "当前代码的足球首页路径是 `/`（`/football` 已不再是首页路由）。这次我会测足球首页以及英超、曼城、一个有完整数据的球员详情页；如果你说的 `/football` 是比赛详情页，或有出现 250ms 的具体 URL、日志和机器配置，请补充。";
+    const secondQuestion = "Which **section**?";
     const reply = "## Reply heading\n\n- **First item**\n- `second item`";
     const summary = `**Reasoning preview**\n\n${"Review the details. ".repeat(110)}\n\n**Reasoning tail**`;
     const timestamp = "2026-10-08T09:01:15.757Z";
@@ -24,7 +25,7 @@ describe("session user input rendering", () => {
       { type: "session_meta", payload: { id, cwd: "/user-input-test" } },
       { type: "turn_context", payload: { turn_id: "question-turn", model: "gpt-5" } },
       { type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Check question rendering" }] } },
-      { type: "response_item", payload: { type: "function_call", id: itemId, name: "request_user_input_async", call_id: callId, arguments: JSON.stringify({ questions: [{ title }] }) } },
+      { type: "response_item", payload: { type: "function_call", id: itemId, name: "request_user_input_async", call_id: callId, arguments: JSON.stringify({ questions: [{ title }, { title: secondQuestion }] }) } },
       { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: '{"accepted":true}' } },
       { type: "response_item", payload: { type: "function_call", name: "functions.request_user_input_async", call_id: "choices", arguments: JSON.stringify({ questions: [{ title: "Which **page**?", options: ["Home", "Team"] }] }) } },
       { type: "response_item", payload: { type: "function_call_output", call_id: "choices", output: '{"accepted":true}' } },
@@ -68,10 +69,11 @@ describe("session user input rendering", () => {
       const renderedButton = 'button=Show rendered Markdown';
       await questionCard.$(sourceButton).click();
       await expect(questionCard.$('code=/football')).not.toBeExisting();
-      expect(await questionCard.$("pre").getProperty("textContent")).toBe(title);
+      expect(await questionCard.$$("pre").map((block) => block.getProperty("textContent"))).toEqual([title, secondQuestion]);
       await expect(dialog.$('strong=page')).toBeExisting();
       await questionCard.$(renderedButton).click();
       await expect(questionCard.$('code=/football')).toBeExisting();
+      await expect(questionCard.$('strong=section')).toBeExisting();
 
       const raw = questionCard.$('button=View raw JSONL');
       await raw.execute((element) => element.scrollIntoView({ block: "center" }));
@@ -98,6 +100,13 @@ describe("session user input rendering", () => {
       expect(await replyCard.$("pre").getProperty("textContent")).toBe(reply);
       await replyCard.$(renderedButton).click();
       await expect(replyCard.$('h2=Reply heading')).toBeExisting();
+
+      for (const itemCard of [questionCard, reasoningCard, replyCard]) {
+        const markdownLocation = await itemCard.$(sourceButton).getLocation();
+        const jsonlLocation = await itemCard.$('button=View raw JSONL').getLocation();
+        expect(markdownLocation.x).toBeLessThan(jsonlLocation.x);
+        expect(markdownLocation.y).toBe(jsonlLocation.y);
+      }
 
       await browser.keys("Escape");
       await dialog.waitForExist({ reverse: true });
