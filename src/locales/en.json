@@ -703,6 +703,8 @@
       "error": "Error",
       "show_full_text": "Show full text",
       "hide_full_text": "Hide full text",
+      "show_raw_markdown": "Show raw Markdown",
+      "show_rendered_markdown": "Show rendered Markdown",
       "show_item_raw_jsonl": "View raw JSONL",
       "hide_item_raw_jsonl": "Hide raw JSONL",
       "raw_preview": "Raw JSONL preview",

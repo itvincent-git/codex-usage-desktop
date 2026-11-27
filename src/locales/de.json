@@ -746,6 +746,8 @@
       "error": "Fehler",
       "show_full_text": "Vollständigen Text anzeigen",
       "hide_full_text": "Vollständigen Text ausblenden",
+      "show_raw_markdown": "Markdown-Quelltext anzeigen",
+      "show_rendered_markdown": "Gerendertes Markdown anzeigen",
       "show_item_raw_jsonl": "JSONL-Rohdaten anzeigen",
       "hide_item_raw_jsonl": "JSONL-Rohdaten ausblenden",
       "raw_preview": "Vorschau der JSONL-Rohdaten",

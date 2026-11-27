@@ -7,7 +7,7 @@ import type { SessionReplayDetail } from "../src/lib/api";
 describe("session user input rendering", () => {
   const run = process.env.CODEX_USAGE_ARCHIVE_E2E === "1" ? it : it.skip;
 
-  run("renders async questions through the native replay path and retains raw details", async () => {
+  run("renders async questions and lets each Markdown block show its source", async () => {
     const sessions = join(process.env.CODEX_HOME!, "sessions", "2026", "10", "08");
     mkdirSync(sessions, { recursive: true });
     const id = "01a11abd-cd00-7fd0-b1de-1c76bda0e681";
@@ -16,6 +16,8 @@ describe("session user input rendering", () => {
     const callId = "call_c1b878e6c86d4fcea9d32aeab086ca8a";
     const itemId = "fc_09eb5b3daf51cd25016ac75bd87b0c81979f6281800b28894e";
     const title = "当前代码的足球首页路径是 `/`（`/football` 已不再是首页路由）。这次我会测足球首页以及英超、曼城、一个有完整数据的球员详情页；如果你说的 `/football` 是比赛详情页，或有出现 250ms 的具体 URL、日志和机器配置，请补充。";
+    const reply = "## Reply heading\n\n- **First item**\n- `second item`";
+    const summary = `**Reasoning preview**\n\n${"Review the details. ".repeat(110)}\n\n**Reasoning tail**`;
     const timestamp = "2026-10-08T09:01:15.757Z";
     const usage = { input_tokens: 1000, cached_input_tokens: 200, output_tokens: 300, total_tokens: 1300 };
     writeFileSync(path, [
@@ -26,6 +28,8 @@ describe("session user input rendering", () => {
       { type: "response_item", payload: { type: "function_call_output", call_id: callId, output: '{"accepted":true}' } },
       { type: "response_item", payload: { type: "function_call", name: "functions.request_user_input_async", call_id: "choices", arguments: JSON.stringify({ questions: [{ title: "Which **page**?", options: ["Home", "Team"] }] }) } },
       { type: "response_item", payload: { type: "function_call_output", call_id: "choices", output: '{"accepted":true}' } },
+      { type: "response_item", payload: { type: "reasoning", summary: [{ type: "summary_text", text: summary }] } },
+      { type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: reply }] } },
       { type: "event_msg", payload: { type: "token_count", info: { total_token_usage: usage, last_token_usage: usage } } },
     ].map((entry) => JSON.stringify({ timestamp, ...entry })).join("\n"));
 
@@ -60,6 +64,15 @@ describe("session user input rendering", () => {
       expect(await dialog.getText()).not.toContain("request_user_input_async");
 
       const questionCard = question.$('./ancestor::div[contains(@class, "rounded-lg")][1]');
+      const sourceButton = 'button=Show raw Markdown';
+      const renderedButton = 'button=Show rendered Markdown';
+      await questionCard.$(sourceButton).click();
+      await expect(questionCard.$('code=/football')).not.toBeExisting();
+      expect(await questionCard.$("pre").getProperty("textContent")).toBe(title);
+      await expect(dialog.$('strong=page')).toBeExisting();
+      await questionCard.$(renderedButton).click();
+      await expect(questionCard.$('code=/football')).toBeExisting();
+
       const raw = questionCard.$('button=View raw JSONL');
       await raw.execute((element) => element.scrollIntoView({ block: "center" }));
       await raw.click();
@@ -68,6 +81,24 @@ describe("session user input rendering", () => {
       await hideRaw.execute((element) => element.scrollIntoView({ block: "center" }));
       await hideRaw.click();
       await expect(questionCard.$('pre')).not.toBeExisting();
+
+      const reasoningCard = dialog.$('div=Reasoning summary').$('./ancestor::div[contains(@class, "rounded-lg")][1]');
+      await expect(reasoningCard.$('strong=Reasoning preview')).toBeExisting();
+      await reasoningCard.$(sourceButton).click();
+      expect(await reasoningCard.$("pre").getProperty("textContent")).toBe(`${summary.slice(0, 1200)}...`);
+      await reasoningCard.$('button=Show full text').click();
+      expect(await reasoningCard.$("pre").getProperty("textContent")).toBe(summary);
+      await reasoningCard.$(renderedButton).click();
+      await expect(reasoningCard.$('strong=Reasoning tail')).toBeExisting();
+
+      const replyCard = dialog.$('span=Assistant').$('./ancestor::article[1]');
+      await expect(replyCard.$('h2=Reply heading')).toBeExisting();
+      await replyCard.$(sourceButton).click();
+      await expect(replyCard.$('h2=Reply heading')).not.toBeExisting();
+      expect(await replyCard.$("pre").getProperty("textContent")).toBe(reply);
+      await replyCard.$(renderedButton).click();
+      await expect(replyCard.$('h2=Reply heading')).toBeExisting();
+
       await browser.keys("Escape");
       await dialog.waitForExist({ reverse: true });
     } finally {

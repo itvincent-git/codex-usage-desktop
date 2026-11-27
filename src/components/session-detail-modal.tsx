@@ -361,6 +361,25 @@ function AgentHierarchy({
   );
 }
 
+function SessionMarkdown({ text, preview = text }: { text: string; preview?: string }) {
+  const { t } = useTranslation();
+  const [showSource, setShowSource] = useState(false);
+  const source = <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">{preview}</pre>;
+
+  return (
+    <>
+      <div className="mb-1 flex justify-end">
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setShowSource((value) => !value)}>
+          {showSource ? t("sessions.detail.show_rendered_markdown") : t("sessions.detail.show_raw_markdown")}
+        </Button>
+      </div>
+      <SessionSearchText text={text}>
+        {showSource ? source : <Suspense fallback={source}><MarkdownContent content={preview} /></Suspense>}
+      </SessionSearchText>
+    </>
+  );
+}
+
 function TextBlock({
   title,
   text,
@@ -383,9 +402,7 @@ function TextBlock({
     <div className="py-2">
       <div className={`mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${titleClassName}`}>{title}</div>
       {markdown ? (
-        <SessionSearchText text={text}><Suspense fallback={<pre className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{text}</pre>}>
-          <MarkdownContent content={isFullVisible ? text : preview} />
-        </Suspense></SessionSearchText>
+        <SessionMarkdown text={text} preview={isFullVisible ? text : preview} />
       ) : (
         <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
           <SessionSearchText text={text}>{isFullVisible ? text : preview}</SessionSearchText>
@@ -430,9 +447,7 @@ function MessageItem({ item, tokenUsage, rawJsonl }: { item: Extract<ReplayItem,
         </span>
       </button>
       {isExpanded ? (
-        <SessionSearchText text={item.text}><Suspense fallback={<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{item.text}</p>}>
-          <MarkdownContent content={item.text} />
-        </Suspense></SessionSearchText>
+        <SessionMarkdown text={item.text} />
       ) : <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{buildCollapsedPreview(item.text, 3)}</p>}
       <div className="mt-2 flex justify-end"><CopyContentButton content={item.text} /></div>
       <RawJsonlDisclosure rawJsonl={rawJsonl} />
@@ -691,9 +706,7 @@ function UserInputItem({ item, questions, tokenUsage, rawJsonl }: { item: Extrac
             <section key={question.id} className="py-2">
               {question.header ? <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"><SessionSearchText text={question.header} /></div> : null}
               <div className="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">
-                <Suspense fallback={question.question}>
-                  <SessionSearchText text={question.question}><MarkdownContent content={question.question} /></SessionSearchText>
-                </Suspense>
+                <SessionMarkdown text={question.question} />
               </div>
               {question.options.length > 0 ? <ol className="mt-3 space-y-2">
                 {question.options.map((option, index) => {

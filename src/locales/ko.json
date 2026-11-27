@@ -703,6 +703,8 @@
       "error": "오류",
       "show_full_text": "전체 텍스트 보기",
       "hide_full_text": "전체 텍스트 숨기기",
+      "show_raw_markdown": "원본 Markdown 표시",
+      "show_rendered_markdown": "렌더링된 Markdown 표시",
       "show_item_raw_jsonl": "원본 JSONL 보기",
       "hide_item_raw_jsonl": "원본 JSONL 숨기기",
       "raw_preview": "원본 JSONL 미리보기",

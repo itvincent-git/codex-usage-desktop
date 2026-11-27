@@ -710,6 +710,8 @@
       "error": "错误",
       "show_full_text": "显示全文",
       "hide_full_text": "收起全文",
+      "show_raw_markdown": "显示原始Markdown",
+      "show_rendered_markdown": "显示渲染后的 Markdown",
       "show_item_raw_jsonl": "查看原始 JSONL",
       "hide_item_raw_jsonl": "收起原始 JSONL",
       "raw_preview": "原始 JSONL 预览",

@@ -740,6 +740,8 @@
       "error": "エラー",
       "show_full_text": "全文を表示",
       "hide_full_text": "全文を隠す",
+      "show_raw_markdown": "Markdown のソースを表示",
+      "show_rendered_markdown": "レンダリングされた Markdown を表示",
       "show_item_raw_jsonl": "生の JSONL を表示",
       "hide_item_raw_jsonl": "生の JSONL を隠す",
       "raw_preview": "生の JSONL プレビュー",
