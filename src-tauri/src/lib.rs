@@ -6,6 +6,10 @@ mod codex_environment;
 mod codex_forecast;
 mod codex_limits;
 mod codex_projects;
+#[cfg(target_os = "macos")]
+mod desktop_widget;
+#[cfg(target_os = "macos")]
+mod widget_charts;
 mod codex_resets;
 mod date;
 mod db;
@@ -129,6 +133,8 @@ fn scan_usage_blocking(
         db::recalculate_daily_costs(&mut db, &pricing_source)?;
     }
     response.metrics.pricing_ms = pricing_started.elapsed().as_millis().max(pricing_ms);
+    #[cfg(target_os = "macos")]
+    desktop_widget::refresh(database_path, &response.timezone);
     Ok(response)
 }
 
@@ -202,7 +208,12 @@ fn refresh_usage_data_blocking(
     refresh_usage_data_with(
         force_limits,
         || scan_usage_blocking(database_path, pricing_cache_path),
-        || codex_limits::fetch_codex_limits(reuse_limits_since),
+        || {
+            let limits = codex_limits::fetch_codex_limits(reuse_limits_since)?;
+            #[cfg(target_os = "macos")]
+            desktop_widget::publish_quota(database_path, &limits);
+            Ok(limits)
+        },
     )
 }
 
@@ -365,7 +376,14 @@ async fn fetch_codex_limits(
     force: Option<bool>,
 ) -> Result<CodexLimitsResponse, String> {
     let reuse_since = (!force.unwrap_or(false)).then(codex_accounts::recent_status_cutoff);
-    let result = tauri::async_runtime::spawn_blocking(move || codex_limits::fetch_codex_limits(reuse_since))
+    #[cfg(target_os = "macos")]
+    let database_path = app.state::<AppState>().database_path.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let limits = codex_limits::fetch_codex_limits(reuse_since)?;
+        #[cfg(target_os = "macos")]
+        desktop_widget::publish_quota(&database_path, &limits);
+        Ok::<_, String>(limits)
+    })
         .await
         .map_err(|error| error.to_string())?;
     let _ = app.emit("codex-account-statuses-updated", ());

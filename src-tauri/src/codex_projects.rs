@@ -46,6 +46,12 @@ impl CodexProjectCatalog {
             .unwrap_or_default()
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn desktop_widget_project(&self, thread_id: &str) -> Option<(&str, &str)> {
+        let project = self.projects.get(self.assignments.get(thread_id)?)?;
+        Some((&project.id, &project.name))
+    }
+
     fn from_state(state: GlobalState) -> Self {
         let projects = state
             .local_projects
@@ -163,7 +169,7 @@ fn display_name(path: &str) -> String {
         .to_string()
 }
 
-fn rollout_thread_id(path: &Path) -> Option<&str> {
+pub(crate) fn rollout_thread_id(path: &Path) -> Option<&str> {
     let stem = path.file_stem()?.to_str()?;
     let id = stem.get(stem.len().checked_sub(THREAD_ID_LENGTH)?..)?;
     let bytes = id.as_bytes();
