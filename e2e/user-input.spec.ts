@@ -102,7 +102,9 @@ describe("session user input rendering", () => {
       await expect(replyCard.$('h2=Reply heading')).toBeExisting();
 
       for (const itemCard of [questionCard, reasoningCard, replyCard]) {
-        const markdownLocation = await itemCard.$(sourceButton).getLocation();
+        const markdownButton = itemCard.$(sourceButton);
+        await expect(markdownButton.$('svg[aria-hidden="true"]')).toBeDisplayed();
+        const markdownLocation = await markdownButton.getLocation();
         const jsonlLocation = await itemCard.$('button=View raw JSONL').getLocation();
         expect(markdownLocation.x).toBeLessThan(jsonlLocation.x);
         expect(markdownLocation.y).toBe(jsonlLocation.y);

@@ -7,7 +7,7 @@ import {
 } from "@/lib/session-conversation";
 import { lazy, memo, Suspense, useContext, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCcw, MessageSquare, Search, Terminal, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpToLine, Bot, Check, ChevronDown, ChevronRight, Clipboard, Clock3, CodeXml, Coins, Database, FileDiff, FileJson, FolderOpen, GitBranch, Info, List, Loader2, RefreshCcw, MessageSquare, Search, Terminal, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { fetchSessionDetail, rescanSession, revealInFileManager, type ScanResponse, type SessionDetailRow, type SessionReplayDetail } from "@/lib/api";
@@ -368,6 +368,7 @@ function MarkdownSourceButton({ showSource, onClick }: { showSource: boolean; on
   const { t } = useTranslation();
   return (
     <button type="button" className={ITEM_ACTION_BUTTON_CLASS} onClick={onClick}>
+      <CodeXml aria-hidden="true" className="h-3 w-3" />
       {showSource ? t("sessions.detail.show_rendered_markdown") : t("sessions.detail.show_raw_markdown")}
     </button>
   );
