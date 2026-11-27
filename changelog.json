@@ -1,4 +1,8 @@
 {
+  "7.3.0": {
+    "zh": "- chore(homebrew): update cask to 7.2.0\n- fix(tray): sync current account quota with sidebar\n- feat(sessions): add raw Markdown view\n- fix(sessions): align Markdown and JSONL controls\n- fix(sessions): add icon to Markdown toggle\n- chore: add allowBuilds for edgedriver & geckodriver",
+    "en": "- chore(homebrew): update cask to 7.2.0\n- fix(tray): sync current account quota with sidebar\n- feat(sessions): add raw Markdown view\n- fix(sessions): align Markdown and JSONL controls\n- fix(sessions): add icon to Markdown toggle\n- chore: add allowBuilds for edgedriver & geckodriver"
+  },
   "7.2.0": {
     "zh": "- chore(homebrew): update cask to 7.1.0\n- fix(limits): skip Codex apps and plugins during activation\n- fix: compact sidebar quota refresh warnings\n- fix: show assistant replies in session quick navigation\n- fix: simplify session quick navigation\n- fix: keep turn selection stable during navigation",
     "en": "- chore(homebrew): update cask to 7.1.0\n- fix(limits): skip Codex apps and plugins during activation\n- fix: compact sidebar quota refresh warnings\n- fix: show assistant replies in session quick navigation\n- fix: simplify session quick navigation\n- fix: keep turn selection stable during navigation"
