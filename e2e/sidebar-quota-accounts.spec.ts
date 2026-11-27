@@ -2,6 +2,7 @@ import { $, browser, expect } from "@wdio/globals";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AccountList, LoginTask } from "../src/lib/codex-accounts";
+import type { TrayPopoverData } from "../src/lib/tray-popover";
 import { accountCredentials } from "./fixtures/codex-accounts";
 
 function invoke<T>(command: string, args: Record<string, unknown> = {}) {
@@ -64,6 +65,7 @@ describe("sidebar quota accounts", () => {
       localStorage.setItem("language", "en");
       localStorage.setItem("sidebar_width", "160");
       localStorage.setItem("sidebar_collapsed", "false");
+      localStorage.removeItem("tray_menu_show");
     });
     await browser.refresh();
     const sidebar = $(".sidebar-limits");
@@ -75,6 +77,13 @@ describe("sidebar quota accounts", () => {
     const fiveHour = sidebar.$('[data-testid="limit-row-5-hour"]');
     const weekly = sidebar.$('[data-testid="limit-row-weekly"]');
     const monthly = sidebar.$('[data-testid="limit-row-monthly"]');
+    const assertTrayQuota = async (user: string, remaining: number) => {
+      await browser.waitUntil(async () => {
+        const tray = await invoke<TrayPopoverData | null>("get_tray_popover");
+        return tray?.account === `${user}@example.test`
+          && tray.quotas.find(({ kind }) => kind === "5h")?.remainingPercent === remaining;
+      }, { timeoutMsg: `Expected the tray to show ${remaining}% for ${user}` });
+    };
     const assertAccount = async (user: string) => {
       await expect(identity.$(`span[title="${user}@example.test"]`)).toBeDisplayed();
     };
@@ -104,6 +113,7 @@ describe("sidebar quota accounts", () => {
       await assertSwitchRow("alice", true);
       await expect(identity).toHaveText(expect.stringContaining("Current"));
       await expect(fiveHour).toHaveText(expect.stringContaining("80%"));
+      await assertTrayQuota("alice", 80);
       await expect(activate).toBeDisplayed();
       await expect($(".accounts-page")).not.toExist();
 
@@ -123,6 +133,7 @@ describe("sidebar quota accounts", () => {
       await expect(aliceRefresh).toBeDisabled();
       await control({ holdAliceUsage: false });
       await expect(fiveHour).toHaveText(expect.stringContaining("65%"));
+      await assertTrayQuota("alice", 65);
       await expect(aliceMeter).toHaveAttribute("aria-valuenow", "65");
       expect((await control())[aliceUsage]).toBe(initialAliceRequests + 1);
 
@@ -130,6 +141,7 @@ describe("sidebar quota accounts", () => {
       await aliceRefresh.click();
       await expect(aliceMeter).toHaveAttribute("aria-valuenow", "80");
       await expect(fiveHour).toHaveText(expect.stringContaining("80%"));
+      await assertTrayQuota("alice", 80);
       expect((await control())[aliceUsage]).toBe(initialAliceRequests + 2);
       await $('[data-testid="dashboard-nav-tab"]').click();
 
@@ -142,6 +154,7 @@ describe("sidebar quota accounts", () => {
       await assertAccount("bob");
       await expect(fiveHour).toHaveText(expect.stringContaining("25%"));
       await expect(weekly).toHaveText(expect.stringContaining("60%"));
+      await assertTrayQuota("alice", 80);
       await expect(activate).not.toExist();
 
       await $('button[aria-label="Collapse sidebar"]').click();
@@ -190,6 +203,7 @@ describe("sidebar quota accounts", () => {
       await expect($('[role="dialog"][aria-label="Update failed"]')).toHaveText(expect.stringContaining("Last success:"));
       await browser.keys("Escape");
       await expect(fiveHour).toHaveText(expect.stringContaining("55%"));
+      await assertTrayQuota("alice", 80);
 
       writeFileSync(process.env.CODEX_USAGE_ACCOUNTS_LOGIN_AUTH!, JSON.stringify(accountCredentials("charlie")));
       await login(null);

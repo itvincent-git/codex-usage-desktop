@@ -80,6 +80,7 @@ export default function App() {
     overview,
     monthlyUsage,
     codexLimits,
+    currentQuota,
     codexLimitsError,
     isLimitsRefreshing,
     isWindowActivating,
@@ -144,7 +145,7 @@ export default function App() {
     handleTrayMenuShowChange,
     trayCountdownUnits,
     handleTrayCountdownUnitChange,
-  } = useUsageDashboard(sessionTabs.tabs.length > 0);
+  } = useUsageDashboard(accounts.list, sessionTabs.tabs.length > 0);
 
   const activeSessionId = view === "settings" ? null : sessionTabs.selectedId;
   const showSessionTabs = view !== "settings" && sessionTabs.tabs.length > 0;
@@ -327,7 +328,7 @@ export default function App() {
               selectedId={selectedQuotaAccountId}
               onSelect={setSelectedQuotaAccountId}
               compact={sidebarCollapsed}
-              limits={codexLimits}
+              currentQuota={currentQuota}
               error={codexLimitsError}
               isLimitsRefreshing={isLimitsRefreshing || isLimitsLoading}
               isWindowActivating={isWindowActivating}
@@ -659,7 +660,7 @@ export default function App() {
               onTrayMenuShowChange={handleTrayMenuShowChange}
               trayCountdownUnits={trayCountdownUnits}
               onTrayCountdownUnitChange={handleTrayCountdownUnitChange}
-              codexLimits={codexLimits}
+              codexLimits={currentQuota.limits}
             />
           ) : null}
 

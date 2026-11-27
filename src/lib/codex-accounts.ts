@@ -23,6 +23,28 @@ export type LoginTask = {
   authorizationUrl: string | null; deviceCode: string | null; accountId: string | null; error: string | null;
 };
 
+export function getAccountQuota(account: CodexAccount | null | undefined) {
+  const snapshot = account?.status;
+  const status = snapshot && account && snapshot.accountId === account.id
+    && snapshot.identity.userId === account.identity.userId && snapshot.identity.workspaceId === account.identity.workspaceId
+    && snapshot.credentialVersion <= account.credentialVersion ? snapshot : null;
+  const updatedAt = status?.updatedAt.limits;
+  const cached = status?.data;
+  const limits = cached && (updatedAt || cached.session || cached.weekly) ? { ...cached, updatedAt: updatedAt ?? cached.updatedAt } : null;
+  return { status, limits };
+}
+
+export function getCurrentCodexQuota(list: AccountList | null, live: CodexLimitsResponse | null) {
+  const current = list?.accounts.find((account) => account.current && account.authMode !== "apikey"
+    && account.credentialVersion === list.currentCredentialVersion);
+  const { status, limits: cached } = getAccountQuota(current);
+  const matches = !list || !live?.authContext || live.authContext === list.authContext;
+  const liveLimits = matches ? live : null;
+  const newerLive = !!liveLimits && (!cached || Date.parse(liveLimits.updatedAt) > Date.parse(cached.updatedAt));
+  const showLive = newerLive || !!liveLimits && liveLimits.updatedAt === cached?.updatedAt;
+  return { status, limits: showLive ? liveLimits : cached, newerLive, showLive };
+}
+
 export const listCodexAccounts = () => invoke<AccountList>("list_codex_accounts");
 export const importCurrentCodexAccount = () => invoke<string>("import_current_codex_account");
 export const fetchCodexAccountStatus = (accountId: string, reuseRecent: boolean) =>

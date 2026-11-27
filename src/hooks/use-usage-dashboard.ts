@@ -1,9 +1,9 @@
-import { currentCodexAuthContext } from "@/lib/codex-accounts";
+import { currentCodexAuthContext, getCurrentCodexQuota, type AccountList } from "@/lib/codex-accounts";
 import { useCodexForecast } from "@/hooks/use-codex-forecast";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   activateCodexWindow,
@@ -122,13 +122,15 @@ function toUpdateProgressState(progress: UpdateDownloadProgress): UpdateProgress
   };
 }
 
-export function useUsageDashboard(keepSessionsCurrent = false) {
+export function useUsageDashboard(accountList: AccountList | null, keepSessionsCurrent = false) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<DashboardView>("dashboard");
   const [range, setRange] = useState<RangeKey>("30d");
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [monthlyUsage, setMonthlyUsage] = useState<MonthlyUsageResponse | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexLimitsResponse | null>(null);
+  const currentQuota = useMemo(() => getCurrentCodexQuota(accountList, codexLimits), [accountList, codexLimits]);
+  const trayLimits = currentQuota.limits;
   const [codexLimitsError, setCodexLimitsError] = useState<string | null>(null);
   const [isLimitsRefreshing, setIsLimitsRefreshing] = useState(false);
   const [isWindowActivating, setIsWindowActivating] = useState(false);
@@ -802,7 +804,7 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
     const todayTokensLabel = formatTrayTokens(todayTokens);
     const todayCost = todayRow ? todayRow.costUSD : 0;
 
-    const hasSub = hasSubscription(codexLimits);
+    const hasSub = hasSubscription(trayLimits);
 
     const titleParts: string[] = [];
     const indicators: TrayQuotaIndicator[] = [];
@@ -814,17 +816,17 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
       });
     };
     if (hasSub) {
-      if (trayTitleShow.limit5h && codexLimits?.session) {
-        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limit5h, codexLimits.session, trayCountdownUnits));
-        addIndicator(codexLimits.session, "5h");
+      if (trayTitleShow.limit5h && trayLimits?.session) {
+        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limit5h, trayLimits.session, trayCountdownUnits));
+        addIndicator(trayLimits.session, "5h");
       }
       if (trayTitleShow.limitWeekly) {
-        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limitWeekly, codexLimits?.weekly, trayCountdownUnits));
-        addIndicator(codexLimits?.weekly, "weekly");
+        titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limitWeekly, trayLimits?.weekly, trayCountdownUnits));
+        addIndicator(trayLimits?.weekly, "weekly");
       }
     } else {
       if (trayTitleShow.limit5h || trayTitleShow.limitWeekly) {
-        const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
+        const activeWindow = trayLimits?.weekly ?? trayLimits?.session;
         titleParts.push(formatTrayLimitTitle(TRAY_TITLE_TEMPLATES.limitMonthly, activeWindow, trayCountdownUnits));
         addIndicator(activeWindow, "monthly");
       }
@@ -841,32 +843,32 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
 
     const items: TrayMenuItemDto[] = [];
 
-    if (codexLimits?.account) {
-      items.push({ id: "account", text: `${t("settings.menu_bar_account")}: ${codexLimits.account}`, enabled: false });
+    if (trayLimits?.account) {
+      items.push({ id: "account", text: `${t("settings.menu_bar_account")}: ${trayLimits.account}`, enabled: false });
     }
-    if (codexLimits?.membershipLevel) {
-      items.push({ id: "membership", text: `${t("settings.menu_bar_membership")}: ${codexLimits.membershipLevel}`, enabled: false });
+    if (trayLimits?.membershipLevel) {
+      items.push({ id: "membership", text: `${t("settings.menu_bar_membership")}: ${trayLimits.membershipLevel}`, enabled: false });
     }
-    if (codexLimits?.workspaceName) {
-      items.push({ id: "workspace", text: `${t("settings.menu_bar_workspace")}: ${codexLimits.workspaceName}`, enabled: false });
+    if (trayLimits?.workspaceName) {
+      items.push({ id: "workspace", text: `${t("settings.menu_bar_workspace")}: ${trayLimits.workspaceName}`, enabled: false });
     }
     const accountItemCount = items.length;
 
     if (hasSub) {
-      if (trayMenuShow.limit5h && codexLimits?.session) {
-        const text = `${t("limits.window_5hour")}: ${Math.round(codexLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.session.usedPercent)}%); ${formatResetTime(codexLimits.session.resetsAt, codexLimits.session.windowMinutes, t)}`;
+      if (trayMenuShow.limit5h && trayLimits?.session) {
+        const text = `${t("limits.window_5hour")}: ${Math.round(trayLimits.session.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(trayLimits.session.usedPercent)}%); ${formatResetTime(trayLimits.session.resetsAt, trayLimits.session.windowMinutes, t)}`;
         items.push({ id: "status_5h", text, enabled: false });
       }
 
       if (trayMenuShow.limitWeekly) {
-        const text = codexLimits?.weekly
-          ? `${t("limits.window_weekly")}: ${Math.round(codexLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(codexLimits.weekly.usedPercent)}%); ${formatResetTime(codexLimits.weekly.resetsAt, codexLimits.weekly.windowMinutes, t)}`
+        const text = trayLimits?.weekly
+          ? `${t("limits.window_weekly")}: ${Math.round(trayLimits.weekly.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(trayLimits.weekly.usedPercent)}%); ${formatResetTime(trayLimits.weekly.resetsAt, trayLimits.weekly.windowMinutes, t)}`
           : `${t("limits.window_weekly")}: ${t("limits.unavailable")}`;
         items.push({ id: "status_weekly", text, enabled: false });
       }
     } else {
       if (trayMenuShow.limit5h || trayMenuShow.limitWeekly) {
-        const activeWindow = codexLimits?.weekly ?? codexLimits?.session;
+        const activeWindow = trayLimits?.weekly ?? trayLimits?.session;
         const text = activeWindow
           ? `${t("limits.window_monthly")}: ${Math.round(activeWindow.remainingPercent)}% ${t("limits.remaining")} (${t("limits.consumed")}: ${Math.round(activeWindow.usedPercent)}%)`
           : `${t("limits.window_monthly")}: ${t("limits.unavailable")}`;
@@ -914,10 +916,10 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
       });
     };
     if (hasSub) {
-      if (trayMenuShow.limit5h && codexLimits?.session) addQuota("5h", codexLimits.session);
-      if (trayMenuShow.limitWeekly) addQuota("weekly", codexLimits?.weekly);
+      if (trayMenuShow.limit5h && trayLimits?.session) addQuota("5h", trayLimits.session);
+      if (trayMenuShow.limitWeekly) addQuota("weekly", trayLimits?.weekly);
     } else if (trayMenuShow.limit5h || trayMenuShow.limitWeekly) {
-      addQuota("monthly", codexLimits?.weekly ?? codexLimits?.session);
+      addQuota("monthly", trayLimits?.weekly ?? trayLimits?.session);
     }
 
     void updateTray({
@@ -926,9 +928,9 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
       indicators,
       metrics,
       popover: {
-        account: codexLimits?.account ?? null,
-        membership: codexLimits?.membershipLevel ?? null,
-        workspace: codexLimits?.workspaceName ?? null,
+        account: trayLimits?.account ?? null,
+        membership: trayLimits?.membershipLevel ?? null,
+        workspace: trayLimits?.workspaceName ?? null,
         quotas,
         tokens: trayMenuShow.tokens ? { value: todayTokensLabel, exact: formatNumber(todayTokens) } : null,
         cost: trayMenuShow.cost ? formatCurrency(todayCost) : null,
@@ -948,7 +950,7 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
     });
   }, [
     bootstrapped,
-    codexLimits,
+    trayLimits,
     overview,
     trayTitleShow,
     trayMenuShow,
@@ -1267,6 +1269,7 @@ export function useUsageDashboard(keepSessionsCurrent = false) {
     overview,
     monthlyUsage,
     codexLimits,
+    currentQuota,
     codexLimitsError,
     isLimitsRefreshing,
     isWindowActivating,
